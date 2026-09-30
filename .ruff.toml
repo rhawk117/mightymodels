@@ -1,14 +1,16 @@
-required-version = ">=0.16.5"
-target-version = "py314"
 line-length = 100
 indent-width = 4
 src = ["plugins"]
-exclude = ["plugins/**/assets/*.template.py"]
+extend-exclude = [
+    "plugins/**/assets/*.template.py",
+    "plugins/**/assets/template/**",
+    "plugins/ai-engineer/bin/**",
+]
+per-file-target-version = { "plugins/*/skills/**" = "py312" }
 force-exclude = true
 show-fixes = true
 unsafe-fixes = true
 fix = true
-output-prefer-rule-codes = true
 
 [lint]
 preview = true
@@ -44,7 +46,6 @@ extend-select = [
     "PYI",
     "RET",
     "RSE",
-    "RUF",
     "S",
     "SIM",
     "SLF",

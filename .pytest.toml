@@ -1,6 +1,7 @@
 [pytest]
 strict = true
 testpaths = ["tests", "plugins"]
+pythonpath = ["plugins/ai-engineer/bin"]
 collect_imported_tests = false
 empty_parameter_set_mark = "fail_at_collect"
 

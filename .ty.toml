@@ -7,6 +7,11 @@ root = ["plugins"]
 include = ["plugins"]
 respect-ignore-files = true
 exclude-scripts = true
+exclude = [
+    "plugins/**/assets/*.template.py",
+    "plugins/**/assets/template/**",
+    "plugins/ai-engineer/bin/**",
+]
 
 [analysis]
 respect-type-ignore-comments = true
