@@ -3,7 +3,9 @@ name = "rygentic-harness-plugins"
 version = "0.1.0"
 description = "The Claude Code plugin marketplace for my custom agentic tooling and harnessing"
 readme = "README.md"
-authors = [{ name = "rhawk117", email = "hawkinsry19@gmail.com" }]
+authors = [
+    { name = "rhawk117", email = "noplaceLike127dot0dot0dot1@proton.me" },
+]
 requires-python = ">=3.14"
 repository = "https://github.com/rhawk117/rygentic-harness"
 dependencies = []
@@ -11,7 +13,6 @@ dependencies = []
 
 [dependency-groups]
 check = [
-    "check-jsonschema>=0.38.2",
     "mdformat>=1.0.0",
     "mdformat-frontmatter>=2.1.2",
     "pre-commit>=4.6.2",
@@ -30,9 +31,6 @@ dev = [{ include-group = "check" }, { include-group = "test" }]
 
 [tool.uv]
 default-groups = ['dev']
-# workspace = { members = ['plugins/mightymodels', 'plugins/ai-engineer'] }
 
-
-[tool.uv.sources]
-# mightymodels-plugin = { workspace = true }
-# ai-engineer-plugin = { workspace = true }
+[tool.uv.workspace]
+members = ["plugins/mightymodels", "plugins/ai-engineer"]

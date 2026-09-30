@@ -14,7 +14,7 @@ main() {
   log::step_end
 
   log::step "syncing dependency groups"
-  uv sync --all-groups
+  uv sync --all-packages --all-groups
   log::step_end
 
   log::success "development environment setup"

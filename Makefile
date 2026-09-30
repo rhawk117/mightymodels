@@ -8,7 +8,7 @@ help: ## Show available targets
 setup: ## Prepare the checkout and install the pre-commit hook
 	./scripts/setup.sh
 sync: ## Synchronize locked root dependencies
-	$(UV) sync --locked --group check
+	$(UV) sync --locked --all-packages --group check
 	$(UV) lock --check
 format: ## Apply repository formatters
 	./scripts/quality.sh --format
