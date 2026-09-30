@@ -46,7 +46,7 @@ repos:
 
       - id: quality
         name: quality
-        entry: scripts/quality.sh
+        entry: scripts/quality.sh --lint
         language: system
         pass_filenames: false
         always_run: true

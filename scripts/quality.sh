@@ -3,13 +3,8 @@
 set -uo pipefail
 shopt -s globstar
 
-readonly MARKETPLACE='sre-copilot-marketplace-plugin'
 readonly RUFF_CONFIG=(--config .ruff.toml --force-exclude)
-readonly AGENT_PLUGINS_SCHEMA='agent-plugins.org/schemas/'
-readonly LEGACY_PATHS=(
-  SKILL.md agents hooks.json hooks/hooks.json .mcp.json .github/mcp.json
-  lsp.json .github/lsp.json
-)
+readonly MARKDOWN_GLOBS=(plugins/**/*.md docs/**/*.md)
 
 repository_root=$(git rev-parse --show-toplevel) || exit 1
 cd "${repository_root}" || exit 1
@@ -29,68 +24,57 @@ run() {
   }
 }
 
+usage() {
+  printf 'usage: %s [--format | --lint]\n' "${0##*/}" >&2
+}
+
 run_formatter() {
   run 'Ruff Format' uv run ruff format "${RUFF_CONFIG[@]}" .
   run 'Ruff Fix' uv run ruff check "${RUFF_CONFIG[@]}" --fix-only --unsafe-fixes .
-  run 'Markdown Format' uv run mdformat plugins/**/*.md doc/**/*.md
+  run 'Markdown Format' uv run mdformat "${MARKDOWN_GLOBS[@]}"
 }
 
 run_linter() {
-  local pyproject
+  local plugin
 
   run 'Ruff Format Check' uv run ruff format "${RUFF_CONFIG[@]}" --check .
-  run 'Ruff Check' uv run ruff check "${RUFF_CONFIG[@]}" .
-  run 'Markdown Check' uv run mdformat --check plugins/**/*.md doc/**/*.md
+  run 'Ruff Check' uv run ruff check "${RUFF_CONFIG[@]}" --no-fix .
+  run 'Markdown Check' uv run mdformat --check "${MARKDOWN_GLOBS[@]}"
 
-  for pyproject in plugins/*/pyproject.toml; do
-    lint_python_plugin "${pyproject%/pyproject.toml}"
-  done
+  run 'ty (3.14)' uv run ty check --config-file .ty.toml
+  run 'ty (3.12 skills)' uv run ty check --config-file .ty.toml \
+    --python-version 3.12 plugins/mightymodels/skills plugins/ai-engineer/skills
+  run 'pytest' uv run pytest
 
-  run 'Plugin Schema' uv run check-jsonschema \
-    --schemafile schemas/plugin.schema.json plugins/*/plugin.json
-  run 'Marketplace Schema' uv run check-jsonschema \
-    --schemafile schemas/marketplace.schema.json .github/plugin/marketplace.json
-
-  lint_copilot_plugins
-}
-
-lint_python_plugin() {
-  local plugin=$1
-  local name=${plugin#plugins/}
-
-  run "[${name}] ty" uv run --project "${plugin}" --frozen --group check \
-    ty check --config-file ty.toml --config "environment.root=[\"${plugin}\"]" \
-    --config "src.include=[\"${plugin}/src\"]" --no-progress "${plugin}/src"
-  run "[${name}] pytest" uv run --project "${plugin}" --frozen --group check \
-    pytest "${plugin}" -q
-}
-
-lint_copilot_plugins() {
-  local manifest
-
-  if ! command -v copilot >/dev/null; then
-    log::error 'copilot not on PATH: npm install --global @github/copilot'
-    FAILURES+=('Copilot CLI')
+  if ! command -v claude >/dev/null; then
+    log::error 'claude not on PATH: npm install -g @anthropic-ai/claude-code'
+    FAILURES+=('Claude CLI')
     return
   fi
 
-  COPILOT_SANDBOX=$(mktemp -d)
-  trap 'rm -rf -- "${COPILOT_SANDBOX}"' EXIT
-  trap 'exit 129' HUP
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
-
-  run '[copilot] marketplace add' sandboxed_copilot plugin marketplace add "${PWD}" || return
-
-  for manifest in plugins/*/plugin.json; do
-    verify_plugin "${manifest%/plugin.json}"
+  for plugin in plugins/*/; do
+    run "[${plugin#plugins/}] plugin validate" claude plugin validate --strict "${plugin}"
   done
+  run '[root] plugin validate' claude plugin validate --strict .
 }
 
-sandboxed_copilot() {
-  COPILOT_HOME=${COPILOT_SANDBOX} copilot "$@"
-}
+case "${1:-}" in
+  --format) run_formatter ;;
+  --lint) run_linter ;;
+  '')
+    run_formatter
+    run_linter
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
 
-verify_plugin() {
-  local plugin=$1
-  local name=${plugin#plugins/}
+if ((${#FAILURES[@]} > 0)); then
+  log::error 'quality checks failed:'
+  printf '  - %s\n' "${FAILURES[@]}" >&2
+  exit 1
+fi
+
+log::success 'quality checks passed'
