@@ -5,7 +5,4 @@ __pycache__/
 .venv/
 dist/
 *.egg-info/
-evals/fixtures/
-evals/staging/
 .coverage
-node_modules/

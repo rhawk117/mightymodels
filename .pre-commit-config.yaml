@@ -1,37 +1,53 @@
-# Hook scripts run under any Python >= 3.12 (they are stdlib-only); the
-# package itself targets 3.14. Install with scripts/precheck.sh.
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+
+      - id: check-case-conflict
+
+      - id: check-json
+
+      - id: check-toml
+
+      - id: end-of-file-fixer
+
+      - id: forbid-submodules
+
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-toml
-      - id: check-json
-      - id: check-merge-conflict
-      - id: check-added-large-files
-      - id: mixed-line-ending
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.0
-    hooks:
-      - id: ruff-check
-        args: [--fix]
-      - id: ruff-format
-
-  - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.18.1
-    hooks:
-      - id: markdownlint-cli2
+        exclude: ^plugins/[^/]+/dist/server\.mjs$
 
   - repo: local
     hooks:
-      - id: skills-prompt-injection-scan
-        name: prompt-injection scan (skills + agents)
-        entry: bash scripts/security.sh
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --config .ruff.toml --force-exclude
+        language: system
+        types: [python]
+        pass_filenames: true
+        stages: [pre-commit]
+
+      - id: mdformat
+        name: mdformat
+        entry: uv run mdformat
+        language: system
+        types: [markdown]
+        pass_filenames: true
+        stages: [pre-commit]
+
+      - id: quality
+        name: quality
+        entry: scripts/quality.sh
         language: system
         pass_filenames: false
-        files: ^(skills|agents)/
-
+        always_run: true
+        require_serial: true
