@@ -6,7 +6,7 @@ extend-exclude = [
     "plugins/**/assets/template/**",
     "plugins/ai-engineer/bin/**",
 ]
-per-file-target-version = { "plugins/*/skills/**" = "py312" }
+per-file-target-version = { "plugins/*/skills/**" = "py312", "plugins/ai-engineer/src/**" = "py312", "plugins/ai-engineer/tests/**" = "py312" }
 force-exclude = true
 show-fixes = true
 unsafe-fixes = true
