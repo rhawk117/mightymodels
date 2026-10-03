@@ -41,12 +41,7 @@ def check_rule_file(path: Path) -> list[Finding]:
     if not path.is_file():
         message = f'{path} is not a file or a directory'
         raise CannotCheckError(message)
-    return check_rule(read_text(path))
-
-
-def check_rule(text: str) -> list[Finding]:
-    """The checks on one rule file: the built-in opens none of them."""
-    rule = parse_skill_text(text)
+    rule = parse_skill_text(read_text(path))
     return [*check_frontmatter(rule), *check_body(rule.body)]
 
 
@@ -56,6 +51,6 @@ def audit_project(root: Path) -> list[Finding]:
         Finding(finding.level, f'{entry.relative}: {finding.message}')
         for entry in files
         if not entry.always_on
-        for finding in check_rule(entry.text)
+        for finding in check_frontmatter(parse_skill_text(entry.text))
     ]
     return [*rule_findings, *audit_files(files, root)]

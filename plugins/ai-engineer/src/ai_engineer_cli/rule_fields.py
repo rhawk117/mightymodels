@@ -11,12 +11,7 @@ MAX_EXPANDED_PATTERNS = 1000
 def check_frontmatter(rule: SkillText) -> list[Finding]:
     """Frontmatter checks for a rule file; `paths` is the only field Claude Code reads."""
     if rule.yaml_problem is not None:
-        return [
-            error(
-                f'frontmatter is not valid YAML ({rule.yaml_problem}); '
-                'Claude Code ignores it and loads the rule as if it had no paths'
-            )
-        ]
+        return [error(f'frontmatter is not valid YAML ({rule.yaml_problem})')]
     if not rule.fields or 'paths' not in rule.fields:
         return []
     return check_paths(paths_of(rule.fields['paths']))

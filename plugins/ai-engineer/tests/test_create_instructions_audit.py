@@ -48,21 +48,45 @@ def test_clean_fixture_passes_with_only_an_info_finding(
 
 
 def test_dirty_fixture_exits_one(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    code, out = audit(fixture_copy(tmp_path, 'dirty'), capsys)
+    code, out = audit(fixture_copy(tmp_path, 'dirty'), capsys, '--strict')
 
     assert code == 1
     assert out.splitlines()[-1].startswith('FAIL dirty: ')
 
 
-def test_directory_runs_the_rule_checks_on_every_rule(
+def test_directory_runs_the_frontmatter_checks_on_every_rule(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root = project(tmp_path, {'.claude/rules/a/b.md': '# no sections\n', 'CLAUDE.md': '# Hi\n'})
+    root = project(tmp_path, {'.claude/rules/a/b.md': '---\npaths:\n---\n# Rule\n'})
 
     code, out = audit(root, capsys)
 
     assert code == 1
-    assert 'error: .claude/rules/a/b.md: required section <scope> is missing' in out
+    assert 'error: .claude/rules/a/b.md: paths is empty' in out
+
+
+def test_directory_does_not_run_the_body_checks_on_a_docs_shaped_rule(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rule = '---\npaths:\n  - "src/**/*.py"\n---\n# Python\n\n- Use type hints.\n'
+    root = project(tmp_path, {'.claude/rules/py.md': rule, 'CLAUDE.md': '# Hi\n'})
+
+    code, out = audit(root, capsys)
+
+    assert code == 0
+    assert 'required section' not in out
+
+
+def test_file_mode_runs_the_body_checks_on_a_docs_shaped_rule(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    docs_shaped = '---\npaths:\n  - "src/**/*.py"\n---\n# Python\n\n- Use type hints.\n'
+    rule = project(tmp_path, {'py.md': docs_shaped}) / 'py.md'
+
+    code = main(['create-instructions', 'validate', str(rule)])
+
+    assert code == 1
+    assert 'error: required section <scope> is missing' in capsys.readouterr().out
 
 
 def test_directory_does_not_run_the_rule_checks_on_claude_md(
