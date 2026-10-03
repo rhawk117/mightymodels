@@ -1,6 +1,6 @@
 # Configuration smell catalog
 
-Six smells, from a June 2026 mining study of 100 top-starred repositories carrying an
+Six smells, with prevalence figures from external studies, not from Claude Code docs. They come from a June 2026 mining study of 100 top-starred repositories carrying an
 `AGENTS.md` or `CLAUDE.md`. 91 of the 100 files had at least one. Prevalences below are from
 that dataset.
 
@@ -83,7 +83,7 @@ Before, in `AGENTS.md`:
 ```
 
 After: move to `.claude/skills/adding-an-os/SKILL.md` with a description naming the trigger.
-Both tools load it on demand and neither pays for it otherwise.
+Claude Code loads a skill on demand and pays nothing for it otherwise.
 
 ## Init Fossilization (24%)
 
