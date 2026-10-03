@@ -54,10 +54,10 @@ def text_findings(where: str, text: str, *, credentials_empty: bool) -> list[Fin
                 where, variable, has_default=has_default, credentials_empty=credentials_empty
             )
         )
-    findings.extend(
-        warning(f'{where}: {bare} is not expanded; write ${{{bare[1:]}}}')
-        for bare in BARE_REFERENCE.findall(text)
-    )
+    if BARE_REFERENCE.search(text):
+        findings.append(
+            warning(f'{where}: a bare $NAME reference is not expanded; write it as ${{NAME}}')
+        )
     return findings
 
 

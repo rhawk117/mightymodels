@@ -464,7 +464,10 @@ def test_mc_a9_bare_dollar_variable_is_a_warning(
 
     assert validate('plugin', path) == 0
     assert validate('plugin', path, '--strict') == 1
-    assert 'db.env.KEY: $HOME is not expanded; write ${HOME}' in capsys.readouterr().out
+    assert (
+        'db.env.KEY: a bare $NAME reference is not expanded; write it as ${NAME}'
+        in capsys.readouterr().out
+    )
 
 
 @pytest.mark.parametrize('field', ['url', 'headers'])
@@ -509,6 +512,22 @@ def test_findings_never_print_an_env_or_headers_value(
     output = capsys.readouterr().out
     assert 'NOPE' in output
     assert 'hunter2' not in output
+
+
+def test_bare_variable_warning_never_prints_a_piece_of_an_env_or_headers_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub_builtin(monkeypatch)
+    servers: dict[str, object] = {
+        'db': {'command': 'uv', 'env': {'PASSWORD': 'hunter$ecretpart'}},
+        'api': {'type': 'http', 'url': 'https://x', 'headers': {'A': 'Bearer tok$ecretpart'}},
+    }
+
+    assert validate('plugin', servers_file(tmp_path, servers), '--strict') == 1
+    output = capsys.readouterr().out
+    assert 'db.env.PASSWORD: a bare $NAME reference' in output
+    assert 'api.headers.A: a bare $NAME reference' in output
+    assert 'ecretpart' not in output
 
 
 def command_config(directory: Path, command: str, args: list[str]) -> Path:
