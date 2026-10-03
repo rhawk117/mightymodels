@@ -17,6 +17,7 @@ Checked on 2026-10-03 against https://code.claude.com/docs/en/memory, https://co
 - Monorepos and exclusions
 - Who loads what
 - Verification commands
+- Review-only instructions
 
 ## Where instruction files live
 
