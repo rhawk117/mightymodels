@@ -109,7 +109,7 @@ Show both files, then one question to write. Do not write before it.
 **E5. Hand off.**
 
 - The paths written, and that a settings edit is normally picked up by Claude Code's file watcher; `/hooks` lists active hooks with their source, and a plugin hook needs the plugin reloaded.
-- To watch the hook run: `claude --debug-file PATH` writes hook execution details to a known file, and a hook that did not fire shows why there. A mistyped script path exits 127 and proceeds, so an enforcing hook can be silently off; check the first run.
+- To watch the hook run: `claude --debug-file PATH` writes hook execution details to a known file, and a hook that did not fire shows why there. A mistyped script path fails in one of two ways, so check the first run: `python3` given a file that does not exist exits 2, the blocking code, so the hook blocks every matching call; a shell-form command whose program is not found exits 127, a non-blocking error, so an enforcing hook is silently off.
 - Workspace trust: in an interactive session, hooks from a settings file are held back until the folder's trust dialog is accepted, and `-p` runs treat the folder as trusted, so a committed `.claude/settings.json` hook runs there without a prompt.
 - How to turn it off: delete the entry, or `"disableAllHooks": true` in a settings file for everything the user controls; managed hooks stay unless the setting is at managed level.
 - For `PreToolUse` deny rules, a removable demo trigger string the user can fire once to see the deny path.
