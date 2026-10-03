@@ -8,6 +8,7 @@ CLI as an explicit error instead of silently proceeding.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import override
 
 from skilleng.runners.base import HostAdapter, RunRequest
 from skilleng.schema import Arm
@@ -18,9 +19,11 @@ class _MissingCLIAdapter(HostAdapter):
     cli = 'definitely-not-a-real-skilleng-test-binary'
     skill_install_subdir = 'skills'
 
+    @override
     def prepare_sandbox(self, sandbox: Path, probe: bool = False) -> Path:
         return Path(sandbox)
 
+    @override
     def command(self, req: RunRequest) -> list[str]:
         return [self.cli]
 

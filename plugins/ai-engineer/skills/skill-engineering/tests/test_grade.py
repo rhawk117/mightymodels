@@ -6,11 +6,15 @@ ERROR outcome (never folded into "fail"), per grade.py's own module docstring.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pytest
 from skilleng.grade import run_mechanical
 from skilleng.schema import Assertion, AssertionKind, Outcome
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 def _assertion(check: str) -> Assertion:

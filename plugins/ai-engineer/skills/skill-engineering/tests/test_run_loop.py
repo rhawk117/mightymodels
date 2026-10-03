@@ -11,14 +11,17 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, override
 
 import pytest
 from skilleng.cli import cmd_run
 from skilleng.events import Event, append
-from skilleng.runners import HostAdapter, RunRequest, RunResult
+from skilleng.runners import HostAdapter, RunResult
 from skilleng.schema import Arm
 from skilleng.workspace import Workspace
+
+if TYPE_CHECKING:
+    from skilleng.runners import RunRequest
 
 SKILL_MD = (
     '---\nname: demo-skill\ndescription: Does a thing. Use when a thing is needed.\n'
@@ -43,6 +46,7 @@ class FakeAdapter(HostAdapter):
     def version(self) -> str | None:
         return '1.0.0'
 
+    @override
     def prepare_sandbox(self, sandbox: Path, probe: bool = False) -> Path:
         sandbox = Path(sandbox)
         sandbox.mkdir(parents=True, exist_ok=True)
@@ -54,6 +58,7 @@ class FakeAdapter(HostAdapter):
         self.installed.append(Path(skill_dir).name)
         return Path(sandbox)
 
+    @override
     def run(self, req: RunRequest, sandbox: Path) -> RunResult:
         self.calls.append(req)
         if not self._ok:
@@ -126,7 +131,7 @@ class TestPerArmLoop:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         adapter = FakeAdapter()
-        monkeypatch.setattr('skilleng.runners.get_adapter', lambda name: adapter)
+        monkeypatch.setattr('skilleng.runners.get_adapter', lambda _name: adapter)
         ws_root = tmp_path / 'ws'
         args = _args(
             skill=str(skill_dir),
@@ -156,7 +161,7 @@ class TestPerArmLoop:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         adapter = FakeAdapter(ok=False)
-        monkeypatch.setattr('skilleng.runners.get_adapter', lambda name: adapter)
+        monkeypatch.setattr('skilleng.runners.get_adapter', lambda _name: adapter)
         ws_root = tmp_path / 'ws'
         args = _args(
             skill=str(skill_dir),
@@ -183,7 +188,7 @@ class TestEarlyExits:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         adapter = FakeAdapter(available=False)
-        monkeypatch.setattr('skilleng.runners.get_adapter', lambda name: adapter)
+        monkeypatch.setattr('skilleng.runners.get_adapter', lambda _name: adapter)
         args = _args(skill=str(skill_dir), evals=str(evals_path), workspace=str(tmp_path / 'ws'))
 
         assert cmd_run(args) == 2
@@ -197,7 +202,7 @@ class TestEarlyExits:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         adapter = FakeAdapter()
-        monkeypatch.setattr('skilleng.runners.get_adapter', lambda name: adapter)
+        monkeypatch.setattr('skilleng.runners.get_adapter', lambda _name: adapter)
         args = _args(
             skill=str(skill_dir),
             evals=str(evals_path),

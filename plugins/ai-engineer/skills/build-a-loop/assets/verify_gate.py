@@ -26,7 +26,8 @@ class GateConfig:
         raw = json.loads(path.read_text())
         platform = raw['platform']
         if platform not in (CLAUDE_CODE, COPILOT_CLI):
-            raise ValueError(f'unsupported platform: {platform}')
+            msg = f'unsupported platform: {platform}'
+            raise ValueError(msg)
         return cls(
             platform=platform,
             check=list(raw['check']),
@@ -94,37 +95,43 @@ def clear_blocks(config: GateConfig) -> None:
     config.state_path.unlink(missing_ok=True)
 
 
-def emit_claude_code(blocking: bool, message: str) -> None:
+def emit_claude_code(*, blocking: bool, message: str) -> None:
     if blocking:
         print(json.dumps({'decision': 'block', 'reason': message}))
     else:
         print(json.dumps({'systemMessage': message}) if message else '', end='')
 
 
-def emit_copilot_cli(blocking: bool, message: str) -> None:
+def emit_copilot_cli(*, blocking: bool, message: str) -> None:
     payload: dict[str, Any] = {'decision': 'block' if blocking else 'continue'}
     if message:
         payload['additionalContext'] = message
     print(json.dumps(payload))
 
 
-def emit(config: GateConfig, blocking: bool, message: str) -> None:
+def emit(config: GateConfig, *, blocking: bool, message: str) -> None:
     if config.platform == CLAUDE_CODE:
-        emit_claude_code(blocking, message)
+        emit_claude_code(blocking=blocking, message=message)
     else:
-        emit_copilot_cli(blocking, message)
+        emit_copilot_cli(blocking=blocking, message=message)
 
 
-def main() -> int:
+def load_config() -> GateConfig | None:
     config_path = Path(os.environ.get('LOOP_GATE_CONFIG', '.loop-gate.json'))
     if not config_path.exists():
         print(f'loop gate config not found at {config_path}', file=sys.stderr)
-        return 1
+        return None
 
     try:
-        config = GateConfig.load(config_path)
+        return GateConfig.load(config_path)
     except (KeyError, ValueError, json.JSONDecodeError) as error:
         print(f'loop gate config is invalid: {error}', file=sys.stderr)
+        return None
+
+
+def main() -> int:
+    config = load_config()
+    if config is None:
         return 1
 
     payload = read_payload()

@@ -10,8 +10,8 @@ changing anything in skilleng/.
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any
+import zipfile
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from skilleng.aggregate import NoDataError, build
@@ -40,6 +40,9 @@ from skilleng.schema import (
 )
 from skilleng.skillmd import errors, lint
 from skilleng.workspace import Workspace
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _run(eval_id: str, arm: Arm, idx: int, score: float, **kw: Any) -> RunRecord:
@@ -142,11 +145,12 @@ class TestScriptEscaping:
         assert '&lt;script&gt;' in html
 
 
+@pytest.mark.usefixtures('_tmp')
 class TestValidator:
     """F-15. skill-creator prints "Skill is valid!" for an empty name and an empty
     description, never checks name-vs-directory, and rejects real host frontmatter."""
 
-    @pytest.fixture(autouse=True)
+    @pytest.fixture
     def _tmp(self, tmp_path: Path) -> None:
         self.tmp = tmp_path
 
@@ -418,11 +422,12 @@ class TestEventLogIntegrity:
         assert skill_invoked(events, 'r1', 'demo') is None
 
 
+@pytest.mark.usefixtures('_tmp')
 class TestSupplyChain:
     """F-14. skill-creator packages .git, packages .env, scans for nothing, and
     strips the evals the recipient would need to re-verify the skill."""
 
-    @pytest.fixture(autouse=True)
+    @pytest.fixture
     def _tmp(self, tmp_path: Path) -> None:
         self.tmp = tmp_path
         self.d = self.tmp / 'demo-skill'
@@ -444,15 +449,11 @@ class TestSupplyChain:
     def test_git_and_env_never_enter_the_archive(self) -> None:
         archive, _rep, _ = package(self.d, self.tmp / 'out')
         assert archive is not None
-        import zipfile
-
         names = zipfile.ZipFile(archive).namelist()
         assert not [n for n in names if '.git/' in n or n.endswith('.env')]
 
     def test_evals_ship_with_the_skill(self) -> None:
         archive, _, _ = package(self.d, self.tmp / 'out')
-        import zipfile
-
         assert 'demo-skill/evals/evals.json' in zipfile.ZipFile(archive).namelist()
 
     def test_a_leaked_credential_blocks_packaging(self) -> None:
@@ -493,8 +494,6 @@ class TestSupplyChain:
 
     def test_security_report_travels_inside_the_archive(self) -> None:
         archive, _, _ = package(self.d, self.tmp / 'out')
-        import zipfile
-
         assert 'demo-skill/SECURITY.md' in zipfile.ZipFile(archive).namelist()
 
 

@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from audit_rules import Finding, audit, main
+from audit_rules import Finding, Layout, audit, main
 
 FIXTURES = Path(__file__).resolve().parent / 'fixtures'
 
@@ -30,17 +30,17 @@ def clean_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.fixture(scope='module')
-def dirty_result(dirty_root: Path) -> tuple[list[Finding], dict]:
+def dirty_result(dirty_root: Path) -> tuple[list[Finding], Layout]:
     return audit(dirty_root)
 
 
 @pytest.fixture(scope='module')
-def dirty_findings(dirty_result: tuple[list[Finding], dict]) -> list[Finding]:
+def dirty_findings(dirty_result: tuple[list[Finding], Layout]) -> list[Finding]:
     return dirty_result[0]
 
 
 @pytest.fixture(scope='module')
-def dirty_layout(dirty_result: tuple[list[Finding], dict]) -> dict:
+def dirty_layout(dirty_result: tuple[list[Finding], Layout]) -> Layout:
     return dirty_result[1]
 
 
@@ -50,12 +50,12 @@ def dirty_smells(dirty_findings: list[Finding]) -> set[str]:
 
 
 @pytest.fixture(scope='module')
-def clean_result(clean_root: Path) -> tuple[list[Finding], dict]:
+def clean_result(clean_root: Path) -> tuple[list[Finding], Layout]:
     return audit(clean_root)
 
 
 @pytest.fixture(scope='module')
-def clean_findings(clean_result: tuple[list[Finding], dict]) -> list[Finding]:
+def clean_findings(clean_result: tuple[list[Finding], Layout]) -> list[Finding]:
     return clean_result[0]
 
 
@@ -101,7 +101,7 @@ def test_detects_duplication_across_tools(dirty_smells: set[str]) -> None:
     assert 'Duplication' in dirty_smells
 
 
-def test_layout_reports_readers_per_file(dirty_layout: dict) -> None:
+def test_layout_reports_readers_per_file(dirty_layout: Layout) -> None:
     by_path = {entry['path']: entry for entry in dirty_layout['files']}
     assert by_path['AGENTS.md']['read_by'] == ['GitHub Copilot']
     assert by_path['CLAUDE.md']['read_by'] == ['Claude Code']

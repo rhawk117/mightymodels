@@ -10,11 +10,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, override
 
 from skilleng.events import Event, append
-from skilleng.runners import HostAdapter, RunRequest, RunResult
+from skilleng.runners import HostAdapter, RunResult
 from skilleng.schema import Outcome, Tier
 from skilleng.trigger import evaluate
+
+if TYPE_CHECKING:
+    from skilleng.runners import RunRequest
 
 
 @dataclass
@@ -41,6 +45,7 @@ class FakeAdapter(HostAdapter):
         self.calls: list[RunRequest] = []
         self.installed: list[str] = []
 
+    @override
     def prepare_sandbox(self, sandbox: Path, probe: bool = False) -> Path:
         sandbox = Path(sandbox)
         sandbox.mkdir(parents=True, exist_ok=True)
@@ -50,6 +55,7 @@ class FakeAdapter(HostAdapter):
         self.installed.append(Path(skill_dir).name)
         return Path(sandbox)
 
+    @override
     def run(self, req: RunRequest, sandbox: Path) -> RunResult:
         self.calls.append(req)
         step = next(self._script)
@@ -85,7 +91,7 @@ class FakeAdapter(HostAdapter):
         return RunResult(ok=True, exit_code=0, stdout='', stderr='', duration_seconds=0.01)
 
 
-def _queries(*pairs: tuple[str, bool]) -> list[dict]:
+def _queries(*pairs: tuple[str, bool]) -> list[dict[str, str | bool]]:
     return [{'query': q, 'should_trigger': should} for q, should in pairs]
 
 

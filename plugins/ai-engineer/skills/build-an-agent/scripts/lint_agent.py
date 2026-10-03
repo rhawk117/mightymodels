@@ -9,6 +9,8 @@ from pathlib import Path
 import yaml
 
 COPILOT_MAX_BODY_CHARS = 30_000
+# Text before the opening '---', the front matter, and the body after the closing '---'.
+FRONT_MATTER_PARTS = 3
 CLAUDE_CODE_NAME_PATTERN = re.compile(r'^[a-z][a-z0-9-]*$')
 COPILOT_FILENAME_PATTERN = re.compile(r'^[A-Za-z0-9._-]+\.agent\.md$')
 TRIGGER_PATTERN = re.compile(
@@ -95,13 +97,15 @@ class MalformedDefinitionError(Exception):
 
 def split_front_matter(text: str) -> tuple[str, str]:
     if not text.startswith('---'):
-        raise MalformedDefinitionError(
+        msg = (
             "opening '---' must be the first line, or the platform treats the file as documentation"
         )
+        raise MalformedDefinitionError(msg)
 
     parts = text.split('---', 2)
-    if len(parts) < 3:
-        raise MalformedDefinitionError("front matter is not closed by a second '---'")
+    if len(parts) < FRONT_MATTER_PARTS:
+        msg = "front matter is not closed by a second '---'"
+        raise MalformedDefinitionError(msg)
 
     return parts[1], parts[2]
 
@@ -112,10 +116,12 @@ def load_definition(path: Path) -> Definition:
     try:
         parsed = yaml.safe_load(raw_front_matter)
     except yaml.YAMLError as error:
-        raise MalformedDefinitionError(f'front matter is not valid YAML: {error}') from error
+        msg = f'front matter is not valid YAML: {error}'
+        raise MalformedDefinitionError(msg) from error
 
     if not isinstance(parsed, dict):
-        raise MalformedDefinitionError('front matter did not parse to a mapping')
+        msg = 'front matter did not parse to a mapping'
+        raise MalformedDefinitionError(msg)
 
     return Definition(path=path, raw_front_matter=raw_front_matter, front_matter=parsed, body=body)
 

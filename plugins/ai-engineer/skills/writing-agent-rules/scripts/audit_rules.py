@@ -12,13 +12,31 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ALWAYS_ON_WARN_LINES = 200
 ALWAYS_ON_ERROR_LINES = 1000
+MIN_CONFLICTING_COMMANDS = 2
+DUPLICATION_MIN_LINE_CHARS = 25
+DUPLICATION_MIN_SHARED_LINES = 3
 
 CLAUDE_ALWAYS_ON = ('CLAUDE.md', '.claude/CLAUDE.md', 'CLAUDE.local.md')
 COPILOT_ALWAYS_ON = ('.github/copilot-instructions.md',)
 SHARED_ALWAYS_ON = ('AGENTS.md',)
+ALWAYS_ON_TOOLS = {
+    **dict.fromkeys(CLAUDE_ALWAYS_ON, 'claude'),
+    **dict.fromkeys(COPILOT_ALWAYS_ON, 'copilot'),
+    **dict.fromkeys(SHARED_ALWAYS_ON, 'shared'),
+}
+# (path prefix, path suffix, (role, tool)), checked in order after the always-on names.
+PATTERN_KINDS = (
+    ('.claude/rules/', '.md', ('scoped', 'claude')),
+    ('.github/instructions/', '.instructions.md', ('scoped', 'copilot')),
+    ('', '/SKILL.md', ('skill', 'shared')),
+)
 
 LINT_LEAKAGE_PATTERNS = {
     'indentation': (r'\b(indent(ation)?|tabs?\s+(vs|versus|over)\s+spaces?|\d+[- ]space)\b'),
@@ -94,6 +112,17 @@ class InstructionFile:
         return self.text.splitlines()
 
 
+class LayoutEntry(TypedDict):
+    path: str
+    role: str
+    lines: int
+    read_by: list[str]
+
+
+class Layout(TypedDict):
+    files: list[LayoutEntry]
+
+
 def strip_code_fences(lines: list[str]) -> list[tuple[int, str]]:
     result = []
     inside = False
@@ -108,18 +137,11 @@ def strip_code_fences(lines: list[str]) -> list[tuple[int, str]]:
 
 def classify(relative: str) -> tuple[str, str] | None:
     normalized = relative.replace('\\', '/')
-    if normalized in CLAUDE_ALWAYS_ON:
-        return 'always_on', 'claude'
-    if normalized in COPILOT_ALWAYS_ON:
-        return 'always_on', 'copilot'
-    if normalized in SHARED_ALWAYS_ON:
-        return 'always_on', 'shared'
-    if normalized.startswith('.claude/rules/') and normalized.endswith('.md'):
-        return 'scoped', 'claude'
-    if normalized.startswith('.github/instructions/') and normalized.endswith('.instructions.md'):
-        return 'scoped', 'copilot'
-    if normalized.endswith('/SKILL.md'):
-        return 'skill', 'shared'
+    if normalized in ALWAYS_ON_TOOLS:
+        return 'always_on', ALWAYS_ON_TOOLS[normalized]
+    for prefix, suffix, kind in PATTERN_KINDS:
+        if normalized.startswith(prefix) and normalized.endswith(suffix):
+            return kind
     return None
 
 
@@ -156,7 +178,7 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     if end == -1:
         return {}
     block = text[3:end]
-    fields = {}
+    fields: dict[str, str] = {}
     current = None
     for line in block.splitlines():
         if re.match(r'^\s*-\s', line) and current:
@@ -199,25 +221,35 @@ def check_size(files: list[InstructionFile]) -> list[Finding]:
     return findings
 
 
+def leaked_lint_label(line: str) -> str | None:
+    return next(
+        (
+            label
+            for label, pattern in LINT_LEAKAGE_PATTERNS.items()
+            if re.search(pattern, line, re.IGNORECASE)
+        ),
+        None,
+    )
+
+
 def check_lint_leakage(files: list[InstructionFile]) -> list[Finding]:
     findings = []
     for entry in files:
         if entry.role == 'skill':
             continue
         for number, line in strip_code_fences(entry.lines):
-            for label, pattern in LINT_LEAKAGE_PATTERNS.items():
-                if re.search(pattern, line, re.IGNORECASE):
-                    findings.append(
-                        Finding(
-                            'Lint Leakage',
-                            'warn',
-                            entry.relative,
-                            number,
-                            f'Mentions {label}, which a formatter or linter '
-                            'enforces deterministically.',
-                        )
-                    )
-                    break
+            label = leaked_lint_label(line)
+            if label is None:
+                continue
+            findings.append(
+                Finding(
+                    'Lint Leakage',
+                    'warn',
+                    entry.relative,
+                    number,
+                    f'Mentions {label}, which a formatter or linter enforces deterministically.',
+                )
+            )
     return findings
 
 
@@ -247,21 +279,28 @@ def check_blind_references(files: list[InstructionFile]) -> list[Finding]:
     return findings
 
 
-def check_command_conflicts(files: list[InstructionFile]) -> list[Finding]:
-    seen: dict[str, dict[str, tuple[str, int]]] = {verb: {} for verb in COMMAND_VERBS}
-    findings = []
+def always_on_lines(files: list[InstructionFile]) -> Iterator[tuple[str, int, str]]:
     for entry in files:
         if entry.role != 'always_on':
             continue
         for number, line in strip_code_fences(entry.lines):
-            for command in BACKTICK_COMMAND.findall(line):
-                normalized = ' '.join(command.split())
-                for verb in COMMAND_VERBS:
-                    if not re.search(rf'\b{verb}\b', normalized):
-                        continue
-                    seen[verb][normalized] = (entry.relative, number)
+            yield entry.relative, number, line
+
+
+def verbs_in(command: str) -> list[str]:
+    return [verb for verb in COMMAND_VERBS if re.search(rf'\b{verb}\b', command)]
+
+
+def check_command_conflicts(files: list[InstructionFile]) -> list[Finding]:
+    seen: dict[str, dict[str, tuple[str, int]]] = {verb: {} for verb in COMMAND_VERBS}
+    findings = []
+    for relative, number, line in always_on_lines(files):
+        for command in BACKTICK_COMMAND.findall(line):
+            normalized = ' '.join(command.split())
+            for verb in verbs_in(normalized):
+                seen[verb][normalized] = (relative, number)
     for verb, variants in seen.items():
-        if len(variants) < 2:
+        if len(variants) < MIN_CONFLICTING_COMMANDS:
             continue
         rendered = ', '.join(f'`{command}`' for command in sorted(variants))
         location = min(variants.values())
@@ -379,7 +418,7 @@ def check_duplication(files: list[InstructionFile]) -> list[Finding]:
         return {
             line.strip().lower()
             for _, line in strip_code_fences(entry.lines)
-            if len(line.strip()) > 25 and not line.lstrip().startswith('#')
+            if len(line.strip()) > DUPLICATION_MIN_LINE_CHARS and not line.lstrip().startswith('#')
         }
 
     claude_side = [
@@ -392,7 +431,7 @@ def check_duplication(files: list[InstructionFile]) -> list[Finding]:
     for left in claude_side:
         for right in copilot_side:
             overlap = body(left) & body(right)
-            if len(overlap) >= 3:
+            if len(overlap) >= DUPLICATION_MIN_SHARED_LINES:
                 findings.append(
                     Finding(
                         'Duplication',
@@ -421,7 +460,7 @@ def check_fossilization(root: Path, files: list[InstructionFile]) -> list[Findin
                 timeout=10,
                 check=False,
             )
-        except OSError, subprocess.SubprocessError:
+        except (OSError, subprocess.SubprocessError):
             return findings
         if completed.returncode != 0:
             return findings
@@ -440,7 +479,7 @@ def check_fossilization(root: Path, files: list[InstructionFile]) -> list[Findin
     return findings
 
 
-def describe_layout(files: list[InstructionFile]) -> dict:
+def describe_layout(files: list[InstructionFile]) -> Layout:
     readers = {
         ('always_on', 'claude'): ['Claude Code'],
         ('always_on', 'copilot'): ['GitHub Copilot'],
@@ -462,7 +501,7 @@ def describe_layout(files: list[InstructionFile]) -> dict:
     }
 
 
-def audit(root: Path) -> tuple[list[Finding], dict]:
+def audit(root: Path) -> tuple[list[Finding], Layout]:
     files = discover(root)
     findings = []
     findings.extend(check_size(files))
@@ -478,7 +517,7 @@ def audit(root: Path) -> tuple[list[Finding], dict]:
     return findings, describe_layout(files)
 
 
-def render(findings: list[Finding], layout: dict) -> str:
+def render(findings: list[Finding], layout: Layout) -> str:
     lines = ['Layout', '------']
     if not layout['files']:
         lines.append('  no agent instruction files found')
