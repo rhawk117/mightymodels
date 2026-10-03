@@ -4,7 +4,6 @@ src = ["plugins"]
 extend-exclude = [
     "plugins/**/assets/*.template.py",
     "plugins/**/assets/template/**",
-    "plugins/ai-engineer/bin/**",
 ]
 per-file-target-version = { "plugins/*/skills/**" = "py312", "plugins/ai-engineer/src/**" = "py312", "plugins/ai-engineer/tests/**" = "py312" }
 force-exclude = true

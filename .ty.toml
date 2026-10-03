@@ -10,7 +10,6 @@ exclude-scripts = true
 exclude = [
     "plugins/**/assets/*.template.py",
     "plugins/**/assets/template/**",
-    "plugins/ai-engineer/bin/**",
 ]
 
 [analysis]
