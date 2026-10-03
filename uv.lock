@@ -11,8 +11,8 @@ members = [
 
 [[package]]
 name = "ai-engineer-plugin"
-version = "0.1.0"
-source = { virtual = "plugins/ai-engineer" }
+version = "0.3.0"
+source = { editable = "plugins/ai-engineer" }
 dependencies = [
     { name = "pyyaml" },
 ]

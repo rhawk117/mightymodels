@@ -1,0 +1,20 @@
+#!/bin/sh
+# Runs the ai-engineer CLI from the plugin directory this script lives in.
+set -eu
+
+case $0 in
+  */*) bin_dir=${0%/*} ;;
+  *) bin_dir=. ;;
+esac
+AI_ENGINEER_PLUGIN_ROOT=$(CDPATH='' cd -- "${bin_dir}/.." && pwd -P)
+export AI_ENGINEER_PLUGIN_ROOT
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo 'ai-engineer: uv is required but not on PATH; install it from https://docs.astral.sh/uv/' >&2
+  exit 127
+fi
+
+exec uv run --no-project --python '>=3.12' \
+  --with-requirements "${AI_ENGINEER_PLUGIN_ROOT}/requirements.lock" \
+  --with-editable "${AI_ENGINEER_PLUGIN_ROOT}" \
+  ai-engineer "$@"
