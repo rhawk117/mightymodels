@@ -2,7 +2,7 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
-from ai_engineer_cli import create_skill
+from ai_engineer_cli import create_hooks, create_skill
 
 GroupBuilder = Callable[[argparse.ArgumentParser], None]
 
@@ -13,7 +13,10 @@ class Arguments(argparse.Namespace):
     handler: GroupHandler | None = None
 
 
-GROUPS: dict[str, GroupBuilder] = {'create-skill': create_skill.build_group}
+GROUPS: dict[str, GroupBuilder] = {
+    'create-skill': create_skill.build_group,
+    'create-hooks': create_hooks.build_group,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:

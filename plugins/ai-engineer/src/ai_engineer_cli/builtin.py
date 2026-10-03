@@ -10,8 +10,11 @@ class BuiltinUnavailableError(CannotCheckError):
     """The built-in validator could not run, so no verdict exists."""
 
 
-def run_builtin(target: Path) -> list[Finding]:
-    """Run `claude plugin validate --json` on target and return what it found."""
+def run_builtin(target: Path, *, include_manifest: bool = True) -> list[Finding]:
+    """Run `claude plugin validate --json` on target and return what it found.
+
+    A caller that stages a throwaway manifest passes include_manifest=False to drop its findings.
+    """
     claude = shutil.which('claude')
     if claude is None:
         message = 'claude is not on PATH: npm install -g @anthropic-ai/claude-code'
@@ -22,14 +25,14 @@ def run_builtin(target: Path) -> list[Finding]:
         text=True,
         check=False,
     )
-    findings = parse_report(result.stdout)
+    findings = parse_report(result.stdout, include_manifest=include_manifest)
     if result.returncode != 0 and not any(finding.level == 'error' for finding in findings):
         message = f'claude plugin validate exited {result.returncode} with no error finding: '
         raise BuiltinUnavailableError(message + result.stderr.strip())
     return findings
 
 
-def parse_report(stdout: str) -> list[Finding]:
+def parse_report(stdout: str, *, include_manifest: bool = True) -> list[Finding]:
     try:
         report = json.loads(stdout)
     except json.JSONDecodeError as problem:
@@ -38,7 +41,8 @@ def parse_report(stdout: str) -> list[Finding]:
     if not isinstance(report, dict):
         message = 'claude plugin validate printed a JSON report that is not an object'
         raise BuiltinUnavailableError(message)
-    sections = [report.get('manifest'), *report.get('contents', [])]
+    manifest = [report.get('manifest')] if include_manifest else []
+    sections = [*manifest, *report.get('contents', [])]
     return [
         finding
         for section in sections
