@@ -2,9 +2,18 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
+from ai_engineer_cli import create_skill
+
 GroupBuilder = Callable[[argparse.ArgumentParser], None]
 
-GROUPS: dict[str, GroupBuilder] = {}
+GroupHandler = Callable[[argparse.Namespace], int]
+
+
+class Arguments(argparse.Namespace):
+    handler: GroupHandler | None = None
+
+
+GROUPS: dict[str, GroupBuilder] = {'create-skill': create_skill.build_group}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -20,6 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
-    parser.parse_args(argv)
-    parser.print_help(sys.stderr)
-    return 2
+    arguments = parser.parse_args(argv, namespace=Arguments())
+    if arguments.handler is None:
+        parser.print_help(sys.stderr)
+        return 2
+    return arguments.handler(arguments)
