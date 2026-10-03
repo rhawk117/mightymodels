@@ -2,7 +2,13 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
-from ai_engineer_cli import create_hooks, create_instructions, create_skill, create_subagent
+from ai_engineer_cli import (
+    create_hooks,
+    create_instructions,
+    create_mcp,
+    create_skill,
+    create_subagent,
+)
 
 GroupBuilder = Callable[[argparse.ArgumentParser], None]
 
@@ -18,6 +24,7 @@ GROUPS: dict[str, GroupBuilder] = {
     'create-hooks': create_hooks.build_group,
     'create-subagent': create_subagent.build_group,
     'create-instructions': create_instructions.build_group,
+    'create-mcp': create_mcp.build_group,
 }
 
 
