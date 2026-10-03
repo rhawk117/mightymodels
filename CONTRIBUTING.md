@@ -55,9 +55,10 @@ Pre-commit runs the standard file hygiene hooks, `ruff format`, `mdformat` on ma
 pre-commit hook type is installed, so commit messages are not checked by a hook.
 
 CI runs on pull requests to `main` with three jobs: `labeler`, `quality`, and `workflow-narrator`.
-The `quality` job runs `uv run pre-commit run --all-files`, which is the same gate as `make check`
-minus the lockfile check. Pull requests from forks skip labeling and the PR comment, so those
-jobs report as skipped rather than failed.
+The `quality` job runs `uv run pre-commit run --all-files`, which is the same gate as `make check`,
+and CI's bootstrap syncs with `uv sync --locked`, so a stale lockfile fails CI too. Pull requests
+from forks skip the `labeler` job, but `workflow-narrator` still runs: it reports the result in the
+job summary instead of a PR comment, and it still fails the run when `quality` fails.
 
 ## Python and markdown rules
 
