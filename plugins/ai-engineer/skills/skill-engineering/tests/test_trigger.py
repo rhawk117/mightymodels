@@ -82,9 +82,7 @@ class FakeAdapter(HostAdapter):
                 duration_seconds=0.01,
                 error=step.error or 'boom',
             )
-        return RunResult(
-            ok=True, exit_code=0, stdout='', stderr='', duration_seconds=0.01
-        )
+        return RunResult(ok=True, exit_code=0, stdout='', stderr='', duration_seconds=0.01)
 
 
 def _queries(*pairs: tuple[str, bool]) -> list[dict]:
@@ -97,12 +95,14 @@ class TestConfusionMatrix:
     def test_counts_land_in_the_right_cell(self, tmp_path: Path) -> None:
         skill_dir = tmp_path / 'demo-skill'
         skill_dir.mkdir()
-        adapter = FakeAdapter([
-            ScriptedRun(fired=['demo-skill']),  # should trigger, did      -> tp
-            ScriptedRun(fired=[]),  # should not trigger, did not -> tn
-            ScriptedRun(fired=[]),  # should trigger, did not  -> fn
-            ScriptedRun(fired=['demo-skill']),  # should not trigger, did  -> fp
-        ])
+        adapter = FakeAdapter(
+            [
+                ScriptedRun(fired=['demo-skill']),  # should trigger, did      -> tp
+                ScriptedRun(fired=[]),  # should not trigger, did not -> tn
+                ScriptedRun(fired=[]),  # should trigger, did not  -> fn
+                ScriptedRun(fired=['demo-skill']),  # should not trigger, did  -> fp
+            ]
+        )
         queries = _queries(
             ('merge these csv files', True),
             ('what is the weather', False),
@@ -113,9 +113,7 @@ class TestConfusionMatrix:
 
         assert report.confusion == {'tp': 1, 'fp': 1, 'tn': 1, 'fn': 1, 'errors': 0}
         assert report.metrics['accuracy']['point'] == 0.5
-        assert adapter.installed == ['demo-skill'], (
-            'the skill under test must be installed once'
-        )
+        assert adapter.installed == ['demo-skill'], 'the skill under test must be installed once'
         assert len(adapter.calls) == 4, 'one run per query at the quick tier'
 
 
@@ -123,23 +121,17 @@ class TestPromptMentionsSkillExclusion:
     """trigger.py:~75 — a query naming the skill is a forced invocation, not a trigger
     test."""
 
-    def test_a_query_that_names_the_skill_is_excluded_not_run(
-        self, tmp_path: Path
-    ) -> None:
+    def test_a_query_that_names_the_skill_is_excluded_not_run(self, tmp_path: Path) -> None:
         skill_dir = tmp_path / 'demo-skill'
         skill_dir.mkdir()
-        adapter = FakeAdapter([
-            ScriptedRun(fired=['demo-skill'])
-        ])  # would fire for the other query
+        adapter = FakeAdapter([ScriptedRun(fired=['demo-skill'])])  # would fire for the other query
         queries = _queries(
             ('please use demo-skill on this file', True),
             ('merge these csv files', True),
         )
         report = evaluate(adapter, skill_dir, queries, tier=Tier.QUICK)
 
-        assert len(adapter.calls) == 1, (
-            'the forced-mention query must never reach adapter.run'
-        )
+        assert len(adapter.calls) == 1, 'the forced-mention query must never reach adapter.run'
         excluded = next(r for r in report.results if r['query'].startswith('please use'))
         assert excluded['outcome'] == Outcome.ERROR.value
         assert excluded['errors'] == 1
@@ -164,9 +156,7 @@ class TestFiredIsNoneErrorPath:
         assert report.confusion == {'tp': 0, 'fp': 0, 'tn': 0, 'fn': 0, 'errors': 1}
         assert any('no hook events for a completed run' in d for d in report.diagnostics)
 
-    def test_a_failed_run_is_also_excluded_from_the_confusion_matrix(
-        self, tmp_path: Path
-    ) -> None:
+    def test_a_failed_run_is_also_excluded_from_the_confusion_matrix(self, tmp_path: Path) -> None:
         skill_dir = tmp_path / 'demo-skill'
         skill_dir.mkdir()
         adapter = FakeAdapter([ScriptedRun(ok=False, error='claude exited 1')])

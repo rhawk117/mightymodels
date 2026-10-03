@@ -21,9 +21,7 @@ COPILOT_ALWAYS_ON = ('.github/copilot-instructions.md',)
 SHARED_ALWAYS_ON = ('AGENTS.md',)
 
 LINT_LEAKAGE_PATTERNS = {
-    'indentation': (
-        r'\b(indent(ation)?|tabs?\s+(vs|versus|over)\s+spaces?|\d+[- ]space)\b'
-    ),
+    'indentation': (r'\b(indent(ation)?|tabs?\s+(vs|versus|over)\s+spaces?|\d+[- ]space)\b'),
     'line length': (
         r'\b(line[- ]length|max(imum)?\s+\d{2,3}\s+char|\d{2,3}\s+characters?\s+max)\b'
     ),
@@ -38,9 +36,7 @@ LINT_LEAKAGE_PATTERNS = {
     'quote style': r'\b(single|double)\s+quotes?\b',
     'semicolons': r'\bsemicolons?\b',
     'trailing whitespace': r'\btrailing\s+(whitespace|commas?)\b',
-    'formatter settings': (
-        r'\b(prettier|black|gofmt|rustfmt|biome)\s+(config|settings|rules)\b'
-    ),
+    'formatter settings': (r'\b(prettier|black|gofmt|rustfmt|biome)\s+(config|settings|rules)\b'),
 }
 
 REFERENCE_CUES = (
@@ -71,9 +67,7 @@ COMMAND_VERBS = (
     'start',
 )
 
-PATH_TOKEN = re.compile(
-    r'`([^`\s]*[/\\][^`\s]*\.[A-Za-z0-9]{1,6})`|\]\((\.{0,2}/?[^)\s]+\.md)\)'
-)
+PATH_TOKEN = re.compile(r'`([^`\s]*[/\\][^`\s]*\.[A-Za-z0-9]{1,6})`|\]\((\.{0,2}/?[^)\s]+\.md)\)')
 BACKTICK_COMMAND = re.compile(r'`([a-z][a-z0-9_.-]*(?:\s+[^`]{0,60})?)`')
 IMPORT_TOKEN = re.compile(r'(?<![\w`])@([\w./~-]+)')
 
@@ -122,9 +116,7 @@ def classify(relative: str) -> tuple[str, str] | None:
         return 'always_on', 'shared'
     if normalized.startswith('.claude/rules/') and normalized.endswith('.md'):
         return 'scoped', 'claude'
-    if normalized.startswith('.github/instructions/') and normalized.endswith(
-        '.instructions.md'
-    ):
+    if normalized.startswith('.github/instructions/') and normalized.endswith('.instructions.md'):
         return 'scoped', 'copilot'
     if normalized.endswith('/SKILL.md'):
         return 'skill', 'shared'
@@ -153,9 +145,7 @@ def discover(root: Path) -> list[InstructionFile]:
         if kind is None:
             continue
         role, tool = kind
-        files.append(
-            InstructionFile(path, relative, role, tool, path.read_text(encoding='utf-8'))
-        )
+        files.append(InstructionFile(path, relative, role, tool, path.read_text(encoding='utf-8')))
     return files
 
 
@@ -192,8 +182,7 @@ def check_size(files: list[InstructionFile]) -> list[Finding]:
                     'error',
                     entry.relative,
                     count,
-                    f'{count} lines. Past the documented ceiling where response '
-                    'quality degrades.',
+                    f'{count} lines. Past the documented ceiling where response quality degrades.',
                 )
             )
         elif count >= ALWAYS_ON_WARN_LINES:
@@ -325,8 +314,7 @@ def check_scope_frontmatter(files: list[InstructionFile]) -> list[Finding]:
                     'info',
                     entry.relative,
                     1,
-                    'No paths frontmatter, so this rule loads unconditionally in '
-                    'every session.',
+                    'No paths frontmatter, so this rule loads unconditionally in every session.',
                 )
             )
     return findings
@@ -356,9 +344,7 @@ def check_agents_visibility(files: list[InstructionFile]) -> list[Finding]:
     by_relative = {entry.relative: entry for entry in files}
     if 'AGENTS.md' not in by_relative:
         return []
-    claude_entries = [
-        by_relative[name] for name in CLAUDE_ALWAYS_ON if name in by_relative
-    ]
+    claude_entries = [by_relative[name] for name in CLAUDE_ALWAYS_ON if name in by_relative]
     if not claude_entries:
         return [
             Finding(
@@ -397,9 +383,7 @@ def check_duplication(files: list[InstructionFile]) -> list[Finding]:
         }
 
     claude_side = [
-        entry
-        for entry in files
-        if entry.role == 'always_on' and entry.tool in ('claude', 'shared')
+        entry for entry in files if entry.role == 'always_on' and entry.tool in ('claude', 'shared')
     ]
     copilot_side = [
         entry for entry in files if entry.role == 'always_on' and entry.tool == 'copilot'
@@ -506,19 +490,19 @@ def render(findings: list[Finding], layout: dict) -> str:
     if not findings:
         lines.append('  none')
     for item in findings:
-        lines.append(
-            f'  {item.severity.upper():<5} {item.path}:{item.line}  {item.smell}'
-        )
+        lines.append(f'  {item.severity.upper():<5} {item.path}:{item.line}  {item.smell}')
         lines.append(f'        {item.message}')
 
     counts = {
         level: sum(1 for item in findings if item.severity == level)
         for level in ('error', 'warn', 'info')
     }
-    lines.extend([
-        '',
-        f'{counts["error"]} errors, {counts["warn"]} warnings, {counts["info"]} info',
-    ])
+    lines.extend(
+        [
+            '',
+            f'{counts["error"]} errors, {counts["warn"]} warnings, {counts["info"]} info',
+        ]
+    )
     return '\n'.join(lines)
 
 
@@ -537,11 +521,7 @@ def main(argv: list[str] | None = None) -> int:
     findings, layout = audit(root)
 
     if arguments.json:
-        print(
-            json.dumps(
-                {'layout': layout, 'findings': [asdict(f) for f in findings]}, indent=2
-            )
-        )
+        print(json.dumps({'layout': layout, 'findings': [asdict(f) for f in findings]}, indent=2))
     else:
         print(render(findings, layout))
 

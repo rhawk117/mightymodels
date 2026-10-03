@@ -17,37 +17,41 @@ TRIGGER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 CLAUDE_CODE_MODELS = frozenset({'opus', 'sonnet', 'haiku', 'fable', 'inherit'})
-CLAUDE_CODE_KNOWN_KEYS = frozenset({
-    'name',
-    'description',
-    'tools',
-    'disallowedTools',
-    'model',
-    'permissionMode',
-    'maxTurns',
-    'skills',
-    'memory',
-    'effort',
-    'isolation',
-    'background',
-    'mcpServers',
-    'hooks',
-    'color',
-    'initialPrompt',
-    'experimental',
-})
-COPILOT_KNOWN_KEYS = frozenset({
-    'name',
-    'description',
-    'tools',
-    'model',
-    'target',
-    'user-invocable',
-    'disable-model-invocation',
-    'mcp-servers',
-    'metadata',
-    'deferred-tool-loading',
-})
+CLAUDE_CODE_KNOWN_KEYS = frozenset(
+    {
+        'name',
+        'description',
+        'tools',
+        'disallowedTools',
+        'model',
+        'permissionMode',
+        'maxTurns',
+        'skills',
+        'memory',
+        'effort',
+        'isolation',
+        'background',
+        'mcpServers',
+        'hooks',
+        'color',
+        'initialPrompt',
+        'experimental',
+    }
+)
+COPILOT_KNOWN_KEYS = frozenset(
+    {
+        'name',
+        'description',
+        'tools',
+        'model',
+        'target',
+        'user-invocable',
+        'disable-model-invocation',
+        'mcp-servers',
+        'metadata',
+        'deferred-tool-loading',
+    }
+)
 CLAUDE_ONLY_KEYS = (
     'disallowedTools',
     'maxTurns',
@@ -92,8 +96,7 @@ class MalformedDefinitionError(Exception):
 def split_front_matter(text: str) -> tuple[str, str]:
     if not text.startswith('---'):
         raise MalformedDefinitionError(
-            "opening '---' must be the first line, or the platform treats the file "
-            'as documentation'
+            "opening '---' must be the first line, or the platform treats the file as documentation"
         )
 
     parts = text.split('---', 2)
@@ -109,16 +112,12 @@ def load_definition(path: Path) -> Definition:
     try:
         parsed = yaml.safe_load(raw_front_matter)
     except yaml.YAMLError as error:
-        raise MalformedDefinitionError(
-            f'front matter is not valid YAML: {error}'
-        ) from error
+        raise MalformedDefinitionError(f'front matter is not valid YAML: {error}') from error
 
     if not isinstance(parsed, dict):
         raise MalformedDefinitionError('front matter did not parse to a mapping')
 
-    return Definition(
-        path=path, raw_front_matter=raw_front_matter, front_matter=parsed, body=body
-    )
+    return Definition(path=path, raw_front_matter=raw_front_matter, front_matter=parsed, body=body)
 
 
 def as_tool_list(value: object) -> list[str] | None:
@@ -212,8 +211,7 @@ def check_claude_code(definition: Definition) -> list[Finding]:
             Finding(
                 Severity.ERROR,
                 'NAME_MISSING',
-                "'name' is required; without it the file is silently treated as "
-                'documentation',
+                "'name' is required; without it the file is silently treated as documentation",
             )
         )
     elif not CLAUDE_CODE_NAME_PATTERN.fullmatch(name):
@@ -233,8 +231,7 @@ def check_claude_code(definition: Definition) -> list[Finding]:
             Finding(
                 Severity.WARNING,
                 'BYPASS_PERMISSIONS',
-                'bypassPermissions allows writes to .git, .claude, .vscode and '
-                '.config/git',
+                'bypassPermissions allows writes to .git, .claude, .vscode and .config/git',
             )
         )
     return findings
@@ -261,16 +258,12 @@ def _check_claude_code_tools(definition: Definition) -> list[Finding]:
                 'does what it looks like',
             )
         )
-    if (
-        any(tool in COMMAND_TOOLS for tool in tools)
-        and 'maxTurns' not in definition.front_matter
-    ):
+    if any(tool in COMMAND_TOOLS for tool in tools) and 'maxTurns' not in definition.front_matter:
         findings.append(
             Finding(
                 Severity.WARNING,
                 'NO_TURN_BUDGET',
-                'agent can run commands but has no maxTurns; a runaway delegation '
-                'has no stop',
+                'agent can run commands but has no maxTurns; a runaway delegation has no stop',
             )
         )
     return findings
@@ -316,8 +309,7 @@ def check_copilot_cli(definition: Definition) -> list[Finding]:
             Finding(
                 Severity.ERROR,
                 'BODY_TOO_LONG',
-                f'body is {len(definition.body)} characters; the cap is '
-                f'{COPILOT_MAX_BODY_CHARS}',
+                f'body is {len(definition.body)} characters; the cap is {COPILOT_MAX_BODY_CHARS}',
             )
         )
     tools = definition.front_matter.get('tools')
@@ -389,9 +381,7 @@ def render(path: Path, findings: list[Finding]) -> str:
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('paths', nargs='+', type=Path)
-    parser.add_argument(
-        '--platform', required=True, type=Platform, choices=list(Platform)
-    )
+    parser.add_argument('--platform', required=True, type=Platform, choices=list(Platform))
     return parser.parse_args(argv)
 
 

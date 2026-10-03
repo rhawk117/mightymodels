@@ -21,6 +21,7 @@ The per-task loop. Its whole design bet is that verification has a persisted tar
 **4. Verify DONE against ASKED.** One scout-tier pass per task, criterion by criterion: run the AC's command or check its assertion, VERIFIED/UNVERIFIED each, with the evidence. An engineer report claiming `verified="true"` on a criterion the check contradicts gets called out by name — averaging a contradiction is how drift compounds. Then your own surface-level sanity read of the diff; it is the second opinion now, not the only one.
 
 **5. Route residuals.**
+
 - Bounded, mechanical, one-concern residual → **budgetron** (dispatch via its promptlint template; Fix:/Verify: verbatim). Two rounds max; its contract escalates on budget or scope excess, and an escalation routes to a full engineer dispatch.
 - Scout verification fails **twice** on the same task → **whats-broken**. The third attempt is never another patch; repeated failure means the understanding is wrong, and patching a misunderstanding just relocates it.
 

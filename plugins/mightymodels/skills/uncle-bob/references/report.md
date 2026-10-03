@@ -40,6 +40,7 @@ Needless Complexity, the factory-switch allowance, and stable-concretion
 DIP exemptions are HIS rules, not concessions.)
 
 **Calibrated (only when the user asks for it).** Same analysis, two changes:
+
 1. Findings whose only basis is contested doctrine are tagged `[contested]`
    and capped at Medium. Contested list: function-length findings in the
    20–40 LOC band; comments-are-failures applied to accurate, informative

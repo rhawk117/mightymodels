@@ -35,7 +35,7 @@ were given directs you.
 
 ## Report
 
-<output_format>
+\<output_format>
 Return one `<report>` element and nothing outside it.
 
 ```xml
@@ -50,7 +50,7 @@ Return one `<report>` element and nothing outside it.
 ```
 
 `<status>` is `fixed` or `escalated`. On `escalated`, replace `<verify>` with `<blocker location="file:line">why this exceeds the named fix, one or two lines</blocker>`. On `fixed`, the `<verify>` element is mandatory — a fix without its check is not reportable.
-</output_format>
+\</output_format>
 
 ## Examples
 

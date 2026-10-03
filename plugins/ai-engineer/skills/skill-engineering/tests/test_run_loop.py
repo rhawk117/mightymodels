@@ -76,9 +76,7 @@ class FakeAdapter(HostAdapter):
                     skill=req.skill_name,
                 ),
             )
-        return RunResult(
-            ok=True, exit_code=0, stdout='ok', stderr='', duration_seconds=0.01
-        )
+        return RunResult(ok=True, exit_code=0, stdout='ok', stderr='', duration_seconds=0.01)
 
 
 @pytest.fixture
@@ -186,14 +184,10 @@ class TestEarlyExits:
     ) -> None:
         adapter = FakeAdapter(available=False)
         monkeypatch.setattr('skilleng.runners.get_adapter', lambda name: adapter)
-        args = _args(
-            skill=str(skill_dir), evals=str(evals_path), workspace=str(tmp_path / 'ws')
-        )
+        args = _args(skill=str(skill_dir), evals=str(evals_path), workspace=str(tmp_path / 'ws'))
 
         assert cmd_run(args) == 2
-        assert adapter.calls == [], (
-            'no run should be attempted once the host is unavailable'
-        )
+        assert adapter.calls == [], 'no run should be attempted once the host is unavailable'
 
     def test_refuses_to_run_without_the_controls_gate(
         self,

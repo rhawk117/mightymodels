@@ -126,9 +126,7 @@ class TestScriptEscaping:
     inline script blanks the viewer and opens an injection sink."""
 
     def test_closing_script_tag_is_neutralised(self) -> None:
-        payload = {
-            'content': '<html><script>x</script><img src=x onerror=alert(1)></html>'
-        }
+        payload = {'content': '<html><script>x</script><img src=x onerror=alert(1)></html>'}
         blob = safe_json_for_script(payload)
         assert '</script' not in blob
         assert '</' not in blob
@@ -239,9 +237,7 @@ class TestTokensAreTokens:
             assert arm['mean_tokens'] is None
             assert not arm['tokens_available']
         assert any('token counts unavailable' in d for d in bench.diagnostics)
-        assert 'Tokens' not in to_markdown(
-            bench.__dict__ | {'provenance': _prov().__dict__}
-        )
+        assert 'Tokens' not in to_markdown(bench.__dict__ | {'provenance': _prov().__dict__})
 
 
 class TestTierGating:
@@ -251,13 +247,8 @@ class TestTierGating:
         runs = [_run('e1', Arm.FORCED, 1, 1.0), _run('e1', Arm.BASELINE, 1, 0.0)]
         bench = build(runs, _prov(tier=Tier.QUICK.value))
         assert not bench.claims_permitted['intervals']
-        assert (
-            next(a for a in bench.arms if a['arm'] == 'forced')['score_interval'] is None
-        )
-        assert (
-            'cannot tell you whether a difference is real'
-            in bench.claims_permitted['note']
-        )
+        assert next(a for a in bench.arms if a['arm'] == 'forced')['score_interval'] is None
+        assert 'cannot tell you whether a difference is real' in bench.claims_permitted['note']
 
     def test_standard_tier_shows_intervals(self) -> None:
         runs = [
@@ -267,10 +258,7 @@ class TestTierGating:
         ]
         bench = build(runs, _prov(tier=Tier.STANDARD.value))
         assert bench.claims_permitted['intervals']
-        assert (
-            next(a for a in bench.arms if a['arm'] == 'forced')['score_interval']
-            is not None
-        )
+        assert next(a for a in bench.arms if a['arm'] == 'forced')['score_interval'] is not None
 
     def test_resolving_power_is_reported(self) -> None:
         runs = [
@@ -294,9 +282,7 @@ class TestRulerStaysFixed:
                     id='e1',
                     prompt='p',
                     assertions=[
-                        Assertion(
-                            id='a1', text='output mentions X', kind=AssertionKind.JUDGED
-                        )
+                        Assertion(id='a1', text='output mentions X', kind=AssertionKind.JUDGED)
                     ],
                 )
             ],
@@ -336,9 +322,7 @@ class TestSchemaDiscipline:
 
     def test_duplicate_eval_ids_are_rejected(self) -> None:
         with pytest.raises(SchemaError):
-            EvalSet(
-                'demo', [EvalCase(id='e1', prompt='a'), EvalCase(id='e1', prompt='b')]
-            )
+            EvalSet('demo', [EvalCase(id='e1', prompt='a'), EvalCase(id='e1', prompt='b')])
 
     def test_mechanical_assertion_must_be_executable(self) -> None:
         with pytest.raises(SchemaError):
@@ -363,10 +347,7 @@ class TestSchemaDiscipline:
             ],
         )
         es.save(tmp_path / 'evals.json')
-        assert (
-            EvalSet.load(tmp_path / 'evals.json').assertion_set_hash()
-            == es.assertion_set_hash()
-        )
+        assert EvalSet.load(tmp_path / 'evals.json').assertion_set_hash() == es.assertion_set_hash()
 
     def test_future_schema_version_is_refused(self, tmp_path: Path) -> None:
         (tmp_path / 'evals.json').write_text(
@@ -424,9 +405,7 @@ class TestEventLogIntegrity:
     """UB-13 / UB-25. A lost or unparseable event must read as "unknown", not as
     proof the skill never fired."""
 
-    def test_a_corrupted_log_line_makes_a_non_hit_unknown_not_false(
-        self, tmp_path: Path
-    ) -> None:
+    def test_a_corrupted_log_line_makes_a_non_hit_unknown_not_false(self, tmp_path: Path) -> None:
         log = tmp_path / 'events.ndjson'
         run_id = 'r1'
         append(log, Event(ts='t', event='pre_tool_use', run_id=run_id))
@@ -458,9 +437,7 @@ class TestSupplyChain:
         (self.d / 'scripts' / 'go.py').write_text(
             "import subprocess, requests\nrequests.get('https://api.example.com/x')\n"
         )
-        (self.d / 'evals' / 'evals.json').write_text(
-            '{"skill_name": "demo-skill", "cases": []}'
-        )
+        (self.d / 'evals' / 'evals.json').write_text('{"skill_name": "demo-skill", "cases": []}')
         (self.d / '.git' / 'config').write_text('[remote]\n')
         (self.d / '.env').write_text('SECRET=hunter2\n')
 

@@ -20,10 +20,10 @@ discovery, and validation.
 
 ## Plugins
 
-| Plugin       | What it does                                                                |
+| Plugin | What it does |
 | ------------ | --------------------------------------------------------------------------- |
 | mightymodels | Ticket-scoped agent dev loop: per-ticket state, model routing, review stack |
-| ai-engineer  | Skills for building and hardening Claude Code agents, skills, and loops     |
+| ai-engineer | Skills for building and hardening Claude Code agents, skills, and loops |
 
 ### mightymodels
 
@@ -89,14 +89,14 @@ new skill and agent text for injection indicators without any configuration.
 
 ## Documentation
 
-| Page                                       | What it covers                                  |
+| Page | What it covers |
 | ------------------------------------------ | ----------------------------------------------- |
-| [docs/workflow.md](docs/workflow.md)       | The full loop, stage by stage, with diagrams    |
-| [docs/skills.md](docs/skills.md)           | Every skill: what it does and when it fires     |
-| [docs/agents.md](docs/agents.md)           | The seven workers and how models get routed     |
-| [docs/state.md](docs/state.md)             | The `.mightymodels/` directory and `ticket.yml` |
-| [docs/claude-code.md](docs/claude-code.md) | Running under Claude Code                       |
-| [evals/README.md](evals/README.md)         | The eval harness and how results are read       |
+| [docs/workflow.md](docs/workflow.md) | The full loop, stage by stage, with diagrams |
+| [docs/skills.md](docs/skills.md) | Every skill: what it does and when it fires |
+| [docs/agents.md](docs/agents.md) | The seven workers and how models get routed |
+| [docs/state.md](docs/state.md) | The `.mightymodels/` directory and `ticket.yml` |
+| [docs/claude-code.md](docs/claude-code.md) | Running under Claude Code |
+| [evals/README.md](evals/README.md) | The eval harness and how results are read |
 
 ## Evals
 

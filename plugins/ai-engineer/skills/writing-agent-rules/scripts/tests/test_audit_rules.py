@@ -74,9 +74,7 @@ def test_detects_conflicting_test_commands(dirty_findings: list[Finding]) -> Non
 
 
 def test_detects_missing_apply_to(dirty_findings: list[Finding]) -> None:
-    assert 'Scoping' in smells_in(
-        dirty_findings, '.github/instructions/frontend.instructions.md'
-    )
+    assert 'Scoping' in smells_in(dirty_findings, '.github/instructions/frontend.instructions.md')
 
 
 def test_missing_apply_to_is_an_error(dirty_findings: list[Finding]) -> None:
@@ -90,9 +88,7 @@ def test_missing_apply_to_is_an_error(dirty_findings: list[Finding]) -> None:
 
 def test_flags_rule_without_paths_as_info_only(dirty_findings: list[Finding]) -> None:
     scoping = [
-        f
-        for f in dirty_findings
-        if f.smell == 'Scoping' and f.path == '.claude/rules/api.md'
+        f for f in dirty_findings if f.smell == 'Scoping' and f.path == '.claude/rules/api.md'
     ]
     assert [f.severity for f in scoping] == ['info']
 
@@ -119,9 +115,7 @@ def test_ignores_smells_inside_code_fences(tmp_path: Path) -> None:
 
     findings, _ = audit(dirty_copy)
 
-    assert not [
-        f for f in findings if f.path == 'FENCED.md' and f.smell == 'Lint Leakage'
-    ]
+    assert not [f for f in findings if f.path == 'FENCED.md' and f.smell == 'Lint Leakage']
 
 
 def test_no_errors_or_warnings(clean_findings: list[Finding]) -> None:
@@ -139,9 +133,7 @@ def test_skill_paths_are_reported_as_shared(tmp_path: Path) -> None:
     shutil.copytree(FIXTURES / 'clean', clean_copy)
     skill_dir = clean_copy / '.claude' / 'skills' / 'demo'
     skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / 'SKILL.md').write_text(
-        '---\nname: demo\ndescription: d\n---\n', encoding='utf-8'
-    )
+    (skill_dir / 'SKILL.md').write_text('---\nname: demo\ndescription: d\n---\n', encoding='utf-8')
 
     _, layout = audit(clean_copy)
 

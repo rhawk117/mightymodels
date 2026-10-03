@@ -187,9 +187,7 @@ NESTING_NODES = (
 
 
 def dispatch_depth(child: ast.AST, depth: int) -> int:
-    if isinstance(
-        child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
-    ):
+    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
         return depth
     if isinstance(child, ast.If):
         return if_chain_depth(child, depth + 1)
@@ -229,9 +227,7 @@ def class_is_abstract(node: ast.ClassDef) -> bool:
         if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         for deco in item.decorator_list:
-            name = (
-                deco.attr if isinstance(deco, ast.Attribute) else getattr(deco, 'id', '')
-            )
+            name = deco.attr if isinstance(deco, ast.Attribute) else getattr(deco, 'id', '')
             if name in ('abstractmethod', 'abstractproperty'):
                 return True
     return False
@@ -337,9 +333,7 @@ def analyze_js(path: Path, rel: Path, text: str, language: str) -> FileMetric:
             if not match:
                 continue
             name = match.group(1) or '<anonymous>'
-            raw_params = (
-                match.group(2) if match.lastindex and match.lastindex >= 2 else ''
-            )
+            raw_params = match.group(2) if match.lastindex and match.lastindex >= 2 else ''
             end = js_function_end(lines, idx)
             params, bool_params = js_param_stats(raw_params or '')
             metric.functions.append(
@@ -378,9 +372,7 @@ def resolve_js_import(spec: str, importer: Path) -> str | None:
     return str(rel)
 
 
-def package_of(
-    module: str, depth: int = 1, strip: tuple[str, ...] = ('src', 'lib', 'app')
-) -> str:
+def package_of(module: str, depth: int = 1, strip: tuple[str, ...] = ('src', 'lib', 'app')) -> str:
     parts = module.split('.')
     while len(parts) > 1 and parts[0] in strip:
         parts = parts[1:]
@@ -507,13 +499,15 @@ def package_metrics(
         distance = None
         if instability is not None and abstractness is not None:
             distance = round(abs(abstractness + instability - 1), 3)
-        pkg.update({
-            'fan_in_ca': ca,
-            'fan_out_ce': ce,
-            'instability_i': instability,
-            'abstractness_a': abstractness,
-            'distance_d': distance,
-        })
+        pkg.update(
+            {
+                'fan_in_ca': ca,
+                'fan_out_ce': ce,
+                'instability_i': instability,
+                'abstractness_a': abstractness,
+                'distance_d': distance,
+            }
+        )
     package_graph: dict[str, set[str]] = {}
     for src, dst in edges:
         package_graph.setdefault(src, set()).add(dst)

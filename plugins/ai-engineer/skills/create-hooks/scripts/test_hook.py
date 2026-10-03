@@ -91,9 +91,7 @@ def main() -> int:
     if args.expect_empty and outputs:
         failures.append(f'expected empty stdout, got: {outputs[0][0][:200]}')
     if len(outputs) > 1:
-        failures.append(
-            f'{len(outputs)} JSON output lines; the contract is a single line'
-        )
+        failures.append(f'{len(outputs)} JSON output lines; the contract is a single line')
 
     result_obj = outputs[0][1] if outputs and outputs[0][1] is not None else {}
     for spec in args.expect_field:
@@ -107,10 +105,7 @@ def main() -> int:
             print(f'  - {f}')
         return 1
     shown = outputs[0][0][:200] if outputs else '(empty stdout)'
-    print(
-        f'PASS {script.name} < {Path(args.payload).name} -> '
-        f'exit {proc.returncode}, {shown}'
-    )
+    print(f'PASS {script.name} < {Path(args.payload).name} -> exit {proc.returncode}, {shown}')
     return 0
 
 

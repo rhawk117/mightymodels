@@ -72,17 +72,17 @@ Every agent file carries a `model:` pin, and the pin is only the fallback for he
 where nobody answered a routing question. The real source of truth is the active ticket's
 `ticket.yml`, whose `subagent-models` block the primary reads at dispatch time:
 
-| Role        | Default            | Why                                                        |
+| Role | Default | Why |
 | ----------- | ------------------ | ---------------------------------------------------------- |
-| scout       | `claude-haiku-4-5` | Retrieval is cheap-tier work by design                     |
-| engineer    | derived from scope | `large` pulls `claude-opus-5`; otherwise `claude-sonnet-5` |
-| budgetron   | `claude-sonnet-5`  | Bounded fixes do not need a frontier model                 |
-| gitty-up    | `claude-haiku-4-5` | Watching CI is polling, the cheapest job in the fleet      |
-| grumpy      | `claude-sonnet-5`  | Adversarial existence proofs are cheap to obtain           |
-| sunny       | `claude-opus-5`    | Corroboration carries the universal-claim burden           |
-| wingman     | `claude-opus-5`    | Tool-less judgment needs the strongest available reasoner  |
-| uncle-bob   | `claude-opus-5`    | Abstraction and structure judgment gets the frontier tier  |
-| merge-vader | `claude-opus-5`    | The adversarial pre-merge pass carries merge risk          |
+| scout | `claude-haiku-4-5` | Retrieval is cheap-tier work by design |
+| engineer | derived from scope | `large` pulls `claude-opus-5`; otherwise `claude-sonnet-5` |
+| budgetron | `claude-sonnet-5` | Bounded fixes do not need a frontier model |
+| gitty-up | `claude-haiku-4-5` | Watching CI is polling, the cheapest job in the fleet |
+| grumpy | `claude-sonnet-5` | Adversarial existence proofs are cheap to obtain |
+| sunny | `claude-opus-5` | Corroboration carries the universal-claim burden |
+| wingman | `claude-opus-5` | Tool-less judgment needs the strongest available reasoner |
+| uncle-bob | `claude-opus-5` | Abstraction and structure judgment gets the frontier tier |
+| merge-vader | `claude-opus-5` | The adversarial pre-merge pass carries merge risk |
 
 The engineer value in the ticket is the default for every task; the primary may bump a single
 gnarly task one tier at dispatch, logging the reason in that task's ASKED stanza. The reviewer

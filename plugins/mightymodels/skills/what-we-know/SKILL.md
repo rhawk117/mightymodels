@@ -132,8 +132,8 @@ The vocabulary is shared with lets-investigate so the two compose without transl
 
 | lets-investigate ledger | what-we-know |
 | ----------------------- | --------------------------------------- |
-| Known                   | knowns table row                        |
-| Open                    | uncertainty                             |
-| Decision                | knowns table row, source `user, round N` |
-| Resource                | Resources list, carried forward         |
-| Next                    | dropped; the investigation has ended    |
+| Known | knowns table row |
+| Open | uncertainty |
+| Decision | knowns table row, source `user, round N` |
+| Resource | Resources list, carried forward |
+| Next | dropped; the investigation has ended |

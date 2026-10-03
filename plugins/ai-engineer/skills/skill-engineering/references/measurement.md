@@ -76,8 +76,7 @@ claim about sampling error that three samples cannot support.
 Every assertion declares how much it can be trusted.
 
 **`mechanical`** — a shell command run in the outputs directory. Exit 0 passes. Deterministic,
-cheap, trustworthy at any n. Prefer these; a check like `test -f report.csv && head -1
-report.csv | grep -q margin` beats any amount of judgement.
+cheap, trustworthy at any n. Prefer these; a check like `test -f report.csv && head -1 report.csv | grep -q margin` beats any amount of judgement.
 
 **`judged`** — decided by the blinded grader in `agents/grader.md`. Necessary for anything
 about quality, and it carries grader noise. At `rigorous` a sample is double-graded and
@@ -147,8 +146,7 @@ different amounts of confidence.
 
 ## Comparing iterations
 
-Provenance records the model, host, skill content hash and assertion set hash. `skilleng
-bench --compare-to N` refuses the comparison when any of those changed, naming which.
+Provenance records the model, host, skill content hash and assertion set hash. `skilleng bench --compare-to N` refuses the comparison when any of those changed, naming which.
 
 The assertion hash is the important one. Sharpening assertions between iterations always
 produces apparent improvement, because assertions get sharpened toward what the current

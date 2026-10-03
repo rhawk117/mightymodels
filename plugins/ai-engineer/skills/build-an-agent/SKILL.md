@@ -25,7 +25,7 @@ with nothing but a debug-log line. A tool name neither platform recognises is dr
 silence, and the agent then runs without the capability and never says so. That is why this
 skill ends in a lint step rather than a "looks good to me".
 
----
+______________________________________________________________________
 
 ## Step 0 - Ask the target platform. Always, first.
 
@@ -52,7 +52,7 @@ Then read the reference for the chosen platform (both, if they said both):
 Read them at this point rather than earlier - they are lookups, and loading the wrong one
 wastes context.
 
----
+______________________________________________________________________
 
 ## Step 1 - Check that a subagent is the right answer
 
@@ -74,7 +74,7 @@ Two things people reach for subagents to do that a subagent does not do:
 If the request is really one of these, say so and offer the right artifact instead. Building
 the agent anyway is the more expensive mistake.
 
----
+______________________________________________________________________
 
 ## Step 2 - Interview
 
@@ -116,7 +116,7 @@ round rather than dripping them out.
    caller can ask follow-up questions, it will not port to Claude Code, where the subagent
    returns exactly once. Better to learn that now than at Step 5.
 
----
+______________________________________________________________________
 
 ## Step 3 - Write the body
 
@@ -147,7 +147,7 @@ Body length: Copilot CLI caps it at 30,000 characters. Below that, there is no e
 longer body hurts - so do not pad, but do not agonise about trimming a body that is genuinely
 carrying its weight.
 
----
+______________________________________________________________________
 
 ## Step 4 - Write the frontmatter
 
@@ -165,7 +165,7 @@ A few decisions worth making deliberately rather than by default:
 - **Do not hardcode runtime limits into the body.** Nesting depth, spawn caps and model
   precedence all changed inside a single quarter. Cite the reference; do not restate it.
 
----
+______________________________________________________________________
 
 ## Step 5 - Lint, then hand over
 
@@ -196,7 +196,7 @@ Close by stating what the output was verified against, for example "frontmatter 
 2026-08-30 against Claude Code v2.1.251 / Copilot CLI 1.0.79", so a stale recommendation
 identifies itself later instead of being trusted forever.
 
----
+______________________________________________________________________
 
 ## Reviewing or debugging an existing agent
 
@@ -213,14 +213,14 @@ Same skill, different entry point. Ask the platform (Step 0), read the reference
 `references/failure-modes.md` is the full catalogue, organised by symptom, with evidence
 grades. Read it when a diagnosis is not obvious from the four checks above.
 
----
+______________________________________________________________________
 
 ## Files in this skill
 
-| Path                          | Read it when                                                                     |
+| Path | Read it when |
 | ----------------------------- | -------------------------------------------------------------------------------- |
-| `references/claude-code.md`   | Target includes Claude Code. Frontmatter, load rules, caps.                      |
-| `references/copilot-cli.md`   | Target includes Copilot CLI. Frontmatter, paths, limits.                         |
+| `references/claude-code.md` | Target includes Claude Code. Frontmatter, load rules, caps. |
+| `references/copilot-cli.md` | Target includes Copilot CLI. Frontmatter, paths, limits. |
 | `references/failure-modes.md` | Diagnosing an existing agent, or unsure whether a design choice is a known trap. |
-| `templates/agent-body.md`     | Every time you write a body.                                                     |
-| `scripts/lint_agent.py`       | Every file you emit, before handing over.                                        |
+| `templates/agent-body.md` | Every time you write a body. |
+| `scripts/lint_agent.py` | Every file you emit, before handing over. |

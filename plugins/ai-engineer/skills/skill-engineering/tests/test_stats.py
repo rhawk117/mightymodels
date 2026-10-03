@@ -78,9 +78,7 @@ class TestDetectableEffect:
 
 class TestKappa:
     def test_perfect_agreement(self) -> None:
-        assert cohens_kappa([True, False, True], [True, False, True]) == pytest.approx(
-            1.0
-        )
+        assert cohens_kappa([True, False, True], [True, False, True]) == pytest.approx(1.0)
 
     def test_disagreement_lowers_kappa(self) -> None:
         assert cohens_kappa([True, True, False, False], [True, False, True, False]) < 0.5

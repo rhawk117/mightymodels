@@ -8,10 +8,10 @@ Re-read this file at the start of every iteration. It is the loop's rules; the c
 
 ## Unit of work
 
-One iteration handles: <one ticket / one failing test / one module>
+One iteration handles: \<one ticket / one failing test / one module>
 
 It may touch: <explicit paths or modules>
-It must not touch: <paths owned by another worker, or off limits>
+It must not touch: \<paths owned by another worker, or off limits>
 
 ## Acceptance criteria
 
@@ -19,12 +19,12 @@ Every criterion starts `false`. A criterion flips to `true` only after the evide
 
 | # | Criterion | Check | Evidence artifact | Passing looks like | Status |
 |---|---|---|---|---|---|
-| 1 | <what must be true> | `<command>` | `<path or output>` | <exit 0 / count / string> | false |
+| 1 | <what must be true> | `<command>` | `<path or output>` | \<exit 0 / count / string> | false |
 | 2 | | | | | false |
 
 ## Stop conditions
 
-- **Progress**: <e.g. all criteria true, or two consecutive iterations with no change to the criteria table>
+- **Progress**: \<e.g. all criteria true, or two consecutive iterations with no change to the criteria table>
 - **Cost backstop**: <turn cap> turns, <spend cap>
 - **Impossible**: if a criterion cannot be satisfied as written, stop, mark it impossible, and record why here rather than rewriting the criterion to something easier.
 
@@ -45,4 +45,4 @@ Every criterion starts `false`. A criterion flips to `true` only after the evide
 
 Append one line per iteration: what changed, which criteria moved, what the check said. Keep it terse; this file is re-read every iteration.
 
-- <iteration 1>
+- \<iteration 1>

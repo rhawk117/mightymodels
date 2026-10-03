@@ -64,14 +64,14 @@ The next session starts fresh and cheap. Which ramp it takes is not a judgment c
 from `ticket.yml`. This table is the canonical statement of the routing rule; every other
 document points here rather than restating it:
 
-| scope | plan-first | ramp             |
+| scope | plan-first | ramp |
 | ----- | ---------- | ---------------- |
-| sm    | false      | `yolo`           |
-| sm    | true       | `game-plan`      |
-| med   | false      | `game-plan`      |
-| med   | true       | `game-plan`      |
-| large | false      | `game-plan`      |
-| large | true       | `game-plan`      |
+| sm | false | `yolo` |
+| sm | true | `game-plan` |
+| med | false | `game-plan` |
+| med | true | `game-plan` |
+| large | false | `game-plan` |
+| large | true | `game-plan` |
 
 `yolo`: one short interview for whatever the context has not answered (it also runs without a
 ticket, writing the minimal ticket directory itself), reconfirm the claims at HEAD with two or

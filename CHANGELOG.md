@@ -34,7 +34,6 @@ See evals/README.md. Repository becomes a Claude-plugin-compatible layout; ad-ho
 
 ## 0.2.0 — the ten loop skills (2026-08-20)
 
-
 10 new skills (prepare-handoff, what-we-know, agents-assemble, lets-investigate, inline-sendoff, plan-work, finish-assembly, review-circus, whats-broken, prune-ticket) with shared contracts in agents-assemble/references/contracts.md and the ticket/dir schemas in prepare-handoff/references/.
 
 Every skill ships evals/: the smoke scenario + assertions (evals.json), a trigger set with the sprint/jira collision near-misses (trigger-eval.json), and a dated RESULTS-2026-08-20.md — harvested before session end, per the retention rule. Shared fixtures under evals/fixtures/ (rebuild with git state: evals/fixtures-build.sh).
@@ -46,7 +45,6 @@ Known iteration-2 items: bury fx-debug's cause deeper (cause-finding barely disc
 One design edit made mid-eval, before any run: review-circus gained the dual-provenance routing rule (a finding both reviewers flag routes to the engineer — when the structure judge saw it too, the fix is rarely mechanical). Surfaced by fixture design, not by a failure.
 
 ## 0.1.0 — alignment pass (2026-08-20)
-
 
 Alignment pass bringing the existing skills and agents in line with the v2 methodology, plus the two new items turn-2 skills depend on. Review gate per file below: each entry is what changed, why, and the one thing to check.
 
