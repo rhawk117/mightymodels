@@ -6,5 +6,11 @@
   "permission_mode": "default",
   "tool_name": "Bash",
   "tool_input": { "command": "npm test" },
-  "tool_response": { "stdout": "42 tests passed", "stderr": "", "interrupted": false }
+  "tool_response": {
+    "stdout": "42 tests passed",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false
+  },
+  "tool_use_id": "toolu_test_004"
 }

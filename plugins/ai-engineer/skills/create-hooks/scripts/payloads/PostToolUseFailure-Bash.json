@@ -6,5 +6,7 @@
   "permission_mode": "default",
   "tool_name": "Bash",
   "tool_input": { "command": "pytest" },
-  "error": "bash: pytest: command not found"
+  "tool_use_id": "toolu_test_005",
+  "error": "Exit code 127\nbash: pytest: command not found",
+  "is_interrupt": false
 }

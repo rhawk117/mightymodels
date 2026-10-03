@@ -6,8 +6,9 @@
   "permission_mode": "default",
   "tool_name": "Edit",
   "tool_input": {
-    "file_path": ".github/workflows/publish.yaml",
+    "file_path": "/tmp/repo/.github/workflows/publish.yaml",
     "old_string": "a",
     "new_string": "b"
-  }
+  },
+  "tool_use_id": "toolu_test_003"
 }

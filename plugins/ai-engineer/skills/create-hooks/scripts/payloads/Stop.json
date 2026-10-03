@@ -4,5 +4,8 @@
   "hook_event_name": "Stop",
   "transcript_path": "/tmp/transcript.jsonl",
   "permission_mode": "default",
-  "stop_hook_active": false
+  "stop_hook_active": false,
+  "last_assistant_message": "I have finished the change.",
+  "background_tasks": [],
+  "session_crons": []
 }
