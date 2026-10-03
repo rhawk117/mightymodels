@@ -47,15 +47,15 @@ rough task directly. This applies especially to grumpy, sunny, and wingman.
 
 ## The fleet at a glance
 
-| Worker | Class | Job | Hard state | Never does |
+| Worker    | Class     | Job                                           | Hard state        | Never does                        |
 | --------- | --------- | --------------------------------------------- | ----------------- | --------------------------------- |
-| scout | utility | Locate, extract, run one command, cite facts | `UNKNOWN-BLOCKED` | Analyze, diagnose, recommend |
-| engineer | utility | Implement one task group, verify, commit | `blocked` | Touch files outside its owned set |
-| budgetron | utility | Fix one named, bounded residual issue | `escalated` | Expand scope past the named issue |
-| gitty-up | utility | Watch CI on one PR, report the verdict | `error` | Modify code, ever |
-| grumpy | reasoning | Attack a proposition, plan, diff, or claim | report only | Validate or fix the work |
-| sunny | reasoning | Independently corroborate load-bearing claims | report only | Criticize or fix the work |
-| wingman | reasoning | Decide a genuinely stuck judgment call | one-shot | Read files, run commands, or act |
+| scout     | utility   | Locate, extract, run one command, cite facts  | `UNKNOWN-BLOCKED` | Analyze, diagnose, recommend      |
+| engineer  | utility   | Implement one task group, verify, commit      | `blocked`         | Touch files outside its owned set |
+| budgetron | utility   | Fix one named, bounded residual issue         | `escalated`       | Expand scope past the named issue |
+| gitty-up  | utility   | Watch CI on one PR, report the verdict        | `error`           | Modify code, ever                 |
+| grumpy    | reasoning | Attack a proposition, plan, diff, or claim    | report only       | Validate or fix the work          |
+| sunny     | reasoning | Independently corroborate load-bearing claims | report only       | Criticize or fix the work         |
+| wingman   | reasoning | Decide a genuinely stuck judgment call        | one-shot          | Read files, run commands, or act  |
 
 Two reviewer roles complete the fleet but are not agent-file workers: `uncle-bob` (structure and
 abstraction grading) and `merge-vader` (adversarial pre-merge review) are skills you run on a

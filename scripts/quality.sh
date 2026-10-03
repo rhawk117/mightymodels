@@ -4,7 +4,7 @@ set -uo pipefail
 shopt -s globstar
 
 readonly RUFF_CONFIG=(--config .ruff.toml --force-exclude)
-readonly MARKDOWN_GLOBS=(plugins/**/*.md docs/**/*.md)
+readonly MARKDOWN_GLOBS=(docs/**/*.md *.md)
 
 repository_root=$(git rev-parse --show-toplevel) || exit 1
 cd "${repository_root}" || exit 1

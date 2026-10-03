@@ -108,7 +108,7 @@ worded instruction because a precondition holds and a paragraph does not.
 
 `skilleng run` prints the run count before starting. The arithmetic is unforgiving:
 5 evals × 3 arms × 3 runs = 45 agent sessions for one `standard` iteration. At `rigorous`,
-120\. Say the number out loud before spending it, and prefer raising the number of *evals*
+120. Say the number out loud before spending it, and prefer raising the number of *evals*
 over the number of *runs* — variance between prompts is almost always larger than variance
 between repeats of one prompt, so evals buy more resolution per session.
 

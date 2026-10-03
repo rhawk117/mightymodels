@@ -1,15 +1,15 @@
 ---
 name: humanizer
 description: |
-  Remove signs of AI-generated writing from text. Use when editing or reviewing
-  text to make it sound more natural and human-written. Based on Wikipedia's
-  comprehensive "Signs of AI writing" guide. Detects and fixes patterns including:
-  inflated symbolism, promotional language, superficial -ing analyses, vague
-  attributions, em dash overuse, rule of three, AI vocabulary words, passive
-  voice, negative parallelisms, and filler phrases.
+    Remove signs of AI-generated writing from text. Use when editing or reviewing
+    text to make it sound more natural and human-written. Based on Wikipedia's
+    comprehensive "Signs of AI writing" guide. Detects and fixes patterns including:
+    inflated symbolism, promotional language, superficial -ing analyses, vague
+    attributions, em dash overuse, rule of three, AI vocabulary words, passive
+    voice, negative parallelisms, and filler phrases.
 license: MIT
 metadata:
-  version: '2.9.1'
+    version: '2.9.1'
 ---
 
 # Humanizer: Remove AI Writing Patterns
@@ -437,7 +437,7 @@ When you see these, lean toward leaving the prose alone — they are evidence of
 - **Genuine asides, parentheticals, or self-corrections.** "(I keep wanting to say 'almost' here, but it really was certain.)" Models rarely interrupt themselves like this.
 - **Edits made before November 30, 2022.** ChatGPT's public launch. Anything older than that is, with very rare exceptions, not AI-written.
 
-______________________________________________________________________
+---
 
 ## Invocation Modes
 

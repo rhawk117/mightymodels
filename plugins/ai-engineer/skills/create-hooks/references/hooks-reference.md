@@ -43,19 +43,19 @@ Hooks are entries under the `hooks` key of a settings file. Sources merge; when 
 
 The core set create-hooks proposes against:
 
-| Event | Fires | Matcher on |
+| Event                | Fires                                            | Matcher on            |
 | -------------------- | ------------------------------------------------ | --------------------- |
-| `SessionStart` | Session begins | startup/resume/clear/compact |
-| `UserPromptSubmit` | User submits a prompt, before the model sees it | (none) |
-| `PreToolUse` | Before a tool call executes | tool name |
-| `PostToolUse` | After a tool call succeeds | tool name |
-| `PostToolUseFailure` | After a tool call fails | tool name |
-| `Notification` | Claude Code emits a notification | notification type |
-| `SubagentStart` | A subagent is dispatched | agent type |
-| `SubagentStop` | A subagent finishes | agent type |
-| `Stop` | The main agent is about to end its turn | (none) |
-| `PreCompact` | Before context compaction | manual/auto |
-| `SessionEnd` | Session ends | (none) |
+| `SessionStart`       | Session begins                                   | startup/resume/clear/compact |
+| `UserPromptSubmit`   | User submits a prompt, before the model sees it  | (none)                |
+| `PreToolUse`         | Before a tool call executes                      | tool name             |
+| `PostToolUse`        | After a tool call succeeds                       | tool name             |
+| `PostToolUseFailure` | After a tool call fails                          | tool name             |
+| `Notification`       | Claude Code emits a notification                 | notification type     |
+| `SubagentStart`      | A subagent is dispatched                         | agent type            |
+| `SubagentStop`       | A subagent finishes                              | agent type            |
+| `Stop`               | The main agent is about to end its turn          | (none)                |
+| `PreCompact`         | Before context compaction                        | manual/auto           |
+| `SessionEnd`         | Session ends                                     | (none)                |
 
 More events exist (a long tail including `PermissionRequest`, `PostCompact`, and setup/config events); consult the installed version's docs before proposing outside this table, and never invent names — a misspelled event silently never fires.
 
@@ -106,9 +106,7 @@ Structured output goes in a `hookSpecificOutput` wrapper (plus optional top-leve
   `permissionDecision` is `allow`, `deny`, `ask`, or `defer`. `updatedInput` rewrites the tool's arguments before execution — the rewrite pattern (`allow` + `updatedInput`) replaces denying and hoping the model retries correctly.
 
 - `PostToolUse` and `Stop`: `{"decision": "block", "reason": "..."}` blocks (for Stop, the turn continues with the reason as guidance — guard with `stop_hook_active`).
-
 - `UserPromptSubmit`: `{"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": "..."}}` injects context; a `decision: "block"` rejects the prompt.
-
 - `SessionStart` and `SubagentStart`: `additionalContext` injects live context at the boundary.
 
 Scripts should emit at most one JSON object on stdout and keep diagnostics on stderr; interleaved prose on stdout corrupts parsing.

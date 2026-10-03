@@ -4,7 +4,7 @@ For one retrieval question inside an active mightymodels loop. The scout's own c
 
 **Ten-second checklist:** the question is retrieval, not judgment (a "should/why/is it sound" question bounces back NEEDS-ANALYSIS and wastes the dispatch) · exact paths, symbols, and search terms are in the task — the scout has not seen your diff, ticket, or ledger · scope is the narrowest that answers it.
 
-```
+````
 <objective>
 Answer one retrieval question: <question, phrased as locate/list/extract/run>.
 </objective>
@@ -14,6 +14,6 @@ Answer one retrieval question: <question, phrased as locate/list/extract/run>.
 <discovery>
 Search scope: <paths or packages>. Terms/symbols: <exact strings, quoted>. <File-type filter if useful.> Exclude vendored trees.
 </discovery>
-```
+````
 
 Slots: question · scope paths · exact terms · optional context lines. Everything else is the agent's standing contract.

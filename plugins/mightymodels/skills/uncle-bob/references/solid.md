@@ -36,7 +36,6 @@ function-level rule. SRP counts *actors* (distinct sources of change
 requests: finance vs operations vs DBAs), not features.
 
 Detect:
-
 - One class/module mixing two or more of: domain computation, persistence
   (SQL/ORM/file I/O), presentation (HTML/JSON layout, formatting), transport
   (HTTP/sockets), logging/config policy. His canonical negative example:
@@ -49,7 +48,6 @@ Detect:
   unrelated requirement sources; recurring merge conflicts in one class.
 
 Not a violation:
-
 - A DTO/dataclass with many fields and no behavior — no divergent actors.
 - Several steps serving the SAME actor in one module.
 - Responsibilities that never change independently. His modem example:
@@ -67,7 +65,6 @@ form (2017): "If component A should be protected from changes in component B,
 then B should depend on A."
 
 Detect:
-
 - The same type-tag switch/if-elif chain (on an enum, string kind,
   isinstance) repeated in 2+ places — adding a variant means editing every
   site. This is the load-bearing OCP signature and also smell G5/G23.
@@ -78,7 +75,6 @@ Detect:
 - Core business modules edited every time a peripheral feature landed.
 
 Not a violation:
-
 - ONE switch, appearing once, creating polymorphic objects, hidden behind an
   abstraction — Martin's own factory exception (Clean Code ch. 3).
 - Not being closed against every conceivable change: "No significant program
@@ -96,7 +92,6 @@ implementations), not inheritance syntax. Contract rule (via Meyer): an
 override may only *weaken* preconditions and *strengthen* postconditions.
 
 Detect:
-
 - Overrides that throw NotImplementedError/UnsupportedOperation or silently
   no-op ("degenerate functions in derivatives").
 - Overrides that add validation the base does not have (strengthened
@@ -111,7 +106,6 @@ Detect:
 - Subtypes raising exception types the base never raises.
 
 Not a violation:
-
 - Implementation-reuse inheritance with no polymorphic clients — the smell is
   latent until a client can be confused.
 - Subtypes extending behavior: new methods, wider inputs, stronger
@@ -126,7 +120,6 @@ Not a violation:
 more than you need."
 
 Detect:
-
 - Interfaces/ABCs/protocols whose methods partition into groups used by
   disjoint client sets (cluster the call sites; >1 cohesive cluster = fat).
 - Implementations forced to stub members: empty bodies, `pass`,
@@ -138,7 +131,6 @@ Detect:
   depends on everything.
 
 Not a violation:
-
 - A large interface whose methods are cohesive and used together by the same
   clients — ISP segregates by client, not by method count.
 - A class implementing several small interfaces — that is the cure.
@@ -153,7 +145,6 @@ list: don't refer to volatile concrete classes; don't derive from them; don't
 override concrete functions; concrete wiring lives in Main/factories.
 
 Detect:
-
 - Domain/use-case modules importing concrete infrastructure by name: DB
   drivers, ORMs, HTTP clients, SDK classes, filesystem APIs inside policy
   code.
@@ -168,7 +159,6 @@ Detect:
   inside policy code.
 
 Not a violation:
-
 - Depending on STABLE concretions: stdlib types, language runtime,
   `String`/`Path`/`Decimal`. Wrapping the stdlib in interfaces to satisfy
   DIP is Needless Complexity. Volatility is the trigger, not concreteness.

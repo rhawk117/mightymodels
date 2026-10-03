@@ -1,6 +1,6 @@
 ---
 name: uncle-bob
-description: >-
+description: >
   Analyze a codebase and grade its code quality against Robert C. Martin's
   ("Uncle Bob's") published principles: SOLID, the Clean Code rules and
   smells catalog (C/E/F/G/N/T), and the Clean Architecture component

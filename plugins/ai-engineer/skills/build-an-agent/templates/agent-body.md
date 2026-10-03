@@ -5,23 +5,23 @@ Bounded authority is what stops role drift - an agent that owns exactly one arti
 question resists wandering better than one told at length to stay focused.
 </role>
 
-\<inputs_expected>
+<inputs_expected>
 What the dispatching prompt MUST supply. Be specific enough that their absence is detectable.
 
 - <input>
 - <input>
 
-If any of these are missing, say so and stop. Do NOT infer them from \<the tempting wrong
+If any of these are missing, say so and stop. Do NOT infer them from <the tempting wrong
 source: filenames, commit messages, repository conventions, adjacent code>.
 
 This section is why the agent refuses instead of guessing. An agent that guesses its inputs
 returns something that looks exactly like a real answer.
-\</inputs_expected>
+</inputs_expected>
 
 <scope>
 IN: <the one unit of work>
 
-OUT: \<the adjacent work this agent must not drift into - name it explicitly; an empty OUT
+OUT: <the adjacent work this agent must not drift into - name it explicitly; an empty OUT
 list is how a task review turns into a branch review>
 </scope>
 
@@ -41,11 +41,11 @@ choose the route; heavy step-by-step scaffolding wastes the reasoning being paid
   missing, since a partial answer presented as complete is worse than no answer>
 </constraints>
 
-\<output_contract>
+<output_contract>
 <report>
-<finding location="file:line"/>
-<verdict>...</verdict>
-<confidence>high | medium | low</confidence>
+  <finding location="file:line"/>
+  <verdict>...</verdict>
+  <confidence>high | medium | low</confidence>
 </report>
 
 Return nothing outside these tags.
@@ -53,7 +53,7 @@ Return nothing outside these tags.
 Only what appears here survives back to the caller - on Claude Code the parent receives the
 final message and may summarise it further. Everything else stays in this agent's context and
 is discarded.
-\</output_contract>
+</output_contract>
 
 <examples>
 <example>

@@ -2,7 +2,7 @@
 
 Follow this structure exactly. Placeholders sit in angle brackets. Sections marked conditional appear only when they carry content; Plan conformance and Clean dimensions always appear.
 
-```markdown
+````markdown
 # MERGE-VADER REPORT: <branch> into <base>
 
 VERDICT: <BLOCK | MERGE WITH CONDITIONS | CLEAR>
@@ -55,7 +55,7 @@ VERDICT: <BLOCK | MERGE WITH CONDITIONS | CLEAR>
 
 <n> dispatched: <n> VERIFIED, <n> INFERRED, <n> NEEDS-ANALYSIS, <n> UNKNOWN-BLOCKED.
 <When applicable: Scouts unavailable; retrievals performed inline by the coordinator.>
-```
+````
 
 Field notes:
 

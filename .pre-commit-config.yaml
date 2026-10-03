@@ -41,6 +41,7 @@ repos:
         entry: uv run mdformat
         language: system
         types: [markdown]
+        exclude: ^plugins/
         pass_filenames: true
         stages: [pre-commit]
 

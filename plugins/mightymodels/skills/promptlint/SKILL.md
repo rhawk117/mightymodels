@@ -56,15 +56,15 @@ Keep commentary to a couple of sentences. If the prompt is long or the user want
 
 House format: trim, well-formed XML sections containing Markdown. XML tags let the agent parse instruction boundaries unambiguously; Markdown inside keeps each section readable. Include only sections that earn their place — a small bugfix prompt might need four; never pad to fill the template.
 
-| Section | Carries | Include when |
+| Section          | Carries                                                                                                                                                     | Include when                                      |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `<objective>` | What, where, and _why it matters_. One short paragraph. | Always |
-| `<context>` | Facts the agent cannot discover: symptom, environment, history, decisions already made. | There are such facts |
-| `<discovery>` | Investigation before changes: named files to read, flows to trace, assumptions to confirm against the code. | Always for non-trivial work |
-| `<constraints>` | Scope boundary (what must not change), minimal-change expectation, conventions — by pointing at an existing exemplar file, not describing style abstractly. | Always |
-| `<verification>` | The exact commands and expected results. Require evidence in the report — actual output, not "tests pass". | Always — non-negotiable |
-| `<output>` | What the final report contains: changed files, evidence, and anything discovered that contradicts this brief. | Agent runs unattended or reports to the user |
-| `<examples>` | 3–5 input→output pairs in `<example>` tags. | Output format matters and prose can't pin it down |
+| `<objective>`    | What, where, and _why it matters_. One short paragraph.                                                                                                     | Always                                            |
+| `<context>`      | Facts the agent cannot discover: symptom, environment, history, decisions already made.                                                                     | There are such facts                              |
+| `<discovery>`    | Investigation before changes: named files to read, flows to trace, assumptions to confirm against the code.                                                 | Always for non-trivial work                       |
+| `<constraints>`  | Scope boundary (what must not change), minimal-change expectation, conventions — by pointing at an existing exemplar file, not describing style abstractly. | Always                                            |
+| `<verification>` | The exact commands and expected results. Require evidence in the report — actual output, not "tests pass".                                                  | Always — non-negotiable                           |
+| `<output>`       | What the final report contains: changed files, evidence, and anything discovered that contradicts this brief.                                               | Agent runs unattended or reports to the user      |
+| `<examples>`     | 3–5 input→output pairs in `<example>` tags.                                                                                                                 | Output format matters and prose can't pin it down |
 
 Content rules that make the difference:
 
@@ -77,15 +77,15 @@ Content rules that make the difference:
 
 ## Anti-patterns to catch
 
-| Smell | Fix |
+| Smell                                                                     | Fix                                                                                           |
 | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| "Fix the login bug" | Symptom + likely location + what fixed looks like + a reproducing test |
-| Prescribing implementation the agent should discover | Move it to `<discovery>` as a question to answer |
-| "Do not X" with no alternative | Say what to do instead |
-| Success by assertion | Verification commands + evidence requirement |
-| Pasting whole files the agent can read | Reference the path; paste only what the agent can't access (logs, screenshots, external docs) |
-| Tests exist and the task is "make them pass" | Add general-solution language from `references/snippets.md` |
-| Conflicting instructions ("be thorough" + "change as little as possible") | Resolve the priority explicitly in the prompt |
+| "Fix the login bug"                                                       | Symptom + likely location + what fixed looks like + a reproducing test                        |
+| Prescribing implementation the agent should discover                      | Move it to `<discovery>` as a question to answer                                              |
+| "Do not X" with no alternative                                            | Say what to do instead                                                                        |
+| Success by assertion                                                      | Verification commands + evidence requirement                                                  |
+| Pasting whole files the agent can read                                    | Reference the path; paste only what the agent can't access (logs, screenshots, external docs) |
+| Tests exist and the task is "make them pass"                              | Add general-solution language from `references/snippets.md`                                   |
+| Conflicting instructions ("be thorough" + "change as little as possible") | Resolve the priority explicitly in the prompt                                                 |
 
 ## Review mode
 

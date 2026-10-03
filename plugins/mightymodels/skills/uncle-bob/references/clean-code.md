@@ -7,8 +7,8 @@ written — optimize for the reader; and the Boy Scout Rule — "always check a
 module in cleaner than when you checked it out."
 
 Contents: 1. Names · 2. Functions · 3. Comments · 4. Formatting ·
-5\. Objects/Data · 6. Error handling · 7. Boundaries · 8. Tests · 9. Classes ·
-10\. Numeric thresholds · 11. Full smells catalog (C/E/F/G/N/T).
+5. Objects/Data · 6. Error handling · 7. Boundaries · 8. Tests · 9. Classes ·
+10. Numeric thresholds · 11. Full smells catalog (C/E/F/G/N/T).
 
 ## 1. Meaningful Names (ch 2)
 
