@@ -11,6 +11,7 @@ Checked on 2026-10-03 against https://code.claude.com/docs/en/sub-agents and htt
 - Model resolution
 - Runtime caps
 - Invocation
+- Tools a subagent keeps
 
 ## Scopes and precedence
 
@@ -91,3 +92,9 @@ There is no limit on the total number of subagents spawned over a session. At th
 Claude delegates automatically from the `description` and the current context; a description containing "use proactively" encourages it. `@agent-NAME` or the typeahead entry `@"NAME (agent)"` makes that agent run, though Claude still writes its task prompt. `claude --agent NAME` runs the whole session as the agent, with its prompt replacing the default system prompt. Unverified: an older note of this skill said `effort` and `isolation` are dropped under `--agent`, citing two issue numbers; the docs snapshot has no such statement.
 
 A subagent cannot ask the user questions (`AskUserQuestion` is removed from every subagent), so a body that depends on follow-up questions to the user will not work.
+
+## Tools a subagent keeps
+
+A subagent inherits the built-in tools and MCP tools available in the main conversation, narrowed by two filters; a fork skips both and receives the main conversation's exact tool pool. The first filter removes these tools from every subagent, even when listed in the `tools` field: `Agent`, when the subagent is at the depth limit; `AskUserQuestion`; `EndConversation`; `EnterPlanMode`; `ExitPlanMode`, unless the subagent's `permissionMode` is `plan`; `ScheduleWakeup`; `WaitForMcpServers`; and `Workflow`.
+
+The second filter applies to subagents running in the background, which is the default. Apart from `Agent` and `ExitPlanMode`, which follow the first filter's conditions wherever the subagent runs, a background subagent keeps every MCP tool but only these built-in tools: `Read`, `Grep`, `Glob`, `LSP`, `Bash`, `PowerShell`, `Edit`, `Write`, `NotebookEdit`, `WebFetch`, `WebSearch`, `TodoWrite`, `Skill`, `ToolSearch`, `EnterWorktree`, `ExitWorktree`, `Monitor`, `TaskStop`, `SendMessage` and `Artifact`, plus `SubagentHandback` for a subagent that reports through it. Claude Code removes every other built-in tool from a background subagent, whether inherited or listed in the `tools` field, and reports no error unless that leaves the `tools` list resolving to nothing.
