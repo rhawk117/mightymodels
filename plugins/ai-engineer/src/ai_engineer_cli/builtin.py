@@ -3,10 +3,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ai_engineer_cli.findings import Finding, error, warning
+from ai_engineer_cli.findings import CannotCheckError, Finding, error, warning
 
 
-class BuiltinUnavailableError(Exception):
+class BuiltinUnavailableError(CannotCheckError):
     """The built-in validator could not run, so no verdict exists."""
 
 

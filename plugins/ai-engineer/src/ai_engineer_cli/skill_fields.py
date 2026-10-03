@@ -4,8 +4,7 @@ from pathlib import Path
 
 from ai_engineer_cli.findings import Finding, error, warning
 
-# The 17 keys in the Claude Code skills frontmatter table, plus the agentskills.io keys
-# license, compatibility and metadata, which the checks below also validate.
+# The 20 keys in the Claude Code skills frontmatter table.
 KNOWN_KEYS = frozenset(
     {
         'name',

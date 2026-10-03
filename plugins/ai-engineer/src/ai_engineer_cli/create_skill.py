@@ -4,8 +4,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ai_engineer_cli.builtin import BuiltinUnavailableError, run_builtin
-from ai_engineer_cli.findings import Finding, error, report
+from ai_engineer_cli.builtin import run_builtin
+from ai_engineer_cli.findings import CannotCheckError, Finding, error, report
 from ai_engineer_cli.frontmatter import parse_skill_text
 from ai_engineer_cli.skill_body import check_body
 from ai_engineer_cli.skill_fields import check_fields, directory_name_of
@@ -30,10 +30,12 @@ def validate_command(arguments: argparse.Namespace) -> int:
         return 2
     try:
         builtin_findings = run_skill_builtin(skill_dir)
-    except BuiltinUnavailableError as problem:
+        builtin_errored = any(finding.level == 'error' for finding in builtin_findings)
+        own_findings = check_skill(skill_dir, builtin_errored=builtin_errored)
+    except CannotCheckError as problem:
         print(f'error: {problem}', file=sys.stderr)
         return 2
-    findings = [*builtin_findings, *check_skill(skill_dir)]
+    findings = [*builtin_findings, *own_findings]
     return report(directory_name_of(skill_dir), findings, strict=arguments.strict)
 
 
@@ -42,12 +44,19 @@ def run_skill_builtin(skill_dir: Path) -> list[Finding]:
     # would also report on siblings, so it gets a copy of this one skill alone under `skills`.
     with tempfile.TemporaryDirectory() as staging:
         skills = Path(staging) / 'skills'
-        shutil.copytree(skill_dir, skills / directory_name_of(skill_dir), symlinks=True)
+        try:
+            shutil.copytree(skill_dir, skills / directory_name_of(skill_dir), symlinks=True)
+        except (shutil.Error, OSError) as problem:
+            message = f'could not read {skill_dir} to hand it to claude: {problem}'
+            raise CannotCheckError(message) from problem
         return run_builtin(skills)
 
 
-def check_skill(skill_dir: Path) -> list[Finding]:
-    """The checks `claude plugin validate` is silent on."""
+def check_skill(skill_dir: Path, *, builtin_errored: bool = False) -> list[Finding]:
+    """The checks `claude plugin validate` is silent on.
+
+    Raises CannotCheckError when the frontmatter is invalid YAML that the built-in let pass.
+    """
     skill_md = skill_dir / 'SKILL.md'
     if not skill_md.is_file():
         return [error(f'{skill_md} not found')]
@@ -58,6 +67,12 @@ def check_skill(skill_dir: Path) -> list[Finding]:
     except UnicodeError:
         return [error(f'{skill_md} is not valid UTF-8')]
     skill = parse_skill_text(text)
+    if skill.yaml_problem is not None and not builtin_errored:
+        message = (
+            f'{skill_md}: frontmatter is not valid YAML ({skill.yaml_problem}); '
+            'the field checks could not run'
+        )
+        raise CannotCheckError(message)
     findings = [error(problem) for problem in skill.key_problems]
     if skill.fields is not None:
         findings.extend(check_fields(skill.fields, directory_name_of(skill_dir)))

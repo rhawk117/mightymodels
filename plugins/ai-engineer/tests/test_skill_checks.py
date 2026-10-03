@@ -1,7 +1,8 @@
 from pathlib import Path
 
+import pytest
 from ai_engineer_cli.create_skill import check_skill
-from ai_engineer_cli.findings import Finding
+from ai_engineer_cli.findings import CannotCheckError, Finding
 
 DESCRIPTION = 'Summarize a file. Use when the user asks for a summary of a file.'
 CLEAN_FRONTMATTER = f'name: demo-skill\ndescription: {DESCRIPTION}\n'
@@ -305,9 +306,18 @@ def test_vs29_skill_md_over_500_lines(tmp_path: Path) -> None:
     assert_warning(findings, 'SKILL.md is 525 lines')
 
 
-def test_unparseable_frontmatter_is_left_to_the_builtin(tmp_path: Path) -> None:
-    skill_dir = tmp_path / 'demo-skill'
-    skill_dir.mkdir()
-    (skill_dir / 'SKILL.md').write_text('---\nname: "unclosed\n---\n# Demo\n\nBody.\n')
+def test_invalid_yaml_the_builtin_passed_cannot_be_checked(tmp_path: Path) -> None:
+    skill_dir = write_skill(tmp_path, 'name: demo-skill\ndescription: [unclosed\n')
 
-    assert check_skill(skill_dir) == []
+    with pytest.raises(CannotCheckError, match='field checks could not run'):
+        check_skill(skill_dir)
+
+
+def test_invalid_yaml_the_builtin_reported_keeps_the_own_checks(tmp_path: Path) -> None:
+    skill_dir = write_skill(tmp_path, 'name: demo-skill\ndescription: "unclosed\n')
+
+    assert check_skill(skill_dir, builtin_errored=True) == []
+
+
+def test_empty_link_target_is_not_a_reference(tmp_path: Path) -> None:
+    assert check(tmp_path, body='# Demo\n\nSee [the notes]( ) and [more](<>).\n') == []

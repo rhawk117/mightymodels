@@ -53,6 +53,7 @@ class SkillText:
     fields: dict[str, object] | None
     key_problems: list[str]
     body: str
+    yaml_problem: str | None = None
 
 
 def split_frontmatter(text: str) -> tuple[str | None, str]:
@@ -74,8 +75,9 @@ def parse_skill_text(text: str) -> SkillText:
     loader = FrontmatterLoader(raw)
     try:
         fields = loader.get_single_data()
-    except yaml.YAMLError:
-        return SkillText(None, [], body)
+    except yaml.YAMLError as problem:
+        first_line = (str(problem).splitlines() or [type(problem).__name__])[0]
+        return SkillText(None, [], body, first_line)
     finally:
         loader.dispose()
     if fields is None:

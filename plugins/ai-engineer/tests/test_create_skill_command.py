@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -150,3 +151,42 @@ def test_builtin_runs_for_a_skill_under_a_directory_with_another_name(
     output = capsys.readouterr().out
     assert 'name must be a string' in output
     assert 'No description in frontmatter' not in output
+
+
+def test_invalid_yaml_the_builtin_passed_exits_two_without_a_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub_builtin(monkeypatch, [])
+    skill_dir = write_skill(tmp_path, 'name: demo-skill\ndescription: [unclosed\n')
+
+    assert main(['create-skill', 'validate', str(skill_dir)]) == 2
+    captured = capsys.readouterr()
+    assert 'not valid YAML' in captured.err
+    assert 'PASS' not in captured.out
+    assert 'FAIL' not in captured.out
+
+
+def test_invalid_yaml_the_builtin_reported_exits_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub_builtin(monkeypatch, [error('YAML frontmatter failed to parse')])
+    skill_dir = write_skill(tmp_path, 'name: demo-skill\ndescription: "unclosed\n')
+
+    assert main(['create-skill', 'validate', str(skill_dir)]) == 1
+    assert 'FAIL demo-skill' in capsys.readouterr().out
+
+
+def test_unreadable_skill_file_exits_two_naming_the_path(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    skill_dir = write_skill(tmp_path)
+    skill_md = skill_dir / 'SKILL.md'
+    skill_md.chmod(0)
+    if os.access(skill_md, os.R_OK):
+        pytest.skip('this user can read a mode 000 file')
+
+    assert main(['create-skill', 'validate', str(skill_dir)]) == 2
+    captured = capsys.readouterr()
+    assert str(skill_md) in captured.err
+    assert 'PASS' not in captured.out
+    assert 'FAIL' not in captured.out

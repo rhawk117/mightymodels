@@ -112,7 +112,8 @@ def link_target(raw: str) -> str:
     if target.startswith('<'):
         closing = target.find('>')
         return target[1:closing] if closing > 0 else target
-    return target.split(maxsplit=1)[0]
+    words = target.split(maxsplit=1)
+    return words[0] if words else ''
 
 
 def normalized_reference(value: str, *, resource_only: bool) -> str | None:

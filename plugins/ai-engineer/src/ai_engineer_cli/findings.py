@@ -2,6 +2,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 
+class CannotCheckError(Exception):
+    """The skill cannot be fully checked, so the command must give no verdict."""
+
+
 @dataclass(frozen=True)
 class Finding:
     level: Literal['error', 'warning']
