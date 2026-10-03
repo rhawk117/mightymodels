@@ -29,6 +29,10 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
 
 IGNORED_DIRS = {
     '.git',
@@ -132,17 +136,18 @@ def is_test_path(rel: Path) -> bool:
     return any(marker in rel.name.lower() for marker in ('.spec.', '.test.'))
 
 
-def iter_source_files(root: Path) -> list[Path]:
-    found: list[Path] = []
+def iter_source_files(root: Path) -> list[tuple[Path, str]]:
+    found: list[tuple[Path, str]] = []
     for path in sorted(root.rglob('*')):
-        if not path.is_file() or language_of(path) is None:
+        language = language_of(path)
+        if not path.is_file() or language is None:
             continue
         rel_parts = path.relative_to(root).parts
         if any(part in IGNORED_DIRS or part.startswith('.') for part in rel_parts[:-1]):
             continue
         if path.name.endswith(('.min.js', '.bundle.js', '.d.ts')):
             continue
-        found.append(path)
+        found.append((path, language))
     return found
 
 
@@ -215,22 +220,37 @@ def if_chain_depth(node: ast.If, depth: int) -> int:
     return deepest
 
 
+def _reference_name(expr: ast.expr) -> str:
+    if isinstance(expr, ast.Attribute):
+        return expr.attr
+    if isinstance(expr, ast.Name):
+        return expr.id
+    return ''
+
+
+def _has_abstract_method(node: ast.ClassDef) -> bool:
+    methods = [i for i in node.body if isinstance(i, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    return any(
+        _reference_name(deco) in ('abstractmethod', 'abstractproperty')
+        for method in methods
+        for deco in method.decorator_list
+    )
+
+
 def class_is_abstract(node: ast.ClassDef) -> bool:
-    for base in node.bases:
-        name = base.attr if isinstance(base, ast.Attribute) else getattr(base, 'id', '')
-        if name in ('ABC', 'Protocol', 'ABCMeta'):
-            return True
-    for kw in node.keywords:
-        if kw.arg == 'metaclass':
-            return True
-    for item in node.body:
-        if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        for deco in item.decorator_list:
-            name = deco.attr if isinstance(deco, ast.Attribute) else getattr(deco, 'id', '')
-            if name in ('abstractmethod', 'abstractproperty'):
-                return True
-    return False
+    if any(_reference_name(base) in ('ABC', 'Protocol', 'ABCMeta') for base in node.bases):
+        return True
+    if any(kw.arg == 'metaclass' for kw in node.keywords):
+        return True
+    return _has_abstract_method(node)
+
+
+def resolve_from_import(node: ast.ImportFrom, package_parts: list[str]) -> str:
+    if node.level == 0:
+        return node.module or ''
+    base = package_parts[: len(package_parts) - node.level + 1]
+    prefix = '.'.join(base)
+    return f'{prefix}.{node.module}' if node.module else prefix
 
 
 def python_imports(tree: ast.Module, module: str) -> list[str]:
@@ -240,19 +260,13 @@ def python_imports(tree: ast.Module, module: str) -> list[str]:
         if isinstance(node, ast.Import):
             imports.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
-            if node.level == 0:
-                if node.module:
-                    imports.append(node.module)
-                continue
-            base = package_parts[: len(package_parts) - node.level + 1]
-            prefix = '.'.join(base)
-            resolved = f'{prefix}.{node.module}' if node.module else prefix
+            resolved = resolve_from_import(node, package_parts)
             if resolved:
                 imports.append(resolved)
     return imports
 
 
-def analyze_python(path: Path, rel: Path, text: str) -> FileMetric:
+def analyze_python(rel: Path, text: str) -> FileMetric:
     loc, long_lines = count_loc(text)
     metric = FileMetric(str(rel), 'python', loc, long_lines, is_test=is_test_path(rel))
     try:
@@ -317,7 +331,7 @@ def js_param_stats(raw: str) -> tuple[int, int]:
     return count, min(bools, count)
 
 
-def analyze_js(path: Path, rel: Path, text: str, language: str) -> FileMetric:
+def analyze_js(rel: Path, text: str, language: str) -> FileMetric:
     loc, long_lines = count_loc(text)
     metric = FileMetric(str(rel), language, loc, long_lines, is_test=is_test_path(rel))
     metric.imports = JS_IMPORT_RE.findall(text)
@@ -333,9 +347,9 @@ def analyze_js(path: Path, rel: Path, text: str, language: str) -> FileMetric:
             if not match:
                 continue
             name = match.group(1) or '<anonymous>'
-            raw_params = match.group(2) if match.lastindex and match.lastindex >= 2 else ''
+            raw_params = match.group(2)
             end = js_function_end(lines, idx)
-            params, bool_params = js_param_stats(raw_params or '')
+            params, bool_params = js_param_stats(raw_params)
             metric.functions.append(
                 FunctionMetric(
                     str(rel),
@@ -379,107 +393,127 @@ def package_of(module: str, depth: int = 1, strip: tuple[str, ...] = ('src', 'li
     return '.'.join(parts[: max(depth, 1)]) if len(parts) > 1 else parts[0]
 
 
-def build_module_graph(metrics: list[FileMetric], root: Path) -> dict[str, set[str]]:
+def build_module_graph(metrics: list[FileMetric]) -> dict[str, set[str]]:
     modules = {module_name_for(Path(m.path)): m for m in metrics}
     graph: dict[str, set[str]] = {name: set() for name in modules}
     for metric in metrics:
         source = module_name_for(Path(metric.path))
         for imp in metric.imports:
-            target = resolve_internal(imp, metric, modules, root)
+            target = resolve_internal(imp, metric, modules)
             if target and target != source:
                 graph[source].add(target)
     return graph
 
 
-def resolve_internal(
-    imp: str, metric: FileMetric, modules: dict[str, FileMetric], root: Path
-) -> str | None:
-    if metric.language == 'python':
-        candidate = imp
-        while candidate:
-            if candidate in modules:
-                return candidate
-            candidate = candidate.rpartition('.')[0]
-        return None
-    if not imp.startswith('.'):
-        return None
-    base = Path(metric.path).parent
-    joined = base.joinpath(imp)
+def resolve_python_import(imp: str, modules: dict[str, FileMetric]) -> str | None:
+    candidate = imp
+    while candidate:
+        if candidate in modules:
+            return candidate
+        candidate = candidate.rpartition('.')[0]
+    return None
+
+
+def normalize_parts(parts: tuple[str, ...]) -> list[str]:
     normalized: list[str] = []
-    for part in joined.parts:
+    for part in parts:
         if part == '..':
             if normalized:
                 normalized.pop()
         elif part not in ('.', ''):
             normalized.append(part)
-    candidate = '.'.join(normalized)
+    return normalized
+
+
+def resolve_relative_import(
+    imp: str, metric: FileMetric, modules: dict[str, FileMetric]
+) -> str | None:
+    if not imp.startswith('.'):
+        return None
+    joined = Path(metric.path).parent.joinpath(imp)
+    candidate = '.'.join(normalize_parts(joined.parts))
     for suffix in ('', '.index'):
         if candidate + suffix in modules:
             return candidate + suffix
     return None
 
 
-def tarjan_sccs(graph: dict[str, set[str]]) -> list[list[str]]:
-    index_counter = [0]
-    stack: list[str] = []
-    lowlinks: dict[str, int] = {}
-    index: dict[str, int] = {}
-    on_stack: dict[str, bool] = {}
-    sccs: list[list[str]] = []
+def resolve_internal(imp: str, metric: FileMetric, modules: dict[str, FileMetric]) -> str | None:
+    if metric.language == 'python':
+        return resolve_python_import(imp, modules)
+    return resolve_relative_import(imp, metric, modules)
 
-    def strongconnect(node: str) -> None:
-        worklist = [(node, iter(sorted(graph.get(node, ()))))]
-        index[node] = lowlinks[node] = index_counter[0]
-        index_counter[0] += 1
-        stack.append(node)
-        on_stack[node] = True
+
+@dataclass
+class TarjanState:
+    graph: dict[str, set[str]]
+    stack: list[str] = field(default_factory=list)
+    index: dict[str, int] = field(default_factory=dict)
+    lowlinks: dict[str, int] = field(default_factory=dict)
+    on_stack: set[str] = field(default_factory=set)
+    sccs: list[list[str]] = field(default_factory=list)
+
+    def visit(self, node: str) -> tuple[str, Iterator[str]]:
+        self.index[node] = self.lowlinks[node] = len(self.index)
+        self.stack.append(node)
+        self.on_stack.add(node)
+        return node, iter(sorted(self.graph.get(node, ())))
+
+    def next_unvisited_child(self, current: str, children: Iterator[str]) -> str | None:
+        for child in children:
+            if child not in self.index:
+                return child
+            if child in self.on_stack:
+                self.lowlinks[current] = min(self.lowlinks[current], self.index[child])
+        return None
+
+    def pop_component(self, root: str) -> None:
+        component: list[str] = []
+        while True:
+            member = self.stack.pop()
+            self.on_stack.discard(member)
+            component.append(member)
+            if member == root:
+                break
+        self.sccs.append(sorted(component))
+
+    def strongconnect(self, start: str) -> None:
+        worklist = [self.visit(start)]
         while worklist:
             current, children = worklist[-1]
-            advanced = False
-            for child in children:
-                if child not in index:
-                    index[child] = lowlinks[child] = index_counter[0]
-                    index_counter[0] += 1
-                    stack.append(child)
-                    on_stack[child] = True
-                    worklist.append((child, iter(sorted(graph.get(child, ())))))
-                    advanced = True
-                    break
-                if on_stack.get(child):
-                    lowlinks[current] = min(lowlinks[current], index[child])
-            if advanced:
+            child = self.next_unvisited_child(current, children)
+            if child is not None:
+                worklist.append(self.visit(child))
                 continue
             worklist.pop()
             if worklist:
                 parent = worklist[-1][0]
-                lowlinks[parent] = min(lowlinks[parent], lowlinks[current])
-            if lowlinks[current] == index[current]:
-                component: list[str] = []
-                while True:
-                    member = stack.pop()
-                    on_stack[member] = False
-                    component.append(member)
-                    if member == current:
-                        break
-                sccs.append(sorted(component))
+                self.lowlinks[parent] = min(self.lowlinks[parent], self.lowlinks[current])
+            if self.lowlinks[current] == self.index[current]:
+                self.pop_component(current)
 
+
+def tarjan_sccs(graph: dict[str, set[str]]) -> list[list[str]]:
+    state = TarjanState(graph)
     for node in sorted(graph):
-        if node not in index:
-            strongconnect(node)
-    return [scc for scc in sccs if len(scc) > 1]
+        if node not in state.index:
+            state.strongconnect(node)
+    return [scc for scc in state.sccs if len(scc) > 1]
 
 
-def package_metrics(
-    graph: dict[str, set[str]], metrics: list[FileMetric], depth: int = 1
-) -> dict[str, dict]:
-    by_module = {module_name_for(Path(m.path)): m for m in metrics}
-    packages: dict[str, dict] = {}
+def package_edges(graph: dict[str, set[str]], depth: int) -> set[tuple[str, str]]:
     edges: set[tuple[str, str]] = set()
     for source, targets in graph.items():
         for target in targets:
             src_pkg, dst_pkg = package_of(source, depth), package_of(target, depth)
             if src_pkg != dst_pkg:
                 edges.add((src_pkg, dst_pkg))
+    return edges
+
+
+def package_totals(metrics: list[FileMetric], depth: int) -> dict[str, dict[str, Any]]:
+    by_module = {module_name_for(Path(m.path)): m for m in metrics}
+    packages: dict[str, dict[str, Any]] = {}
     for module, metric in by_module.items():
         pkg = packages.setdefault(
             package_of(module, depth),
@@ -489,25 +523,35 @@ def package_metrics(
         pkg['classes'] += metric.classes
         pkg['abstract_classes'] += metric.abstract_classes
         pkg['loc'] += metric.loc
+    return packages
+
+
+def add_coupling(name: str, pkg: dict[str, Any], edges: set[tuple[str, str]]) -> None:
+    ce = sum(1 for src, dst in edges if src == name)
+    ca = sum(1 for src, dst in edges if dst == name)
+    instability = round(ce / (ca + ce), 3) if (ca + ce) else None
+    abstractness = round(pkg['abstract_classes'] / pkg['classes'], 3) if pkg['classes'] else None
+    distance = None
+    if instability is not None and abstractness is not None:
+        distance = round(abs(abstractness + instability - 1), 3)
+    pkg.update(
+        {
+            'fan_in_ca': ca,
+            'fan_out_ce': ce,
+            'instability_i': instability,
+            'abstractness_a': abstractness,
+            'distance_d': distance,
+        }
+    )
+
+
+def package_metrics(
+    graph: dict[str, set[str]], metrics: list[FileMetric], depth: int = 1
+) -> dict[str, Any]:
+    edges = package_edges(graph, depth)
+    packages = package_totals(metrics, depth)
     for name, pkg in packages.items():
-        ce = sum(1 for src, dst in edges if src == name)
-        ca = sum(1 for src, dst in edges if dst == name)
-        instability = round(ce / (ca + ce), 3) if (ca + ce) else None
-        abstractness = (
-            round(pkg['abstract_classes'] / pkg['classes'], 3) if pkg['classes'] else None
-        )
-        distance = None
-        if instability is not None and abstractness is not None:
-            distance = round(abs(abstractness + instability - 1), 3)
-        pkg.update(
-            {
-                'fan_in_ca': ca,
-                'fan_out_ce': ce,
-                'instability_i': instability,
-                'abstractness_a': abstractness,
-                'distance_d': distance,
-            }
-        )
+        add_coupling(name, pkg, edges)
     package_graph: dict[str, set[str]] = {}
     for src, dst in edges:
         package_graph.setdefault(src, set()).add(dst)
@@ -515,10 +559,12 @@ def package_metrics(
     return {'packages': packages, 'package_cycles': tarjan_sccs(package_graph)}
 
 
-def collect_violations(metrics: list[FileMetric], cap: int) -> dict:
+def collect_violations(metrics: list[FileMetric], cap: int) -> dict[str, Any]:
     functions = [f for m in metrics for f in m.functions]
 
-    def listing(items: list[FunctionMetric], key) -> list[dict]:
+    def listing(
+        items: list[FunctionMetric], key: Callable[[FunctionMetric], int]
+    ) -> list[dict[str, Any]]:
         ranked = sorted(items, key=key, reverse=True)[:cap]
         return [
             {
@@ -564,8 +610,8 @@ def collect_violations(metrics: list[FileMetric], cap: int) -> dict:
 
 
 def summarize(
-    metrics: list[FileMetric], graph: dict[str, set[str]], cap: int, depth: int = 1
-) -> dict:
+    metrics: list[FileMetric], graph: dict[str, set[str]], cap: int, *, depth: int = 1
+) -> dict[str, Any]:
     src = [m for m in metrics if not m.is_test]
     tests = [m for m in metrics if m.is_test]
     src_loc = sum(m.loc for m in src)
@@ -578,7 +624,9 @@ def summarize(
     pkg = package_metrics(graph, metrics, depth)
     return {
         'tool': 'uncle-bob metrics.py',
-        'granularity_note': 'fan-in/fan-out counted at module level, rolled up to top-level packages',
+        'granularity_note': (
+            'fan-in/fan-out counted at module level, rolled up to top-level packages'
+        ),
         'totals': {
             'files': len(metrics),
             'source_files': len(src),
@@ -598,18 +646,24 @@ def summarize(
     }
 
 
-def render_summary(report: dict) -> str:
+def render_summary(report: dict[str, Any]) -> str:
     totals = report['totals']
     violations = report['violations']
     lines = [
         f'files\t{totals["files"]} ({totals["test_files"]} test)',
-        f'source LOC\t{totals["source_loc"]}\ttest LOC\t{totals["test_loc"]}\tratio\t{totals["test_to_source_ratio"]}',
+        (
+            f'source LOC\t{totals["source_loc"]}\ttest LOC\t{totals["test_loc"]}'
+            f'\tratio\t{totals["test_to_source_ratio"]}'
+        ),
         f'module cycles (ADP)\t{report["module_cycles_adp"]["count"]}',
         f'package cycles (ADP)\t{len(report["component_metrics"]["package_cycles"])}',
         f'functions > {FUNCTION_LOC_LIMIT} LOC\t{violations["functions_over_20_loc"]["count"]}',
         f'functions > {PARAM_LIMIT} params\t{violations["functions_over_3_params"]["count"]}',
         f'functions with bool params\t{violations["functions_with_bool_params"]["count"]}',
-        f'functions nested > {DEPTH_LIMIT}\t{violations["functions_nested_deeper_than_2"]["count"]}',
+        (
+            f'functions nested > {DEPTH_LIMIT}'
+            f'\t{violations["functions_nested_deeper_than_2"]["count"]}'
+        ),
         f'files > {FILE_LOC_LIMIT} LOC\t{len(violations["files_over_500_loc"])}',
         f'lines > {LINE_LIMIT} chars\t{violations["long_lines_over_120_chars"]}',
         '',
@@ -621,6 +675,27 @@ def render_summary(report: dict) -> str:
             f'{pkg["instability_i"]}\t{pkg["abstractness_a"]}\t{pkg["distance_d"]}'
         )
     return '\n'.join(lines)
+
+
+def read_text(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding='utf-8', errors='replace')
+    except OSError:
+        return None
+
+
+def analyze_tree(root: Path) -> list[FileMetric]:
+    metrics: list[FileMetric] = []
+    for path, language in iter_source_files(root):
+        text = read_text(path)
+        if text is None:
+            continue
+        rel = path.relative_to(root)
+        if language == 'python':
+            metrics.append(analyze_python(rel, text))
+        else:
+            metrics.append(analyze_js(rel, text, language))
+    return metrics
 
 
 def main() -> int:
@@ -639,20 +714,9 @@ def main() -> int:
     if not root.is_dir():
         print(f'error: {root} is not a directory', file=sys.stderr)
         return 2
-    metrics: list[FileMetric] = []
-    for path in iter_source_files(root):
-        rel = path.relative_to(root)
-        try:
-            text = path.read_text(encoding='utf-8', errors='replace')
-        except OSError:
-            continue
-        language = language_of(path)
-        if language == 'python':
-            metrics.append(analyze_python(path, rel, text))
-        else:
-            metrics.append(analyze_js(path, rel, text, language))
-    graph = build_module_graph(metrics, root)
-    report = summarize(metrics, graph, args.max_listed, args.package_depth)
+    metrics = analyze_tree(root)
+    graph = build_module_graph(metrics)
+    report = summarize(metrics, graph, args.max_listed, depth=args.package_depth)
     if args.out:
         args.out.write_text(json.dumps(report, indent=2, sort_keys=False))
         print(f'wrote {args.out}')

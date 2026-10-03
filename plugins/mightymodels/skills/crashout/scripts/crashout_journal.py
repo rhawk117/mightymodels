@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -34,17 +34,19 @@ DEFAULT_JOURNAL = Path('.mightymodels/crashouts.yml')
 class _Rant(str):
     """Marker type so the rant always dumps as a literal block scalar."""
 
+    __slots__ = ()
+
 
 class _Dumper(yaml.SafeDumper):
     pass
 
 
-def _repr_str(dumper: yaml.SafeDumper, data: str) -> yaml.ScalarNode:
+def _repr_str(dumper: yaml.SafeDumper, data: str) -> object:
     style = '|' if '\n' in data else None
     return dumper.represent_scalar('tag:yaml.org,2002:str', data, style=style)
 
 
-def _repr_rant(dumper: yaml.SafeDumper, data: _Rant) -> yaml.ScalarNode:
+def _repr_rant(dumper: yaml.SafeDumper, data: _Rant) -> object:
     return dumper.represent_scalar('tag:yaml.org,2002:str', str(data), style='|')
 
 
@@ -58,7 +60,7 @@ def _fail(message: str) -> NoReturn:
 
 
 def _dump(entries: list[dict[str, Any]]) -> str:
-    return yaml.dump(entries, Dumper=_Dumper, sort_keys=False, allow_unicode=True, width=100)
+    return str(yaml.dump(entries, Dumper=_Dumper, sort_keys=False, allow_unicode=True, width=100))
 
 
 def _load(journal: Path) -> list[dict[str, Any]]:
@@ -79,13 +81,16 @@ def _nonempty_str(raw: dict[str, Any], key: str) -> str:
     return value
 
 
-def _validated(raw: dict[str, Any]) -> dict[str, Any]:
+def _check_keys(raw: dict[str, Any]) -> None:
     provided = set(raw)
     required = set(ENTRY_KEYS) - set(NULLABLE_KEYS) - {'at'}
     if missing := sorted(required - provided):
         _fail(f'missing keys: {missing}')
     if unknown := sorted(provided - (set(ENTRY_KEYS) - {'at'})):
         _fail(f'unknown keys: {unknown} (schema drift: fix the caller, not the journal)')
+
+
+def _check_values(raw: dict[str, Any]) -> None:
     if raw['severity'] not in SEVERITIES:
         _fail(f'severity must be one of {SEVERITIES}')
     if raw['verdict'] not in VERDICTS:
@@ -102,6 +107,11 @@ def _validated(raw: dict[str, Any]) -> dict[str, Any]:
     for key in NULLABLE_KEYS:
         if raw.get(key) is not None and not isinstance(raw[key], str):
             _fail(f"'{key}' must be a string or null")
+
+
+def _validated(raw: dict[str, Any]) -> dict[str, Any]:
+    _check_keys(raw)
+    _check_values(raw)
     entry = {key: raw.get(key) for key in ENTRY_KEYS if key != 'at'}
     entry['root_cause'] = _nonempty_str(raw, 'root_cause').strip()
     entry['corrective_action'] = _nonempty_str(raw, 'corrective_action').strip()
@@ -138,7 +148,7 @@ def _cmd_add(journal: Path) -> None:
     if not isinstance(raw, dict):
         _fail('stdin must be a single JSON object')
     entry = _validated(raw)
-    ordered: dict[str, Any] = {'at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}
+    ordered: dict[str, Any] = {'at': datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}
     ordered.update(entry)
     journal.parent.mkdir(parents=True, exist_ok=True)
     with journal.open('a', encoding='utf-8') as handle:
