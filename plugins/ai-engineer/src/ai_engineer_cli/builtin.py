@@ -53,6 +53,13 @@ def parse_report(stdout: str, *, include_manifest: bool = True) -> list[Finding]
 
 def section_findings(section: dict[str, list[dict[str, str]]]) -> list[Finding]:
     return [
-        *(error(item['message']) for item in section.get('errors', [])),
-        *(warning(item['message']) for item in section.get('warnings', [])),
+        *(error(finding_text(item)) for item in section.get('errors', [])),
+        *(warning(finding_text(item)) for item in section.get('warnings', [])),
     ]
+
+
+def finding_text(item: dict[str, str]) -> str:
+    path = item.get('path')
+    if isinstance(path, str) and path:
+        return f'{path}: {item["message"]}'
+    return item['message']

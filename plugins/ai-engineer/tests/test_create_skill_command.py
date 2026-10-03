@@ -117,7 +117,22 @@ def test_parse_report_reads_errors_and_warnings_from_contents() -> None:
         '"warnings": [{"path": "d", "message": "no description", "code": null}], "notes": []}]}'
     )
 
-    assert parse_report(report) == [error('bad name'), warning('no description')]
+    assert parse_report(report) == [error('name: bad name'), warning('d: no description')]
+
+
+def test_parse_report_prefixes_a_finding_with_its_path_only_when_it_has_one() -> None:
+    report = (
+        '{"success": false, "manifest": null, "contents": [{"errors": ['
+        '{"path": "mcpServers.db.command", "message": "expected string", "code": null}, '
+        '{"path": "", "message": "empty path", "code": null}, '
+        '{"message": "no path"}], "warnings": []}]}'
+    )
+
+    assert parse_report(report) == [
+        error('mcpServers.db.command: expected string'),
+        error('empty path'),
+        error('no path'),
+    ]
 
 
 def test_parse_report_rejects_output_that_is_not_json() -> None:

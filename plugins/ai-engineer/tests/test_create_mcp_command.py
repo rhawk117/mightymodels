@@ -612,5 +612,5 @@ def test_real_builtin_reports_a_server_with_no_command(
 
     assert validate(kind, path) == 1
     output = capsys.readouterr().out
-    assert 'Invalid input: expected string, received undefined' in output
+    assert 'mcpServers.db.command: Invalid input: expected string, received undefined' in output
     assert 'version' not in output
