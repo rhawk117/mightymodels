@@ -2,7 +2,6 @@ import os
 import re
 import subprocess
 import tomllib
-from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -15,14 +14,6 @@ SHEBANG_LIMIT = 127
 REQUIREMENT_END = re.compile(r'[<>=!~;\[ ]')
 WITH_PIN = re.compile(r'--with (\S+)==(\S+)')
 PYTHON_SPEC = re.compile(r'--python "?([^" ]+)"?')
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class Launch:
-    shebang: str
-    command: str
-    pins: dict[str, str]
-    requires_python: str
 
 
 def normalized(name: str) -> str:
