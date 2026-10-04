@@ -48,13 +48,6 @@ def test_validate_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     assert 'PLAN' in capsys.readouterr().out
 
 
-def test_render_is_not_a_command_yet() -> None:
-    with pytest.raises(SystemExit) as exit_info:
-        main(['plugin', 'render', '--help'])
-
-    assert exit_info.value.code == 2
-
-
 def test_plugin_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

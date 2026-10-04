@@ -1,0 +1,52 @@
+from pathlib import Path
+
+import msgspec
+
+from ai_engineer_cli.plugin.layout import MANIFEST_PATH, planned_directories
+from ai_engineer_cli.plugin.manifest import json_text, manifest_text
+from ai_engineer_cli.plugin.plan_md import render_plan_md, render_readme
+from ai_engineer_cli.plugin.record import Plan
+
+
+class RenderRefusedError(Exception):
+    """The target cannot take the plugin shell; nothing was written."""
+
+
+def plan_files(plan: Plan, root: Path) -> dict[str, str]:
+    return {
+        MANIFEST_PATH: manifest_text(plan),
+        'README.md': render_readme(plan),
+        'PLAN.md': render_plan_md(plan, str(root)),
+        'plugin-plan.json': json_text(msgspec.to_builtins(plan)),
+    }
+
+
+def inside(root: Path, relative: str) -> Path:
+    """The path under root, resolved, or a refusal when it leaves root."""
+    path = (root / relative).resolve()
+    if not path.is_relative_to(root):
+        message = f'{relative} resolves outside {root}'
+        raise RenderRefusedError(message)
+    return path
+
+
+def render(plan: Plan, target: Path, *, force: bool) -> list[str]:
+    """Write the four plan files and the planned directories under target; return their paths.
+
+    Every path is resolved inside target before the first write, and nothing is deleted.
+    """
+    root = target.resolve()
+    if root.exists() and not root.is_dir():
+        message = f'{target} is not a directory'
+        raise RenderRefusedError(message)
+    files = {inside(root, name): text for name, text in plan_files(plan, root).items()}
+    directories = [inside(root, name) for name in planned_directories(plan)]
+    if inside(root, MANIFEST_PATH).exists() and not force:
+        message = f'{target / MANIFEST_PATH} exists; pass --force to rewrite the plan files'
+        raise RenderRefusedError(message)
+    for path, text in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding='utf-8')
+    for directory in directories:
+        directory.mkdir(parents=True, exist_ok=True)
+    return [str(path.relative_to(root)) for path in [*files, *directories]]

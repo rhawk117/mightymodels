@@ -44,6 +44,7 @@ class Component(msgspec.Struct):
     facts: list[str] = []
     advice: Advice | None = None
     decision: str = 'as planned'
+    files: list[str] = []
 
 
 class OutsideItem(msgspec.Struct):
@@ -57,6 +58,13 @@ class UserConfigOption(msgspec.Struct):
     type: str = ''
     title: str = ''
     description: str = ''
+    required: bool | UnsetType = UNSET
+    default: str | float | bool | list[str] | UnsetType = UNSET
+    options: list[str] | UnsetType = UNSET
+    multiple: bool | UnsetType = UNSET
+    sensitive: bool | UnsetType = UNSET
+    minimum: float | UnsetType = msgspec.field(name='min', default=UNSET)
+    maximum: float | UnsetType = msgspec.field(name='max', default=UNSET)
 
 
 class Dependency(msgspec.Struct):
@@ -88,6 +96,14 @@ class Plan(msgspec.Struct):
         name='userConfig', default_factory=dict
     )
     dependencies: list[str | Dependency] = []
+
+
+def audience_of(plan: Plan) -> Audience:
+    return plan.audience or Audience()
+
+
+def distribution_of(plan: Plan) -> Distribution:
+    return plan.distribution or Distribution()
 
 
 def decode_plan(document: object) -> Plan:

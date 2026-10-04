@@ -32,24 +32,25 @@
   "components": [
     {
       "kind": "hook",
-      "name": "ruff-on-edit",
-      "purpose": "Run ruff on each Python file the agent edits and feed the findings back so they are fixed in the same turn.",
+      "name": "uv-runner",
+      "purpose": "Rewrite bare pytest, ruff and mypy invocations to run through uv when the repo has a uv.lock.",
       "status": "planned",
       "builder": "create-hooks",
       "answers": {
-        "event": "PostToolUse",
-        "matcher": "Edit|Write",
+        "event": "PreToolUse",
+        "matcher": "Bash",
         "intent": "failure mode, prevent",
-        "posture": "inform",
+        "posture": "enforce",
         "scope": "plugin"
       },
       "facts": [
-        "ships in hooks/hooks.json; runs for every user of the plugin",
-        "the script is called through ${CLAUDE_PLUGIN_ROOT}/scripts/ruff-on-edit.py"
+        "ships in hooks/hooks.json under the PreToolUse event with matcher Bash; runs for every user of the plugin",
+        "the script is scripts/uv-runner.py, called through ${CLAUDE_PLUGIN_ROOT}",
+        "exit code 2 blocks the command and any other failure does not; run /reload-plugins after changes"
       ],
       "advice": {
-        "mechanism": "rules",
-        "reason": "an instruction to run ruff would cost nothing, but agents skip it under pressure; the hook runs every time"
+        "mechanism": "permissions",
+        "reason": "a rewrite that only ever wraps three fixed commands could be a deny rule such as Bash(pytest *) in the project .claude/settings.json plus a rule file; the hook was kept because the rewrite must also work in repositories without settings"
       },
       "decision": "as planned"
     },
@@ -88,7 +89,7 @@
       },
       "facts": [
         "registers as py-harness:test-runner",
-        "verify discovery with claude agents after installing the plugin"
+        "after installing the plugin, type @agent-py-harness:test-runner in a session; the typeahead lists plugin agents under their scoped name"
       ],
       "advice": null,
       "decision": "as planned"
