@@ -68,7 +68,7 @@
       },
       "facts": [
         "runs as /py-harness:add-fastapi-route",
-        "a skill of the same name in the project or personal scope takes precedence over the plugin skill"
+        "a skill of the same name in the project or personal scope loads alongside the plugin skill, because plugin skills are namespaced as /plugin-name:skill-name"
       ],
       "advice": null,
       "decision": "as planned"

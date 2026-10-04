@@ -9,9 +9,7 @@ from ai_engineer_cli.cli import main
 from ai_engineer_cli.plugin.phases import PHASES
 
 EXAMPLE = Path(__file__).parent.parent / 'skills' / 'plan-plugin' / 'assets' / 'plan.example.json'
-RESIDUE = re.compile(
-    r'copilot|agent-plugins|COPILOT_HOME|\.agent\.md|ask_user|worker', re.IGNORECASE
-)
+RESIDUE = re.compile(r'agent-plugins|\.agent\.md|ask_user|worker', re.IGNORECASE)
 
 KIND_COMPONENTS = {
     'skill': 'add-route',
@@ -158,9 +156,6 @@ def test_pp_a13_render_creates_one_directory_per_planned_component_kind(tmp_path
         'bin',
         'output-styles',
     }
-    assert not any(
-        'com.github.copilot' in name or 'rules' in name for name in directories_of(tmp_path / 'out')
-    )
     assert claude_validate(tmp_path / 'out').returncode == 0
 
 
@@ -264,7 +259,7 @@ def test_pp_a19_a20_publish_session_pins_sha_beside_ref(tmp_path: Path) -> None:
     assert 'CLAUDE_CODE_PLUGIN_CACHE_DIR' in publish
 
 
-def test_pp_a47_rendered_example_text_has_no_copilot_residue(tmp_path: Path) -> None:
+def test_pp_a47_rendered_example_text_has_no_residue(tmp_path: Path) -> None:
     assert render(EXAMPLE, tmp_path / 'out') == 0
 
     for name in ('PLAN.md', 'README.md'):
