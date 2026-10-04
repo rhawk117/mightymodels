@@ -108,6 +108,74 @@ def test_ch_a24_camel_case_event_exits_one_without_strict(
     assert 'spell it PreToolUse' in capsys.readouterr().out
 
 
+def bad_command_handler(**extra: object) -> dict[str, object]:
+    return {'type': 'command', 'command': SCRIPT_COMMAND, 'timeout': 10, **extra}
+
+
+def validate_lines(path: Path, capsys: pytest.CaptureFixture[str]) -> list[str]:
+    assert main(['hook', 'validate', str(path)]) == 1
+    return [line for line in capsys.readouterr().out.splitlines() if line.startswith('error')]
+
+
+def test_a_handler_both_passes_report_prints_one_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    where = 'hooks.PreToolUse.0.hooks.0'
+    stub_builtin(monkeypatch, [error(f'hooks: {where}: Invalid command hook')])
+    hooks = {'PreToolUse': [{'matcher': 'Bash', 'hooks': [bad_command_handler(bogus=1)]}]}
+
+    lines = validate_lines(write_plugin(tmp_path, hooks), capsys)
+
+    assert lines == [f'error: {where}: Object contains unknown field `bogus`']
+
+
+def test_a_builtin_finding_at_a_location_the_schema_did_not_report_still_prints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub_builtin(monkeypatch, [error('hooks: hooks.PreToolUse.0: Hook matcher must be an object')])
+
+    lines = validate_lines(write_plugin(tmp_path), capsys)
+
+    assert lines == ['error: hooks: hooks.PreToolUse.0: Hook matcher must be an object']
+
+
+def test_two_handlers_that_each_fail_print_one_line_each(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub_builtin(
+        monkeypatch,
+        [
+            error('hooks: hooks.PreToolUse.0.hooks.1: Invalid command hook'),
+            error('hooks: hooks.PreToolUse.0.hooks.10: Invalid command hook'),
+        ],
+    )
+    handlers = [bad_command_handler(), bad_command_handler(bogus=1)]
+    handlers.extend(bad_command_handler() for _ in range(8))
+    handlers.append(bad_command_handler(bogus=2))
+    hooks = {'PreToolUse': [{'matcher': 'Bash', 'hooks': handlers}]}
+
+    lines = validate_lines(write_plugin(tmp_path, hooks), capsys)
+
+    assert lines == [
+        'error: hooks.PreToolUse.0.hooks.1: Object contains unknown field `bogus`',
+        'error: hooks.PreToolUse.0.hooks.10: Object contains unknown field `bogus`',
+    ]
+
+
+def test_a_groups_schema_finding_does_not_drop_its_handlers_builtin_findings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub_builtin(monkeypatch, [error('hooks: hooks.PreToolUse.0.hooks.0: Invalid command hook')])
+    hooks = {'PreToolUse': [{'matcher': 7, 'hooks': [bad_command_handler()]}]}
+
+    lines = validate_lines(write_plugin(tmp_path, hooks), capsys)
+
+    assert lines == [
+        'error: hooks.PreToolUse.0: Expected `str`, got `int` - at `$.matcher`',
+        'error: hooks: hooks.PreToolUse.0.hooks.0: Invalid command hook',
+    ]
+
+
 def test_builtin_error_exits_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     stub_builtin(monkeypatch, [error('Unknown hook type "bogus"')])
 
@@ -235,26 +303,28 @@ def test_parse_report_can_leave_out_the_manifest_findings() -> None:
 
 
 @pytest.mark.skipif(shutil.which('claude') is None, reason='needs the claude CLI')
-def test_real_builtin_reports_a_bogus_handler_type_in_a_plugin_file(
+def test_a_bogus_handler_type_in_a_plugin_file_is_reported_once_beside_the_real_builtin(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     path = write_plugin(tmp_path, BOGUS_TYPE_HOOKS)
 
     assert main(['hook', 'validate', str(path)]) == 1
     output = capsys.readouterr().out
-    assert 'Unknown hook type "bogus"' in output
+    assert output.count('hooks.PreToolUse.0.hooks.0') == 1
+    assert "Invalid value 'bogus'" in output
     assert 'version' not in output
 
 
 @pytest.mark.skipif(shutil.which('claude') is None, reason='needs the claude CLI')
-def test_real_builtin_reports_a_bogus_handler_type_in_a_settings_file(
+def test_a_bogus_handler_type_in_a_settings_file_is_reported_once_beside_the_real_builtin(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     path = write_settings(tmp_path, BOGUS_TYPE_HOOKS)
 
     assert main(['hook', 'validate', str(path)]) == 1
     output = capsys.readouterr().out
-    assert 'Unknown hook type "bogus"' in output
+    assert output.count('hooks.PreToolUse.0.hooks.0') == 1
+    assert "Invalid value 'bogus'" in output
     assert 'version' not in output
 
 

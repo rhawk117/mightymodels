@@ -7,6 +7,7 @@ from ai_engineer_cli.builtin import run_builtin
 from ai_engineer_cli.findings import CannotCheckError, Finding, report
 from ai_engineer_cli.hook.checks import check_hooks
 from ai_engineer_cli.hook.file import HooksFile, load_hooks_file
+from ai_engineer_cli.hook.nodes import SchemaFinding, decode_hooks
 from ai_engineer_cli.hook.runner import Expectations, HookTest, check_hook, parse_field_expectation
 
 DEFAULT_TEST_TIMEOUT_SECONDS = 15.0
@@ -16,7 +17,7 @@ def build_group(parser: argparse.ArgumentParser) -> None:
     commands = parser.add_subparsers(dest='command', metavar='COMMAND')
     validate = commands.add_parser(
         'validate',
-        help='run claude plugin validate on the hooks, then the checks it misses',
+        help='check the schema, run claude plugin validate, then the checks both miss',
     )
     validate.add_argument(
         'hooks_file',
@@ -62,11 +63,26 @@ def validate_command(arguments: argparse.Namespace) -> int:
 
 
 def validate_findings(path: Path) -> list[Finding]:
+    """The schema findings, the built-in's the schema did not already report, then the checks."""
     hooks_file = load_hooks_file(path)
+    decoded = decode_hooks(hooks_file.config)
     builtin_findings = run_hooks_builtin(hooks_file)
     builtin_errored = any(finding.level == 'error' for finding in builtin_findings)
-    own_findings = check_hooks(hooks_file, builtin_errored=builtin_errored)
-    return [*builtin_findings, *own_findings]
+    own_findings = check_hooks(hooks_file, decoded, builtin_errored=builtin_errored)
+    return [
+        *(schema_finding.finding for schema_finding in decoded.findings),
+        *(
+            finding
+            for finding in builtin_findings
+            if not reports_location(finding, decoded.findings)
+        ),
+        *own_findings,
+    ]
+
+
+def reports_location(finding: Finding, schema_findings: tuple[SchemaFinding, ...]) -> bool:
+    """Whether the finding names a location the schema pass already reported."""
+    return any(f'{schema.where}: ' in finding.message for schema in schema_findings)
 
 
 def run_hooks_builtin(hooks_file: HooksFile) -> list[Finding]:

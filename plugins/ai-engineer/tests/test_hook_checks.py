@@ -3,10 +3,11 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.findings import CannotCheckError, Finding
+from ai_engineer_cli.findings import CannotCheckError, Finding, error, warning
 from ai_engineer_cli.hook.checks import check_hooks
 from ai_engineer_cli.hook.file import load_hooks_file
 from ai_engineer_cli.hook.matchers import regex_problem
+from ai_engineer_cli.hook.nodes import decode_hooks
 
 SCRIPT_COMMAND = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check.py"'
 
@@ -39,8 +40,13 @@ def write_settings(root: Path, hooks: object, **top_level: object) -> Path:
     return path
 
 
-def check(path: Path) -> list[Finding]:
-    return check_hooks(load_hooks_file(path), builtin_errored=False)
+def check(path: Path, *, builtin_errored: bool = False) -> list[Finding]:
+    hooks_file = load_hooks_file(path)
+    decoded = decode_hooks(hooks_file.config)
+    return [
+        *(schema_finding.finding for schema_finding in decoded.findings),
+        *check_hooks(hooks_file, decoded, builtin_errored=builtin_errored),
+    ]
 
 
 def check_plugin(root: Path, hooks: object, **top_level: object) -> list[Finding]:
@@ -119,16 +125,18 @@ def test_ch_a24_pascal_case_events_pass(tmp_path: Path) -> None:
     assert check(write_settings(tmp_path, hooks)) == []
 
 
-def test_ch_a24_a_name_that_is_no_event_in_any_case_is_left_to_the_builtin(tmp_path: Path) -> None:
+def test_ch_a24_a_name_that_is_no_event_in_any_case_is_a_schema_warning(tmp_path: Path) -> None:
     hooks = {'notAnEvent': [{'hooks': [command_handler('true')]}]}
 
-    assert check_plugin(tmp_path, hooks) == []
+    assert check_plugin(tmp_path, hooks) == [
+        warning("hooks.notAnEvent: Invalid enum value 'notAnEvent'")
+    ]
 
 
 def test_h15_unknown_handler_field_is_an_error(tmp_path: Path) -> None:
     findings = check_plugin(tmp_path, pre_tool_use(command_handler(bogus=1)))
 
-    assert_error(findings, "unknown field 'bogus' on a command handler")
+    assert findings == [error('hooks.PreToolUse.0.hooks.0: Object contains unknown field `bogus`')]
 
 
 @pytest.mark.parametrize('field', ['env', 'bash', 'powershell', 'timeoutSec', 'cwd', 'matcher'])
@@ -137,7 +145,7 @@ def test_ch_a28_launch_fields_of_the_other_host_are_unknown_handler_fields(
 ) -> None:
     findings = check_plugin(tmp_path, pre_tool_use(command_handler(**{field: 'x'})))
 
-    assert_error(findings, f"unknown field '{field}'")
+    assert_error(findings, f'unknown field `{field}`')
 
 
 def test_ch_a25_the_shell_field_and_exec_form_fields_are_known(tmp_path: Path) -> None:
@@ -348,10 +356,10 @@ def test_unparseable_file_the_builtin_passed_cannot_be_checked(tmp_path: Path) -
 
     with pytest.raises(CannotCheckError):
         check(path)
-    assert check_hooks(load_hooks_file(path), builtin_errored=True) == []
+    assert check(path, builtin_errored=True) == []
 
 
-def test_malformed_parts_are_left_to_the_builtin(tmp_path: Path) -> None:
+def test_each_malformed_part_gets_one_schema_finding(tmp_path: Path) -> None:
     hooks = {
         'PreToolUse': [
             'x',
@@ -360,5 +368,53 @@ def test_malformed_parts_are_left_to_the_builtin(tmp_path: Path) -> None:
         ]
     }
 
-    assert check_plugin(tmp_path, hooks) == []
-    assert check_plugin(tmp_path, []) == []
+    assert [finding.message for finding in check_plugin(tmp_path, hooks)] == [
+        'hooks.PreToolUse.0: Expected `object`, got `str`',
+        'hooks.PreToolUse.1: Expected `array`, got `str` - at `$.hooks`',
+        'hooks.PreToolUse.2.hooks.0: Expected `object`, got `str`',
+        "hooks.PreToolUse.2.hooks.1: Invalid value 'bogus' - at `$.type`",
+    ]
+
+
+def test_a_hooks_value_that_is_not_an_object_gets_one_schema_finding(tmp_path: Path) -> None:
+    assert [finding.message for finding in check_plugin(tmp_path, [])] == [
+        'hooks: Expected `object`, got `array`'
+    ]
+
+
+def test_an_event_whose_value_is_not_an_array_gets_one_schema_finding(tmp_path: Path) -> None:
+    findings = check_plugin(tmp_path, {'PreToolUse': 'x'})
+
+    assert [finding.message for finding in findings] == [
+        'hooks.PreToolUse: Expected `array`, got `str`'
+    ]
+
+
+def test_a_handler_that_fails_the_schema_gets_no_gap_checks(tmp_path: Path) -> None:
+    handler = command_handler('python3 /opt/none/x.py', bogus=1)
+
+    findings = check_plugin(tmp_path, pre_tool_use(handler))
+
+    assert [finding.level for finding in findings] == ['error']
+
+
+def test_a_group_that_fails_the_schema_gets_no_gap_checks(tmp_path: Path) -> None:
+    group = {'matcher': 7, 'hooks': [command_handler('python3 /opt/none/x.py')]}
+
+    findings = check_plugin(tmp_path, {'PreToolUse': [group]})
+
+    assert [finding.message for finding in findings] == [
+        'hooks.PreToolUse.0: Expected `str`, got `int` - at `$.matcher`'
+    ]
+
+
+def test_a_valid_handler_is_checked_beside_a_handler_that_fails_the_schema(tmp_path: Path) -> None:
+    missing = command_handler('python3 "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/missing.py"')
+    group = {'matcher': 'Bash', 'hooks': [command_handler(bogus=1), missing]}
+
+    findings = check_plugin(tmp_path, {'PreToolUse': [group]})
+
+    assert [finding.message.split(':')[0] for finding in findings] == [
+        'hooks.PreToolUse.0.hooks.0',
+        'hooks.PreToolUse.0.hooks.1',
+    ]

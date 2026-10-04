@@ -1,6 +1,8 @@
 import re
 import warnings
 
+from msgspec import UNSET
+
 from ai_engineer_cli.findings import Finding, error, warning
 from ai_engineer_cli.hook.events import EVERY_TOOL_CALL_EVENTS, MATCHERLESS_EVENTS
 from ai_engineer_cli.hook.nodes import Group
@@ -35,11 +37,9 @@ TOLERATED_REGEX_ERRORS = (
 
 def matcher_findings(group: Group) -> list[Finding]:
     """Rows H33, H34 and H35 for one matcher group."""
-    if 'matcher' not in group.fields:
+    matcher = group.matcher
+    if matcher is UNSET:
         return missing_matcher_findings(group)
-    matcher = group.fields['matcher']
-    if not isinstance(matcher, str):
-        return []
     if group.event in MATCHERLESS_EVENTS:
         return [warning(f'{group.where}: matcher is ignored on {group.event}')]
     return invalid_regex_findings(group, matcher)

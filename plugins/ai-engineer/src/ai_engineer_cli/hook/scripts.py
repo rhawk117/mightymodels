@@ -1,9 +1,12 @@
 import re
 from pathlib import Path
 
+from msgspec import UNSET
+
 from ai_engineer_cli.findings import Finding, error, warning
 from ai_engineer_cli.hook.file import HooksFile
 from ai_engineer_cli.hook.nodes import Handler
+from ai_engineer_cli.hook.schema import CommandHook
 
 PLUGIN_ROOT_MARKER = '@CLAUDE_PLUGIN_ROOT@'
 PROJECT_DIR_MARKER = '@CLAUDE_PROJECT_DIR@'
@@ -19,33 +22,24 @@ SCRIPT_REFERENCE = re.compile(
 
 def script_findings(handler: Handler, hooks_file: HooksFile) -> list[Finding]:
     """Rows H23a, H23b, H24 and H25: the scripts a command handler names must exist."""
-    if handler.fields.get('type') != 'command':
+    hook = handler.hook
+    if not isinstance(hook, CommandHook):
         return []
-    references = exec_form_references(handler) if exec_form(handler) else shell_references(handler)
+    if hook.args is UNSET:
+        references = shell_references(hook.command)
+    else:
+        references = exec_form_references(hook.command, hook.args)
     findings = (script_finding(handler, reference, hooks_file) for reference in references)
     return [finding for finding in findings if finding is not None]
 
 
-def exec_form(handler: Handler) -> bool:
-    return isinstance(handler.fields.get('args'), list)
-
-
-def shell_references(handler: Handler) -> list[str]:
-    command = handler.fields.get('command')
-    if not isinstance(command, str):
-        return []
+def shell_references(command: str) -> list[str]:
     return [str(reference) for reference in SCRIPT_REFERENCE.findall(marked(command))]
 
 
-def exec_form_references(handler: Handler) -> list[str]:
-    command = handler.fields.get('command')
-    arguments = handler.fields.get('args')
-    candidates = [command, *arguments] if isinstance(arguments, list) else [command]
-    return [
-        marked(candidate)
-        for candidate in candidates
-        if isinstance(candidate, str) and names_a_script(candidate)
-    ]
+def exec_form_references(command: str, args: list[str]) -> list[str]:
+    candidates = [command, *args]
+    return [marked(candidate) for candidate in candidates if names_a_script(candidate)]
 
 
 def names_a_script(value: str) -> bool:
