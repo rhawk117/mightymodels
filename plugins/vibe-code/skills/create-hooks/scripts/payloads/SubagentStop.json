@@ -1,0 +1,12 @@
+{
+  "session_id": "s-test-001",
+  "cwd": "/tmp/repo",
+  "hook_event_name": "SubagentStop",
+  "transcript_path": "/tmp/transcript.jsonl",
+  "permission_mode": "default",
+  "stop_hook_active": false,
+  "agent_id": "agent-test-001",
+  "agent_type": "scout",
+  "agent_transcript_path": "/tmp/subagent-transcript.jsonl",
+  "last_assistant_message": "<report><findings/></report>"
+}

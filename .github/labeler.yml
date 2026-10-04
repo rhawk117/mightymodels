@@ -1,0 +1,28 @@
+plugin:mightymodels:
+  - changed-files:
+      - any-glob-to-any-file: plugins/mightymodels/**
+
+plugin:vibe-code:
+  - changed-files:
+      - any-glob-to-any-file: plugins/vibe-code/**
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: .github/**
+
+tooling:
+  - changed-files:
+      - any-glob-to-any-file:
+          - scripts/**
+          - Makefile
+          - pyproject.toml
+          - uv.lock
+          - .*.toml
+          - .coveragerc.ini
+          - .pre-commit-config.yaml
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**
+          - "*.md"

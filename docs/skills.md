@@ -9,9 +9,8 @@ reads.
 Two things decide when a skill fires. You can always invoke one explicitly with a slash,
 `/agents-assemble` or `/prune-ticket`, in either harness. Otherwise the harness selects from your
 prompt and the skill's description, which makes the description the retrieval surface: every
-description in this repo names its trigger phrases and its boundaries, and the eval datasets
-include near-miss prompts (a sprint-board question must not trigger `agents-assemble`) to keep that
-selection honest.
+description in this repo names its trigger phrases and its boundaries, so that near-miss prompts
+(a sprint-board question must not trigger `agents-assemble`) stay out.
 
 ## The loop skills
 
@@ -131,11 +130,11 @@ the user's rant verbatim, checks whether the failure has happened before, and tu
 tilt into standing corrective actions. It fires only when invoked by name.
 
 Issue-tracker sprint and board operations are deliberately outside the plugin, and their
-phrasing is one half of the collision pair the eval datasets guard: sprint words alone must not
-pull in `agents-assemble`.
+phrasing is one half of a collision pair: sprint words alone must not pull in
+`agents-assemble`.
 
 ## Editing a skill
 
 Every skill edit ships with a re-run of its evals and a new dated result, or it does not ship.
-The per-skill datasets live in `evals/datasets/<plugin>/<skill>/`; [CONTRIBUTING.md](../CONTRIBUTING.md)
+Dated results live in `plugins/mightymodels/skills/<skill>/evals/`; [CONTRIBUTING.md](../CONTRIBUTING.md)
 walks through the gate.

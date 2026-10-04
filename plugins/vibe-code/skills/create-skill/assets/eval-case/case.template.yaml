@@ -1,0 +1,13 @@
+# Needed only when the case seeds a workspace or resumes a conversation; otherwise omit this file.
+# Put it beside prompt.md. The prompt.md body stays the prompt and its frontmatter wins on overlap.
+schema_version: "1.1"
+name: CASE_NAME
+tags: [smoke]
+context:
+  # A Bash script in this directory that creates fixture files or a git repository.
+  # Runs outside the agent's sandbox, and only when you pass --scaffold.
+  scaffold_script: fixture.sh
+  # Directories inside this case directory that Claude may read during the run.
+  add_dirs: [resources]
+  # A .jsonl transcript in this directory to resume; the prompt becomes the next user turn.
+  # history_file: history.jsonl

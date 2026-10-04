@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vibe-code",
+  "displayName": "vibe-code",
+  "version": "0.3.0",
+  "description": "Ten skills for building and hardening Claude Code agents, skills, hooks, instructions, MCP servers, and loops, plus a vibe-code CLI that needs uv on PATH.",
+  "author": {
+    "name": "rhawk117"
+  },
+  "keywords": [
+    "agents",
+    "skills",
+    "hooks",
+    "mcp",
+    "plugin-authoring",
+    "workflow"
+  ]
+}

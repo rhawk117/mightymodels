@@ -4,8 +4,8 @@ A Claude Code plugin marketplace for all of my skills. The repository runs on an
 a plugin" mindset, inspired by the idea behind the DeepSeek harness: the repo root owns only the
 marketplace manifest and the shared quality gate, and every capability ships as a plugin under
 `plugins/`, one directory per plugin carrying its own manifest, skills, and agents. The
-marketplace manifest lists one entry per plugin, and the test suite enforces that the entries
-and the directories stay in step.
+marketplace manifest lists one entry per plugin, and `make check` validates the manifests with
+`claude plugin validate --strict`.
 
 ## Install
 
@@ -20,10 +20,10 @@ discovery, and validation.
 
 ## Plugins
 
-| Plugin       | What it does                                                                |
+| Plugin | What it does |
 | ------------ | --------------------------------------------------------------------------- |
 | mightymodels | Ticket-scoped agent dev loop: per-ticket state, model routing, review stack |
-| ai-engineer  | Skills for building and hardening Claude Code agents, skills, and loops     |
+| vibe-code | Skills for building and hardening Claude Code agents, skills, and loops |
 
 ### mightymodels
 
@@ -56,25 +56,42 @@ vocabularies, and the two-half brief schema are in
 directory layout are in `plugins/mightymodels/skills/prepare-handoff/references/`. When a skill
 and a contract disagree, the contract wins and the skill gets fixed.
 
-### ai-engineer
+### vibe-code
 
-Skills for building and hardening the agents, skills, and loops that other plugins are made of:
-`build-a-loop` designs a reliable agent loop and its stop condition, `build-an-agent` creates,
-reviews, or ports a subagent definition file, `skill-engineering` drafts and evals a `SKILL.md`
-against a calibrated harness, `writing-agent-rules` places and audits instruction files like
-`CLAUDE.md` and `AGENTS.md`, `create-hooks` designs and implements repo-specific Claude Code
-hooks, and `create-agents-md` generates an evidence-based AGENTS.md and its per-platform router
-files. All six are standard `SKILL.md` directories under `plugins/ai-engineer/`.
+Ten skills for building and hardening the agents, skills, hooks, and loops that other plugins are
+made of, plus a `vibe-code` CLI that the skills call to validate what they write. The plugin
+ships no agents. It was called `ai-engineer` before 0.3.0; an install under the old name has to be
+removed and reinstalled as `vibe-code`.
+
+| Skill | What it does |
+| ------------------- | ------------------------------------------------------------------------ |
+| `build-a-loop` | Designs an agent loop, its stop condition, and a `LOOP.md` contract |
+| `create-agents-md` | Generates an AGENTS.md from the repository, with an optional CLAUDE.md |
+| `create-hooks` | Builds repo-specific Claude Code hooks as Python scripts and tests them |
+| `create-instructions` | Writes `.claude/rules/` files and checks that Claude Code loads them |
+| `create-mcp` | Interviews you, then scaffolds a Python MCP server and its Claude config |
+| `create-skill` | Writes a skill from scenarios, with eval cases recorded before the skill |
+| `create-subagent` | Builds a subagent file and validates it |
+| `humanizer` | Removes signs of AI-generated writing from prose |
+| `plan-plugin` | Interviews you and writes a phased plugin plan and an empty plugin shell |
+| `promptlint` | Reviews and improves a coding-agent prompt for Claude Code |
+
+The CLI needs [uv](https://docs.astral.sh/uv/) on your `PATH` and a Claude Code whose
+`claude plugin validate` accepts `--json`. The plugin's `bin/vibe-code` launcher starts the CLI
+through `uv tool run`, with the dependency versions pinned on its first line. The pins select
+versions and do not verify hashes. The skills are standard `SKILL.md` directories under
+`plugins/vibe-code/skills/`. [plugins/vibe-code/README.md](plugins/vibe-code/README.md) covers
+install, the CLI, the launcher and Windows.
 
 ## Layout
 
 ```text
-plugins/         one directory per plugin; each carries its own manifest, skills, and agents
+plugins/         one directory per plugin; each carries its own manifest and skills
   mightymodels/  the dev loop: twenty skills, seven worker agents
-evals/           pydantic-evals harness: package source, per-skill datasets, dated results
-tests/           marketplace-wide contracts: plugin layout, manifest agreement, integrity
+  vibe-code/     authoring skills and the `vibe-code` CLI: ten skills, no agents,
+                 with its own tests and eval cases
 docs/            human documentation for the harness and the mightymodels plugin
-scripts/         quality gate, security scan over every plugin, git hooks
+scripts/         the quality gate (`quality.sh`), checkout setup, and a log helper
 .claude-plugin/  the rygentic-harness marketplace manifest
 ```
 
@@ -82,37 +99,34 @@ scripts/         quality gate, security scan over every plugin, git hooks
 
 A new plugin is a directory under `plugins/` with a `.claude-plugin/plugin.json` naming it,
 plus its `skills/` and `agents/`. Add a matching entry to the marketplace manifest and the rest
-is automatic: `tests/test_plugin.py` checks the entry against the directory and holds every
-plugin's skills and agents to the frontmatter contracts, and `scripts/security.sh` scans the
-new skill and agent text for injection indicators without any configuration.
-[CONTRIBUTING.md](CONTRIBUTING.md) has the details.
+is automatic: `scripts/quality.sh` runs `claude plugin validate --strict` for every directory under
+`plugins/` and for the marketplace root, which checks the manifests and the skill and agent
+frontmatter. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
 
 ## Documentation
 
-| Page                                       | What it covers                                  |
+| Page | What it covers |
 | ------------------------------------------ | ----------------------------------------------- |
-| [docs/workflow.md](docs/workflow.md)       | The full loop, stage by stage, with diagrams    |
-| [docs/skills.md](docs/skills.md)           | Every skill: what it does and when it fires     |
-| [docs/agents.md](docs/agents.md)           | The seven workers and how models get routed     |
-| [docs/state.md](docs/state.md)             | The `.mightymodels/` directory and `ticket.yml` |
-| [docs/claude-code.md](docs/claude-code.md) | Running under Claude Code                       |
-| [evals/README.md](evals/README.md)         | The eval harness and how results are read       |
+| [docs/workflow.md](docs/workflow.md) | The full loop, stage by stage, with diagrams |
+| [docs/skills.md](docs/skills.md) | Every skill: what it does and when it fires |
+| [docs/agents.md](docs/agents.md) | The seven workers and how models get routed |
+| [docs/state.md](docs/state.md) | The `.mightymodels/` directory and `ticket.yml` |
+| [docs/claude-code.md](docs/claude-code.md) | Running under Claude Code |
+| [plugins/vibe-code/README.md](plugins/vibe-code/README.md) | The vibe-code plugin: install, skills, CLI, launcher |
 
 ## Evals
 
-The eval harness covers registered plugins, currently mightymodels and ai-engineer: every
-measured skill ships with a baseline delta, and edits re-run the harness before they land.
-Replaying the iteration-1 mightymodels sessions grades 65 of 65 assertions with the skills on,
-against 31 of 65 without them. `evals/README.md` covers the harness;
-[CONTRIBUTING.md](CONTRIBUTING.md) covers the gate a change has to pass, and `make ci` runs the
-whole thing: ruff, ty, shellcheck, markdownlint, the prompt-injection scan over every plugin, and
-the test suite on Python 3.14.
+Some mightymodels skills keep dated eval results in `plugins/mightymodels/skills/<skill>/evals/`.
+The vibe-code eval cases live in `plugins/vibe-code/evals` and run with `claude plugin eval`,
+which costs money and is not part of the gate. [CONTRIBUTING.md](CONTRIBUTING.md) covers the gate
+a change has to pass: `make check`, which syncs the locked environment, runs pre-commit, and runs
+`scripts/quality.sh`.
 
 ## Status
 
-mightymodels is at 0.7.0 and is the marketplace's first plugin. Its hook layer (session
-covenant injection, verification gates at Stop, PreCompact ticket snapshots) and the
-team/personal overlay split are designed but not yet shipped. CHANGELOG.md has the full trail.
+vibe-code is at 0.3.0. mightymodels is at 0.8.0 and is the marketplace's first plugin. Its hook
+layer (session covenant injection, verification gates at Stop, PreCompact ticket snapshots) and
+the team/personal overlay split are designed but not yet shipped. CHANGELOG.md has the full trail.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR, and
 [SECURITY.md](SECURITY.md) for reporting anything sensitive.

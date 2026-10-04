@@ -1,0 +1,97 @@
+{
+  "name": "repo-inspector",
+  "description": "Inspect a git repository for the model: changed files, file counts, and a guarded cleanup.",
+  "instructions": "Use list_changed_files before proposing edits. clean_untracked deletes files and asks first.",
+  "reach": "both",
+  "binaries": [
+    "git"
+  ],
+  "tools": [
+    {
+      "name": "list_changed_files",
+      "description": "List files git reports as modified or untracked.",
+      "binary": "git",
+      "arguments": [
+        "status",
+        "--porcelain"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "lines",
+          "type": "list[str]",
+          "description": "One porcelain status line per file."
+        }
+      ],
+      "side_effects": "read_only",
+      "max_result_chars": 100000
+    },
+    {
+      "name": "count_files",
+      "description": "Count files with a given extension under a directory.",
+      "inputs": [
+        {
+          "name": "extension",
+          "type": "str",
+          "description": "Extension without the dot, for example py."
+        },
+        {
+          "name": "directory",
+          "type": "str",
+          "description": "Directory relative to the root.",
+          "required": false,
+          "default": "."
+        }
+      ],
+      "outputs": [
+        {
+          "name": "count",
+          "type": "int",
+          "description": "Number of matching files."
+        }
+      ],
+      "side_effects": "read_only"
+    },
+    {
+      "name": "clean_untracked",
+      "description": "Delete untracked files after confirmation.",
+      "inputs": [
+        {
+          "name": "dry_run",
+          "type": "bool",
+          "description": "Report instead of deleting."
+        }
+      ],
+      "outputs": [
+        {
+          "name": "summary",
+          "type": "str",
+          "description": "What was deleted."
+        }
+      ],
+      "side_effects": "destructive",
+      "confirm": true
+    }
+  ],
+  "resources": [
+    {
+      "uri": "repo://{path}/head",
+      "name": "head_of_file",
+      "description": "First 40 lines of a file."
+    }
+  ],
+  "prompts": [
+    {
+      "name": "review_changes",
+      "description": "Start a review of the working tree.",
+      "arguments": [
+        {
+          "name": "focus",
+          "description": "What to look at."
+        }
+      ]
+    }
+  ],
+  "root_source": "cwd",
+  "scope": "project"
+}

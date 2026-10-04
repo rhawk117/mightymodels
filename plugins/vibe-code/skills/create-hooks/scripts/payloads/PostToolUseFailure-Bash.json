@@ -1,0 +1,12 @@
+{
+  "session_id": "s-test-001",
+  "cwd": "/tmp/repo",
+  "hook_event_name": "PostToolUseFailure",
+  "transcript_path": "/tmp/transcript.jsonl",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": { "command": "pytest" },
+  "tool_use_id": "toolu_test_005",
+  "error": "Exit code 127\nbash: pytest: command not found",
+  "is_interrupt": false
+}

@@ -1,72 +1,36 @@
 [project]
-name = "plugin-evals"
-version = "0.6.0"
-description = "Eval harness for the marketplace's registered plugins: pydantic-evals datasets, deterministic fixtures, executor-pluggable runs, consolidated HTML reports"
-requires-python = ">=3.14"
-authors = [{ name = "BUSYSRE" }]
-dependencies = [
-    "pydantic-evals>=2.32",
-    "pyyaml>=6.0",
-    "jinja2>=3.1",
+name = "rygentic-harness-plugins"
+version = "0.1.0"
+description = "The Claude Code plugin marketplace for my custom agentic tooling and harnessing"
+readme = "README.md"
+authors = [
+    { name = "rhawk117", email = "noplaceLike127dot0dot0dot1@proton.me" },
 ]
+requires-python = ">=3.14"
+repository = "https://github.com/rhawk117/rygentic-harness"
+dependencies = []
 
-[project.scripts]
-plugin-evals = "plugin_evals.cli:main"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["evals/src/plugin_evals"]
 
 [dependency-groups]
-lint = [
-    "ruff>=0.14",
-    "ty>=0.0.73",
+check = [
+    "mdformat>=1.0.0",
+    "mdformat-frontmatter>=2.1.2",
+    "pre-commit>=4.6.2",
+    "ruff>=0.16.9",
+    "ty>=0.0.84",
 ]
 test = [
-    "pytest>=9.0",
-    "pytest-cov>=7.0",
-    "pytest-mock>=3.15",
-    "pytest-randomly>=4.0",
-    "pytest-xdist>=3.8",
+    "hypothesis>=6.168.3",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.16.0",
+    "pytest-randomly>=5.0.0",
+    "pytest-xdist>=3.8.0",
 ]
-dev = [
-    { include-group = "lint" },
-    { include-group = "test" },
-    "pre-commit>=4.0",
-]
+dev = [{ include-group = "check" }, { include-group = "test" }]
 
 [tool.uv]
-default-groups = ["dev"]
+default-groups = ['dev']
 
-# hook-facing scripts under scripts/ stay 3.12-compatible; the package itself is 3.14
-[tool.uv.dependency-groups]
-dev = { requires-python = ">=3.14" }
-lint = { requires-python = ">=3.14" }
-
-[tool.ty.environment]
-python-version = "3.14"
-root = ["evals/src", "tests"]
-
-[tool.ty.src]
-# fixture template bodies are eval material with intentional violations, not package
-# code; skills/ scripts ship to foreign harnesses and follow their own conventions
-exclude = ["evals/src/plugin_evals/templates", "plugins"]
-
-[tool.ty.terminal]
-error-on-warning = true
-
-[tool.ty.rules]
-# would-be-warnings that have caught real bugs in this repo; keep them hard errors
-possibly-unresolved-reference = "error"
-unused-ignore-comment = "error"
-division-by-zero = "error"
-redundant-cast = "error"
-# suppression hygiene (adopted from humansays): every ignore is targeted and alive
-blanket-ignore-comment = "error"
-ignore-comment-unknown-rule = "error"
-invalid-ignore-comment = "error"
-unused-type-ignore-comment = "error"
-deprecated = "error"
+[tool.uv.workspace]
+members = ["plugins/mightymodels", "plugins/vibe-code"]
