@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.create_skill import check_skill
 from ai_engineer_cli.findings import CannotCheckError, Finding
+from ai_engineer_cli.skill.command import check_skill
 
 DESCRIPTION = 'Summarize a file. Use when the user asks for a summary of a file.'
 CLEAN_FRONTMATTER = f'name: demo-skill\ndescription: {DESCRIPTION}\n'

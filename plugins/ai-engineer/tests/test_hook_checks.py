@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 from ai_engineer_cli.findings import CannotCheckError, Finding
-from ai_engineer_cli.hook_checks import check_hooks
-from ai_engineer_cli.hook_matchers import regex_problem
-from ai_engineer_cli.hooks_file import load_hooks_file
+from ai_engineer_cli.hook.checks import check_hooks
+from ai_engineer_cli.hook.file import load_hooks_file
+from ai_engineer_cli.hook.matchers import regex_problem
 
 SCRIPT_COMMAND = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check.py"'
 
