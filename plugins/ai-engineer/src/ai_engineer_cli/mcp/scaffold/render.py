@@ -41,6 +41,11 @@ def substitute(text: str, tokens: dict[str, str]) -> str:
     return TOKEN.sub(lambda match: tokens.get(match[0], match[0]), text)
 
 
+def in_tool_cache(relative: Path) -> bool:
+    """Whether a template path sits under a dot-directory or `__pycache__`, at any depth."""
+    return any(name.startswith('.') or name == '__pycache__' for name in relative.parts[:-1])
+
+
 def plan_project(loaded: LoadedSpec, template_dir: Path) -> dict[str, str]:
     """Every file the scaffold writes, keyed by its path under the target, built in memory."""
     spec = loaded.spec
@@ -49,11 +54,8 @@ def plan_project(loaded: LoadedSpec, template_dir: Path) -> dict[str, str]:
     plan = {'tests/__init__.py': ''}
     try:
         for source in sorted(template_dir.rglob('*')):
-            path = source.relative_to(template_dir)
-            if any(name.startswith('.') or name == '__pycache__' for name in path.parts[:-1]):
-                continue
-            if source.is_file():
-                relative = substitute(path.as_posix(), tokens)
+            if source.is_file() and not in_tool_cache(source.relative_to(template_dir)):
+                relative = substitute(source.relative_to(template_dir).as_posix(), tokens)
                 plan[relative] = substitute(source.read_text(encoding='utf-8'), tokens)
     except (OSError, UnicodeError) as problem:
         message = f'cannot read the template {template_dir}: {type(problem).__name__}'
