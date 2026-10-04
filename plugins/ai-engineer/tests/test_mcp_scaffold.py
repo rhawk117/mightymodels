@@ -1,6 +1,7 @@
 import ast
 import json
 import re
+import shutil
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,8 @@ from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import CannotCheckError
 from ai_engineer_cli.mcp import command as mcp_group
 from ai_engineer_cli.mcp.scaffold import command
-from ai_engineer_cli.mcp.scaffold.render import write_project
+from ai_engineer_cli.mcp.scaffold.render import plan_project, write_project
+from ai_engineer_cli.mcp.scaffold.spec import load_spec
 
 ASSETS = Path(__file__).resolve().parents[1] / 'skills' / 'create-mcp' / 'assets'
 EXAMPLE_SPEC = ASSETS / 'spec.example.json'
@@ -420,6 +422,24 @@ def test_missing_template_exits_two(tmp_path: Path, capsys: pytest.CaptureFixtur
 
     assert code == 2
     assert 'is not a directory' in capsys.readouterr().err
+
+
+def test_tool_caches_in_the_template_are_left_out_of_the_plan(tmp_path: Path) -> None:
+    template = tmp_path / 'template'
+    shutil.copytree(TEMPLATE, template)
+    ruff_cache = template / '.ruff_cache'
+    bytecode_cache = template / 'src' / '__PKG__' / '__pycache__'
+    (ruff_cache / '0.1').mkdir(parents=True, exist_ok=True)
+    bytecode_cache.mkdir(exist_ok=True)
+    (ruff_cache / '0.1' / 'blob').write_bytes(b'\xff\xfe\x00')
+    (bytecode_cache / 'server.cpython-314.pyc').write_bytes(b'\xff\xfe\x00')
+    (ruff_cache / 'CACHEDIR.TAG').write_text('Signature: 8a477f597d28d172789f06886806bc55\n')
+    loaded = load_spec(EXAMPLE_SPEC)
+
+    plan = plan_project(loaded, template)
+
+    assert [path for path in plan if '.ruff_cache' in path or '__pycache__' in path] == []
+    assert plan == plan_project(loaded, TEMPLATE)
 
 
 def test_non_empty_target_needs_force(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

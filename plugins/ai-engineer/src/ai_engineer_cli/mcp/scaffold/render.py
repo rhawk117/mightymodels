@@ -49,8 +49,11 @@ def plan_project(loaded: LoadedSpec, template_dir: Path) -> dict[str, str]:
     plan = {'tests/__init__.py': ''}
     try:
         for source in sorted(template_dir.rglob('*')):
+            path = source.relative_to(template_dir)
+            if any(name.startswith('.') or name == '__pycache__' for name in path.parts[:-1]):
+                continue
             if source.is_file():
-                relative = substitute(source.relative_to(template_dir).as_posix(), tokens)
+                relative = substitute(path.as_posix(), tokens)
                 plan[relative] = substitute(source.read_text(encoding='utf-8'), tokens)
     except (OSError, UnicodeError) as problem:
         message = f'cannot read the template {template_dir}: {type(problem).__name__}'
