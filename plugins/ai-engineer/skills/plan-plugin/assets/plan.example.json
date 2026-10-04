@@ -1,0 +1,132 @@
+{
+  "name": "py-harness",
+  "version": "0.1.0",
+  "description": "Python project harness: uv, ruff, ty and pytest conventions enforced and explained for Claude Code sessions.",
+  "keywords": [
+    "python",
+    "uv",
+    "ruff",
+    "ty",
+    "pytest"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Platform Team",
+    "email": "platform@example.com"
+  },
+  "homepage": "https://example.com/platform/py-harness",
+  "repository": "https://example.com/platform/py-harness.git",
+  "problem": "Agents in our Python repos run bare pytest, skip ruff, and write tests that never hit the app; reviewers catch it late.",
+  "audience": {
+    "who": "the platform team's Python developers",
+    "how": "team"
+  },
+  "kinds": [
+    "ecosystem"
+  ],
+  "ecosystem": "python",
+  "distribution": {
+    "channel": "marketplace",
+    "install": "claude plugin install py-harness@platform-tools --scope project"
+  },
+  "components": [
+    {
+      "kind": "hook",
+      "name": "ruff-on-edit",
+      "purpose": "Run ruff on each Python file the agent edits and feed the findings back so they are fixed in the same turn.",
+      "status": "planned",
+      "builder": "create-hooks",
+      "answers": {
+        "event": "PostToolUse",
+        "matcher": "Edit|Write",
+        "intent": "failure mode, prevent",
+        "posture": "inform",
+        "scope": "plugin"
+      },
+      "facts": [
+        "ships in hooks/hooks.json; runs for every user of the plugin",
+        "the script is called through ${CLAUDE_PLUGIN_ROOT}/scripts/ruff-on-edit.py"
+      ],
+      "advice": {
+        "mechanism": "rules",
+        "reason": "an instruction to run ruff would cost nothing, but agents skip it under pressure; the hook runs every time"
+      },
+      "decision": "as planned"
+    },
+    {
+      "kind": "skill",
+      "name": "add-fastapi-route",
+      "purpose": "Add a route the way this team does it: router module, TestClient test, checks through uv.",
+      "status": "planned",
+      "builder": "create-skill",
+      "answers": {
+        "invocation": "model and human",
+        "allowed_tools": "Bash(uv *)",
+        "mcp": "none",
+        "rigor": 2
+      },
+      "facts": [
+        "runs as /py-harness:add-fastapi-route",
+        "a skill of the same name in the project or personal scope takes precedence over the plugin skill"
+      ],
+      "advice": null,
+      "decision": "as planned"
+    },
+    {
+      "kind": "agent",
+      "name": "test-runner",
+      "purpose": "Run the test suite and return only the failing tests with their assertion output.",
+      "status": "planned",
+      "builder": "create-subagent",
+      "answers": {
+        "tools": [
+          "Bash",
+          "Read"
+        ],
+        "model": "haiku",
+        "output": "failing tests, file:line, assertion text"
+      },
+      "facts": [
+        "registers as py-harness:test-runner",
+        "verify discovery with claude agents after installing the plugin"
+      ],
+      "advice": null,
+      "decision": "as planned"
+    },
+    {
+      "kind": "lsp",
+      "name": "pyright",
+      "purpose": "Give the agent live type diagnostics on .py files.",
+      "status": "planned",
+      "builder": null,
+      "answers": {
+        "binary": "pyright-langserver, installed by the user via uv tool install pyright",
+        "extensions": ".py, .pyi"
+      },
+      "facts": [
+        "ships in .lsp.json; extensionToLanguage is required",
+        "the language server binary must be on the user's PATH"
+      ],
+      "advice": {
+        "mechanism": "hook",
+        "reason": "a PostToolUse hook running ty on the edited file gives the same diagnostics without a long-running server"
+      },
+      "decision": "as planned"
+    }
+  ],
+  "open_questions": [
+    "Does the team want the hook to also cover `python -m pytest`?"
+  ],
+  "outside_plugin": [
+    {
+      "need": "agents must steer to uv for every Python invocation",
+      "mechanism": "a project rule file .claude/rules/python.md",
+      "where": "each repository's .claude/rules/ directory; a plugin cannot ship rules"
+    },
+    {
+      "need": "agents must never pip install into a uv-managed repo",
+      "mechanism": "permissions: a deny rule Bash(pip install *)",
+      "where": "the team's .claude/settings.json; plugin.json cannot carry permissions"
+    }
+  ]
+}

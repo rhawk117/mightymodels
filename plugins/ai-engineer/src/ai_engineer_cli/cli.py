@@ -5,6 +5,7 @@ from collections.abc import Callable, Sequence
 from ai_engineer_cli.hook import command as hook_command
 from ai_engineer_cli.instruction import command as instruction_command
 from ai_engineer_cli.mcp import command as mcp_group
+from ai_engineer_cli.plugin import command as plugin_command
 from ai_engineer_cli.skill import command as skill_command
 from ai_engineer_cli.subagent import command as subagent_command
 
@@ -23,6 +24,7 @@ GROUPS: dict[str, GroupBuilder] = {
     'subagent': subagent_command.build_group,
     'instruction': instruction_command.build_group,
     'mcp': mcp_group.build_group,
+    'plugin': plugin_command.build_group,
 }
 
 

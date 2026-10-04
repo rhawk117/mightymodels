@@ -15,17 +15,17 @@ def test_main_without_a_group_prints_usage_and_fails(capsys: pytest.CaptureFixtu
     assert 'usage: ai-engineer' in capsys.readouterr().err
 
 
-def test_help_lists_the_five_groups(capsys: pytest.CaptureFixture[str]) -> None:
+def test_help_lists_the_six_groups(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit):
         build_parser().parse_args(['--help'])
 
     output = capsys.readouterr().out
-    for group in ('skill', 'hook', 'subagent', 'instruction', 'mcp'):
+    for group in ('skill', 'hook', 'subagent', 'instruction', 'mcp', 'plugin'):
         assert group in output
 
 
-def test_parser_accepts_exactly_the_five_groups() -> None:
-    assert set(GROUPS) == {'skill', 'hook', 'subagent', 'instruction', 'mcp'}
+def test_parser_accepts_exactly_the_six_groups() -> None:
+    assert set(GROUPS) == {'skill', 'hook', 'subagent', 'instruction', 'mcp', 'plugin'}
 
 
 @pytest.mark.parametrize(
