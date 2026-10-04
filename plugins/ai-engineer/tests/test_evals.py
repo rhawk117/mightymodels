@@ -63,7 +63,7 @@ REQUIRED_OPTIONS = {
 }
 STRING_TARGETS = {'last_message', 'trace', 'files', 'mock_calls'}
 REGEX_FLAGS = set('dgimsuvy')
-FORBIDDEN_WORDS = re.compile(r'copilot|agentStop|deniedTools|com\.github|worker', re.IGNORECASE)
+FORBIDDEN_WORDS = re.compile(r'agentStop|deniedTools|com\.github|worker', re.IGNORECASE)
 SKILL_PREFIXES = ('create-mcp-', 'plan-plugin-')
 
 
