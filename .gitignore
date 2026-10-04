@@ -7,3 +7,4 @@ dist/
 *.egg-info/
 .coverage
 .ref
+plugins/ai-engineer/evals/results/
