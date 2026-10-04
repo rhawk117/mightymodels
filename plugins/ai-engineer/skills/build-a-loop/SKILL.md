@@ -2,7 +2,7 @@
 name: build-a-loop
 license: Apache-2.0
 description: >-
-  Design a reliable agent loop from a plain description of the work. Picks the loop shape, defines what one iteration may touch, sets the evidence each success criterion needs, writes a stop condition that measures progress instead of counting turns, and emits a LOOP.md contract plus the Claude Code or GitHub Copilot CLI configuration and verification hook that enforce it. Use this whenever someone wants an agent to keep working on its own - a loop, a harness, an autonomous or long-running or overnight run, a self-verifying build, a fan-out of subagents, a scheduled or recurring agent task - and also when an existing loop misbehaves: runs away, stalls, burns turns repairing the wrong thing, claims success it cannot prove, or loses its rules after compaction. Trigger even when the user never says the word "loop".
+  Design a reliable agent loop from a plain description of the work. Picks the loop shape, defines what one iteration may touch, sets the evidence each success criterion needs, writes a stop condition that measures progress instead of counting turns, and emits a LOOP.md contract plus the Claude Code configuration and verification hook that enforce it. Use this whenever someone wants an agent to keep working on its own - a loop, a harness, an autonomous or long-running or overnight run, a self-verifying build, a fan-out of subagents, a scheduled or recurring agent task - and also when an existing loop misbehaves: runs away, stalls, burns turns repairing the wrong thing, claims success it cannot prove, or loses its rules after compaction. Trigger even when the user never says the word "loop".
 ---
 
 # Design an agent loop
@@ -31,7 +31,6 @@ The user has usually described most of the loop already. Extract it before askin
 - What "done" means in their words
 - What tooling exists (test command, linter, build, CI, a script that prints a number)
 - Whether a human is present while it runs
-- Which platform they are on
 
 Re-asking something they already said is the fastest way to lose them. Ask only about the gaps that change the output.
 
@@ -50,11 +49,13 @@ Every good loop is these five answers. Fill each one from what the user said; wh
 
 Default to goal-based. It is the only shape that carries its own stop condition.
 
+In Claude Code, goal-based is `/goal`. Time-based is `/loop` while a session stays open, or a cloud routine or desktop scheduled task when nothing is open. Event-driven and overnight runs use the routine or the scheduled task. `references/claude-code.md` compares them.
+
 ### 2. Unit of work - what one iteration may touch
 
 An iteration should be small enough that a bad one is cheap to throw away, and bounded enough that two workers cannot collide. State it as concrete boundaries: these files, this module, this test suite, this one ticket.
 
-This matters most with parallel workers, which typically share a filesystem with no locking. Two agents writing the same file means the last writer wins, silently. Partition by file or module, and say which paths belong to whom. Where the work is genuinely sequential, say so and keep it sequential rather than paying for parallelism that has to be serialized anyway.
+This matters most with parallel workers, which typically share a filesystem with no locking. Two agents writing the same file means the last writer wins, silently. Partition by file or module, and say which paths belong to whom. A git worktree per worker (`claude --worktree`) gives each one its own copy of the files. Where the work is genuinely sequential, say so and keep it sequential rather than paying for parallelism that has to be serialized anyway.
 
 ### 3. Evidence - what proves a criterion, and who reads it
 
@@ -73,10 +74,10 @@ If a criterion has no artifact, it is a wish. Either find a check for it or move
 Give every loop three stop conditions, because they catch different things:
 
 - **Progress**: the real one. "Until the type check passes, or two consecutive rounds make no progress." "Until two rounds in a row find nothing new." A count cannot detect a loop that is confidently repairing the wrong thing; a progress measure can.
-- **Cost backstop**: a turn cap and a spend cap, set explicitly. Both platforms default to unlimited. Treat the cap as a fuse, not as the design.
+- **Cost backstop**: a turn cap and a spend cap, set explicitly. Claude Code defaults to no turn limit and no spend limit. Treat the cap as a fuse, not as the design.
 - **Impossible**: an explicit verdict for "this condition can never be satisfied", which ends the loop and says why. Without it a loop with a bad criterion runs forever.
 
-Add stall detection where the platform offers it: several turns of talking without tool use means the loop is spinning.
+`/goal` has stall detection built in. Elsewhere add it: several turns of talking without tool use means the loop is spinning.
 
 ### 5. Escalation - what ends the run and what does not
 
@@ -98,14 +99,9 @@ Keep it short enough that re-reading it every iteration is cheap. If it is growi
 
 ## Step 4: emit the enforcement
 
-Ask which platform, then read exactly one reference file and follow it:
+Read `references/claude-code.md` and follow it. It covers the goal wiring, the stop-gate hook, the budget flags, unattended runs, the verifier subagent, and how to keep the contract pinned against compaction.
 
-- Claude Code: `references/claude-code.md`
-- GitHub Copilot CLI: `references/copilot-cli.md`
-
-Do not emit both dialects unless the user asks. Each reference covers the goal or autopilot wiring, the stop-gate hook, the budget flags, the verifier subagent, and how to keep the contract pinned against compaction.
-
-Both platforms move fast. Before writing a hook file, confirm the event names and payload shape against the platform's own documentation or config schema rather than trusting the template verbatim, and tell the user which parts you verified.
+For writing and testing a hook, use the `create-hooks` skill. Before writing a hook file, confirm the event names and payload shape against the Claude Code hooks reference rather than trusting the template verbatim, and tell the user which parts you verified.
 
 ## Step 5: red-team the design before handing it over
 
@@ -118,7 +114,7 @@ Walk the emitted loop against these. Each one is a failure that shows up in the 
 - **A watcher agent.** Supervisors that monitor a run in flight currently detect failure about 29% of the time, and typically not until after the point of no return. Put the gate at the boundary instead.
 - **Parallelism for throughput alone.** Splitting agents to divide labour mostly multiplies collisions and cost. The reported wins come from splitting to get an independent second opinion from a deliberately narrow context.
 - **No give-up path.** Is there any way for this loop to conclude the goal is impossible?
-- **Unbounded blast radius.** Can one bad iteration damage something the user cannot cheaply undo? Restrict the tool surface rather than asking the agent to be careful. A tool that is not granted cannot be misused.
+- **Unbounded blast radius.** Can one bad iteration damage something the user cannot cheaply undo? Restrict the tool surface rather than asking the agent to be careful. A tool that is not granted cannot be misused. For a run nobody watches, set the permission mode and `--permission-prompts none` on purpose, and note that `--bare` also skips the stop gate.
 - **Over-orchestration.** Five reviewers on a two-file change is a 20x cost for no benefit. Cut it.
 
 ## What to hand back
@@ -127,13 +123,13 @@ Show the user, in this order:
 
 1. **The loop in three sentences** - what repeats, what proves it worked, when it stops. Plain language, no jargon. If this is hard to write, the design is not finished.
 2. **The files** - path and one line each on what it does.
-3. **How to start it** - the literal command.
+3. **How to start it** - the literal command, and for a long run how to watch it (`--output-format stream-json --verbose`).
 4. **What will go wrong first** - the residual risks from step 5, and the signal that would tell them. This is the most valuable paragraph in the handoff; do not skip it because the design looks clean.
 
 ## Reference material
 
-- `references/claude-code.md` - Claude Code wiring: goal conditions, Stop hooks, budgets, verifier subagents
-- `references/copilot-cli.md` - Copilot CLI wiring: autopilot, agentStop hooks, credit caps, custom agents
+- `references/claude-code.md` - Claude Code wiring: goal and loop triggers, Stop hooks, unattended-run flags, budgets, verifier subagents
 - `references/failure-modes.md` - the evidence behind the checks in step 5, with sources. Read when the user pushes back on a recommendation or asks why
 - `assets/LOOP.template.md` - the contract template
-- `assets/verify_gate.py` - starting point for the stop-gate hook, adapted per platform
+- `assets/verify_gate.py` - starting point for the stop-gate hook; copy it to `.claude/hooks/` and write `.loop-gate.json` beside it
+- `assets/tests/test_verify_gate.py` - tests for the gate; run them after changing the script

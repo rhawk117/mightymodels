@@ -46,7 +46,7 @@ What follows: small units of work, and a fresh context between them, beat one he
 
 ## Parallel workers collide on shared state
 
-From a production run of 64 concurrent agents producing 6,502 commits in 11 days: "One agent ran `git stash` before committing. Another ran `git stash pop`. And then `git reset HEAD --hard`." The fix was constraining the tool surface, not writing a more polite prompt. GitHub documents the same hazard for `/fleet`: subagents share a filesystem with no locking, and the last writer wins silently.
+From a production run of 64 concurrent agents producing 6,502 commits in 11 days: "One agent ran `git stash` before committing. Another ran `git stash pop`. And then `git reset HEAD --hard`." The fix was constraining the tool surface, not writing a more polite prompt. Subagents start in the main conversation's working directory, so two of them writing one file means the last writer wins, unless a subagent is given `isolation: worktree`.
 
 What follows: partition by file or module, and restrict tools rather than trusting instructions.
 
@@ -77,5 +77,3 @@ What follows: prefer a hook or a withheld tool over a rule, and keep the contrac
 - Rajasekaran. *Harness design for long-running application development*, 2026-03-24. https://www.anthropic.com/engineering/harness-design-long-running-apps
 - Yan, Dattani. *Using LLMs to secure source code*, 2026-05-22. https://github.com/anthropics/defending-code-reference-harness/blob/main/docs/blog-post.md
 - Sumner. *Bun in Rust*, 2026-07. https://bun.com/blog/bun-in-rust
-- GitHub. *Copilot CLI hooks reference.* https://docs.github.com/en/copilot/reference/hooks-reference
-- GitHub. *Running tasks in parallel with /fleet.* https://docs.github.com/en/copilot/concepts/agents/copilot-cli/fleet

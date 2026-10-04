@@ -9,13 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-CLAUDE_CODE = 'claude-code'
-COPILOT_CLI = 'copilot-cli'
-
 
 @dataclass(frozen=True, slots=True)
 class GateConfig:
-    platform: str
     check: list[str]
     cwd: Path
     state_path: Path
@@ -24,12 +20,7 @@ class GateConfig:
     @classmethod
     def load(cls, path: Path) -> GateConfig:
         raw = json.loads(path.read_text())
-        platform = raw['platform']
-        if platform not in (CLAUDE_CODE, COPILOT_CLI):
-            msg = f'unsupported platform: {platform}'
-            raise ValueError(msg)
         return cls(
-            platform=platform,
             check=list(raw['check']),
             cwd=Path(raw.get('cwd', '.')).expanduser(),
             state_path=Path(raw.get('state_path', '.loop-gate.state')).expanduser(),
@@ -95,25 +86,11 @@ def clear_blocks(config: GateConfig) -> None:
     config.state_path.unlink(missing_ok=True)
 
 
-def emit_claude_code(*, blocking: bool, message: str) -> None:
+def emit(*, blocking: bool, message: str) -> None:
     if blocking:
         print(json.dumps({'decision': 'block', 'reason': message}))
     else:
         print(json.dumps({'systemMessage': message}) if message else '', end='')
-
-
-def emit_copilot_cli(*, blocking: bool, message: str) -> None:
-    payload: dict[str, Any] = {'decision': 'block' if blocking else 'continue'}
-    if message:
-        payload['additionalContext'] = message
-    print(json.dumps(payload))
-
-
-def emit(config: GateConfig, *, blocking: bool, message: str) -> None:
-    if config.platform == CLAUDE_CODE:
-        emit_claude_code(blocking=blocking, message=message)
-    else:
-        emit_copilot_cli(blocking=blocking, message=message)
 
 
 def load_config() -> GateConfig | None:
@@ -139,14 +116,13 @@ def main() -> int:
 
     if result.passed:
         clear_blocks(config)
-        emit(config, blocking=False, message='')
+        emit(blocking=False, message='')
         return 0
 
     prior = max(blocks_recorded(config), 1 if payload.get('stop_hook_active') else 0)
     if prior >= config.max_blocks:
         clear_blocks(config)
         emit(
-            config,
             blocking=False,
             message=(
                 f'Verification still failing after {prior} blocked attempt(s). '
@@ -157,7 +133,6 @@ def main() -> int:
 
     record_blocks(config, prior + 1)
     emit(
-        config,
         blocking=True,
         message=(
             "The loop's verification check is failing, so the work is not done. "
