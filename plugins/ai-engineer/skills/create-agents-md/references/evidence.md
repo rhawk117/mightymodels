@@ -1,4 +1,4 @@
-# Why these rules — evidence base (researched 2026-08-07)
+# Why these rules: evidence base (researched 2026-08-07)
 
 Read this when the user challenges a rule, asks why the file is so small, or wants sources. Tags: [doc] official vendor documentation, [emp] controlled study, [comm] named community figure.
 
@@ -14,14 +14,13 @@ Consequence: every line must earn its context cost. Commands and explicit conven
 
 ## Size and adherence
 
-- GitHub: repository instructions "no longer than 2 pages"; code review: "Begin with 10–20 specific instructions", cap files ~1,000 lines. [doc]
-- Anthropic: "target under 200 lines... Longer files consume more context and reduce adherence"; CLAUDE.md is injected as a user message after the system prompt — context, not enforced configuration. [doc]
+- Anthropic: "target under 200 lines per CLAUDE.md file. Longer files consume more context and reduce adherence"; CLAUDE.md is delivered as a user message after the system prompt, so it is context, not enforced configuration. [doc]
 - HumanLayer: frontier models follow roughly 150–200 instructions with consistency and the product's own system prompt consumes a large share; their production CLAUDE.md is under 60 lines. [comm]
-- This skill's ≤150-line target sits inside all three envelopes.
+- This skill's 150-line target sits inside both envelopes.
 
 ## Commands first, verified only
 
-- GitHub: include build/test/validation commands so the agent "is able to build, test and validate its changes in its own development environment" — the stated mechanism behind every vendor quality claim. [doc]
+- Anthropic: give Claude a check it can run on its own work, such as a test suite, a build exit code or a linter. [doc]
 - Anthropic: "Run `npm test` before committing" not "Test your changes" — instructions "concrete enough to verify". [doc]
 - Chris Reddington (GitHub DevRel, 2026-08): "Keep validation commands executable. 'Write good tests' leaves room for interpretation; `pnpm test` gives the agent and reviewer an observable result." [comm]
 - CI workflows are ground truth in conflicts: they are the commands that must actually pass.
@@ -30,13 +29,14 @@ Consequence: every line must earn its context cost. Commands and explicit conven
 
 - Linter-enforced style: VS Code docs say skip "conventions that standard linters or formatters already enforce"; HumanLayer: don't use the model as "an expensive linter". [doc/comm]
 - Derivable content: Claude Code's /doctor trim cuts "content Claude can derive from the codebase, such as directory layouts, dependency lists, and architecture overviews, and keeps pitfalls, rationale, and conventions that differ from tool defaults" — the same dividing line this skill uses. [doc]
-- Personas and vague demands: Copilot code review documents that it ignores vague quality instructions ("Be more accurate"); "You are a helpful coding assistant" personas are a documented anti-pattern (Matt Nigh, GitHub, 2,500-repo analysis). [doc/comm]
+- Personas and vague demands: Anthropic says instructions work best when "concrete enough to verify"; "You are a helpful coding assistant" personas are a documented anti-pattern (Matt Nigh, GitHub, 2,500-repo analysis). [doc/comm]
 
-## Router architecture
+## How Claude Code reads AGENTS.md
 
-- Claude Code reads CLAUDE.md, not AGENTS.md — official docs, verbatim. The `@AGENTS.md` import is the vendor-documented bridge (symlink also works; import wins on Windows and permits Claude-specific additions). [doc]
-- Copilot reads AGENTS.md natively on cloud agent, CLI, VS Code, and code review (since 2026-06-18) — and combines it additively with copilot-instructions.md. The per-surface support matrix shows github.com Chat and JetBrains/Visual Studio/Xcode/Eclipse chat do NOT load AGENTS.md, which is the only reason the pointer file exists. [doc]
-- Single source of truth, "duplication is a source of drift" (Reddington); one canonical AGENTS.md + thin routers is the cross-tool pattern (Vaughan, 2026-05). [comm]
+- Since v2.1.277 Claude Code reads `AGENTS.md` directly, but only when no `CLAUDE.md` or `CLAUDE.local.md` exists in the working directory or any directory above it. With one present, Claude reads the `CLAUDE.md` files only. [doc]
+- An `@AGENTS.md` import in a `CLAUDE.md` keeps `AGENTS.md` as the one file every tool shares, and Claude does not read it twice. A symlink also works; the import is the choice on Windows and when Claude-specific rules are needed. [doc]
+- Adding a `CLAUDE.local.md` to a project that relies on `AGENTS.md` stops Claude reading `AGENTS.md`. [doc]
+- Single source of truth, "duplication is a source of drift" (Reddington); one canonical `AGENTS.md` plus thin per-tool files is the cross-tool pattern (Vaughan, 2026-05). [comm]
 
 ## Boundaries section
 
@@ -45,9 +45,7 @@ Consequence: every line must earn its context cost. Commands and explicit conven
 
 ## Key sources
 
-1. GitHub Docs — custom instructions (repo/IDE/CLI variants, support matrix): docs.github.com/en/copilot/reference/custom-instructions-support
-2. GitHub Docs — Copilot code review customization tutorial: docs.github.com/en/copilot/tutorials/customize-code-review
-3. VS Code Docs — custom instructions: code.visualstudio.com/docs/agent-customization/custom-instructions
-4. Claude Code Docs — memory: code.claude.com/docs/en/memory
-5. Gloaguen et al., arXiv:2602.11988 · Lulla et al., arXiv:2601.20404 · Khatri, arXiv:2607.27250 · Chatlatanagulchai et al., arXiv:2511.12884
-6. Harrison (github.blog 5-tips, upd. 2026-06) · Nigh (github.blog agents-md, 2025-11) · Reddington (chrisreddington.com, upd. 2026-08) · Vaughan (codex.danielvaughan.com, upd. 2026-07) · HumanLayer (humanlayer.dev, writing-a-good-claude-md)
+1. VS Code Docs, custom instructions: code.visualstudio.com/docs/agent-customization/custom-instructions
+2. Claude Code Docs, memory: code.claude.com/docs/en/memory
+3. Gloaguen et al., arXiv:2602.11988 · Lulla et al., arXiv:2601.20404 · Khatri, arXiv:2607.27250 · Chatlatanagulchai et al., arXiv:2511.12884
+4. Nigh (github.blog agents-md, 2025-11) · Reddington (chrisreddington.com, upd. 2026-08) · Vaughan (codex.danielvaughan.com, upd. 2026-07) · HumanLayer (humanlayer.dev, writing-a-good-claude-md)

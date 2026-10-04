@@ -2,10 +2,10 @@
 
 ## AGENTS.md skeleton
 
-Sections in this order. Delete any section with nothing real to say — never pad. Target ≤150 lines total.
+Sections in this order. Delete any section with nothing real to say; never pad. Target 150 lines or fewer in total.
 
 ```markdown
-# <repo-name> — agent instructions
+# <repo-name>: agent instructions
 
 ## Commands
 <!-- verified only; prefix "(unverified)" where applicable; include flags -->
@@ -23,20 +23,22 @@ Sections in this order. Delete any section with nothing real to say — never pa
 
 ## Conventions
 <!-- only deviations from ecosystem defaults, each with its why -->
-<!-- include the observed commit convention: "Conventional commits (feat/fix/chore), scope optional — matches git history" -->
+<!-- include the observed commit convention: "Conventional commits (feat/fix/chore), scope optional, matches git history" -->
 
 ## Boundaries
 - Always: <e.g. run the Verification commands before finishing>
 - Ask first: <e.g. dependency changes, schema migrations>
-- Never: <e.g. edit src/*/generated/ — regenerate with `make codegen`>
+- Never: <e.g. edit src/*/generated/ and regenerate with `make codegen`>
 
 ## Verification
 <!-- the exact commands an agent runs before declaring work done -->
 ```
 
-A code example section is allowed only when observed style genuinely deviates from what a model produces by default — one real snippet from the repo, not an invented one.
+A code example section is allowed only when observed style genuinely deviates from what a model produces by default: one real snippet from the repo, not an invented one.
 
-## CLAUDE.md router (Claude Code)
+## CLAUDE.md router
+
+Write it when step 1 chose the import, or when a `CLAUDE.md` or `CLAUDE.local.md` is already on the path (Claude would otherwise skip `AGENTS.md`).
 
 ```markdown
 @AGENTS.md
@@ -46,28 +48,15 @@ A code example section is allowed only when observed style genuinely deviates fr
      Delete this section if there are none. -->
 ```
 
-The `@AGENTS.md` import is the vendor-official bridge — Claude Code reads CLAUDE.md, not AGENTS.md, and loads the import at session start. Prefer the import over a symlink: it works on Windows without elevation and allows Claude-specific additions below it.
-
-## .github/copilot-instructions.md router (Copilot)
-
-```markdown
-Repository instructions live in [AGENTS.md](../AGENTS.md) at the repo root. Read
-and follow that file — it is the single source of truth for this repository.
-
-This pointer exists for Copilot surfaces that do not load AGENTS.md automatically
-(github.com Chat; JetBrains, Visual Studio, Xcode, and Eclipse chat). Copilot's
-agent surfaces (cloud agent, CLI, VS Code, code review) read AGENTS.md natively.
-```
-
-Keep it a pointer. Copilot combines copilot-instructions.md and AGENTS.md additively on agent surfaces, so any rule duplicated here will drift from the canonical copy. If the user explicitly wants chat-surface coverage without a file-read hop, mirror at most the Commands section and add a comment naming AGENTS.md as canonical — but offer that trade-off, don't default to it.
+The `@AGENTS.md` import keeps `AGENTS.md` as the one file every tool shares, and Claude reads the imported file first, then the rest. Prefer it over a symlink: a symlink cannot hold Claude-specific additions, the Edit and Write tools refuse to write through it, and on Windows it needs Administrator privileges or Developer Mode. If there are no Claude-specific rules and nobody works on Windows, `ln -s AGENTS.md CLAUDE.md` is enough.
 
 ## Merge guidance (existing instruction files)
 
 | From existing files | Disposition |
 | --- | --- |
-| Commands, validation steps | Migrate to AGENTS.md `## Commands` / `## Verification`; reconcile against explorer findings — CI wins conflicts |
+| Commands, validation steps | Migrate to AGENTS.md `## Commands` / `## Verification`; reconcile against explorer findings. CI wins conflicts |
 | Real conventions, boundary rules ("never touch X", "ask before Y") | Migrate to `## Conventions` / `## Boundaries` |
-| Platform-specific rules (plan-mode habits, tool quirks) | Keep in that platform's router file |
-| Personas, overview prose, linter duplicates, stale facts | Drop — list each dropped item and its reason when presenting the draft |
+| Claude-specific rules (plan-mode habits, tool quirks) | Keep in the `## Claude Code` section of `CLAUDE.md` |
+| Personas, overview prose, linter duplicates, stale facts | Drop; list each dropped item and its reason when presenting the draft |
 
-Existing CLAUDE.md with real content: migrate its keep-worthy rules, then replace the file body with the router (import first line). Existing cursor/windsurf/cline rules: mine them but leave the files untouched — other tools may still read them; note that to the user.
+Existing `CLAUDE.md` with real content: migrate its keep-worthy rules, then replace the file body with the router (import first line). Existing `CLAUDE.local.md` and `.claude/rules/*.md`: leave them as they are. Existing cursor, windsurf and cline rules: mine them but leave the files untouched, because other tools may still read them, and say so to the user.
