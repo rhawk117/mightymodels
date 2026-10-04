@@ -58,19 +58,34 @@ and a contract disagree, the contract wins and the skill gets fixed.
 
 ### ai-engineer
 
-Skills for building and hardening the agents, skills, and loops that other plugins are made of:
-`build-a-loop` designs a reliable agent loop and its stop condition, `build-an-agent` creates,
-reviews, or ports a subagent definition file, `skill-engineering` drafts and evals a `SKILL.md`
-against a calibrated harness, `writing-agent-rules` places and audits instruction files like
-`CLAUDE.md` and `AGENTS.md`, `create-hooks` designs and implements repo-specific Claude Code
-hooks, and `create-agents-md` generates an evidence-based AGENTS.md and its per-platform router
-files. All six are standard `SKILL.md` directories under `plugins/ai-engineer/`.
+Ten skills for building and hardening the agents, skills, hooks, and loops that other plugins are
+made of, plus an `ai-engineer` CLI that the skills call to validate what they write. The plugin
+ships no agents.
+
+| Skill | What it does |
+| ------------------- | ------------------------------------------------------------------------ |
+| `build-a-loop` | Designs an agent loop, its stop condition, and a `LOOP.md` contract |
+| `create-agents-md` | Generates an AGENTS.md from the repository, with an optional CLAUDE.md |
+| `create-hooks` | Builds repo-specific Claude Code hooks as Python scripts and tests them |
+| `create-instructions` | Writes `.claude/rules/` files and checks that Claude Code loads them |
+| `create-mcp` | Interviews you, then scaffolds a Python MCP server and its Claude config |
+| `create-skill` | Writes a skill from scenarios, with eval cases recorded before the skill |
+| `create-subagent` | Builds a subagent file and validates it |
+| `humanizer` | Removes signs of AI-generated writing from prose |
+| `plan-plugin` | Interviews you and writes a phased plugin plan and an empty plugin shell |
+| `promptlint` | Reviews and improves a coding-agent prompt for Claude Code |
+
+The CLI needs [uv](https://docs.astral.sh/uv/) on your `PATH`. The plugin's `bin/ai-engineer`
+shim exits with status 127 and a message when `uv` is missing, and otherwise runs the CLI from
+the pinned `requirements.lock`. The lock pins versions; installs are not hash-verified. The
+skills are standard `SKILL.md` directories under `plugins/ai-engineer/skills/`.
 
 ## Layout
 
 ```text
 plugins/         one directory per plugin; each carries its own manifest, skills, and agents
   mightymodels/  the dev loop: twenty skills, seven worker agents
+  ai-engineer/   authoring skills and the `ai-engineer` CLI: ten skills, no agents
 evals/           pydantic-evals harness: package source, per-skill datasets, dated results
 tests/           marketplace-wide contracts: plugin layout, manifest agreement, integrity
 docs/            human documentation for the harness and the mightymodels plugin
@@ -100,10 +115,11 @@ new skill and agent text for injection indicators without any configuration.
 
 ## Evals
 
-The eval harness covers registered plugins, currently mightymodels and ai-engineer: every
+The eval harness covers registered plugins, currently mightymodels: every
 measured skill ships with a baseline delta, and edits re-run the harness before they land.
 Replaying the iteration-1 mightymodels sessions grades 65 of 65 assertions with the skills on,
-against 31 of 65 without them. `evals/README.md` covers the harness;
+against 31 of 65 without them. The ai-engineer eval cases live in `plugins/ai-engineer/evals` and
+run with `claude plugin eval`, which costs money and is not part of the gate. `evals/README.md` covers the harness;
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the gate a change has to pass, and `make ci` runs the
 whole thing: ruff, ty, shellcheck, markdownlint, the prompt-injection scan over every plugin, and
 the test suite on Python 3.14.

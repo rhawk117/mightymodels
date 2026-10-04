@@ -43,8 +43,11 @@ problem in one pass:
 
 - `ruff format --check` and `ruff check --no-fix`, both with `.ruff.toml`
 - `mdformat --check` on `docs/` and the root `*.md` files only
-- `ty` at Python 3.14, then a second `ty` pass at Python 3.12 over the skills trees
-- `pytest`
+- `ty` at Python 3.14, then a second `ty` pass at Python 3.12 over the skills trees and
+  `plugins/ai-engineer/src` and `plugins/ai-engineer/tests`
+- `pytest`, which runs the ai-engineer tests in `plugins/ai-engineer/tests`
+- the ai-engineer lock check, which fails when `plugins/ai-engineer/requirements.lock` is stale
+  (see The ai-engineer package)
 - `claude plugin validate --strict` for each plugin under `plugins/`, then for the root
   marketplace
 
@@ -63,17 +66,43 @@ job summary instead of a PR comment, and it still fails the run when `quality` f
 ## Python and markdown rules
 
 Skill scripts under `plugins/*/skills/**` must run on Python 3.12, so a contributor's system
-Python can run them. Ruff applies a per-file `py312` target to those paths and the second `ty`
-pass checks them at 3.12. The rest of the repo targets Python 3.14.
+Python can run them. The ai-engineer CLI source and tests under `plugins/ai-engineer/src` and
+`plugins/ai-engineer/tests` follow the same rule. Ruff applies a per-file `py312` target to
+those paths and the second `ty` pass checks them at 3.12. The rest of the repo targets Python 3.14.
 
 Plugin markdown is excluded from mdformat because mdformat escapes underscore-named XML prompt
 tags, which breaks the prompts. Only `docs/` and the root `*.md` files are formatted.
 
-`plugins/ai-engineer/bin` is excluded from lint and type checks until the ai-engineer port
-removes it.
-
 Fix the finding instead of suppressing it. A blanket ignore in config is not acceptable, and a
 targeted `noqa` or `ty: ignore` needs a comment with the reason.
+
+## The ai-engineer package
+
+`plugins/ai-engineer` is also a uv workspace member, the `ai-engineer-plugin` package. Its source
+is `plugins/ai-engineer/src/ai_engineer_cli`, with one sub-package per concept (`skill`, `hook`,
+`subagent`, `instruction`, `mcp`, `plugin`) and the shared modules beside them. Its tests are in
+`plugins/ai-engineer/tests`. The plugin's skills run the CLI through the `bin/ai-engineer` shim,
+which needs `uv` on `PATH` and starts the CLI from `plugins/ai-engineer/requirements.lock`.
+
+The lock pins the package's runtime dependencies by version. The shim's `uv run` does not
+enforce the hash lines in it, so treat the file as a version pin, not as artifact verification.
+After you change the dependencies in `plugins/ai-engineer/pyproject.toml` or `uv.lock`,
+regenerate it from the repository root:
+
+```sh
+NO_COLOR=1 uv export --package ai-engineer-plugin --format requirements.txt \
+  --no-emit-project --no-emit-workspace --frozen > plugins/ai-engineer/requirements.lock
+```
+
+`scripts/quality.sh --lint` runs the same export and diffs it against the checked-in file, so a
+stale lock fails the gate.
+
+The ai-engineer eval cases are in `plugins/ai-engineer/evals`. Running them with
+`claude plugin eval` costs money and is not part of the gate.
+
+On WSL, a checked-in script such as `plugins/ai-engineer/bin/ai-engineer` can lose its
+executable bit. Restore it in the index with
+`git update-index --chmod=+x <file>`.
 
 ## Adding a plugin
 
