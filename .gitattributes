@@ -1,0 +1,2 @@
+plugins/vibe-code/bin/vibe-code text eol=lf
+*.cmd text eol=crlf

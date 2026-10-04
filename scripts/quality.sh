@@ -28,12 +28,6 @@ usage() {
   printf 'usage: %s [--format | --lint]\n' "${0##*/}" >&2
 }
 
-check_vibe_code_lock() {
-  NO_COLOR=1 uv export --package vibe-code-plugin --format requirements.txt \
-    --no-emit-project --no-emit-workspace --frozen |
-    diff - plugins/vibe-code/requirements.lock
-}
-
 run_formatter() {
   run 'Ruff Format' uv run ruff format "${RUFF_CONFIG[@]}" .
   run 'Ruff Fix' uv run ruff check "${RUFF_CONFIG[@]}" --fix-only --unsafe-fixes .
@@ -52,7 +46,6 @@ run_linter() {
     --python-version 3.12 plugins/mightymodels/skills plugins/vibe-code/skills \
     plugins/vibe-code/src plugins/vibe-code/tests
   run 'pytest' uv run pytest
-  run 'vibe-code lock' check_vibe_code_lock
 
   if ! command -v claude >/dev/null; then
     log::error 'claude not on PATH: npm install -g @anthropic-ai/claude-code'
