@@ -4,16 +4,12 @@ from msgspec import UnsetType
 from vibe_code_cli.findings import CannotCheckError, Finding, decode_problem, error, warning
 from vibe_code_cli.jsondoc import Json
 from vibe_code_cli.mcp.file import SERVER_FILE_NAME, McpFile
-from vibe_code_cli.mcp.keys import KEYS_BY_TRANSPORT, STDIO_KEYS
+from vibe_code_cli.mcp.keys import Transport, TransportKeys
 from vibe_code_cli.mcp.servers import WRAPPER_KEY, McpServer, ServerEntry, decode_servers
 from vibe_code_cli.mcp.variables import variable_findings
 
 
 def check_mcp(mcp_file: McpFile, *, builtin_errored: bool) -> list[Finding]:
-    """The checks `claude plugin validate` is silent on.
-
-    Raises CannotCheckError when the file is not JSON the built-in let pass.
-    """
     if not mcp_file.valid_json:
         if builtin_errored:
             return []
@@ -35,7 +31,6 @@ def check_mcp(mcp_file: McpFile, *, builtin_errored: bool) -> list[Finding]:
 
 
 def filename_findings(mcp_file: McpFile) -> list[Finding]:
-    """Rows M25 and M26: only a file named `.mcp.json` is read, in a plugin or a project."""
     if mcp_file.kind == 'user' or mcp_file.path.name == SERVER_FILE_NAME:
         return []
     return [
@@ -47,7 +42,6 @@ def filename_findings(mcp_file: McpFile) -> list[Finding]:
 
 
 def shape_findings(kind: str, document: Json) -> list[Finding]:
-    """Rows M2, M4, M6 and MC-A5: where the servers sit in the file."""
     if not isinstance(document, dict):
         return []
     if WRAPPER_KEY in document:
@@ -60,7 +54,6 @@ def shape_findings(kind: str, document: Json) -> list[Finding]:
 
 
 def extra_key_findings(kind: str, document: dict[str, Json]) -> list[Finding]:
-    """Row M4; a user file is `~/.claude.json`, which holds other keys by design."""
     if kind == 'user':
         return []
     return [
@@ -81,11 +74,6 @@ def server_findings(kind: str, name: str, entry: ServerEntry) -> list[Finding]:
 
 
 def key_findings(kind: str, name: str, entry: ServerEntry) -> list[Finding]:
-    """Rows M10a and M10b, and MC-A7 and MC-A10: keys the docs show on no server entry.
-
-    A plugin file is an error, as in the reference plugin schema; a project or user file is a
-    warning, as in the reference's documented-field list, because the docs key list is not closed.
-    """
     allowed = allowed_keys(entry.server)
     if allowed is None:
         return []
@@ -94,7 +82,8 @@ def key_findings(kind: str, name: str, entry: ServerEntry) -> list[Finding]:
     for key in entry.keys:
         if key == 'tools':
             findings.append(level(tools_message(name)))
-        elif key not in allowed:
+            continue
+        if key not in allowed:
             known = ', '.join(sorted(allowed))
             findings.append(
                 level(f'{name}: unknown server key {key!r}; the known keys are {known}')
@@ -102,11 +91,11 @@ def key_findings(kind: str, name: str, entry: ServerEntry) -> list[Finding]:
     return findings
 
 
-def allowed_keys(server: McpServer) -> frozenset[str] | None:
-    """The keys for the server's transport; None when the built-in already rejects its type."""
+def allowed_keys(server: McpServer) -> tuple[str, ...] | None:
+    keys = TransportKeys().by_transport
     if isinstance(server.type, UnsetType):
-        return None if isinstance(server.url, str) else STDIO_KEYS
-    return KEYS_BY_TRANSPORT.get(server.type)
+        return None if isinstance(server.url, str) else keys[Transport.STDIO]
+    return keys.get(server.type)
 
 
 def tools_message(name: str) -> str:

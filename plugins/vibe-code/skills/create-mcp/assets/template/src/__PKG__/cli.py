@@ -1,7 +1,5 @@
 """Command-line entrypoint: `uv run __NAME__ [--transport ...] [--root DIR]`."""
 
-from __future__ import annotations
-
 import argparse
 import logging
 import os
@@ -53,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         logging.getLogger('__NAME__').error('root %s is not a directory', root)
         return 2
-    missing = [binary for binary in REQUIRED_BINARIES if not WorkspaceTool(binary).available()]
+    missing = [binary for binary in REQUIRED_BINARIES if not WorkspaceTool(binary=binary).available()]
     if missing:
         logging.getLogger('__NAME__').warning(
             'binaries not on PATH: %s; tools that need them will report failure', ', '.join(missing)
@@ -63,10 +61,10 @@ def main(argv: list[str] | None = None) -> int:
     logging.getLogger('__NAME__').info('serving over %s with root %s', transport, root)
     if transport == 'streamable-http':
         mcp.run(transport='streamable-http', host=arguments.host, port=arguments.port)
-    else:
+    if transport == 'stdio':
         mcp.run(transport='stdio')
     return 0
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    raise SystemExit(main())

@@ -6,8 +6,8 @@ from vibe_code_cli.findings import CannotCheckError, Finding, error, warning
 from vibe_code_cli.hook.events import (
     DEFAULT_TIMEOUT_SECONDS,
     ENFORCEMENT_EVENTS,
-    LOWERED_DEFAULT_TIMEOUT_SECONDS,
     SLOW_ENFORCEMENT_SECONDS,
+    TimeoutDefaults,
 )
 from vibe_code_cli.hook.file import HooksFile
 from vibe_code_cli.hook.matchers import matcher_findings
@@ -24,10 +24,6 @@ WEB_SCHEMES = frozenset({'http', 'https'})
 def check_hooks(
     hooks_file: HooksFile, decoded: DecodedHooks, *, builtin_errored: bool
 ) -> list[Finding]:
-    """The checks `claude plugin validate` and the schema are silent on.
-
-    Raises CannotCheckError when the file is not JSON the built-in let pass.
-    """
     config = hooks_file.config
     if config is None:
         if builtin_errored:
@@ -37,9 +33,7 @@ def check_hooks(
             'the checks could not run'
         )
         raise CannotCheckError(message)
-    findings = [
-        error(f'duplicate JSON key {key!r}; the last one wins') for key in hooks_file.duplicate_keys
-    ]
+    findings: list[Finding] = []
     if hooks_file.plugin_shape:
         findings.extend(top_level_findings(config))
     if decoded.events is not None:
@@ -48,7 +42,6 @@ def check_hooks(
 
 
 def top_level_findings(config: JsonObject) -> list[Finding]:
-    """Row H6, for a plugin file; a settings file has other top-level keys by design."""
     return [
         error(
             f'unknown top-level field {key!r}; a plugin hooks file holds only hooks and description'
@@ -70,7 +63,6 @@ def hooks_findings(events: tuple[Event, ...], hooks_file: HooksFile) -> list[Fin
 
 
 def event_findings(event: Event) -> list[Finding]:
-    """Row H11a."""
     if event.empty:
         return [error(f'hooks.{event.name}: must not be an empty array')]
     return []
@@ -88,14 +80,12 @@ def handler_findings(handler: Handler, hooks_file: HooksFile) -> list[Finding]:
 
 
 def command_findings(where: str, hook: CommandHook) -> list[Finding]:
-    """Row H18b."""
     if not hook.command.strip():
         return [error(f'{where}: command must not be empty')]
     return []
 
 
 def http_findings(where: str, hook: HttpHook) -> list[Finding]:
-    """Rows H36d and H37."""
     findings = []
     if hook.url.strip() and urlparse(hook.url).scheme.lower() not in WEB_SCHEMES:
         findings.append(error(f'{where}: url must use http:// or https://'))
@@ -108,12 +98,11 @@ def http_findings(where: str, hook: HttpHook) -> list[Finding]:
 
 
 def timeout_findings(handler: Handler) -> list[Finding]:
-    """Rows H28 and H31, for the handler types that run for a wall-clock time."""
     hook = handler.hook
     if not isinstance(hook, CommandHook | HttpHook) or runs_in_background(hook):
         return []
     if hook.timeout is UNSET:
-        default = LOWERED_DEFAULT_TIMEOUT_SECONDS.get(handler.event, DEFAULT_TIMEOUT_SECONDS)
+        default = TimeoutDefaults().lowered.get(handler.event, DEFAULT_TIMEOUT_SECONDS)
         message = f'no timeout set; Claude Code applies its default of {default:g} s'
         return [warning(f'{handler.where}: {message}')]
     return slow_timeout_findings(handler, hook.timeout)

@@ -1,19 +1,19 @@
-import json
 import re
 from dataclasses import dataclass
+
+import msgspec
 
 from vibe_code_cli.frontmatter import parse_skill_text, split_frontmatter
 
 UNQUOTED_DESCRIPTION = re.compile(r'^description:[ \t]*(?P<value>[^\s"\'>|].*)$', re.MULTILINE)
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class AgentText:
-    """fields is None when the frontmatter is not a mapping or does not parse (yaml_problem)."""
-
     has_block: bool
     fields: dict[str, object] | None
     yaml_problem: str | None
+    key_problem: str | None
     body: str
     unquoted_colon: bool = False
 
@@ -21,20 +21,26 @@ class AgentText:
 def parse_agent_text(text: str) -> AgentText:
     raw, body = split_frontmatter(text)
     if raw is None:
-        return AgentText(has_block=False, fields=None, yaml_problem=None, body=text)
+        return AgentText(
+            has_block=False, fields=None, yaml_problem=None, key_problem=None, body=text
+        )
     skill = parse_skill_text(text)
     unquoted = UNQUOTED_DESCRIPTION.search(raw)
     if unquoted is None:
         return AgentText(
-            has_block=True, fields=skill.fields, yaml_problem=skill.yaml_problem, body=body
+            has_block=True,
+            fields=skill.fields,
+            yaml_problem=skill.yaml_problem,
+            key_problem=skill.key_problem,
+            body=body,
         )
     if skill.yaml_problem is not None and ':' in unquoted['value']:
-        # The built-in reads this description but PyYAML rejects it, so the checks get it quoted.
-        skill = parse_skill_text(f'---\n{quote_description(raw)}---\n{body}')
+        skill = parse_skill_text(f'---\n{quote_description(raw, unquoted)}---\n{body}')
         return AgentText(
             has_block=True,
             fields=skill.fields,
             yaml_problem=skill.yaml_problem,
+            key_problem=skill.key_problem,
             body=body,
             unquoted_colon=True,
         )
@@ -44,12 +50,12 @@ def parse_agent_text(text: str) -> AgentText:
         has_block=True,
         fields=skill.fields,
         yaml_problem=skill.yaml_problem,
+        key_problem=skill.key_problem,
         body=body,
         unquoted_colon=has_colon,
     )
 
 
-def quote_description(raw: str) -> str:
-    return UNQUOTED_DESCRIPTION.sub(
-        lambda match: f'description: {json.dumps(match["value"])}', raw, count=1
-    )
+def quote_description(raw: str, unquoted: re.Match[str]) -> str:
+    quoted = msgspec.json.encode(unquoted['value']).decode()
+    return f'{raw[: unquoted.start()]}description: {quoted}{raw[unquoted.end() :]}'

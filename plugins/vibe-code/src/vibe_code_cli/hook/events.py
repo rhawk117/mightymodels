@@ -1,4 +1,6 @@
-# The "no matcher support" rows of the matcher table in the hooks reference.
+from dataclasses import dataclass, field
+from enum import StrEnum
+
 MATCHERLESS_EVENTS = frozenset(
     {
         'UserPromptSubmit',
@@ -18,12 +20,10 @@ EVERY_TOOL_CALL_EVENTS = frozenset({'PreToolUse', 'PostToolUse'})
 
 ENFORCEMENT_EVENTS = frozenset({'PreToolUse', 'PermissionRequest'})
 
-# The events whose plain-text stdout Claude Code adds to Claude's context.
 PLAIN_TEXT_CONTEXT_EVENTS = frozenset(
     {'UserPromptSubmit', 'UserPromptExpansion', 'SessionStart', 'PostModelSwitch'}
 )
 
-# The events whose exit-2 row in the hooks reference says the exit code is ignored or not honored.
 EXIT_2_IGNORED_EVENTS = frozenset(
     {
         'PermissionRequest',
@@ -38,12 +38,28 @@ EXIT_2_IGNORED_EVENTS = frozenset(
 
 DEFAULT_TIMEOUT_SECONDS = 600
 
-LOWERED_DEFAULT_TIMEOUT_SECONDS = {
-    'UserPromptSubmit': 30,
-    'PreModelSwitch': 30,
-    'PostModelSwitch': 30,
-    'MessageDisplay': 10,
-    'SessionEnd': 1.5,
-}
+
+class LoweredTimeoutEvent(StrEnum):
+    USER_PROMPT_SUBMIT = 'UserPromptSubmit'
+    PRE_MODEL_SWITCH = 'PreModelSwitch'
+    POST_MODEL_SWITCH = 'PostModelSwitch'
+    MESSAGE_DISPLAY = 'MessageDisplay'
+    SESSION_END = 'SessionEnd'
+
+
+def lowered_timeouts() -> dict[str, float]:
+    return {
+        LoweredTimeoutEvent.USER_PROMPT_SUBMIT: 30,
+        LoweredTimeoutEvent.PRE_MODEL_SWITCH: 30,
+        LoweredTimeoutEvent.POST_MODEL_SWITCH: 30,
+        LoweredTimeoutEvent.MESSAGE_DISPLAY: 10,
+        LoweredTimeoutEvent.SESSION_END: 1.5,
+    }
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class TimeoutDefaults:
+    lowered: dict[str, float] = field(default_factory=lowered_timeouts)
+
 
 SLOW_ENFORCEMENT_SECONDS = 10

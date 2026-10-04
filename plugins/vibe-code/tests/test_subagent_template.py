@@ -1,10 +1,15 @@
 import re
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
+from vibe_code_cli.builtin import Services
 from vibe_code_cli.cli import main
 from vibe_code_cli.findings import Finding
-from vibe_code_cli.subagent import command as subagent_command
+
+type ServicesFactory = Callable[[Sequence[Finding]], Services]
+type TemplateFill = Callable[[str, Mapping[str, str], re.Pattern[str]], str]
 
 TEMPLATE = (
     Path(__file__).resolve().parents[1]
@@ -14,53 +19,67 @@ TEMPLATE = (
     / 'agent.template.md'
 )
 PLACEHOLDER = re.compile(r'\b[A-Z][A-Z0-9_]{2,}\b')
-NOT_PLACEHOLDERS = {'CLAUDE'}
-FILLS = {
-    'NAME': 'demo',
-    'WHAT_IT_DOES': 'Reviews demo files for defects',
-    'TRIGGER': 'the user asks for a demo review',
-    'MODEL': 'sonnet',
-    'ONE_LINE_IDENTITY': 'careful reviewer',
-    'JOB': 'review the files the caller names',
-    'RESULT_SHAPE': 'a short findings list',
-    'REPO_OR_PLUGIN_FACTS_FROM_STAGE_2': 'The repository is a Python project.',
-    'WHAT_THE_DISPATCH_SUPPLIES': 'The dispatch names the files to review',
-    'STEP': 'Read the named files',
-    'NEVER_DO_1': 'Never edit a file',
-    'REASON': 'the caller reviews alone',
-    'TOOL_RESTRICTION_IN_PROSE': 'Use only the read tools',
-    'SELF_CHECK': 're-read each cited line',
-    'CALLER_CHECK': 'opening the cited lines',
-}
 
 
-def fill(template: str) -> str:
-    return PLACEHOLDER.sub(lambda token: FILLS.get(token[0], token[0]), template)
+class TestAgentTemplate:
+    NOT_PLACEHOLDERS = frozenset({'CLAUDE'})
+    FILLS = MappingProxyType(
+        {
+            'NAME': 'demo',
+            'WHAT_IT_DOES': 'Reviews demo files for defects',
+            'TRIGGER': 'the user asks for a demo review',
+            'MODEL': 'sonnet',
+            'ONE_LINE_IDENTITY': 'careful reviewer',
+            'JOB': 'review the files the caller names',
+            'RESULT_SHAPE': 'a short findings list',
+            'REPO_OR_PLUGIN_FACTS_FROM_STAGE_2': 'The repository is a Python project.',
+            'WHAT_THE_DISPATCH_SUPPLIES': 'The dispatch names the files to review',
+            'STEP': 'Read the named files',
+            'NEVER_DO_1': 'Never edit a file',
+            'REASON': 'the caller reviews alone',
+            'TOOL_RESTRICTION_IN_PROSE': 'Use only the read tools',
+            'SELF_CHECK': 're-read each cited line',
+            'CALLER_CHECK': 'opening the cited lines',
+        }
+    )
 
+    @pytest.fixture
+    def template_without_comments(self) -> str:
+        lines = TEMPLATE.read_text().splitlines()
+        return '\n'.join(line for line in lines if not line.startswith('#'))
 
-def test_every_template_placeholder_has_a_fill() -> None:
-    body = '\n'.join(line for line in TEMPLATE.read_text().splitlines() if not line.startswith('#'))
+    @pytest.fixture
+    def filled_template(self, fill: TemplateFill) -> str:
+        return fill(TEMPLATE.read_text(), self.FILLS, PLACEHOLDER)
 
-    unfilled = set(PLACEHOLDER.findall(fill(body))) - NOT_PLACEHOLDERS
+    def test_every_template_placeholder_has_a_fill(
+        self, template_without_comments: str, fill: TemplateFill
+    ) -> None:
+        filled = fill(template_without_comments, self.FILLS, PLACEHOLDER)
 
-    assert unfilled == set()
+        unfilled = set(PLACEHOLDER.findall(filled)) - self.NOT_PLACEHOLDERS
 
+        assert unfilled == set()
 
-@pytest.mark.parametrize('directory', ['.claude/agents', 'plugin/agents'])
-def test_filled_template_passes_strict_validation(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-    directory: str,
-) -> None:
-    def no_findings(_target: Path, **_options: bool) -> list[Finding]:
-        return []
+    @pytest.mark.parametrize(
+        'directory',
+        [
+            pytest.param('.claude/agents', id='.claude/agents'),
+            pytest.param('plugin/agents', id='plugin/agents'),
+        ],
+    )
+    def test_filled_template_passes_strict_validation(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+        fake_services: ServicesFactory,
+        filled_template: str,
+        directory: str,
+    ) -> None:
+        agent = tmp_path / directory / 'demo.md'
+        agent.parent.mkdir(parents=True)
+        agent.write_text(filled_template)
 
-    monkeypatch.setattr(subagent_command, 'run_builtin', no_findings)
-    agent = tmp_path / directory / 'demo.md'
-    agent.parent.mkdir(parents=True)
-    agent.write_text(fill(TEMPLATE.read_text()))
+        code = main(['subagent', 'validate', str(agent), '--strict'], fake_services(()))
 
-    code = main(['subagent', 'validate', str(agent), '--strict'])
-
-    assert code == 0, capsys.readouterr().out
+        assert code == 0, capsys.readouterr().out

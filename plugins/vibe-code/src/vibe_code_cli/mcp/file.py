@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,15 +10,8 @@ KINDS = ('plugin', 'project', 'user')
 SERVER_FILE_NAME = '.mcp.json'
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class McpFile:
-    """An MCP config file as read from disk, checked as one of the three kinds.
-
-    A plugin file is the plugin-root `.mcp.json`, a project file is the repository-root
-    `.mcp.json`, and a user file is `~/.claude.json`, which holds user servers under a
-    top-level `mcpServers` key beside unrelated keys.
-    """
-
     path: Path
     kind: str
     text: str
@@ -28,14 +20,12 @@ class McpFile:
 
     @property
     def directory(self) -> Path:
-        """The directory that holds the file, which `${CLAUDE_PLUGIN_ROOT}` names for a plugin."""
         return self.path.resolve().parent
 
     def builtin_text(self) -> str:
-        """The text of a plugin-root `.mcp.json` that holds this file's servers."""
         if self.kind != 'user' or not isinstance(self.document, dict):
             return self.text
-        return json.dumps({'mcpServers': self.document.get('mcpServers', {})})
+        return msgspec.json.encode({'mcpServers': self.document.get('mcpServers', {})}).decode()
 
 
 def load_mcp_file(path: Path, kind: str) -> McpFile:
@@ -47,5 +37,5 @@ def load_mcp_file(path: Path, kind: str) -> McpFile:
     try:
         document = msgspec.json.decode(text)
     except msgspec.DecodeError:
-        return McpFile(path, kind, text, document=None, valid_json=False)
-    return McpFile(path, kind, text, document=document, valid_json=True)
+        return McpFile(path=path, kind=kind, text=text, document=None, valid_json=False)
+    return McpFile(path=path, kind=kind, text=text, document=document, valid_json=True)

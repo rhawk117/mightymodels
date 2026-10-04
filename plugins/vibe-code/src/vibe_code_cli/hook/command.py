@@ -3,7 +3,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from vibe_code_cli.builtin import run_builtin
+from vibe_code_cli.builtin import BuiltinRunner, Services
 from vibe_code_cli.findings import CannotCheckError, Finding, report
 from vibe_code_cli.hook.checks import check_hooks
 from vibe_code_cli.hook.file import HooksFile, load_hooks_file
@@ -13,7 +13,7 @@ from vibe_code_cli.hook.runner import Expectations, HookTest, check_hook, parse_
 DEFAULT_TEST_TIMEOUT_SECONDS = 15.0
 
 
-def build_group(parser: argparse.ArgumentParser) -> None:
+def build(parser: argparse.ArgumentParser) -> None:
     commands = parser.add_subparsers(dest='command', metavar='COMMAND')
     validate = commands.add_parser(
         'validate',
@@ -45,28 +45,30 @@ def build_group(parser: argparse.ArgumentParser) -> None:
     test.add_argument('--expect-silent', action='store_true', help='expect empty stdout')
     test.add_argument('--malformed', action='store_true', help='send invalid JSON, not the payload')
     test.add_argument('--timeout', type=float, default=DEFAULT_TEST_TIMEOUT_SECONDS)
-    test.set_defaults(handler=test_command)
+    test.set_defaults(handler=hook_test_command)
 
 
-def validate_command(arguments: argparse.Namespace) -> int:
-    """Return 0 for a pass, 1 for findings, 2 when the check could not run."""
+def dispatch(arguments: argparse.Namespace, services: Services) -> int:
+    return int(arguments.handler(arguments, services))
+
+
+def validate_command(arguments: argparse.Namespace, services: Services) -> int:
     path = arguments.hooks_file
     if not path.is_file():
         print(f'error: {path} is not a file', file=sys.stderr)
         return 2
     try:
-        findings = validate_findings(path)
+        findings = validate_findings(path, services.run_builtin)
     except CannotCheckError as problem:
         print(f'error: {problem}', file=sys.stderr)
         return 2
     return report(str(path), findings, strict=arguments.strict)
 
 
-def validate_findings(path: Path) -> list[Finding]:
-    """The schema findings, the built-in's the schema did not already report, then the checks."""
+def validate_findings(path: Path, runner: BuiltinRunner) -> list[Finding]:
     hooks_file = load_hooks_file(path)
     decoded = decode_hooks(hooks_file.config)
-    builtin_findings = run_hooks_builtin(hooks_file)
+    builtin_findings = run_hooks_builtin(hooks_file, runner)
     builtin_errored = any(finding.level == 'error' for finding in builtin_findings)
     own_findings = check_hooks(hooks_file, decoded, builtin_errored=builtin_errored)
     return [
@@ -81,14 +83,10 @@ def validate_findings(path: Path) -> list[Finding]:
 
 
 def reports_location(finding: Finding, schema_findings: tuple[SchemaFinding, ...]) -> bool:
-    """Whether the finding names a location the schema pass already reported."""
     return any(f'{schema.where}: ' in finding.message for schema in schema_findings)
 
 
-def run_hooks_builtin(hooks_file: HooksFile) -> list[Finding]:
-    # The built-in reads hooks only from `hooks/hooks.json` inside a plugin root, so both file
-    # shapes go to it as a staged plugin that holds the hooks object. Its findings about the
-    # staged manifest are about the staging, not the file, and are dropped.
+def run_hooks_builtin(hooks_file: HooksFile, runner: BuiltinRunner) -> list[Finding]:
     hooks_text = hooks_file.hooks_text_for_builtin()
     with tempfile.TemporaryDirectory() as staging:
         root = Path(staging)
@@ -103,11 +101,10 @@ def run_hooks_builtin(hooks_file: HooksFile) -> list[Finding]:
         except OSError as problem:
             message = f'could not stage {hooks_file.path} for claude: {problem}'
             raise CannotCheckError(message) from problem
-        return run_builtin(root, include_manifest=False)
+        return runner(root, include_manifest=False)
 
 
-def test_command(arguments: argparse.Namespace) -> int:
-    """Return 0 for a pass, 1 for a contract failure, 2 when the hook could not be run."""
+def hook_test_command(arguments: argparse.Namespace, _services: Services) -> int:
     hook_test = HookTest(
         script=arguments.script,
         payload=arguments.payload,

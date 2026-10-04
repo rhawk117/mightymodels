@@ -1,7 +1,8 @@
-import json
 import re
 import shutil
 from pathlib import Path
+
+import msgspec
 
 from vibe_code_cli.findings import CannotCheckError
 from vibe_code_cli.mcp.scaffold.config import render_config
@@ -9,26 +10,25 @@ from vibe_code_cli.mcp.scaffold.server import server_tokens
 from vibe_code_cli.mcp.scaffold.spec import LoadedSpec, Spec
 from vibe_code_cli.mcp.scaffold.text import wrap_literal
 from vibe_code_cli.mcp.scaffold.tool import render_schema, render_test, render_use_case
+from vibe_code_cli.plugin.manifest import json_text
 
 ROOT_VARIABLE = 'CLAUDE_PROJECT_DIR'
 ROOT_VARIABLE_SOURCES = ('env', 'roots')
-REACH_TRANSPORTS = {
-    'local': ('stdio',),
-    'network': ('streamable-http',),
-    'both': ('stdio', 'streamable-http'),
-}
-TOKEN = re.compile(r'__[A-Z][A-Z_]*__')
+TRANSPORT_REACHES = (('stdio', ('local', 'both')), ('streamable-http', ('network', 'both')))
+TOKEN = re.compile(r'(__[A-Z][A-Z_]*__)')
 
 
 def template_tokens(spec: Spec) -> dict[str, str]:
-    transports = ''.join(f'{transport!r}, ' for transport in REACH_TRANSPORTS[spec.reach])
+    transports = ''.join(
+        f'{transport!r}, ' for transport, reaches in TRANSPORT_REACHES if spec.reach in reaches
+    )
     reads_variable = spec.root_source in ROOT_VARIABLE_SOURCES
     return {
         **server_tokens(spec),
         '__PKG__': spec.package,
         '__NAME__': spec.name,
         '__DESCRIPTION__': spec.description,
-        '__DESCRIPTION_TOML__': json.dumps(spec.description, ensure_ascii=False)[1:-1],
+        '__DESCRIPTION_TOML__': msgspec.json.encode(spec.description).decode()[1:-1],
         '__DESCRIPTION_LITERAL__': wrap_literal(spec.description),
         '__INSTRUCTIONS_LITERAL__': wrap_literal(spec.instructions),
         '__TRANSPORTS__': transports,
@@ -37,17 +37,15 @@ def template_tokens(spec: Spec) -> dict[str, str]:
 
 
 def substitute(text: str, tokens: dict[str, str]) -> str:
-    """Replace every known token in one pass, so spec text is never expanded a second time."""
-    return TOKEN.sub(lambda match: tokens.get(match[0], match[0]), text)
+    pieces = TOKEN.split(text)
+    return ''.join(map(tokens.get, pieces, pieces))
 
 
 def in_tool_cache(relative: Path) -> bool:
-    """Whether a template path sits under a dot-directory or `__pycache__`, at any depth."""
     return any(name.startswith('.') or name == '__pycache__' for name in relative.parts[:-1])
 
 
 def plan_project(loaded: LoadedSpec, template_dir: Path) -> dict[str, str]:
-    """Every file the scaffold writes, keyed by its path under the target, built in memory."""
     spec = loaded.spec
     tokens = template_tokens(spec)
     package_dir = f'src/{spec.package}'
@@ -68,12 +66,11 @@ def plan_project(loaded: LoadedSpec, template_dir: Path) -> dict[str, str]:
         plan[f'tests/test_{tool.name}.py'] = render_test(spec, tool)
     for filename, content in render_config(spec).items():
         plan[f'config/{filename}'] = content
-    plan['mcp-spec.json'] = json.dumps(loaded.record, indent=2) + '\n'
+    plan['mcp-spec.json'] = json_text(loaded.record)
     return plan
 
 
 def write_project(target: Path, plan: dict[str, str], *, force: bool) -> None:
-    """Write the plan under `target`, refusing any path that resolves outside it."""
     root = target.resolve()
     destinations = {relative: (root / relative).resolve() for relative in plan}
     outside = [relative for relative, path in destinations.items() if not path.is_relative_to(root)]

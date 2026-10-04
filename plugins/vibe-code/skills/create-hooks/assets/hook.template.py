@@ -2,7 +2,7 @@
 
 Claude Code command hook for the EVENT_NAME event, failure posture POSTURE_VALUE. One JSON payload
 on stdin, one JSON object on stdout or nothing, diagnostics on stderr. The payload names its event
-in `hook_event_name`, so `HANDLERS` dispatches on it and the config needs no extra argument.
+in `hook_event_name`, so `Handlers` dispatches on it and the config needs no extra argument.
 
 Every decision the host acts on has one constructor below (`deny`, `ask`, `rewrite`, `context`,
 `block`, `block_once`), so a handler never spells a field name. Context for the model is XML:
@@ -11,21 +11,17 @@ reads that as structure rather than as more prose. The example handlers are work
 common hook shapes; keep the ones this hook needs and delete the rest.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import re
 import shlex
 import subprocess
 import sys
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import Literal, NotRequired, TypedDict
 
 HOOK_NAME = 'HOOK_NAME'
 COMMAND_TIMEOUT_SECONDS = 4
@@ -106,7 +102,7 @@ type HookOutput = dict[str, object]
 type Handler = Callable[..., HookOutput | None]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ContextSection:
     tag: str
     body: str
@@ -178,7 +174,7 @@ def redact(text: str) -> str:
     return text
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CommandResult:
     succeeded: bool
     exit_code: int | None
@@ -194,7 +190,7 @@ class CommandResult:
         return '\n'.join(self.output.splitlines()[-lines:])
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CommandRunner:
     cwd: Path
     timeout: int = COMMAND_TIMEOUT_SECONDS
@@ -286,45 +282,51 @@ def on_pre_tool_use(payload: PreToolUseInput) -> HookOutput | None:
     return None
 
 
-RECOVERIES: dict[str, str] = {
-    'ModuleNotFoundError': (
-        'Run `uv sync` to install the project environment, then retry the command.'
+RECOVERIES = (
+    (
+        'ModuleNotFoundError',
+        'Run `uv sync` to install the project environment, then retry the command.',
     ),
-    'command not found': (
-        'The tool is not on PATH; use the project runner (`uv run`), not the bare name.'
+    (
+        'command not found',
+        'The tool is not on PATH; use the project runner (`uv run`), not the bare name.',
     ),
-}
+)
 
 
 def on_post_tool_use_failure(payload: PostToolUseFailureInput) -> HookOutput | None:
     if payload.get('is_interrupt'):
         return None
     error = payload['error']
-    matches = [advice for marker, advice in RECOVERIES.items() if marker in error]
+    matches = [advice for marker, advice in RECOVERIES if marker in error]
     if not matches:
         return None
     return context(
         Event.POST_TOOL_USE_FAILURE,
-        ContextSection('failure', error[-OUTPUT_PREVIEW_CHARS:], {'tool': payload['tool_name']}),
-        ContextSection('recovery', '\n'.join(f'- {advice}' for advice in matches)),
+        ContextSection(
+            tag='failure',
+            body=error[-OUTPUT_PREVIEW_CHARS:],
+            attributes={'tool': payload['tool_name']},
+        ),
+        ContextSection(tag='recovery', body='\n'.join(f'- {advice}' for advice in matches)),
     )
 
 
 def on_session_start(payload: SessionStartInput) -> HookOutput | None:
-    runner = CommandRunner(Path(payload['cwd']))
+    runner = CommandRunner(cwd=Path(payload['cwd']))
     status = runner.run(['git', 'status', '--short', '--branch'])
     if not status.succeeded:
         return None
     return context(
         Event.SESSION_START,
         ContextSection(
-            'repository_state',
-            f'```\n{status.stdout.strip()}\n```',
-            {'source': payload['source']},
+            tag='repository_state',
+            body=f'```\n{status.stdout.strip()}\n```',
+            attributes={'source': payload['source']},
         ),
         ContextSection(
-            'conventions',
-            'This repo runs `uv run ruff check .` and `uv run pytest -q` before work is done.',
+            tag='conventions',
+            body='This repo runs `uv run ruff check .` and `uv run pytest -q` before work is done.',
         ),
     )
 
@@ -332,7 +334,8 @@ def on_session_start(payload: SessionStartInput) -> HookOutput | None:
 def on_stop(payload: StopInput) -> HookOutput | None:
     if payload['stop_hook_active'] or not (Path(payload['cwd']) / 'pyproject.toml').exists():
         return None
-    tests = CommandRunner(Path(payload['cwd']), timeout=GATE_TIMEOUT_SECONDS).run(GATE_COMMAND)
+    runner = CommandRunner(cwd=Path(payload['cwd']), timeout=GATE_TIMEOUT_SECONDS)
+    tests = runner.run(GATE_COMMAND)
     if tests.error is not None:
         log.warning('gate could not run, allowing: %s', tests.error)
         return None
@@ -341,11 +344,13 @@ def on_stop(payload: StopInput) -> HookOutput | None:
     reason = render_context(
         [
             ContextSection(
-                'gate_failed', f'```\n{tests.tail()}\n```', {'command': ' '.join(GATE_COMMAND)}
+                tag='gate_failed',
+                body=f'```\n{tests.tail()}\n```',
+                attributes={'command': ' '.join(GATE_COMMAND)},
             ),
             ContextSection(
-                'instruction',
-                'Fix the failing tests before finishing. Do not skip or delete them.',
+                tag='instruction',
+                body='Fix the failing tests before finishing. Do not skip or delete them.',
             ),
         ]
     )
@@ -358,13 +363,19 @@ def on_subagent_stop(payload: SubagentStopInput) -> HookOutput | None:
     return block_once(payload, 'Return the findings inside a <report> element, then finish.')
 
 
-HANDLERS: dict[str, Handler] = {
-    Event.PRE_TOOL_USE: on_pre_tool_use,
-    Event.POST_TOOL_USE_FAILURE: on_post_tool_use_failure,
-    Event.SESSION_START: on_session_start,
-    Event.STOP: on_stop,
-    Event.SUBAGENT_STOP: on_subagent_stop,
-}
+def event_handlers() -> dict[str, Handler]:
+    return {
+        Event.PRE_TOOL_USE: on_pre_tool_use,
+        Event.POST_TOOL_USE_FAILURE: on_post_tool_use_failure,
+        Event.SESSION_START: on_session_start,
+        Event.STOP: on_stop,
+        Event.SUBAGENT_STOP: on_subagent_stop,
+    }
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Handlers:
+    by_event: dict[str, Handler] = field(default_factory=event_handlers)
 
 
 def fail(detail: str) -> int:
@@ -388,7 +399,7 @@ def read_payload(stream: str) -> dict[str, object]:
 def dispatch(stream: str) -> HookOutput | None:
     payload = read_payload(stream)
     event_name = payload.get('hook_event_name')
-    handler = HANDLERS.get(event_name) if isinstance(event_name, str) else None
+    handler = Handlers().by_event.get(event_name) if isinstance(event_name, str) else None
     if handler is None:
         log.info('no handler registered for %s', event_name)
         return None

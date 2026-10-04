@@ -26,10 +26,8 @@ IDENTITY_KEYS = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Plugin:
-    """A plugin directory and its parsed manifest, which the readers share."""
-
     directory: Path
     manifest: JsonObject
 
@@ -40,27 +38,25 @@ class Plugin:
         return path.resolve().is_relative_to(self.directory.resolve())
 
     def override_paths(self, key: str) -> list[Path]:
-        """The paths a manifest component key names, kept to those inside the plugin."""
         value = self.manifest.get(key)
         entries = value if isinstance(value, list) else [value]
         paths = [self.directory / entry for entry in entries if isinstance(entry, str)]
         return [path for path in paths if self.inside(path)]
 
     def config_documents(self, key: str, default: str) -> list[tuple[str, JsonObject]]:
-        """The default file, then each file or inline object the manifest key adds."""
         documents = [(default, json_document(self.directory / default))]
         value = self.manifest.get(key)
         for entry in value if isinstance(value, list) else [value]:
             inline = as_object(entry)
             if inline is not None:
                 documents.append((MANIFEST_PATH, inline))
-            elif isinstance(entry, str) and self.inside(self.directory / entry):
+                continue
+            if isinstance(entry, str) and self.inside(self.directory / entry):
                 documents.append((entry.removeprefix('./'), json_document(self.directory / entry)))
         return [(source, document) for source, document in documents if document]
 
 
 def json_document(path: Path) -> JsonObject:
-    """The JSON object in path, or an empty one when the file is absent or is not an object."""
     if not path.is_file():
         return {}
     return as_object(msgspec.json.decode(path.read_bytes())) or {}
@@ -89,7 +85,6 @@ def markdown_component(
 
 
 def skill_components(plugin: Plugin) -> list[Component]:
-    """Each SKILL.md under skills/ and under every directory the manifest adds."""
     roots = [plugin.directory / 'skills', *plugin.override_paths('skills')]
     found = [
         skill
@@ -106,12 +101,12 @@ def skill_components(plugin: Plugin) -> list[Component]:
 def markdown_in(path: Path, *, recursive: bool) -> Iterator[Path]:
     if path.is_file():
         yield path
-    elif path.is_dir():
+        return
+    if path.is_dir():
         yield from sorted(path.rglob('*.md') if recursive else path.glob('*.md'))
 
 
 def replaceable_files(plugin: Plugin, key: str, default: str, *, recursive: bool) -> list[Path]:
-    """The files of a component whose manifest key replaces the default directory."""
     paths = plugin.override_paths(key) or [plugin.directory / default]
     files = (file for path in paths for file in markdown_in(path, recursive=recursive))
     return list(dict.fromkeys(files))
@@ -123,7 +118,6 @@ def command_components(plugin: Plugin) -> list[Component]:
 
 
 def agent_components(plugin: Plugin) -> list[Component]:
-    """An agent takes the name its frontmatter gives, or its file name when it gives none."""
     files = replaceable_files(plugin, 'agents', 'agents', recursive=True)
     names = [frontmatter_fields(path).get('name') for path in files]
     return [
@@ -192,12 +186,7 @@ INVENTORIES: tuple[Callable[[Plugin], list[Component]], ...] = (
 
 
 def inventory(plugin_dir: Path) -> Plan:
-    """A record of the plugin as built, valid for `plugin validate` so a session can extend it.
-
-    The manifest supplies the identity. A plugin does not hold its problem, audience or kind, so
-    those, and any identity field the manifest lacks, hold placeholders that say so.
-    """
-    plugin = Plugin(plugin_dir, json_document(plugin_dir / MANIFEST_PATH))
+    plugin = Plugin(directory=plugin_dir, manifest=json_document(plugin_dir / MANIFEST_PATH))
     fallback = plugin_dir.resolve().name
     placeholders = {
         'name': fallback,

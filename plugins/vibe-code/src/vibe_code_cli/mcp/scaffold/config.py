@@ -1,13 +1,11 @@
-import json
-
 from vibe_code_cli.mcp.scaffold.spec import Spec
+from vibe_code_cli.plugin.manifest import json_text
 
 TIMEOUT_MS = 120_000
 NETWORK_URL = 'http://127.0.0.1:8000/mcp'
 
 
 def render_config(spec: Spec) -> dict[str, str]:
-    """The `.mcp.json` shapes for the spec's reach, keyed by the file name written under config/."""
     name = spec.name
     always_load = {'alwaysLoad': True} if spec.always_load else {}
     plugin = {
@@ -28,6 +26,6 @@ def render_config(spec: Spec) -> dict[str, str]:
     if spec.reach in ('network', 'both'):
         shapes['mcp.network.json'] = network
     return {
-        filename: json.dumps({'mcpServers': {name: {**entry, **always_load}}}, indent=2) + '\n'
+        filename: json_text({'mcpServers': {name: {**entry, **always_load}}})
         for filename, entry in shapes.items()
     }

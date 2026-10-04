@@ -1,6 +1,8 @@
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import msgspec
 
@@ -8,31 +10,26 @@ from vibe_code_cli.findings import CannotCheckError, Finding, error, warning
 
 
 class BuiltinUnavailableError(CannotCheckError):
-    """The built-in validator could not run, so no verdict exists."""
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 
 
-class ReportItem(msgspec.Struct):
+class ReportItem(msgspec.Struct, frozen=True, kw_only=True):
     message: str
     path: str | None = None
 
 
-class ReportSection(msgspec.Struct):
+class ReportSection(msgspec.Struct, frozen=True, kw_only=True):
     errors: list[ReportItem] = []
     warnings: list[ReportItem] = []
 
 
-class Report(msgspec.Struct):
-    """The JSON that `claude plugin validate --json` prints; its other keys are not read."""
-
+class Report(msgspec.Struct, frozen=True, kw_only=True):
     manifest: ReportSection | None = None
     contents: list[ReportSection] = []
 
 
 def run_builtin(target: Path, *, include_manifest: bool = True) -> list[Finding]:
-    """Run `claude plugin validate --json` on target and return what it found.
-
-    A caller that stages a throwaway manifest passes include_manifest=False to drop its findings.
-    """
     claude = shutil.which('claude')
     if claude is None:
         message = 'claude is not on PATH: npm install -g @anthropic-ai/claude-code'
@@ -48,6 +45,16 @@ def run_builtin(target: Path, *, include_manifest: bool = True) -> list[Finding]
         message = f'claude plugin validate exited {result.returncode} with no error finding: '
         raise BuiltinUnavailableError(message + result.stderr.strip())
     return findings
+
+
+@runtime_checkable
+class BuiltinRunner(Protocol):
+    def __call__(self, target: Path, /, *, include_manifest: bool = True) -> list[Finding]: ...
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Services:
+    run_builtin: BuiltinRunner = run_builtin
 
 
 def parse_report(stdout: str, *, include_manifest: bool = True) -> list[Finding]:

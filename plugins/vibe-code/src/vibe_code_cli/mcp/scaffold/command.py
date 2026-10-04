@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+from vibe_code_cli.builtin import Services
 from vibe_code_cli.findings import CannotCheckError
 from vibe_code_cli.mcp.scaffold.render import plan_project, write_project
 from vibe_code_cli.mcp.scaffold.spec import Spec, load_spec, spec_warnings
@@ -12,14 +13,12 @@ TEMPLATE_PATH = Path('skills') / 'create-mcp' / 'assets' / 'template'
 
 
 def default_template() -> Path:
-    """The skill's template: under the root the shim exports, else under this package's plugin."""
     exported = os.environ.get(PLUGIN_ROOT_VARIABLE)
     plugin_root = Path(exported) if exported else Path(__file__).resolve().parents[4]
     return plugin_root / TEMPLATE_PATH
 
 
-def scaffold_command(arguments: argparse.Namespace) -> int:
-    """Return 0 once the project is written, 2 for a spec, template or target it rejects."""
+def scaffold_command(arguments: argparse.Namespace, _services: Services) -> int:
     try:
         spec, plan = prepare(arguments)
         write_project(arguments.target, plan, force=arguments.force)
@@ -38,7 +37,6 @@ def scaffold_command(arguments: argparse.Namespace) -> int:
 
 
 def prepare(arguments: argparse.Namespace) -> tuple[Spec, dict[str, str]]:
-    """Validate the inputs and build every file in memory, so a rejection writes nothing."""
     template = arguments.template or default_template()
     target = arguments.target
     if not template.is_dir():

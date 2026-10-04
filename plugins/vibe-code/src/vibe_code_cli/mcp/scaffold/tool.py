@@ -1,19 +1,29 @@
+from dataclasses import dataclass, field
+
 from msgspec import UnsetType
 
-from vibe_code_cli.mcp.scaffold.spec import Parameter, Spec, Tool
+from vibe_code_cli.mcp.scaffold.spec import Parameter, ParameterType, Spec, Tool
 from vibe_code_cli.mcp.scaffold.text import docstring, wrap_literal
 
-EXAMPLES = {
-    'str': "'example'",
-    'int': '1',
-    'float': '1.0',
-    'bool': 'True',
-    'list[str]': "['example']",
-    'list[int]': '[1]',
-    'dict[str, str]': "{'key': 'value'}",
-    'list[dict[str, str]]': "[{'key': 'value'}]",
-}
 COMMAND_FAILED = "        raise ToolError(result.error or result.stderr or 'command failed')"
+
+
+def examples_by_type() -> dict[str, str]:
+    return {
+        ParameterType.STR: "'example'",
+        ParameterType.INT: '1',
+        ParameterType.FLOAT: '1.0',
+        ParameterType.BOOL: 'True',
+        ParameterType.STR_LIST: "['example']",
+        ParameterType.INT_LIST: '[1]',
+        ParameterType.STR_MAP: "{'key': 'value'}",
+        ParameterType.STR_MAP_LIST: "[{'key': 'value'}]",
+    }
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ExampleLiterals:
+    by_type: dict[str, str] = field(default_factory=examples_by_type)
 
 
 def render_field(parameter: Parameter) -> str:
@@ -35,8 +45,6 @@ def render_field(parameter: Parameter) -> str:
 def render_schema(tool: Tool) -> str:
     lines = [
         f'"""Input and output models for the {tool.name} tool."""',
-        '',
-        'from __future__ import annotations',
         '',
         'from pydantic import BaseModel, Field',
         '',
@@ -70,28 +78,19 @@ def auto_mappable(tool: Tool) -> bool:
 
 def render_use_case(spec: Spec, tool: Tool) -> str:
     mapped = auto_mappable(tool)
-    lines = [
-        docstring(tool.name, tool.description),
-        '',
-        'from __future__ import annotations',
-        '',
-        'from typing import TYPE_CHECKING',
-        '',
-    ]
+    params = '_params' if mapped else 'params'
+    lines = [docstring(tool.name, tool.description), '']
     if tool.binary:
         lines += ['from mcp.server.mcpserver.exceptions import ToolError', '']
-    lines += use_case_imports(spec.package, tool, mapped=mapped)
-    lines += ['def run(workspace: RepositoryWorkspace, params: Input) -> Output:']
-    lines += use_case_body(tool, mapped=mapped)
+    lines += [
+        f'from {spec.package}.tools.{tool.name}.schema import Input, Output',
+        f'from {spec.package}.workspace import RepositoryWorkspace',
+        '',
+        '',
+        f'def run(workspace: RepositoryWorkspace, {params}: Input) -> Output:',
+        *use_case_body(tool, mapped=mapped),
+    ]
     return '\n'.join(lines) + '\n'
-
-
-def use_case_imports(package: str, tool: Tool, *, mapped: bool) -> list[str]:
-    schema_import = f'from {package}.tools.{tool.name}.schema import Input, Output'
-    workspace_import = f'    from {package}.workspace import RepositoryWorkspace'
-    if mapped:
-        return [schema_import, '', 'if TYPE_CHECKING:', workspace_import, '', '']
-    return ['if TYPE_CHECKING:', f'    {schema_import}', workspace_import, '', '']
 
 
 def use_case_body(tool: Tool, *, mapped: bool) -> list[str]:
@@ -124,7 +123,6 @@ def use_case_body(tool: Tool, *, mapped: bool) -> list[str]:
         for parameter in tool.outputs
     )
     return [
-        '    del params  # uniform use-case signature; this tool takes no inputs',
         run,
         '    if not result.succeeded:',
         COMMAND_FAILED,
@@ -138,18 +136,21 @@ def render_test(spec: Spec, tool: Tool) -> str:
     lines = [
         f'"""Contract tests for the {name} tool, run in-process through the MCP client."""',
         '',
-        'from __future__ import annotations',
-        '',
         'from pathlib import Path',
         '',
         'from mcp import Client',
     ]
     if tool.confirm:
-        lines += [
-            'from mcp.client.session import ClientRequestContext',
-            'from mcp.types import ElicitRequestParams, ElicitResult',
-        ]
+        lines += ['from mcp.types import ElicitResult']
     lines += ['', f'from {package}.server import build_server', '', '']
+    if tool.confirm:
+        lines += [
+            'async def accept(*_: object, **__: object) -> ElicitResult:',
+            "    return ElicitResult(action='accept', content={'proceed': True})",
+            '',
+            '',
+        ]
+    lines += [f'class Test{name.title().replace("_", "")}:']
     lines += listing_test(tool)
     lines += call_test(tool)
     return '\n'.join(lines) + '\n'
@@ -158,21 +159,22 @@ def render_test(spec: Spec, tool: Tool) -> str:
 def listing_test(tool: Tool) -> list[str]:
     name = tool.name
     lines = [
-        f'async def test_{name}_is_listed_with_its_schema(tmp_path: Path) -> None:',
-        '    async with Client(build_server(tmp_path), raise_exceptions=True) as client:',
-        '        tools = {tool.name: tool for tool in (await client.list_tools()).tools}',
-        f"    assert '{name}' in tools",
+        f'    async def test_{name}_is_listed_with_its_schema(self, tmp_path: Path) -> None:',
+        '        async with Client(build_server(tmp_path), raise_exceptions=True) as client:',
+        '            tools = {tool.name: tool for tool in (await client.list_tools()).tools}',
+        f"        assert '{name}' in tools",
     ]
     if tool.inputs:
-        lines += [f"    properties = tools['{name}'].input_schema['$defs']['Input']['properties']"]
-        lines += [f"    assert '{parameter.name}' in properties" for parameter in tool.inputs]
+        lines += [
+            f"        properties = tools['{name}'].input_schema['$defs']['Input']['properties']"
+        ]
+        lines += [f"        assert '{parameter.name}' in properties" for parameter in tool.inputs]
     lines += [
-        f"    assert tools['{name}'].annotations is not None",
+        f"        assert tools['{name}'].annotations is not None",
         (
-            f"    assert tools['{name}'].annotations.read_only_hint is "
+            f"        assert tools['{name}'].annotations.read_only_hint is "
             f'{tool.side_effects == "read_only"}'
         ),
-        '',
         '',
     ]
     return lines
@@ -180,37 +182,30 @@ def listing_test(tool: Tool) -> list[str]:
 
 def call_test(tool: Tool) -> list[str]:
     name = tool.name
+    examples = ExampleLiterals().by_type
     arguments = ', '.join(
         f"'{parameter.name}': "
-        f'{"str(tmp_path)" if parameter.name == "root" else EXAMPLES[parameter.type]}'
+        f'{"str(tmp_path)" if parameter.name == "root" else examples[parameter.type]}'
         for parameter in tool.inputs
         if parameter.required
     )
-    lines: list[str] = []
-    client_line = '    async with Client(build_server(tmp_path), raise_exceptions=True) as client:'
+    client_line = (
+        '        async with Client(build_server(tmp_path), raise_exceptions=True) as client:'
+    )
     if tool.confirm:
-        lines += [
-            (
-                'async def accept(context: ClientRequestContext, '
-                'params: ElicitRequestParams) -> ElicitResult:'
-            ),
-            '    del context, params',
-            "    return ElicitResult(action='accept', content={'proceed': True})",
-            '',
-            '',
-        ]
         client_line = (
-            '    async with Client(build_server(tmp_path), '
+            '        async with Client(build_server(tmp_path), '
             'raise_exceptions=True, elicitation_callback=accept) as client:'
         )
-    lines += [
-        f'async def test_{name}_returns_structured_output(tmp_path: Path) -> None:',
+    lines = [
+        f'    async def test_{name}_returns_structured_output(self, tmp_path: Path) -> None:',
         client_line,
-        f"        result = await client.call_tool('{name}', {{'params': {{{arguments}}}}})",
-        '    assert not result.is_error',
-        '    assert result.structured_content is not None',
+        f"            result = await client.call_tool('{name}', {{'params': {{{arguments}}}}})",
+        '        assert not result.is_error',
+        '        assert result.structured_content is not None',
     ]
     lines += [
-        f"    assert '{parameter.name}' in result.structured_content" for parameter in tool.outputs
+        f"        assert '{parameter.name}' in result.structured_content"
+        for parameter in tool.outputs
     ]
     return lines

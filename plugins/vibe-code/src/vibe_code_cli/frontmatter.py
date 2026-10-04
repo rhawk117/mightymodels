@@ -1,57 +1,15 @@
-import re
+import datetime
 from dataclasses import dataclass
 
-import yaml
-from yaml.resolver import BaseResolver
+import msgspec
 
-YAML_BOOL = 'tag:yaml.org,2002:bool'
-
-
-class FrontmatterLoader(yaml.SafeLoader):
-    """Read safe YAML; record bad keys, and keep YAML 1.1 bool aliases as strings."""
-
-    def __init__(self, stream: str) -> None:
-        super().__init__(stream)
-        self.key_problems: list[str] = []
+from vibe_code_cli.jsondoc import as_object
 
 
-FrontmatterLoader.yaml_implicit_resolvers = {
-    char: [(tag, pattern) for tag, pattern in resolvers if tag != YAML_BOOL]
-    for char, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
-}
-FrontmatterLoader.add_implicit_resolver(
-    YAML_BOOL, re.compile(r'^(?:true|false)$', re.IGNORECASE), list('tTfF')
-)
-
-
-def checked_mapping(
-    loader: FrontmatterLoader,
-    node: yaml.nodes.MappingNode,
-    *,
-    deep: bool = False,
-) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        line = key_node.start_mark.line + 2
-        if not isinstance(key, str):
-            loader.key_problems.append(f'frontmatter key {key!r} on line {line} is not a string')
-            continue
-        if key in result:
-            loader.key_problems.append(f'duplicate frontmatter key {key!r} on line {line}')
-        result[key] = loader.construct_object(value_node, deep=deep)
-    return result
-
-
-FrontmatterLoader.add_constructor(BaseResolver.DEFAULT_MAPPING_TAG, checked_mapping)
-
-
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class SkillText:
-    """fields is None when the file has no frontmatter block or it is not a YAML mapping."""
-
     fields: dict[str, object] | None
-    key_problems: list[str]
+    key_problem: str | None
     body: str
     yaml_problem: str | None = None
 
@@ -68,20 +26,25 @@ def split_frontmatter(text: str) -> tuple[str | None, str]:
     return ''.join(lines[1:closing]), ''.join(lines[closing + 1 :])
 
 
+def key_problem_of(fields: object) -> str | None:
+    if not isinstance(fields, dict):
+        return None
+    try:
+        msgspec.convert(fields, dict[str, object], builtin_types=(datetime.date, datetime.datetime))
+    except msgspec.ValidationError as problem:
+        return f'frontmatter keys must be strings ({problem})'
+    return None
+
+
 def parse_skill_text(text: str) -> SkillText:
     raw, body = split_frontmatter(text)
     if raw is None:
-        return SkillText(None, [], body)
-    loader = FrontmatterLoader(raw)
+        return SkillText(fields=None, key_problem=None, body=body)
     try:
-        fields = loader.get_single_data()
-    except yaml.YAMLError as problem:
+        fields = msgspec.yaml.decode(raw)
+    except msgspec.DecodeError as problem:
         first_line = (str(problem).splitlines() or [type(problem).__name__])[0]
-        return SkillText(None, [], body, first_line)
-    finally:
-        loader.dispose()
+        return SkillText(fields=None, key_problem=None, body=body, yaml_problem=first_line)
     if fields is None:
         fields = {}
-    if not isinstance(fields, dict):
-        return SkillText(None, [], body)
-    return SkillText(fields, loader.key_problems, body)
+    return SkillText(fields=as_object(fields), key_problem=key_problem_of(fields), body=body)

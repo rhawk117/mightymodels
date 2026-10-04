@@ -4,15 +4,14 @@ from pathlib import Path
 
 import msgspec
 
+from vibe_code_cli.builtin import Services
 from vibe_code_cli.findings import (
     CannotCheckError,
     Finding,
     decode_problem,
-    error,
     report,
     warning,
 )
-from vibe_code_cli.jsondoc import duplicate_keys
 from vibe_code_cli.plugin.checks import check_plan
 from vibe_code_cli.plugin.inventory import inventory
 from vibe_code_cli.plugin.manifest import json_text
@@ -20,7 +19,7 @@ from vibe_code_cli.plugin.record import Plan, decode_plan, normalise, unknown_ke
 from vibe_code_cli.plugin.render import RenderRefusedError, render
 
 
-def build_group(parser: argparse.ArgumentParser) -> None:
+def build(parser: argparse.ArgumentParser) -> None:
     commands = parser.add_subparsers(dest='command', metavar='COMMAND')
     validate = commands.add_parser('validate', help='check a plugin plan record')
     validate.add_argument('plan', type=Path, metavar='PLAN', help='plan record JSON')
@@ -41,24 +40,26 @@ def build_group(parser: argparse.ArgumentParser) -> None:
     inventory_plugin.set_defaults(handler=inventory_command)
 
 
-def validate_command(arguments: argparse.Namespace) -> int:
-    """Return 0 for a pass, 1 for findings, 2 when the record cannot be read."""
+def dispatch(arguments: argparse.Namespace, services: Services) -> int:
+    return int(arguments.handler(arguments, services))
+
+
+def validate_command(arguments: argparse.Namespace, _services: Services) -> int:
     try:
-        text, document = read_document(arguments.plan)
+        document = read_document(arguments.plan)
     except CannotCheckError as problem:
         print(f'error: {problem}', file=sys.stderr)
         return 2
-    return report(str(arguments.plan), validate_findings(text, document), strict=arguments.strict)
+    return report(str(arguments.plan), validate_findings(document), strict=arguments.strict)
 
 
-def render_command(arguments: argparse.Namespace) -> int:
-    """Return 0 once the shell is written, 1 for a record or target it refuses, 2 if unreadable."""
+def render_command(arguments: argparse.Namespace, _services: Services) -> int:
     try:
-        text, document = read_document(arguments.plan)
+        document = read_document(arguments.plan)
     except CannotCheckError as problem:
         print(f'error: {problem}', file=sys.stderr)
         return 2
-    if report(str(arguments.plan), validate_findings(text, document), strict=False) != 0:
+    if report(str(arguments.plan), validate_findings(document), strict=False) != 0:
         return 1
     return write_shell(normalise(decode_plan(document)), arguments)
 
@@ -77,8 +78,7 @@ def write_shell(plan: Plan, arguments: argparse.Namespace) -> int:
     return 0
 
 
-def inventory_command(arguments: argparse.Namespace) -> int:
-    """Return 0 with the record on stdout or in --out, 2 when the plugin cannot be read."""
+def inventory_command(arguments: argparse.Namespace, _services: Services) -> int:
     plugin_dir = arguments.plugin_dir
     if not plugin_dir.is_dir():
         print(f'error: {plugin_dir} is not a directory', file=sys.stderr)
@@ -100,10 +100,10 @@ def emit_record(text: str, out: Path | None) -> None:
     print(f'wrote {out}')
 
 
-def read_document(path: Path) -> tuple[str, object]:
+def read_document(path: Path) -> object:
     text = read_text(path)
     try:
-        return text, msgspec.json.decode(text)
+        return msgspec.json.decode(text)
     except msgspec.DecodeError as problem:
         message = f'{path} is not valid JSON: {problem}'
         raise CannotCheckError(message) from problem
@@ -117,11 +117,8 @@ def read_text(path: Path) -> str:
         raise CannotCheckError(message) from problem
 
 
-def validate_findings(text: str, document: object) -> list[Finding]:
-    findings = [
-        error(f'duplicate JSON key {key!r}; the last one wins') for key in duplicate_keys(text)
-    ]
-    findings += [warning(message) for message in unknown_keys(document)]
+def validate_findings(document: object) -> list[Finding]:
+    findings = [warning(message) for message in unknown_keys(document)]
     try:
         plan = decode_plan(document)
     except msgspec.ValidationError as problem:

@@ -2,210 +2,213 @@ import json
 import re
 import shutil
 import subprocess
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pytest
+from vibe_code_cli.builtin import Services
 from vibe_code_cli.cli import main
 from vibe_code_cli.findings import Finding
-from vibe_code_cli.hook import command as hook_command
-from vibe_code_cli.hook.runner import Expectations, HookTest, check_hook, parse_field_expectation
+from vibe_code_cli.hook.tests.support import (
+    EXAMPLE,
+    PAYLOADS,
+    TEMPLATE,
+    PayloadFiles,
+    TemplateRun,
+)
 
-SKILL = Path(__file__).resolve().parents[1] / 'skills' / 'create-hooks'
-TEMPLATE = SKILL / 'assets' / 'hook.template.py'
-EXAMPLE = SKILL / 'assets' / 'hooks.example.json'
-PAYLOADS = SKILL / 'scripts' / 'payloads'
-FIXTURES = sorted(PAYLOADS.glob('*.json'))
-SCRIPT_PATH = re.compile(r'\$\{CLAUDE_PROJECT_DIR\}/(\S+?\.py)')
-TEST_TIMEOUT_SECONDS = 15.0
-
-
-def stub_builtin(monkeypatch: pytest.MonkeyPatch) -> None:
-    def no_findings(_target: Path, **_options: bool) -> list[Finding]:
-        return []
-
-    monkeypatch.setattr(hook_command, 'run_builtin', no_findings)
+type ServicesFactory = Callable[[Sequence[Finding]], Services]
 
 
-def run_template(
-    payload: Path,
-    *,
-    exit_code: int = 0,
-    fields: tuple[str, ...] = (),
-    silent: bool = False,
-    malformed: bool = False,
-) -> list[Finding]:
-    expectations = Expectations(
-        exit_code=exit_code,
-        fields=tuple(parse_field_expectation(spec) for spec in fields),
-        silent=silent,
-    )
-    hook_test = HookTest(TEMPLATE, payload, expectations, TEST_TIMEOUT_SECONDS, malformed)
-    return check_hook(hook_test)
+class TestExample:
+    SCRIPT_PATH = re.compile(r'\$\{CLAUDE_PROJECT_DIR\}/(\S+?\.py)')
 
+    @pytest.fixture
+    def settings(self, tmp_path: Path) -> Path:
+        settings = tmp_path / '.claude' / 'settings.json'
+        settings.parent.mkdir()
+        shutil.copy(EXAMPLE, settings)
+        return settings
 
-def payload_with(tmp_path: Path, fixture: str, **changes: object) -> Path:
-    payload = json.loads((PAYLOADS / fixture).read_text())
-    payload.update(changes)
-    path = tmp_path / fixture
-    path.write_text(json.dumps(payload))
-    return path
-
-
-def install_example(root: Path, *, with_scripts: bool) -> Path:
-    settings = root / '.claude' / 'settings.json'
-    settings.parent.mkdir()
-    shutil.copy(EXAMPLE, settings)
-    if with_scripts:
-        for relative in set(SCRIPT_PATH.findall(EXAMPLE.read_text())):
+    @pytest.fixture
+    def scripts_it_names(self, settings: Path) -> None:
+        root = settings.parents[1]
+        for relative in set(self.SCRIPT_PATH.findall(EXAMPLE.read_text())):
             script = root / relative
             script.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(TEMPLATE, script)
-    return settings
+
+    @pytest.mark.usefixtures('scripts_it_names')
+    def test_example_validates_strict_with_the_template_at_every_path_it_names(
+        self, settings: Path, fake_services: ServicesFactory
+    ) -> None:
+        assert main(['hook', 'validate', str(settings), '--strict'], fake_services(())) == 0
+
+    def test_example_fails_validation_when_a_script_it_names_is_missing(
+        self, settings: Path, fake_services: ServicesFactory, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert main(['hook', 'validate', str(settings), '--strict'], fake_services(())) == 1
+        assert 'script not found' in capsys.readouterr().out
 
 
-def test_example_validates_strict_with_the_template_at_every_path_it_names(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    stub_builtin(monkeypatch)
-    settings = install_example(tmp_path, with_scripts=True)
-
-    assert main(['hook', 'validate', str(settings), '--strict']) == 0
-
-
-def test_example_fails_validation_when_a_script_it_names_is_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    stub_builtin(monkeypatch)
-    settings = install_example(tmp_path, with_scripts=False)
-
-    assert main(['hook', 'validate', str(settings), '--strict']) == 1
-    assert 'script not found' in capsys.readouterr().out
-
-
-def test_fixtures_cover_the_nine_payloads_and_each_names_its_event() -> None:
-    assert {path.stem for path in FIXTURES} == {
-        'PostToolUse-Bash',
-        'PostToolUseFailure-Bash',
-        'PreToolUse-Bash',
-        'PreToolUse-Bash-dangerous',
-        'PreToolUse-Edit',
-        'SessionStart',
-        'Stop',
-        'Stop-active',
-        'SubagentStop',
-    }
-    for path in FIXTURES:
-        assert json.loads(path.read_text())['hook_event_name'] == path.stem.split('-')[0]
-
-
-def test_fixtures_carry_the_corrected_documented_fields() -> None:
-    edit = json.loads((PAYLOADS / 'PreToolUse-Edit.json').read_text())
-    failure = json.loads((PAYLOADS / 'PostToolUseFailure-Bash.json').read_text())
-    subagent = json.loads((PAYLOADS / 'SubagentStop.json').read_text())
-
-    assert Path(edit['tool_input']['file_path']).is_absolute()
-    assert re.match(r'Exit code \d+', failure['error'])
-    assert 'last_message' not in subagent
-    assert {
-        'stop_hook_active',
-        'agent_id',
-        'agent_type',
-        'agent_transcript_path',
-        'last_assistant_message',
-    } <= subagent.keys()
-
-
-@pytest.mark.parametrize('fixture', FIXTURES, ids=lambda path: path.stem)
-def test_template_passes_the_contract_on_every_fixture(fixture: Path) -> None:
-    assert run_template(fixture) == []
-
-
-def test_dangerous_command_is_denied_by_the_example_handler() -> None:
-    findings = run_template(
-        PAYLOADS / 'PreToolUse-Bash-dangerous.json',
-        fields=(
-            'hookSpecificOutput.hookEventName=PreToolUse',
-            'hookSpecificOutput.permissionDecision=deny',
-        ),
+class TestPayloadFixtures:
+    NINE_PAYLOADS = frozenset(
+        {
+            'PostToolUse-Bash',
+            'PostToolUseFailure-Bash',
+            'PreToolUse-Bash',
+            'PreToolUse-Bash-dangerous',
+            'PreToolUse-Edit',
+            'SessionStart',
+            'Stop',
+            'Stop-active',
+            'SubagentStop',
+        }
+    )
+    SUBAGENT_STOP_FIELDS = frozenset(
+        {
+            'stop_hook_active',
+            'agent_id',
+            'agent_type',
+            'agent_transcript_path',
+            'last_assistant_message',
+        }
     )
 
-    assert findings == []
+    @pytest.fixture
+    def payload_files(self) -> list[Path]:
+        return sorted(PAYLOADS.glob('*.json'))
+
+    def test_fixtures_cover_the_nine_payloads_and_each_names_its_event(
+        self, payload_files: list[Path]
+    ) -> None:
+        assert {path.stem for path in payload_files} == self.NINE_PAYLOADS
+        for path in payload_files:
+            assert json.loads(path.read_text())['hook_event_name'] == path.stem.split('-')[0]
+
+    def test_fixtures_carry_the_corrected_documented_fields(self) -> None:
+        edit = json.loads((PAYLOADS / 'PreToolUse-Edit.json').read_text())
+        failure = json.loads((PAYLOADS / 'PostToolUseFailure-Bash.json').read_text())
+        subagent = json.loads((PAYLOADS / 'SubagentStop.json').read_text())
+
+        assert Path(edit['tool_input']['file_path']).is_absolute()
+        assert re.match(r'Exit code \d+', failure['error'])
+        assert 'last_message' not in subagent
+        assert subagent.keys() >= self.SUBAGENT_STOP_FIELDS
+
+    @pytest.mark.parametrize(
+        'fixture',
+        [pytest.param(path, id=path.stem) for path in sorted(PAYLOADS.glob('*.json'))],
+    )
+    def test_template_passes_the_contract_on_every_fixture(
+        self, hook_template_run: TemplateRun, fixture: Path
+    ) -> None:
+        assert hook_template_run(fixture) == []
 
 
-def test_ordinary_command_gets_no_decision() -> None:
-    assert run_template(PAYLOADS / 'PreToolUse-Bash.json', silent=True) == []
-
-
-def test_release_workflow_edit_asks_the_person() -> None:
-    findings = run_template(
-        PAYLOADS / 'PreToolUse-Edit.json',
-        fields=('hookSpecificOutput.permissionDecision=ask',),
+class TestTemplateDecisions:
+    DENY = (
+        'hookSpecificOutput.hookEventName=PreToolUse',
+        'hookSpecificOutput.permissionDecision=deny',
+    )
+    ASK = ('hookSpecificOutput.permissionDecision=ask',)
+    FAILURE_CONTEXT = (
+        'hookSpecificOutput.hookEventName=PostToolUseFailure',
+        'hookSpecificOutput.additionalContext',
     )
 
-    assert findings == []
+    def test_dangerous_command_is_denied_by_the_example_handler(
+        self, hook_template_run: TemplateRun
+    ) -> None:
+        findings = hook_template_run(PAYLOADS / 'PreToolUse-Bash-dangerous.json', fields=self.DENY)
+
+        assert findings == []
+
+    def test_ordinary_command_gets_no_decision(self, hook_template_run: TemplateRun) -> None:
+        assert hook_template_run(PAYLOADS / 'PreToolUse-Bash.json', silent=True) == []
+
+    def test_release_workflow_edit_asks_the_person(self, hook_template_run: TemplateRun) -> None:
+        findings = hook_template_run(PAYLOADS / 'PreToolUse-Edit.json', fields=self.ASK)
+
+        assert findings == []
+
+    def test_failure_playbook_adds_the_fix_as_context(self, hook_template_run: TemplateRun) -> None:
+        findings = hook_template_run(
+            PAYLOADS / 'PostToolUseFailure-Bash.json', fields=self.FAILURE_CONTEXT
+        )
+
+        assert findings == []
+
+    def test_malformed_input_blocks_with_exit_two_under_the_enforce_posture(
+        self, hook_template_run: TemplateRun
+    ) -> None:
+        findings = hook_template_run(PAYLOADS / 'PreToolUse-Bash.json', exit_code=2, malformed=True)
+
+        assert findings == []
 
 
-def test_bare_runner_command_is_rewritten_when_the_project_has_a_lock_file(tmp_path: Path) -> None:
-    (tmp_path / 'uv.lock').touch()
-    payload = payload_with(tmp_path, 'PreToolUse-Bash.json', cwd=str(tmp_path))
-
-    findings = run_template(
-        payload,
-        fields=(
-            'hookSpecificOutput.permissionDecision=allow',
-            'hookSpecificOutput.updatedInput.command=uv run pytest tests/ -x',
-        ),
+class TestTemplateInAProject:
+    REWRITE = (
+        'hookSpecificOutput.permissionDecision=allow',
+        'hookSpecificOutput.updatedInput.command=uv run pytest tests/ -x',
     )
-
-    assert findings == []
-
-
-def test_failure_playbook_adds_the_fix_as_context() -> None:
-    findings = run_template(
-        PAYLOADS / 'PostToolUseFailure-Bash.json',
-        fields=(
-            'hookSpecificOutput.hookEventName=PostToolUseFailure',
-            'hookSpecificOutput.additionalContext',
-        ),
+    SESSION_CONTEXT = (
+        'hookSpecificOutput.hookEventName=SessionStart',
+        'hookSpecificOutput.additionalContext',
     )
+    BLOCK = ('decision=block', 'reason')
 
-    assert findings == []
+    @pytest.fixture
+    def git_repository(self, tmp_path: Path) -> Path:
+        subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)  # noqa: S603, S607  # fixed git command on a tmp dir
+        return tmp_path
 
+    @pytest.fixture
+    def lock_file(self, tmp_path: Path) -> Path:
+        path = tmp_path / 'uv.lock'
+        path.touch()
+        return path
 
-def test_session_start_reports_the_repository_state(tmp_path: Path) -> None:
-    subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)  # noqa: S603, S607  # fixed git command on a tmp dir
-    payload = payload_with(tmp_path, 'SessionStart.json', cwd=str(tmp_path))
+    @pytest.fixture
+    def pyproject(self, tmp_path: Path) -> Path:
+        path = tmp_path / 'pyproject.toml'
+        path.touch()
+        return path
 
-    findings = run_template(
-        payload,
-        fields=(
-            'hookSpecificOutput.hookEventName=SessionStart',
-            'hookSpecificOutput.additionalContext',
-        ),
-    )
+    @pytest.mark.usefixtures('lock_file')
+    def test_bare_runner_command_is_rewritten_when_the_project_has_a_lock_file(
+        self, tmp_path: Path, hook_template_run: TemplateRun, hook_payload_with: PayloadFiles
+    ) -> None:
+        payload = hook_payload_with('PreToolUse-Bash.json', cwd=str(tmp_path))
 
-    assert findings == []
+        assert hook_template_run(payload, fields=self.REWRITE) == []
 
+    def test_session_start_reports_the_repository_state(
+        self,
+        git_repository: Path,
+        hook_template_run: TemplateRun,
+        hook_payload_with: PayloadFiles,
+    ) -> None:
+        payload = hook_payload_with('SessionStart.json', cwd=str(git_repository))
 
-def test_stop_gate_stands_down_when_a_stop_hook_is_already_active(tmp_path: Path) -> None:
-    (tmp_path / 'pyproject.toml').touch()
-    payload = payload_with(tmp_path, 'Stop-active.json', cwd=str(tmp_path))
+        assert hook_template_run(payload, fields=self.SESSION_CONTEXT) == []
 
-    assert run_template(payload, silent=True) == []
+    @pytest.mark.usefixtures('pyproject')
+    def test_stop_gate_stands_down_when_a_stop_hook_is_already_active(
+        self, tmp_path: Path, hook_template_run: TemplateRun, hook_payload_with: PayloadFiles
+    ) -> None:
+        payload = hook_payload_with('Stop-active.json', cwd=str(tmp_path))
 
+        assert hook_template_run(payload, silent=True) == []
 
-def test_subagent_report_gate_blocks_once_then_allows(tmp_path: Path) -> None:
-    unstructured = payload_with(tmp_path, 'SubagentStop.json', last_assistant_message='all done')
-    already_continuing = tmp_path / 'again.json'
-    already_continuing.write_text(
-        json.dumps({**json.loads(unstructured.read_text()), 'stop_hook_active': True})
-    )
+    def test_subagent_report_gate_blocks_once_then_allows(
+        self, tmp_path: Path, hook_template_run: TemplateRun, hook_payload_with: PayloadFiles
+    ) -> None:
+        unstructured = hook_payload_with('SubagentStop.json', last_assistant_message='all done')
+        already_continuing = tmp_path / 'again.json'
+        already_continuing.write_text(
+            json.dumps({**json.loads(unstructured.read_text()), 'stop_hook_active': True})
+        )
 
-    assert run_template(unstructured, fields=('decision=block', 'reason')) == []
-    assert run_template(already_continuing, silent=True) == []
-
-
-def test_malformed_input_blocks_with_exit_two_under_the_enforce_posture() -> None:
-    findings = run_template(PAYLOADS / 'PreToolUse-Bash.json', exit_code=2, malformed=True)
-
-    assert findings == []
+        assert hook_template_run(unstructured, fields=self.BLOCK) == []
+        assert hook_template_run(already_continuing, silent=True) == []

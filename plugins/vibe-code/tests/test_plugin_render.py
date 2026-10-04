@@ -1,415 +1,472 @@
 import json
 import re
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 from vibe_code_cli.cli import main
 from vibe_code_cli.plugin.phases import PHASES
-
-EXAMPLE = Path(__file__).parent.parent / 'skills' / 'plan-plugin' / 'assets' / 'plan.example.json'
-RESIDUE = re.compile(r'agent-plugins|\.agent\.md|ask_user|worker', re.IGNORECASE)
-
-KIND_COMPONENTS = {
-    'skill': 'add-route',
-    'command': 'ship-it',
-    'agent': 'test-runner',
-    'hook': 'uv-runner',
-    'mcp': 'db-tools',
-    'lsp': 'pyright',
-    'executable': 'lint-all',
-    'output-style': 'terse',
-}
-
-PLAN = {
-    'name': 'py-harness',
-    'description': 'Python conventions for Claude Code sessions.',
-    'keywords': ['python'],
-    'problem': 'Agents skip ruff.',
-    'audience': {'who': 'the team', 'how': 'team'},
-    'kinds': ['ecosystem'],
-    'ecosystem': 'python',
-    'distribution': {'channel': 'local'},
-    'author': {'name': 'Platform Team'},
-    'components': [{'kind': 'skill', 'name': 'add-route', 'purpose': 'Add a route.'}],
-}
+from vibe_code_cli.plugin.tests.support import (
+    EXAMPLE,
+    ClaudeValidate,
+    PlanFiles,
+    all_kinds,
+    component,
+    directories_of,
+    inventory,
+    manifest_of,
+    render,
+)
 
 
-def all_kinds() -> list[dict[str, object]]:
-    return [
-        {'kind': kind, 'name': name, 'purpose': f'The {name} {kind}.'}
-        for kind, name in KIND_COMPONENTS.items()
-    ]
+class TestUsage:
+    def test_render_help_exits_zero(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exit_info:
+            main(['plugin', 'render', '--help'])
+
+        assert exit_info.value.code == 0
+        assert '--force' in capsys.readouterr().out
 
 
-def write_plan(directory: Path, **changes: object) -> Path:
-    path = directory / 'plan.json'
-    path.write_text(json.dumps({**PLAN, **changes}))
-    return path
+class TestManifest:
+    IDENTITY_KEYS = ('name', 'version', 'description', 'keywords', 'author')
+    UNSET_KEYS = ('license', 'homepage', 'repository', 'userConfig', 'dependencies')
+
+    @pytest.fixture
+    def option(self) -> dict[str, object]:
+        return {'type': 'string', 'title': 'Token', 'description': 'API token.', 'sensitive': True}
+
+    @pytest.fixture
+    def dependencies(self) -> list[object]:
+        return ['base-tools', {'name': 'lint', 'marketplace': 'team'}]
+
+    @pytest.fixture
+    def plan_with_optional_keys(
+        self, plugin_plans: PlanFiles, option: dict[str, object], dependencies: list[object]
+    ) -> Path:
+        return plugin_plans.write(
+            license='Apache-2.0',
+            homepage='https://example.com/docs',
+            userConfig={'api_token': option},
+            dependencies=dependencies,
+        )
+
+    def test_pp_a9_a15_b1_b4_render_of_the_example_passes_claude_validate(
+        self, plugin_plans: PlanFiles, plugin_claude_validate: ClaudeValidate
+    ) -> None:
+        target = plugin_plans.directory / 'py-harness'
+
+        assert render(EXAMPLE, target) == 0
+
+        for name in ('.claude-plugin/plugin.json', 'README.md', 'PLAN.md', 'plugin-plan.json'):
+            assert (target / name).is_file()
+        assert not (target / 'plugin.json').exists()
+        assert plugin_claude_validate(target).returncode == 0
+
+    def test_pp_a9_manifest_has_no_schema_and_carries_the_identity_fields(
+        self, plugin_target: Path
+    ) -> None:
+        assert render(EXAMPLE, plugin_target) == 0
+
+        manifest = manifest_of(plugin_target)
+        assert '$schema' not in manifest
+        assert tuple(manifest)[:5] == self.IDENTITY_KEYS
+        assert manifest['author'] == {'name': 'Platform Team', 'email': 'platform@example.com'}
+        assert manifest['license'] == 'MIT'
+
+    def test_pp_a9_manifest_omits_license_and_homepage_the_record_does_not_set(
+        self, plugin_plans: PlanFiles, plugin_target: Path
+    ) -> None:
+        assert render(plugin_plans.write(), plugin_target) == 0
+
+        manifest = manifest_of(plugin_target)
+        for key in self.UNSET_KEYS:
+            assert key not in manifest
+
+    def test_pp_a9_b3_b4_b12_manifest_carries_the_optional_keys_the_record_sets(
+        self,
+        plan_with_optional_keys: Path,
+        option: dict[str, object],
+        dependencies: list[object],
+        plugin_target: Path,
+        plugin_claude_validate: ClaudeValidate,
+    ) -> None:
+        assert render(plan_with_optional_keys, plugin_target) == 0
+
+        manifest = manifest_of(plugin_target)
+        assert manifest['license'] == 'Apache-2.0'
+        assert manifest['homepage'] == 'https://example.com/docs'
+        assert manifest['userConfig'] == {'api_token': option}
+        assert manifest['dependencies'] == dependencies
+        assert plugin_claude_validate(plugin_target).returncode == 0
 
 
-def render(plan: Path, target: Path, *options: str) -> int:
-    return main(['plugin', 'render', str(plan), str(target), *options])
-
-
-def manifest_of(target: Path) -> dict[str, object]:
-    return json.loads((target / '.claude-plugin' / 'plugin.json').read_text())
-
-
-def directories_of(target: Path) -> set[str]:
-    return {path.relative_to(target).as_posix() for path in target.rglob('*') if path.is_dir()}
-
-
-def claude_validate(target: Path) -> subprocess.CompletedProcess[str]:
-    claude = shutil.which('claude')
-    if claude is None:
-        pytest.skip('claude is not on PATH')
-    return subprocess.run(  # noqa: S603  # fixed argument list with no shell; target is a tmp path
-        [claude, 'plugin', 'validate', '--strict', str(target)],
-        capture_output=True,
-        text=True,
-        check=False,
+class TestDirectories:
+    ONE_PER_KIND = frozenset(
+        {
+            '.claude-plugin',
+            'skills',
+            'skills/add-route',
+            'skills/ship-it',
+            'hooks',
+            'agents',
+            'mcp',
+            'mcp/db-tools',
+            'bin',
+            'output-styles',
+        }
     )
 
+    @pytest.fixture
+    def plan_with_a_built_agent(self, plugin_plans: PlanFiles) -> Path:
+        built = {'kind': 'agent', 'name': 'test-runner', 'purpose': 'Run tests.', 'status': 'built'}
+        return plugin_plans.write(components=[component(), built])
 
-def plan_md(tmp_path: Path, **changes: object) -> str:
-    assert render(write_plan(tmp_path, **changes), tmp_path / 'out') == 0
-    return (tmp_path / 'out' / 'PLAN.md').read_text()
+    def test_pp_a13_render_creates_one_directory_per_planned_component_kind(
+        self,
+        plugin_plans: PlanFiles,
+        plugin_target: Path,
+        plugin_claude_validate: ClaudeValidate,
+    ) -> None:
+        plan = plugin_plans.write(components=all_kinds())
 
+        assert render(plan, plugin_target) == 0
 
-def test_render_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit) as exit_info:
-        main(['plugin', 'render', '--help'])
+        assert directories_of(plugin_target) == self.ONE_PER_KIND
+        assert plugin_claude_validate(plugin_target).returncode == 0
 
-    assert exit_info.value.code == 0
-    assert '--force' in capsys.readouterr().out
+    def test_pp_a13_a_built_component_creates_no_directory(
+        self, plan_with_a_built_agent: Path, plugin_target: Path
+    ) -> None:
+        assert render(plan_with_a_built_agent, plugin_target) == 0
 
-
-def test_pp_a9_a15_b1_b4_render_of_the_example_passes_claude_validate(tmp_path: Path) -> None:
-    target = tmp_path / 'py-harness'
-
-    assert render(EXAMPLE, target) == 0
-
-    for name in ('.claude-plugin/plugin.json', 'README.md', 'PLAN.md', 'plugin-plan.json'):
-        assert (target / name).is_file()
-    assert not (target / 'plugin.json').exists()
-    assert claude_validate(target).returncode == 0
-
-
-def test_pp_a9_manifest_has_no_schema_and_carries_the_identity_fields(tmp_path: Path) -> None:
-    assert render(EXAMPLE, tmp_path / 'out') == 0
-
-    manifest = manifest_of(tmp_path / 'out')
-    assert '$schema' not in manifest
-    assert list(manifest)[:5] == ['name', 'version', 'description', 'keywords', 'author']
-    assert manifest['author'] == {'name': 'Platform Team', 'email': 'platform@example.com'}
-    assert manifest['license'] == 'MIT'
+        assert 'agents' not in directories_of(plugin_target)
 
 
-def test_pp_a9_manifest_omits_license_and_homepage_the_record_does_not_set(
-    tmp_path: Path,
-) -> None:
-    assert render(write_plan(tmp_path), tmp_path / 'out') == 0
-
-    manifest = manifest_of(tmp_path / 'out')
-    for key in ('license', 'homepage', 'repository', 'userConfig', 'dependencies'):
-        assert key not in manifest
-
-
-def test_pp_a9_b3_b4_b12_manifest_carries_the_optional_keys_the_record_sets(
-    tmp_path: Path,
-) -> None:
-    option = {'type': 'string', 'title': 'Token', 'description': 'API token.', 'sensitive': True}
-    plan = write_plan(
-        tmp_path,
-        license='Apache-2.0',
-        homepage='https://example.com/docs',
-        userConfig={'api_token': option},
-        dependencies=['base-tools', {'name': 'lint', 'marketplace': 'team'}],
-    )
-
-    assert render(plan, tmp_path / 'out') == 0
-
-    manifest = manifest_of(tmp_path / 'out')
-    assert manifest['license'] == 'Apache-2.0'
-    assert manifest['homepage'] == 'https://example.com/docs'
-    assert manifest['userConfig'] == {'api_token': option}
-    assert manifest['dependencies'] == ['base-tools', {'name': 'lint', 'marketplace': 'team'}]
-    assert claude_validate(tmp_path / 'out').returncode == 0
-
-
-def test_pp_a13_render_creates_one_directory_per_planned_component_kind(tmp_path: Path) -> None:
-    plan = write_plan(tmp_path, components=all_kinds())
-
-    assert render(plan, tmp_path / 'out') == 0
-
-    assert directories_of(tmp_path / 'out') == {
-        '.claude-plugin',
-        'skills',
-        'skills/add-route',
-        'skills/ship-it',
-        'hooks',
-        'agents',
-        'mcp',
-        'mcp/db-tools',
-        'bin',
-        'output-styles',
-    }
-    assert claude_validate(tmp_path / 'out').returncode == 0
-
-
-def test_pp_a13_a_built_component_creates_no_directory(tmp_path: Path) -> None:
-    built = {'kind': 'agent', 'name': 'test-runner', 'purpose': 'Run tests.', 'status': 'built'}
-
-    assert (
-        render(write_plan(tmp_path, components=[*PLAN['components'], built]), tmp_path / 'out') == 0
-    )
-
-    assert 'agents' not in directories_of(tmp_path / 'out')
-
-
-def test_pp_a11_a17_plan_md_keeps_the_human_and_agent_sections_and_greppable_lines(
-    tmp_path: Path,
-) -> None:
-    assert render(EXAMPLE, tmp_path / 'out') == 0
-
-    text = (tmp_path / 'out' / 'PLAN.md').read_text()
-    assert '\n## Human\n' in text
-    assert '\n## Agent\n' in text
-    for line in (
+class TestPlanMd:
+    RESIDUE = re.compile(r'agent-plugins|\.agent\.md|ask_user|worker', re.IGNORECASE)
+    GREPPABLE_LINES = (
         'plugin.name: py-harness',
         'phase.1: Foundation; sessions: uv-runner',
         'component.test-runner.kind: agent',
         'component.uv-runner.builder: create-hooks',
         'component.add-fastapi-route.status: planned',
-    ):
-        assert f'\n{line}\n' in text
-
-
-def test_pp_a48_phases_order_the_executable_before_skills_and_agents_last(
-    tmp_path: Path,
-) -> None:
-    text = plan_md(tmp_path, components=all_kinds())
-
-    sessions = dict(re.findall(r'^component\.([\w-]+)\.session: (\S+)$', text, re.MULTILINE))
-    assert sessions['uv-runner'].startswith('1.')
-    assert sessions['lint-all'] < sessions['add-route'] < sessions['test-runner']
-    assert sessions['test-runner'].startswith(str(PHASES[2].number))
-    assert sessions['test-runner'] > sessions['ship-it'] > sessions['add-route']
-
-
-def test_pp_a22_ready_prompts_open_with_the_namespaced_builder(tmp_path: Path) -> None:
-    text = plan_md(tmp_path, components=all_kinds())
-
-    assert '\n/vibe-code:create-skill Create the `add-route` skill' in text
-    assert '\n/vibe-code:create-hooks Create the `uv-runner` hook' in text
-    assert '\n/vibe-code:create-subagent Create the `test-runner` agent' in text
-    assert '\n/vibe-code:create-mcp Create the `db-tools` MCP server' in text
-    assert '\nAdd the `pyright` language server entry to .lsp.json' in text
-
-
-def test_pp_a18_marketplace_channel_adds_the_marketplace_before_the_install(
-    tmp_path: Path,
-) -> None:
-    assert render(EXAMPLE, tmp_path / 'out') == 0
-
-    readme = (tmp_path / 'out' / 'README.md').read_text()
-    add = 'claude plugin marketplace add <source>'
-    install = 'claude plugin install py-harness@platform-tools --scope project'
-    assert readme.index(add) < readme.index(install)
-
-
-def test_pp_a18_marketplace_channel_without_an_install_line_uses_the_plugin_name(
-    tmp_path: Path,
-) -> None:
-    text = plan_md(tmp_path, distribution={'channel': 'marketplace'})
-
-    assert 'claude plugin install py-harness@<marketplace> --scope project' in text
-
-
-def test_pp_a18_local_channel_installs_with_plugin_dir(tmp_path: Path) -> None:
-    text = plan_md(tmp_path)
-
-    assert '\nplugin.install: claude --plugin-dir ./py-harness\n' in text
-    assert 'marketplace add' not in text
-
-
-def test_pp_a17_a21_verify_session_names_the_claude_code_checks(tmp_path: Path) -> None:
-    text = plan_md(tmp_path)
-
-    for command in (
+    )
+    READY_PROMPTS = (
+        '\n/vibe-code:create-skill Create the `add-route` skill',
+        '\n/vibe-code:create-hooks Create the `uv-runner` hook',
+        '\n/vibe-code:create-subagent Create the `test-runner` agent',
+        '\n/vibe-code:create-mcp Create the `db-tools` MCP server',
+        '\nAdd the `pyright` language server entry to .lsp.json',
+    )
+    VERIFY_COMMANDS = (
         'claude plugin validate',
         '--strict',
         'claude --plugin-dir',
         '/reload-plugins',
         '/mcp',
         '/hooks',
-    ):
-        assert command in text.split('Verify the plugin at')[1].split('```')[0]
-
-
-def test_pp_a19_a20_publish_session_pins_sha_beside_ref(tmp_path: Path) -> None:
-    assert render(EXAMPLE, tmp_path / 'out') == 0
-
-    publish = (tmp_path / 'out' / 'PLAN.md').read_text().split('Publish the plugin at')[1]
-    publish = publish.split('```')[0]
-    assert '.claude-plugin/marketplace.json' in publish
-    assert '`ref` and the 40-char `sha`' in publish
-    assert 'CLAUDE_CODE_PLUGIN_CACHE_DIR' in publish
-
-
-def test_pp_a47_rendered_example_text_has_no_residue(tmp_path: Path) -> None:
-    assert render(EXAMPLE, tmp_path / 'out') == 0
-
-    for name in ('PLAN.md', 'README.md'):
-        assert RESIDUE.findall((tmp_path / 'out' / name).read_text()) == []
-
-
-@pytest.mark.parametrize('name', ['a/b', '..', '.hidden', '../up', 'a\\b'])
-def test_pp_a13_render_refuses_a_component_name_that_could_leave_the_target(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], name: str
-) -> None:
-    component = {'kind': 'skill', 'name': name, 'purpose': 'x'}
-
-    assert render(write_plan(tmp_path, components=[component]), tmp_path / 'out') == 1
-    assert 'error: component' in capsys.readouterr().out
-    assert not (tmp_path / 'out').exists()
-
-
-def test_render_refuses_a_record_that_fails_validate_and_writes_nothing(tmp_path: Path) -> None:
-    assert render(write_plan(tmp_path, name='claude-x'), tmp_path / 'out') == 1
-    assert not (tmp_path / 'out').exists()
-
-
-def test_render_refuses_an_unreadable_record_with_exit_two(tmp_path: Path) -> None:
-    assert render(tmp_path / 'missing.json', tmp_path / 'out') == 2
-
-
-def test_render_refuses_an_existing_manifest_unless_force(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    plan = write_plan(tmp_path)
-    assert render(plan, tmp_path / 'out') == 0
-    manifest = tmp_path / 'out' / '.claude-plugin' / 'plugin.json'
-    manifest.write_text('{"name": "kept"}')
-
-    assert render(plan, tmp_path / 'out') == 1
-    assert '--force' in capsys.readouterr().err
-    assert manifest.read_text() == '{"name": "kept"}'
-
-    assert render(plan, tmp_path / 'out', '--force') == 0
-    assert manifest_of(tmp_path / 'out')['name'] == 'py-harness'
-
-
-def test_force_rewrites_the_plan_files_and_deletes_nothing(tmp_path: Path) -> None:
-    plan = write_plan(tmp_path)
-    assert render(plan, tmp_path / 'out') == 0
-    own_skill = tmp_path / 'out' / 'skills' / 'add-route' / 'SKILL.md'
-    own_skill.write_text('mine')
-    stray = tmp_path / 'out' / 'notes.txt'
-    stray.write_text('keep')
-
-    assert render(write_plan(tmp_path, version='0.2.0'), tmp_path / 'out', '--force') == 0
-
-    assert own_skill.read_text() == 'mine'
-    assert stray.read_text() == 'keep'
-    assert manifest_of(tmp_path / 'out')['version'] == '0.2.0'
-
-
-def test_force_keeps_the_manifest_keys_the_record_does_not_model(tmp_path: Path) -> None:
-    target = tmp_path / 'plugin'
-    (target / '.claude-plugin').mkdir(parents=True)
-    (target / 'custom').mkdir()
-    (target / 'custom' / 'hooks.json').write_text('{"hooks": {}}')
-    kept = {
-        'hooks': './custom/hooks.json',
-        'mcpServers': {'db': {'command': 'uvx', 'args': ['db-tools']}},
-        'displayName': 'Py Harness',
-    }
-    manifest = {
-        'name': 'py-harness',
-        'version': '0.1.0',
-        'description': 'Conventions.',
-        'author': {'name': 'Platform Team'},
-        **kept,
-    }
-    (target / '.claude-plugin' / 'plugin.json').write_text(json.dumps(manifest))
-    record = tmp_path / 'record.json'
-    assert main(['plugin', 'inventory', str(target), '--out', str(record)]) == 0
-
-    assert render(record, target, '--force') == 0
-
-    rewritten = manifest_of(target)
-    assert {key: rewritten[key] for key in kept} == kept
-    assert claude_validate(target).returncode == 0
-
-
-def test_force_writes_the_modelled_manifest_keys_from_the_record(tmp_path: Path) -> None:
-    plan = write_plan(tmp_path, license='MIT')
-    assert render(plan, tmp_path / 'out') == 0
-    manifest = tmp_path / 'out' / '.claude-plugin' / 'plugin.json'
-    manifest.write_text(
-        json.dumps({'name': 'old', 'version': '9.9.9', 'keywords': ['old'], 'license': 'MIT'})
     )
 
-    changed = write_plan(tmp_path, version='0.2.0', keywords=['new'])
-    assert render(changed, tmp_path / 'out', '--force') == 0
+    @pytest.fixture
+    def example_plan_md(self, plugin_target: Path) -> str:
+        assert render(EXAMPLE, plugin_target) == 0
+        return (plugin_target / 'PLAN.md').read_text()
 
-    rewritten = manifest_of(tmp_path / 'out')
-    assert rewritten['version'] == '0.2.0'
-    assert rewritten['keywords'] == ['new']
-    assert 'license' not in rewritten
+    def test_pp_a11_a17_plan_md_keeps_the_human_and_agent_sections_and_greppable_lines(
+        self, example_plan_md: str
+    ) -> None:
+        assert '\n## Human\n' in example_plan_md
+        assert '\n## Agent\n' in example_plan_md
+        for line in self.GREPPABLE_LINES:
+            assert f'\n{line}\n' in example_plan_md
+
+    def test_pp_a48_phases_order_the_executable_before_skills_and_agents_last(
+        self, plugin_plans: PlanFiles
+    ) -> None:
+        text = plugin_plans.plan_md(components=all_kinds())
+
+        sessions = dict(re.findall(r'^component\.([\w-]+)\.session: (\S+)$', text, re.MULTILINE))
+        assert sessions['uv-runner'].startswith('1.')
+        assert sessions['lint-all'] < sessions['add-route'] < sessions['test-runner']
+        assert sessions['test-runner'].startswith(str(PHASES[2].number))
+        assert sessions['test-runner'] > sessions['ship-it'] > sessions['add-route']
+
+    def test_pp_a22_ready_prompts_open_with_the_namespaced_builder(
+        self, plugin_plans: PlanFiles
+    ) -> None:
+        text = plugin_plans.plan_md(components=all_kinds())
+
+        for prompt in self.READY_PROMPTS:
+            assert prompt in text
+
+    def test_pp_a18_marketplace_channel_adds_the_marketplace_before_the_install(
+        self, plugin_target: Path
+    ) -> None:
+        assert render(EXAMPLE, plugin_target) == 0
+
+        readme = (plugin_target / 'README.md').read_text()
+        add = 'claude plugin marketplace add <source>'
+        install = 'claude plugin install py-harness@platform-tools --scope project'
+        assert readme.index(add) < readme.index(install)
+
+    def test_pp_a18_marketplace_channel_without_an_install_line_uses_the_plugin_name(
+        self, plugin_plans: PlanFiles
+    ) -> None:
+        text = plugin_plans.plan_md(distribution={'channel': 'marketplace'})
+
+        assert 'claude plugin install py-harness@<marketplace> --scope project' in text
+
+    def test_pp_a18_local_channel_installs_with_plugin_dir(self, plugin_plans: PlanFiles) -> None:
+        text = plugin_plans.plan_md()
+
+        assert '\nplugin.install: claude --plugin-dir ./py-harness\n' in text
+        assert 'marketplace add' not in text
+
+    def test_pp_a17_a21_verify_session_names_the_claude_code_checks(
+        self, plugin_plans: PlanFiles
+    ) -> None:
+        text = plugin_plans.plan_md()
+
+        for command in self.VERIFY_COMMANDS:
+            assert command in text.split('Verify the plugin at')[1].split('```')[0]
+
+    def test_pp_a19_a20_publish_session_pins_sha_beside_ref(self, example_plan_md: str) -> None:
+        publish = example_plan_md.split('Publish the plugin at')[1]
+        publish = publish.split('```')[0]
+        assert '.claude-plugin/marketplace.json' in publish
+        assert '`ref` and the 40-char `sha`' in publish
+        assert 'CLAUDE_CODE_PLUGIN_CACHE_DIR' in publish
+
+    @pytest.mark.usefixtures('example_plan_md')
+    def test_pp_a47_rendered_example_text_has_no_residue(self, plugin_target: Path) -> None:
+        for name in ('PLAN.md', 'README.md'):
+            assert self.RESIDUE.findall((plugin_target / name).read_text()) == []
 
 
-@pytest.mark.parametrize('content', ['{not json', '["name"]'])
-def test_force_refuses_a_manifest_that_is_not_a_json_object_and_writes_nothing(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], content: str
-) -> None:
-    plan = write_plan(tmp_path)
-    target = tmp_path / 'out'
-    manifest = target / '.claude-plugin' / 'plugin.json'
-    manifest.parent.mkdir(parents=True)
-    manifest.write_text(content)
+class TestRefusals:
+    @pytest.fixture
+    def outside(self, plugin_plans: PlanFiles) -> Path:
+        path = plugin_plans.directory / 'outside'
+        path.mkdir()
+        return path
 
-    assert render(plan, target, '--force') == 1
+    @pytest.fixture
+    def target_linking_out(self, plugin_target: Path, outside: Path) -> Path:
+        plugin_target.mkdir()
+        (plugin_target / '.claude-plugin').symlink_to(outside)
+        return plugin_target
 
-    assert str(manifest) in capsys.readouterr().err
-    assert manifest.read_text() == content
-    assert not (target / 'PLAN.md').exists()
+    @pytest.fixture
+    def target_that_is_a_file(self, plugin_target: Path) -> Path:
+        plugin_target.write_text('x')
+        return plugin_target
+
+    @pytest.mark.parametrize(
+        'name',
+        [
+            pytest.param('a/b', id='a/b'),
+            pytest.param('..', id='..'),
+            pytest.param('.hidden', id='.hidden'),
+            pytest.param('../up', id='../up'),
+            pytest.param('a\\b', id='a\\b'),
+        ],
+    )
+    def test_pp_a13_render_refuses_a_component_name_that_could_leave_the_target(
+        self,
+        plugin_plans: PlanFiles,
+        plugin_target: Path,
+        capsys: pytest.CaptureFixture[str],
+        name: str,
+    ) -> None:
+        plan = plugin_plans.write(components=[component(name=name, purpose='x')])
+
+        assert render(plan, plugin_target) == 1
+        assert 'error: component' in capsys.readouterr().out
+        assert not plugin_target.exists()
+
+    def test_render_refuses_a_record_that_fails_validate_and_writes_nothing(
+        self, plugin_plans: PlanFiles, plugin_target: Path
+    ) -> None:
+        assert render(plugin_plans.write(name='claude-x'), plugin_target) == 1
+        assert not plugin_target.exists()
+
+    def test_render_refuses_an_unreadable_record_with_exit_two(
+        self, plugin_plans: PlanFiles, plugin_target: Path
+    ) -> None:
+        assert render(plugin_plans.directory / 'missing.json', plugin_target) == 2
+
+    def test_render_refuses_a_plan_directory_that_links_out_of_the_target(
+        self,
+        plugin_plans: PlanFiles,
+        target_linking_out: Path,
+        outside: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        assert render(plugin_plans.write(), target_linking_out) == 1
+        assert 'resolves outside' in capsys.readouterr().err
+        assert list(outside.iterdir()) == []
+
+    def test_render_refuses_a_target_that_is_a_file(
+        self, plugin_plans: PlanFiles, target_that_is_a_file: Path
+    ) -> None:
+        assert render(plugin_plans.write(), target_that_is_a_file) == 1
+        assert target_that_is_a_file.read_text() == 'x'
 
 
-def test_every_path_render_writes_resolves_inside_the_target(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    target = tmp_path / 'out'
+class TestForce:
+    HAND_WRITTEN_MANIFEST = '{"name": "kept"}'
 
-    assert render(write_plan(tmp_path, components=all_kinds()), target) == 0
+    @pytest.fixture
+    def plan(self, plugin_plans: PlanFiles) -> Path:
+        return plugin_plans.write()
 
-    written = [line.removeprefix('wrote ') for line in capsys.readouterr().out.splitlines()]
-    written = [line for line in written if not line.startswith(('PASS', 'warning'))]
-    assert len(written) == 4 + 7
-    for relative in written:
-        assert (target / relative).resolve().is_relative_to(target.resolve())
+    @pytest.fixture
+    def rendered(self, plan: Path, plugin_target: Path) -> Path:
+        assert render(plan, plugin_target) == 0
+        return plugin_target
+
+    @pytest.fixture
+    def manifest_with_content(self, plugin_manifest_path: Path, content: str) -> Path:
+        plugin_manifest_path.parent.mkdir(parents=True)
+        plugin_manifest_path.write_text(content)
+        return plugin_manifest_path
+
+    def test_render_refuses_an_existing_manifest_unless_force(
+        self,
+        plan: Path,
+        rendered: Path,
+        plugin_manifest_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        plugin_manifest_path.write_text(self.HAND_WRITTEN_MANIFEST)
+
+        assert render(plan, rendered) == 1
+        assert '--force' in capsys.readouterr().err
+        assert plugin_manifest_path.read_text() == self.HAND_WRITTEN_MANIFEST
+
+        assert render(plan, rendered, '--force') == 0
+        assert manifest_of(rendered)['name'] == 'py-harness'
+
+    def test_force_rewrites_the_plan_files_and_deletes_nothing(
+        self, plugin_plans: PlanFiles, rendered: Path
+    ) -> None:
+        own_skill = rendered / 'skills' / 'add-route' / 'SKILL.md'
+        own_skill.write_text('mine')
+        stray = rendered / 'notes.txt'
+        stray.write_text('keep')
+
+        assert render(plugin_plans.write(version='0.2.0'), rendered, '--force') == 0
+
+        assert own_skill.read_text() == 'mine'
+        assert stray.read_text() == 'keep'
+        assert manifest_of(rendered)['version'] == '0.2.0'
+
+    @pytest.mark.parametrize(
+        'content',
+        [pytest.param('{not json', id='{not json'), pytest.param('["name"]', id='["name"]')],
+    )
+    def test_force_refuses_a_manifest_that_is_not_a_json_object_and_writes_nothing(
+        self,
+        plan: Path,
+        plugin_target: Path,
+        manifest_with_content: Path,
+        capsys: pytest.CaptureFixture[str],
+        content: str,
+    ) -> None:
+        assert render(plan, plugin_target, '--force') == 1
+
+        assert str(manifest_with_content) in capsys.readouterr().err
+        assert manifest_with_content.read_text() == content
+        assert not (plugin_target / 'PLAN.md').exists()
 
 
-def test_render_refuses_a_plan_directory_that_links_out_of_the_target(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    outside = tmp_path / 'outside'
-    outside.mkdir()
-    target = tmp_path / 'out'
-    target.mkdir()
-    (target / '.claude-plugin').symlink_to(outside)
+class TestForceKeepsUnmodelledKeys:
+    @pytest.fixture
+    def kept_keys(self) -> dict[str, object]:
+        return {
+            'hooks': './custom/hooks.json',
+            'mcpServers': {'db': {'command': 'uvx', 'args': ['db-tools']}},
+            'displayName': 'Py Harness',
+        }
 
-    assert render(write_plan(tmp_path), target) == 1
-    assert 'resolves outside' in capsys.readouterr().err
-    assert list(outside.iterdir()) == []
+    @pytest.fixture
+    def plugin_with_unmodelled_keys(
+        self, plugin_plans: PlanFiles, kept_keys: dict[str, object]
+    ) -> Path:
+        target = plugin_plans.directory / 'plugin'
+        (target / '.claude-plugin').mkdir(parents=True)
+        (target / 'custom').mkdir()
+        (target / 'custom' / 'hooks.json').write_text('{"hooks": {}}')
+        manifest = {
+            'name': 'py-harness',
+            'version': '0.1.0',
+            'description': 'Conventions.',
+            'author': {'name': 'Platform Team'},
+            **kept_keys,
+        }
+        (target / '.claude-plugin' / 'plugin.json').write_text(json.dumps(manifest))
+        return target
+
+    @pytest.fixture
+    def record_of_unmodelled_keys(
+        self, plugin_plans: PlanFiles, plugin_with_unmodelled_keys: Path
+    ) -> Path:
+        record = plugin_plans.directory / 'record.json'
+        assert inventory(plugin_with_unmodelled_keys, '--out', str(record)) == 0
+        return record
+
+    def test_force_keeps_the_manifest_keys_the_record_does_not_model(
+        self,
+        record_of_unmodelled_keys: Path,
+        plugin_with_unmodelled_keys: Path,
+        kept_keys: dict[str, object],
+        plugin_claude_validate: ClaudeValidate,
+    ) -> None:
+        target = plugin_with_unmodelled_keys
+
+        assert render(record_of_unmodelled_keys, target, '--force') == 0
+
+        rewritten = manifest_of(target)
+        assert {key: rewritten[key] for key in kept_keys} == kept_keys
+        assert plugin_claude_validate(target).returncode == 0
 
 
-def test_render_refuses_a_target_that_is_a_file(tmp_path: Path) -> None:
-    target = tmp_path / 'out'
-    target.write_text('x')
+class TestForceWritesModelledKeys:
+    @pytest.fixture
+    def old_manifest(self) -> dict[str, object]:
+        return {'name': 'old', 'version': '9.9.9', 'keywords': ['old'], 'license': 'MIT'}
 
-    assert render(write_plan(tmp_path), target) == 1
-    assert target.read_text() == 'x'
+    @pytest.fixture
+    def rendered_with_license(self, plugin_plans: PlanFiles, plugin_target: Path) -> Path:
+        assert render(plugin_plans.write(license='MIT'), plugin_target) == 0
+        return plugin_target
+
+    def test_force_writes_the_modelled_manifest_keys_from_the_record(
+        self,
+        plugin_plans: PlanFiles,
+        rendered_with_license: Path,
+        plugin_manifest_path: Path,
+        old_manifest: dict[str, object],
+    ) -> None:
+        plugin_manifest_path.write_text(json.dumps(old_manifest))
+
+        changed = plugin_plans.write(version='0.2.0', keywords=['new'])
+        assert render(changed, rendered_with_license, '--force') == 0
+
+        rewritten = manifest_of(rendered_with_license)
+        assert rewritten['version'] == '0.2.0'
+        assert rewritten['keywords'] == ['new']
+        assert 'license' not in rewritten
+
+
+class TestWrittenPaths:
+    def test_every_path_render_writes_resolves_inside_the_target(
+        self, plugin_plans: PlanFiles, plugin_target: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert render(plugin_plans.write(components=all_kinds()), plugin_target) == 0
+
+        written = [line.removeprefix('wrote ') for line in capsys.readouterr().out.splitlines()]
+        written = [line for line in written if not line.startswith(('PASS', 'warning'))]
+        assert len(written) == 4 + 7
+        for relative in written:
+            assert (plugin_target / relative).resolve().is_relative_to(plugin_target.resolve())

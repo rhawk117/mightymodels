@@ -154,4 +154,4 @@ Plugin: `hooks/hooks.json` at the plugin root, with an optional `description`, s
 
 ## Where it loads from, and what to check
 
-Hooks merge from the user, project, local, managed and plugin levels; an identical handler in several settings files runs once. Edits to a settings file are normally picked up by a file watcher; `/hooks` lists active hooks with their source; `"disableAllHooks": true` turns off everything the user controls. `vibe-code hook validate FILE` runs `claude plugin validate` on the hooks first and then checks event spelling, handler fields, timeouts, matcher grammar, script paths and duplicate keys.
+Hooks merge from the user, project, local, managed and plugin levels; an identical handler in several settings files runs once. Edits to a settings file are normally picked up by a file watcher; `/hooks` lists active hooks with their source; `"disableAllHooks": true` turns off everything the user controls. `vibe-code hook validate FILE` runs `claude plugin validate` on the hooks first and then checks event spelling, handler fields, timeouts, matcher grammar and script paths.

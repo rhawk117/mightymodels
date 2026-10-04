@@ -1,31 +1,30 @@
 from dataclasses import dataclass, field
 
-from vibe_code_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.kinds import Kinds
 from vibe_code_cli.plugin.record import Component, Plan
 
 MANIFEST_PATH = '.claude-plugin/plugin.json'
 RENDERED_FILES = (MANIFEST_PATH, 'README.md', 'PLAN.md', 'plugin-plan.json')
 
 
-@dataclass
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Node:
     note: str = ''
     children: dict[str, 'Node'] = field(default_factory=dict)
 
 
 def component_files(component: Component) -> list[str]:
-    """The files a component owns: the ones recorded for a built component, else its kind's."""
     if component.files:
         return list(component.files)
     package = component.name.replace('-', '_')
     return [
         pattern.format(name=component.name, package=package)
-        for pattern in KIND_SPECS[component.kind].files
+        for pattern in Kinds().specs[component.kind].files
     ]
 
 
 def component_directory(component: Component) -> str | None:
-    directory = KIND_SPECS[component.kind].directory
+    directory = Kinds().specs[component.kind].directory
     return directory.format(name=component.name) if directory else None
 
 
@@ -34,19 +33,20 @@ def planned(plan: Plan) -> list[Component]:
 
 
 def planned_directories(plan: Plan) -> list[str]:
-    """Each directory the planned components own, once, in component order."""
     directories = (component_directory(component) for component in planned(plan))
     return list(dict.fromkeys(directory for directory in directories if directory))
 
 
 def add_path(root: Node, path: str, note: str) -> None:
     parts = path.rstrip('/').split('/')
-    node = root
+    parent = node = root
+    key = ''
     for index, part in enumerate(parts):
         is_directory = index < len(parts) - 1 or path.endswith('/')
-        node = node.children.setdefault(f'{part}/' if is_directory else part, Node())
+        key = f'{part}/' if is_directory else part
+        parent, node = node, node.children.setdefault(key, Node())
     if not node.note:
-        node.note = note
+        parent.children[key] = Node(note=note, children=node.children)
 
 
 def layout_tree(plan: Plan) -> Node:

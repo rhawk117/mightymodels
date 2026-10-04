@@ -1,9 +1,9 @@
 import argparse
-import json
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -18,32 +18,52 @@ EXCERPT_CHARACTERS = 300
 BLOCKING_EXIT_CODE = 2
 SUCCESS_EXIT_CODE = 0
 
-INTERPRETERS = {
-    '.py': (sys.executable,),
-    '.sh': ('bash',),
-    '.ps1': ('pwsh', 'powershell'),
-    '.js': ('node',),
-    '.mjs': ('node',),
-}
-INTERPRETER_ARGUMENTS = {'.ps1': ('-File',)}
-
 MISSING = object()
 
 
-@dataclass(frozen=True)
+class ScriptSuffix(StrEnum):
+    PY = '.py'
+    SH = '.sh'
+    PS1 = '.ps1'
+    JS = '.js'
+    MJS = '.mjs'
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Interpreter:
+    candidates: tuple[str, ...]
+    arguments: tuple[str, ...] = ()
+
+
+def default_interpreters() -> dict[str, Interpreter]:
+    return {
+        ScriptSuffix.PY: Interpreter(candidates=(sys.executable,)),
+        ScriptSuffix.SH: Interpreter(candidates=('bash',)),
+        ScriptSuffix.PS1: Interpreter(candidates=('pwsh', 'powershell'), arguments=('-File',)),
+        ScriptSuffix.JS: Interpreter(candidates=('node',)),
+        ScriptSuffix.MJS: Interpreter(candidates=('node',)),
+    }
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Interpreters:
+    by_suffix: dict[str, Interpreter] = field(default_factory=default_interpreters)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class FieldExpectation:
     key: str
     expected: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Expectations:
     exit_code: int
     fields: tuple[FieldExpectation, ...]
     silent: bool
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class HookTest:
     script: Path
     payload: Path
@@ -57,15 +77,10 @@ def parse_field_expectation(spec: str) -> FieldExpectation:
     if not key:
         message = f'{spec!r} has an empty key'
         raise argparse.ArgumentTypeError(message)
-    return FieldExpectation(key, expected if separator else None)
+    return FieldExpectation(key=key, expected=expected if separator else None)
 
 
 def check_hook(hook_test: HookTest) -> list[Finding]:
-    """Run the script on the payload and return how the run breaks the output contract.
-
-    Raises CannotCheckError when the script or payload cannot be read, the payload is not
-    JSON, or the script cannot be started.
-    """
     payload_text = read_payload(hook_test.payload)
     event = payload_event(payload_text, hook_test.payload)
     command = hook_command(hook_test.script)
@@ -101,7 +116,6 @@ def read_payload(payload: Path) -> str:
 
 
 def payload_event(payload_text: str, payload: Path) -> str | None:
-    """The `hook_event_name` of a payload, which says which event the hook is handling."""
     try:
         value = msgspec.json.decode(payload_text)
     except msgspec.DecodeError as problem:
@@ -116,14 +130,14 @@ def hook_command(script: Path) -> list[str]:
         message = f'script not found: {script}'
         raise CannotCheckError(message)
     suffix = script.suffix.lower()
-    candidates = INTERPRETERS.get(suffix)
-    if candidates is None:
-        return [str(script.resolve())]
-    interpreter = next(filter(None, map(shutil.which, candidates)), None)
+    interpreter = Interpreters().by_suffix.get(suffix)
     if interpreter is None:
-        message = f'{" or ".join(candidates)} is not on PATH, so {script} cannot run'
+        return [str(script.resolve())]
+    executable = next(filter(None, map(shutil.which, interpreter.candidates)), None)
+    if executable is None:
+        message = f'{" or ".join(interpreter.candidates)} is not on PATH, so {script} cannot run'
         raise CannotCheckError(message)
-    return [interpreter, *INTERPRETER_ARGUMENTS.get(suffix, ()), str(script.resolve())]
+    return [executable, *interpreter.arguments, str(script.resolve())]
 
 
 def contract_findings(
@@ -160,7 +174,6 @@ Stdout = Literal['empty', 'json', 'text', 'broken']
 
 
 def classify_stdout(raw: str) -> tuple[Stdout, dict[str, object] | None]:
-    """Read stdout the way Claude Code does: `{...}` is JSON, anything else is plain text."""
     text = raw.strip()
     if not text:
         return 'empty', None
@@ -212,14 +225,16 @@ def field_problem(output: dict[str, object], expectation: FieldExpectation) -> s
     if value is MISSING:
         return f'missing field {expectation.key}'
     if expectation.expected is not None and not matches(value, expectation.expected):
-        return f'{expectation.key}={json.dumps(value)}, expected {expectation.expected}'
+        actual = msgspec.json.encode(value).decode()
+        return f'{expectation.key}={actual}, expected {expectation.expected}'
     return None
 
 
 def matches(value: object, expected: str) -> bool:
-    """Compare as JSON when the expected text parses as JSON, as a plain string otherwise."""
     try:
         wanted: object = msgspec.json.decode(expected)
     except msgspec.DecodeError:
         wanted = expected
-    return json.dumps(value, sort_keys=True) == json.dumps(wanted, sort_keys=True)
+    return msgspec.json.encode(value, order='deterministic') == msgspec.json.encode(
+        wanted, order='deterministic'
+    )

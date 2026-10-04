@@ -12,7 +12,7 @@ async def roots_workspace_of(ctx: Context[AppState]) -> RepositoryWorkspace:
     root = await listed_root(ctx.request_context.session)
     if root is None:
         return workspace
-    return RepositoryWorkspace(workspace.workspace_tools, root)
+    return RepositoryWorkspace(workspace_tools=workspace.workspace_tools, root=root)
 """
 
 
@@ -130,7 +130,6 @@ def render_prompt(prompt: Prompt) -> str:
 
 
 def server_tokens(spec: Spec) -> dict[str, str]:
-    """The server.py placeholders and the text each one becomes for this spec."""
     package = spec.package
     confirming = any(tool.confirm for tool in spec.tools)
     roots = spec.root_source == 'roots'

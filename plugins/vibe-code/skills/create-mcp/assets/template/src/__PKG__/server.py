@@ -22,7 +22,7 @@ INSTRUCTIONS = __INSTRUCTIONS_LITERAL__
 REQUIRED_BINARIES = (__BINARIES__)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class AppState:
     workspace: RepositoryWorkspace
 
@@ -31,11 +31,15 @@ def workspace_of(ctx: Context[AppState], root: str | None = None) -> RepositoryW
     workspace = ctx.request_context.lifespan_context.workspace
     if root is None:
         return workspace
-    return RepositoryWorkspace(workspace.workspace_tools, Path(root).resolve(strict=True))
+    return RepositoryWorkspace(
+        workspace_tools=workspace.workspace_tools, root=Path(root).resolve(strict=True)
+    )
 __ROOTS_HELPER__
 
 def build_server(root: Path | None = None) -> MCPServer[AppState]:
-    workspace = current_workspace(*(WorkspaceTool(binary) for binary in REQUIRED_BINARIES), root=root)
+    workspace = current_workspace(
+        *(WorkspaceTool(binary=binary) for binary in REQUIRED_BINARIES), root=root
+    )
 
     @asynccontextmanager
     async def lifespan(_: MCPServer[AppState]) -> AsyncIterator[AppState]:

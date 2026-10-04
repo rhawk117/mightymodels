@@ -4,8 +4,6 @@ from xml.parsers import expat
 
 from vibe_code_cli.findings import Finding, error, warning
 
-# House style from the reference agent template: these sections, in this order, directly under
-# the frontmatter.
 REQUIRED_SECTIONS = (
     'role',
     'context',
@@ -27,14 +25,14 @@ FINAL_CHUNK = True
 MODEL_DIRECTIVE = re.compile(r'\bMODEL REQUIREMENT\b|\bMUST only be run with\b')
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Tag:
     line: int
     name: str
     closing: bool
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class SectionScan:
     top_level: list[str]
     findings: list[Finding]
@@ -56,15 +54,15 @@ def check_body(body: str) -> list[Finding]:
 
 
 def section_tags(body: str) -> list[Tag]:
-    """Tags outside fenced blocks and inline code, with their body line numbers."""
     tags: list[Tag] = []
     inside_fence = False
     for number, line in enumerate(body.splitlines(), start=1):
         if FENCE.match(line):
             inside_fence = not inside_fence
-        elif not inside_fence:
+            continue
+        if not inside_fence:
             tags.extend(
-                Tag(number, name, closing=bool(slash))
+                Tag(line=number, name=name, closing=bool(slash))
                 for slash, name in SECTION_TAG.findall(INLINE_CODE.sub('', line))
             )
     return tags
@@ -79,15 +77,16 @@ def scan_sections(tags: list[Tag]) -> SectionScan:
             if not open_sections:
                 top_level.append(tag.name)
             open_sections.append(tag.name)
-        elif open_sections and open_sections[-1] == tag.name:
+            continue
+        if open_sections and open_sections[-1] == tag.name:
             open_sections.pop()
-        else:
-            current = open_sections[-1] if open_sections else 'none'
-            findings.append(
-                error(f'line {tag.line} closes </{tag.name}> but the open section is <{current}>')
-            )
+            continue
+        current = open_sections[-1] if open_sections else 'none'
+        findings.append(
+            error(f'line {tag.line} closes </{tag.name}> but the open section is <{current}>')
+        )
     findings.extend(error(f'<{name}> is never closed') for name in open_sections)
-    return SectionScan(top_level, findings)
+    return SectionScan(top_level=top_level, findings=findings)
 
 
 def check_stray_tags(tags: list[Tag]) -> list[Finding]:

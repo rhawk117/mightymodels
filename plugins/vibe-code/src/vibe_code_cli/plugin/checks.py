@@ -1,11 +1,13 @@
 import re
 from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import StrEnum
 from urllib.parse import urlsplit
 
 from msgspec import UnsetType
 
 from vibe_code_cli.findings import Finding, error, warning
-from vibe_code_cli.plugin.kinds import KIND_SPECS, OUTSIDE_PLUGIN_KINDS, RENAMED_KINDS
+from vibe_code_cli.plugin.kinds import RENAMED_KIND, RENAMED_TO, Kinds
 from vibe_code_cli.plugin.record import (
     AUDIENCE_HOW,
     CHANNELS,
@@ -20,21 +22,39 @@ from vibe_code_cli.plugin.record import (
 KEBAB_CASE = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*')
 COMPONENT_NAME = re.compile(r'[a-z0-9]+(?:[-_][a-z0-9]+)*')
 RESERVED_PREFIX = 'claude-'
-FORBIDDEN_NAME_CHARACTERS = {
-    '.': 'a dot',
-    ' ': 'a space',
-    '@': '@',
-    ':': ':',
-    '/': 'a path separator',
-    '\\': 'a path separator',
-}
+USER_CONFIG_FIELDS = ('type', 'title', 'description')
+
+
+class NameCharacter(StrEnum):
+    DOT = '.'
+    SPACE = ' '
+    AT = '@'
+    COLON = ':'
+    SLASH = '/'
+    BACKSLASH = '\\'
+
+
+def character_labels() -> dict[str, str]:
+    return {
+        NameCharacter.DOT: 'a dot',
+        NameCharacter.SPACE: 'a space',
+        NameCharacter.AT: '@',
+        NameCharacter.COLON: ':',
+        NameCharacter.SLASH: 'a path separator',
+        NameCharacter.BACKSLASH: 'a path separator',
+    }
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ForbiddenNameCharacters:
+    labels: dict[str, str] = field(default_factory=character_labels)
 
 
 def name_problem(name: str) -> str | None:
-    """Why a plugin name fails the Claude Code rule, or None when it passes (PP-A16)."""
-    for character, label in FORBIDDEN_NAME_CHARACTERS.items():
-        if character in name:
-            return f'name {name!r} must not contain {label}'
+    labels = ForbiddenNameCharacters().labels
+    forbidden = next((label for character, label in labels.items() if character in name), None)
+    if forbidden:
+        return f'name {name!r} must not contain {forbidden}'
     if name.startswith(RESERVED_PREFIX):
         return f'name {name!r} must not start with {RESERVED_PREFIX!r}; it is reserved'
     if KEBAB_CASE.fullmatch(name) is None:
@@ -98,21 +118,18 @@ def check_has_components(plan: Plan) -> str | None:
 
 
 def check_outside(plan: Plan) -> str | None:
-    for item in plan.outside_plugin:
-        if not (item.need or item.what) or not item.mechanism:
-            return 'outside_plugin entries need a need (or what) and a mechanism'
-    return None
+    if all((item.need or item.what) and item.mechanism for item in plan.outside_plugin):
+        return None
+    return 'outside_plugin entries need a need (or what) and a mechanism'
 
 
 def check_author(plan: Plan) -> str | None:
-    """PP-B11: an author object that is present needs a name."""
     if plan.author is None or plan.author.name:
         return None
     return 'author needs a name'
 
 
 def check_homepage(plan: Plan) -> str | None:
-    """PP-B12: Claude Code fails to load a plugin whose homepage does not parse as a URL."""
     if plan.homepage is None:
         return None
     try:
@@ -125,23 +142,19 @@ def check_homepage(plan: Plan) -> str | None:
 
 
 def check_user_config(plan: Plan) -> str | None:
-    """PP-B3: each option needs the three fields Claude Code's configuration dialog shows."""
-    for key, option in plan.user_config.items():
-        missing = [
-            field for field in ('type', 'title', 'description') if not getattr(option, field)
-        ]
-        if missing:
-            return f'userConfig.{key} needs {", ".join(missing)}'
-    return None
+    problems = (
+        f'userConfig.{key} needs {", ".join(missing)}'
+        for key, option in plan.user_config.items()
+        if (missing := [name for name in USER_CONFIG_FIELDS if not getattr(option, name)])
+    )
+    return next(problems, None)
 
 
 def check_dependencies(plan: Plan) -> str | None:
-    """PP-B4: each dependency is a plugin name, `name@marketplace` or an object with a name."""
-    for entry in plan.dependencies:
-        name = entry.name if isinstance(entry, Dependency) else entry
-        if not name.split('@')[0]:
-            return 'dependencies entries must name a plugin'
-    return None
+    names = (entry.name if isinstance(entry, Dependency) else entry for entry in plan.dependencies)
+    if all(name.split('@')[0] for name in names):
+        return None
+    return 'dependencies entries must name a plugin'
 
 
 PLAN_CHECKS: tuple[Callable[[Plan], str | None], ...] = (
@@ -163,16 +176,14 @@ PLAN_CHECKS: tuple[Callable[[Plan], str | None], ...] = (
 
 
 def check_kind(component: Component) -> str | None:
-    if component.kind in KIND_SPECS:
+    kinds = Kinds()
+    if component.kind in kinds.specs:
         return None
-    if component.kind in OUTSIDE_PLUGIN_KINDS:
-        return (
-            f'kind {component.kind} is not a plugin component: '
-            f'{OUTSIDE_PLUGIN_KINDS[component.kind]}'
-        )
-    if component.kind in RENAMED_KINDS:
-        return f'kind {component.kind} is called {RENAMED_KINDS[component.kind]} for Claude Code'
-    return f'kind must be one of {sorted(KIND_SPECS)}'
+    if component.kind in kinds.outside:
+        return f'kind {component.kind} is not a plugin component: {kinds.outside[component.kind]}'
+    if component.kind == RENAMED_KIND:
+        return f'kind {component.kind} is called {RENAMED_TO} for Claude Code'
+    return f'kind must be one of {sorted(map(str, kinds.specs))}'
 
 
 def check_component_name(component: Component) -> str | None:
@@ -192,7 +203,7 @@ def check_status(component: Component) -> str | None:
 
 
 def check_builder(component: Component) -> str | None:
-    spec = KIND_SPECS.get(component.kind)
+    spec = Kinds().specs.get(component.kind)
     if (
         spec is None
         or isinstance(component.builder, UnsetType)

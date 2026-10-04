@@ -5,40 +5,33 @@ import msgspec
 
 
 class CannotCheckError(Exception):
-    """The skill cannot be fully checked, so the command must give no verdict."""
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Finding:
     level: Literal['error', 'warning', 'info']
     message: str
 
 
 def error(message: str) -> Finding:
-    return Finding('error', message)
+    return Finding(level='error', message=message)
 
 
 def warning(message: str) -> Finding:
-    return Finding('warning', message)
+    return Finding(level='warning', message=message)
 
 
 def info(message: str) -> Finding:
-    return Finding('info', message)
+    return Finding(level='info', message=message)
 
 
 def decode_problem(problem: msgspec.ValidationError, *, builtin_errored: bool) -> list[Finding]:
-    """One error finding in msgspec's words, which name types and a path and never a value.
-
-    The built-in's own error covers the same document, so it makes this finding redundant.
-    """
     return [] if builtin_errored else [error(str(problem))]
 
 
 def report(label: str, findings: list[Finding], *, strict: bool) -> int:
-    """Print the findings and a verdict line; return 0, or 1 on an error or a strict warning.
-
-    An info finding is printed and counted but never changes the verdict.
-    """
     errors = [finding for finding in findings if finding.level == 'error']
     warnings = [finding for finding in findings if finding.level == 'warning']
     infos = [finding for finding in findings if finding.level == 'info']

@@ -3,7 +3,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from vibe_code_cli.builtin import run_builtin
+from vibe_code_cli.builtin import BuiltinRunner, Services
 from vibe_code_cli.findings import CannotCheckError, Finding, report
 from vibe_code_cli.mcp.checks import check_mcp
 from vibe_code_cli.mcp.file import KINDS, SERVER_FILE_NAME, McpFile, load_mcp_file
@@ -11,7 +11,7 @@ from vibe_code_cli.mcp.help_probe import check_commands
 from vibe_code_cli.mcp.scaffold.command import scaffold_command
 
 
-def build_group(parser: argparse.ArgumentParser) -> None:
+def build(parser: argparse.ArgumentParser) -> None:
     commands = parser.add_subparsers(dest='command', metavar='COMMAND')
     validate = commands.add_parser(
         'validate',
@@ -51,33 +51,37 @@ def build_group(parser: argparse.ArgumentParser) -> None:
     scaffold.set_defaults(handler=scaffold_command)
 
 
-def validate_command(arguments: argparse.Namespace) -> int:
-    """Return 0 for a pass, 1 for findings, 2 when the check could not run."""
+def dispatch(arguments: argparse.Namespace, services: Services) -> int:
+    return int(arguments.handler(arguments, services))
+
+
+def validate_command(arguments: argparse.Namespace, services: Services) -> int:
     path = arguments.config_file
     if not path.is_file():
         print(f'error: {path} is not a file', file=sys.stderr)
         return 2
     try:
         mcp_file = load_mcp_file(path, arguments.kind)
-        findings = validate_findings(mcp_file, check_command=arguments.check_command)
+        findings = validate_findings(
+            mcp_file, services.run_builtin, check_command=arguments.check_command
+        )
     except CannotCheckError as problem:
         print(f'error: {problem}', file=sys.stderr)
         return 2
     return report(f'{path} as {arguments.kind}', findings, strict=arguments.strict)
 
 
-def validate_findings(mcp_file: McpFile, *, check_command: bool) -> list[Finding]:
-    builtin_findings = run_mcp_builtin(mcp_file)
+def validate_findings(
+    mcp_file: McpFile, runner: BuiltinRunner, *, check_command: bool
+) -> list[Finding]:
+    builtin_findings = run_mcp_builtin(mcp_file, runner)
     builtin_errored = any(finding.level == 'error' for finding in builtin_findings)
     own_findings = check_mcp(mcp_file, builtin_errored=builtin_errored)
     command_findings = check_commands(mcp_file) if check_command else []
     return [*builtin_findings, *own_findings, *command_findings]
 
 
-def run_mcp_builtin(mcp_file: McpFile) -> list[Finding]:
-    # The built-in reads MCP servers only from `.mcp.json` at a plugin root, so every kind goes
-    # to it as a staged plugin that holds the file's servers. Its findings about the staged
-    # manifest are about the staging, not the file, and are dropped.
+def run_mcp_builtin(mcp_file: McpFile, runner: BuiltinRunner) -> list[Finding]:
     with tempfile.TemporaryDirectory() as staging:
         root = Path(staging)
         files = {
@@ -91,4 +95,4 @@ def run_mcp_builtin(mcp_file: McpFile) -> list[Finding]:
         except OSError as problem:
             message = f'could not stage {mcp_file.path} for claude: {problem}'
             raise CannotCheckError(message) from problem
-        return run_builtin(root, include_manifest=False)
+        return runner(root, include_manifest=False)

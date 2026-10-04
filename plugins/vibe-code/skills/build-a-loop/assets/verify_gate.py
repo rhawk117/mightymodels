@@ -1,41 +1,39 @@
 #!/usr/bin/env python3
-from __future__ import annotations
-
 import json
 import os
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class GateConfig:
     check: list[str]
     cwd: Path
     state_path: Path
     max_blocks: int
 
-    @classmethod
-    def load(cls, path: Path) -> GateConfig:
-        raw = json.loads(path.read_text())
-        return cls(
-            check=list(raw['check']),
-            cwd=Path(raw.get('cwd', '.')).expanduser(),
-            state_path=Path(raw.get('state_path', '.loop-gate.state')).expanduser(),
-            max_blocks=int(raw.get('max_blocks', 1)),
-        )
+
+def load_gate_config(path: Path) -> GateConfig:
+    raw = json.loads(path.read_text())
+    return GateConfig(
+        check=list(raw['check']),
+        cwd=Path(raw.get('cwd', '.')).expanduser(),
+        state_path=Path(raw.get('state_path', '.loop-gate.state')).expanduser(),
+        max_blocks=int(raw.get('max_blocks', 1)),
+    )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CheckResult:
     passed: bool
     detail: str
 
 
-def read_payload() -> dict[str, Any]:
-    raw = sys.stdin.read().strip() if not sys.stdin.isatty() else ''
+def read_payload(stream: TextIO) -> dict[str, Any]:
+    raw = stream.read().strip() if not stream.isatty() else ''
     if not raw:
         return {}
     try:
@@ -89,8 +87,8 @@ def clear_blocks(config: GateConfig) -> None:
 def emit(*, blocking: bool, message: str) -> None:
     if blocking:
         print(json.dumps({'decision': 'block', 'reason': message}))
-    else:
-        print(json.dumps({'systemMessage': message}) if message else '', end='')
+        return
+    print(json.dumps({'systemMessage': message}) if message else '', end='')
 
 
 def load_config() -> GateConfig | None:
@@ -100,18 +98,18 @@ def load_config() -> GateConfig | None:
         return None
 
     try:
-        return GateConfig.load(config_path)
+        return load_gate_config(config_path)
     except (KeyError, ValueError, json.JSONDecodeError) as error:
         print(f'loop gate config is invalid: {error}', file=sys.stderr)
         return None
 
 
-def main() -> int:
+def main(stdin: TextIO) -> int:
     config = load_config()
     if config is None:
         return 1
 
-    payload = read_payload()
+    payload = read_payload(stdin)
     result = run_check(config)
 
     if result.passed:
@@ -143,4 +141,4 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    raise SystemExit(main(sys.stdin))

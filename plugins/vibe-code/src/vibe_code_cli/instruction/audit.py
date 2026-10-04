@@ -1,32 +1,58 @@
 import re
 import subprocess
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
 from vibe_code_cli.findings import Finding, error, info, warning
 from vibe_code_cli.frontmatter import parse_skill_text
 from vibe_code_cli.instruction.files import InstructionFile, strip_code_fences
 
-# Claude Code loads a CLAUDE.md file of up to 4 MiB in full and skips a larger file.
 SKIP_BYTES = 4 * 1024 * 1024
-# The docs target is under 200 lines per CLAUDE.md file.
 TARGET_LINES = 200
 MIN_CONFLICTING_COMMANDS = 2
 GIT_TIMEOUT_SECONDS = 10
 
-LINT_LEAKAGE_PATTERNS = {
-    'indentation': r'\b(indent(ation)?|tabs?\s+(vs|versus|over)\s+spaces?|\d+[- ]space)\b',
-    'line length': r'\b(line[- ]length|max(imum)?\s+\d{2,3}\s+char|\d{2,3}\s+characters?\s+max)\b',
-    'naming case': (
-        r'\b(camelCase|snake_case|PascalCase|kebab-case|UPPER_CASE|UPPERCASE_SNAKE_CASE)\b'
-    ),
-    'import ordering': (
-        r'\b(import\s+(order|ordering|sorted|sorting)|sort\s+imports|organize\s+imports)\b'
-    ),
-    'quote style': r'\b(single|double)\s+quotes?\b',
-    'semicolons': r'\bsemicolons?\b',
-    'trailing whitespace': r'\btrailing\s+(whitespace|commas?)\b',
-    'formatter settings': r'\b(prettier|black|gofmt|rustfmt|biome)\s+(config|settings|rules)\b',
-}
+
+class LintTopic(StrEnum):
+    INDENTATION = 'indentation'
+    LINE_LENGTH = 'line length'
+    NAMING_CASE = 'naming case'
+    IMPORT_ORDERING = 'import ordering'
+    QUOTE_STYLE = 'quote style'
+    SEMICOLONS = 'semicolons'
+    TRAILING_WHITESPACE = 'trailing whitespace'
+    FORMATTER_SETTINGS = 'formatter settings'
+
+
+def lint_leakage_patterns() -> dict[LintTopic, str]:
+    return {
+        LintTopic.INDENTATION: (
+            r'\b(indent(ation)?|tabs?\s+(vs|versus|over)\s+spaces?|\d+[- ]space)\b'
+        ),
+        LintTopic.LINE_LENGTH: (
+            r'\b(line[- ]length|max(imum)?\s+\d{2,3}\s+char|\d{2,3}\s+characters?\s+max)\b'
+        ),
+        LintTopic.NAMING_CASE: (
+            r'\b(camelCase|snake_case|PascalCase|kebab-case|UPPER_CASE|UPPERCASE_SNAKE_CASE)\b'
+        ),
+        LintTopic.IMPORT_ORDERING: (
+            r'\b(import\s+(order|ordering|sorted|sorting)|sort\s+imports|organize\s+imports)\b'
+        ),
+        LintTopic.QUOTE_STYLE: r'\b(single|double)\s+quotes?\b',
+        LintTopic.SEMICOLONS: r'\bsemicolons?\b',
+        LintTopic.TRAILING_WHITESPACE: r'\btrailing\s+(whitespace|commas?)\b',
+        LintTopic.FORMATTER_SETTINGS: (
+            r'\b(prettier|black|gofmt|rustfmt|biome)\s+(config|settings|rules)\b'
+        ),
+    }
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class LintLeakagePatterns:
+    by_topic: dict[LintTopic, str] = field(default_factory=lint_leakage_patterns)
+
+
 REFERENCE_CUES = (
     'because',
     'contains',
@@ -52,7 +78,6 @@ IMPORT_TOKEN = re.compile(r'(?<![\w`])@([\w./~-]+)')
 
 
 def audit_files(files: list[InstructionFile], root: Path) -> list[Finding]:
-    """The project-level checks over every instruction file found under root."""
     always_on = [entry for entry in files if entry.always_on]
     return [
         *check_size(always_on),
@@ -74,7 +99,8 @@ def check_size(always_on: list[InstructionFile]) -> list[Finding]:
             findings.append(
                 error(f'{entry.relative}: over 4 MiB, so Claude Code skips the file entirely')
             )
-        elif count >= TARGET_LINES:
+            continue
+        if count >= TARGET_LINES:
             findings.append(
                 warning(
                     f'{entry.relative}: {count} lines, at or over the {TARGET_LINES}-line target; '
@@ -103,7 +129,7 @@ def leaked_lint_label(line: str) -> str | None:
     return next(
         (
             label
-            for label, pattern in LINT_LEAKAGE_PATTERNS.items()
+            for label, pattern in LintLeakagePatterns().by_topic.items()
             if re.search(pattern, line, re.IGNORECASE)
         ),
         None,
@@ -147,7 +173,6 @@ def check_command_conflicts(always_on: list[InstructionFile]) -> list[Finding]:
 
 
 def commands_in(entry: InstructionFile) -> list[tuple[str, str, int]]:
-    """The (verb, command, line) of each backticked command outside code fences."""
     commands = [
         (' '.join(command.split()), number)
         for number, line in strip_code_fences(entry.lines)
@@ -210,24 +235,20 @@ def imports_agents(entry: InstructionFile) -> bool:
 
 
 def check_single_commit(always_on: list[InstructionFile], root: Path) -> list[Finding]:
-    """Flag always-on files with one commit; no findings when git is absent or root is no repo."""
-    findings: list[Finding] = []
-    for entry in always_on:
-        commits = commit_count(root, entry.relative)
-        if commits is None:
-            return []
-        if commits == 1:
-            findings.append(
-                warning(
-                    f'{entry.relative}: only one commit; generated files that are never '
-                    'revised measurably hurt agents'
-                )
-            )
-    return findings
+    counts = {entry.relative: commit_count(root, entry.relative) for entry in always_on}
+    if None in counts.values():
+        return []
+    return [
+        warning(
+            f'{relative}: only one commit; generated files that are never '
+            'revised measurably hurt agents'
+        )
+        for relative, commits in counts.items()
+        if commits == 1
+    ]
 
 
 def commit_count(root: Path, relative: str) -> int | None:
-    """Commits touching the file, or None when git cannot answer."""
     try:
         completed = subprocess.run(  # noqa: S603 - fixed argument list, no shell
             ['git', 'log', '--follow', '--format=%H', '--', relative],  # noqa: S607 - git is resolved from PATH on purpose

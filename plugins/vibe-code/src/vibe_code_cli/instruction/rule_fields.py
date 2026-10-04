@@ -1,4 +1,5 @@
 import re
+from itertools import accumulate
 
 import msgspec
 from msgspec import UNSET, UnsetType
@@ -9,25 +10,25 @@ from vibe_code_cli.frontmatter import SkillText
 ALWAYS_ON_GLOBS = frozenset({'**', '**/*'})
 ROOT_ONLY_GLOB = re.compile(r'^\*\.[A-Za-z0-9]+$')
 MAX_EXPANDED_PATTERNS = 1000
+BRACE_TOKEN = re.compile(r'\\.|[{},]', re.DOTALL)
+BRACKET_TOKEN = re.compile(r'\\.|\[[!^]?+.[^\]]*\]|(?P<invalid>\[)', re.DOTALL)
 
 
-class RuleFrontmatter(msgspec.Struct):
-    """A rule's frontmatter; `paths` is the only key Claude Code reads, and null is no pattern."""
-
+class RuleFrontmatter(msgspec.Struct, frozen=True, kw_only=True):
     paths: str | list[str] | UnsetType | None = UNSET
 
 
 def check_frontmatter(rule: SkillText) -> list[Finding]:
-    """Frontmatter checks for a rule file; `paths` is the only field Claude Code reads."""
     if rule.yaml_problem is not None:
         return [error(f'frontmatter is not valid YAML ({rule.yaml_problem})')]
+    findings: list[Finding] = [error(rule.key_problem)] if rule.key_problem else []
     if not rule.fields:
-        return []
+        return findings
     try:
         frontmatter = msgspec.convert(rule.fields, RuleFrontmatter)
     except msgspec.ValidationError as problem:
-        return [error(str(problem))]
-    return check_rule_paths(frontmatter.paths)
+        return [*findings, error(str(problem))]
+    return [*findings, *check_rule_paths(frontmatter.paths)]
 
 
 def check_rule_paths(paths: str | list[str] | UnsetType | None) -> list[Finding]:
@@ -37,7 +38,6 @@ def check_rule_paths(paths: str | list[str] | UnsetType | None) -> list[Finding]
 
 
 def paths_of(value: str | list[str] | None) -> list[str]:
-    """The patterns of a `paths` value: a YAML list, or a comma-separated string."""
     if value is None:
         return []
     items = value if isinstance(value, list) else split_top_level(value)
@@ -45,23 +45,15 @@ def paths_of(value: str | list[str] | None) -> list[str]:
 
 
 def split_top_level(text: str) -> list[str]:
-    """Split on commas that sit outside a brace group; a backslash escapes the next character."""
     parts: list[str] = []
     depth = 0
     start = 0
-    position = 0
-    while position < len(text):
-        char = text[position]
-        if char == '\\':
-            position += 1
-        elif char == '{':
-            depth += 1
-        elif char == '}':
-            depth = max(depth - 1, 0)
-        elif char == ',' and depth == 0:
-            parts.append(text[start:position])
-            start = position + 1
-        position += 1
+    for token in BRACE_TOKEN.finditer(text):
+        char = token[0]
+        depth = max(depth + (char == '{') - (char == '}'), 0)
+        if char == ',' and depth == 0:
+            parts.append(text[start : token.start()])
+            start = token.end()
     parts.append(text[start:])
     return parts
 
@@ -102,29 +94,7 @@ def check_brackets(patterns: list[str]) -> list[Finding]:
 
 
 def has_invalid_bracket(pattern: str) -> bool:
-    position = 0
-    while position < len(pattern):
-        char = pattern[position]
-        if char == '\\':
-            position += 2
-        elif char == '[':
-            end = bracket_end(pattern, position)
-            if end is None:
-                return True
-            position = end + 1
-        else:
-            position += 1
-    return False
-
-
-def bracket_end(pattern: str, start: int) -> int | None:
-    """The index of the `]` closing the bracket expression at start, or None."""
-    body_start = start + 1
-    if pattern[body_start : body_start + 1] in {'!', '^'}:
-        body_start += 1
-    # A `]` first in the expression is a member, so the search for the closing one starts after it.
-    end = pattern.find(']', body_start + 1)
-    return end if end != -1 else None
+    return any(token['invalid'] for token in BRACKET_TOKEN.finditer(pattern))
 
 
 def check_brace_budget(patterns: list[str]) -> list[Finding]:
@@ -140,7 +110,6 @@ def check_brace_budget(patterns: list[str]) -> list[Finding]:
 
 
 def expanded_count(pattern: str) -> int:
-    """How many patterns the brace groups of one pattern expand to; 1 without a group."""
     total = 1
     position = 0
     while position < len(pattern):
@@ -156,17 +125,8 @@ def expanded_count(pattern: str) -> int:
 
 
 def matching_brace(pattern: str, start: int) -> int | None:
-    depth = 0
-    position = start
-    while position < len(pattern):
-        char = pattern[position]
-        if char == '\\':
-            position += 1
-        elif char == '{':
-            depth += 1
-        elif char == '}':
-            depth -= 1
-            if depth == 0:
-                return position
-        position += 1
-    return None
+    tokens = list(BRACE_TOKEN.finditer(pattern, start))
+    depths = accumulate((token[0] == '{') - (token[0] == '}') for token in tokens)
+    token_depths = zip(tokens, depths, strict=True)
+    closing = (token.start() for token, depth in token_depths if depth == 0 and token[0] == '}')
+    return next(closing, None)

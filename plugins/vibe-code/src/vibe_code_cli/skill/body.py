@@ -15,18 +15,18 @@ RESOURCE_REFERENCE = re.compile(
 URI_SCHEME = re.compile(r'^[A-Za-z][A-Za-z0-9+.-]*:')
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Referenced:
     files: frozenset[str]
     directories: frozenset[str]
 
 
 def check_body(skill_dir: Path, text: str, body: str) -> list[Finding]:
-    findings = []
-    if body.strip():
-        findings.extend(check_resources(skill_dir, body))
-    else:
-        findings.append(error('SKILL.md has no Markdown body after the frontmatter'))
+    findings = (
+        check_resources(skill_dir, body)
+        if body.strip()
+        else [error('SKILL.md has no Markdown body after the frontmatter')]
+    )
     line_count = len(text.splitlines())
     if line_count > LINE_BUDGET:
         findings.append(

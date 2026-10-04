@@ -7,7 +7,6 @@ from msgspec import UNSET, UnsetType
 
 from vibe_code_cli.findings import Finding, decode_problem, error, warning
 
-# The 20 keys in the Claude Code skills frontmatter table.
 KNOWN_KEYS = frozenset(
     {
         'name',
@@ -42,14 +41,7 @@ TRUE_VALUES = frozenset({'true', 'yes', 'on', '1'})
 FALSE_VALUES = frozenset({'false', 'no', 'off', '0'})
 
 
-class SkillFrontmatter(msgspec.Struct, rename='kebab'):
-    """The frontmatter keys the checks read, typed as the skills page shows them.
-
-    A key left unset is absent; `name`, `description` and `when_to_use` also accept null, which
-    the checks read as absent. A flag is a YAML bool, a number, or a string such as `No` or `ON`.
-    A string `metadata` is allowed because the built-in only warns that Claude Code drops it.
-    """
-
+class SkillFrontmatter(msgspec.Struct, rename='kebab', frozen=True, kw_only=True):
     name: str | None = None
     description: str | None = None
     when_to_use: str | None = msgspec.field(name='when_to_use', default=None)
@@ -139,12 +131,10 @@ def optional_string(key: str, value: str | UnsetType, max_length: int | None) ->
     if isinstance(value, UnsetType):
         return []
     if not value.strip():
-        problem = f'{key} must not be empty when provided'
-    elif max_length is not None and len(value) > max_length:
-        problem = f'{key} is {len(value)} chars; the limit is {max_length}'
-    else:
-        return []
-    return [error(problem)]
+        return [error(f'{key} must not be empty when provided')]
+    if max_length is not None and len(value) > max_length:
+        return [error(f'{key} is {len(value)} chars; the limit is {max_length}')]
+    return []
 
 
 def as_flag(value: object) -> bool | None:
@@ -188,20 +178,21 @@ def split_outside_parens(text: str, is_separator: Callable[[str], bool]) -> list
     pieces = ['']
     depth = 0
     for char in text:
-        if char == '(':
-            depth += 1
-        elif char == ')':
-            depth = max(depth - 1, 0)
+        depth = max(depth + (char == '(') - (char == ')'), 0)
         if depth == 0 and is_separator(char):
             pieces.append('')
-        else:
-            pieces[-1] += char
+            continue
+        pieces[-1] += char
     return pieces
+
+
+def is_comma(char: str) -> bool:
+    return char == ','
 
 
 def split_tool_string(text: str) -> list[str]:
     entries: list[str] = []
-    for segment in split_outside_parens(text, lambda char: char == ','):
+    for segment in split_outside_parens(text, is_comma):
         words = [word for word in split_outside_parens(segment, str.isspace) if word]
         entries.extend(words or [''])
     return entries

@@ -18,7 +18,6 @@ ALWAYS_WRITTEN = 4
 
 
 def manifest_document(plan: Plan) -> dict[str, object]:
-    """The `plugin.json` fields the record sets; `author`, `license` and the rest only when set."""
     values = (
         plan.name,
         plan.version,
@@ -39,7 +38,6 @@ def manifest_document(plan: Plan) -> dict[str, object]:
 
 
 def merged_manifest_text(plan: Plan, existing: dict[str, object]) -> str:
-    """The record's keys, then every key of the existing manifest the record does not model."""
     kept = {key: value for key, value in existing.items() if key not in MODELLED_KEYS}
     return json_text({**manifest_document(plan), **kept})
 

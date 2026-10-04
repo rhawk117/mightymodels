@@ -6,9 +6,6 @@ from msgspec import UNSET, UnsetType
 from vibe_code_cli.findings import Finding, decode_problem, error, warning
 from vibe_code_cli.subagent.tools import is_known_tool, tool_entries, tool_name
 
-# The 18 keys in the frontmatter table of https://code.claude.com/docs/en/sub-agents (docs
-# snapshot 2026-10-03, sub-agents.md lines 303-320), including `omitClaudeMd`, `initialPrompt`
-# and `experimental`. Refresh this set from that table when the docs gain a key.
 KNOWN_KEYS = frozenset(
     {
         'name',
@@ -31,7 +28,6 @@ KNOWN_KEYS = frozenset(
         'experimental',
     }
 )
-# The "Ignored fields" line of https://code.claude.com/docs/en/plugins/components.
 PLUGIN_IGNORED_KEYS = ('permissionMode', 'hooks', 'mcpServers', 'initialPrompt')
 NAME_PATTERN = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*')
 MODEL_PATTERN = re.compile(r'(?:sonnet|opus|haiku|fable)(?:\[1m\])?|inherit')
@@ -42,12 +38,7 @@ TRIGGER_PATTERN = re.compile(
 )
 
 
-class AgentFrontmatter(msgspec.Struct, rename='camel'):
-    """The frontmatter keys the checks read, typed as the sub-agents page shows them.
-
-    A key left unset is absent; the keys that accept null read it as absent too.
-    """
-
+class AgentFrontmatter(msgspec.Struct, rename='camel', frozen=True, kw_only=True):
     name: str | None = None
     description: str | None = None
     tools: str | list[str] | None = None
@@ -98,7 +89,7 @@ def check_name_value(name: str) -> list[Finding]:
 def check_description(frontmatter: AgentFrontmatter, *, unquoted_colon: bool) -> list[Finding]:
     description = frontmatter.description
     if description is None or not description.strip():
-        return []  # the built-in warns about a missing description
+        return []
     findings: list[Finding] = []
     if not TRIGGER_PATTERN.search(description):
         findings.append(
@@ -127,7 +118,7 @@ def check_tools(frontmatter: AgentFrontmatter) -> list[Finding]:
             )
         ]
     if not entries:
-        return []  # an empty list launches the agent with no tools (errors page)
+        return []
     return [
         *check_tool_names(entries),
         *check_denylist(frontmatter),

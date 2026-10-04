@@ -4,7 +4,7 @@ from vibe_code_cli.plugin.layout import planned
 from vibe_code_cli.plugin.record import Component, Plan
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Phase:
     number: int
     title: str
@@ -12,44 +12,41 @@ class Phase:
     kinds: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Context:
-    """What the text writers share: the plan, where the plugin root is, and each session number."""
-
     plan: Plan
     root: str
     sessions: dict[str, str]
 
 
-# An executable sits ahead of the skills that call it, and agents come last (PP-A48).
 PHASES = (
     Phase(
-        1,
-        'Foundation',
-        'What every later session assumes exists: the manifest and layout (written by '
+        number=1,
+        title='Foundation',
+        purpose='What every later session assumes exists: the manifest and layout (written by '
         'render), then the hooks and output styles that shape every session.',
-        ('hook', 'output-style'),
+        kinds=('hook', 'output-style'),
     ),
     Phase(
-        2,
-        'Capabilities',
-        'Servers and executables the agent can call. Built before the skills that teach when '
-        'to call them, so those skills can name real tools.',
-        ('mcp', 'lsp', 'executable'),
+        number=2,
+        title='Capabilities',
+        purpose='Servers and executables the agent can call. Built before the skills that teach '
+        'when to call them, so those skills can name real tools.',
+        kinds=('mcp', 'lsp', 'executable'),
     ),
     Phase(
-        3,
-        'Skills and delegation',
-        'Procedures and entry points, then the agents they delegate to. Agents last because '
-        'their discovery after install is the thing to verify.',
-        ('skill', 'command', 'agent'),
+        number=3,
+        title='Skills and delegation',
+        purpose='Procedures and entry points, then the agents they delegate to. Agents last '
+        'because their discovery after install is the thing to verify.',
+        kinds=('skill', 'command', 'agent'),
     ),
     Phase(
-        4,
-        'Verify and distribute',
-        'Install the plugin the way its users will, check every component is discovered, '
+        number=4,
+        title='Verify and distribute',
+        purpose='Install the plugin the way its users will, check every component is discovered, '
         'then publish through the chosen channel.',
-        (),
+        kinds=(),
     ),
 )
 

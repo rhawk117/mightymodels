@@ -10,18 +10,12 @@ from vibe_code_cli.mcp.keys import (
 )
 from vibe_code_cli.mcp.servers import McpServer
 
-# `${VAR}` and `${VAR:-default}`, the two forms mcp.md:633 to mcp.md:634 lists.
 REFERENCE = re.compile(r'\$\{([A-Za-z_][\w.]*)(:-[^}]*)?\}')
 BARE_REFERENCE = re.compile(r'\$[A-Za-z_]\w*')
 REMOTE_LOCATIONS = ('url', 'headers.')
 
 
 def variable_findings(name: str, server: McpServer) -> list[Finding]:
-    """Rows MC-A9 and MC-B4: variable references in the places Claude Code expands them.
-
-    A finding names the variable and the key, never the value, because `env` and `headers`
-    hold credentials.
-    """
     remote = server.type in REMOTE_TRANSPORTS
     findings: list[Finding] = []
     for location, text in expandable_values(server):
@@ -33,7 +27,6 @@ def variable_findings(name: str, server: McpServer) -> list[Finding]:
 
 
 def expandable_values(server: McpServer) -> list[tuple[str, str]]:
-    """The string values of `command`, `args`, `env`, `url` and `headers` (mcp.md:640 to 644)."""
     candidates = [('command', server.command), ('url', server.url)]
     candidates.extend((f'args[{index}]', value) for index, value in enumerate(server.args))
     for key, mapping in (('env', server.env), ('headers', server.headers)):

@@ -1,410 +1,431 @@
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 from vibe_code_cli.cli import main
 from vibe_code_cli.findings import info, report
+from vibe_code_cli.instruction.tests.support import RULE, GitRepo, InstructionTree
 
-FIXTURES = Path(__file__).resolve().parent / 'fixtures' / 'instructions'
-RULE = '---\npaths:\n  - "src/**/*.py"\n---\n' + ''.join(
-    f'<{name}>\nText.\n</{name}>\n\n'
-    for name in ('scope', 'conventions', 'examples', 'anti_patterns', 'verification')
-)
-GIT = ('git', '-c', 'user.name=t', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false')
 
+class TestFixtureTrees:
+    INSTRUCTIONS = Path(__file__).resolve().parent / 'fixtures' / 'instructions'
 
-def project(root: Path, files: dict[str, str]) -> Path:
-    for name, text in files.items():
-        path = root / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
-    return root
+    @pytest.fixture
+    def clean_tree(self, tmp_path: Path) -> Path:
+        return shutil.copytree(self.INSTRUCTIONS / 'clean', tmp_path / 'clean')
 
+    @pytest.fixture
+    def dirty_tree(self, tmp_path: Path) -> Path:
+        return shutil.copytree(self.INSTRUCTIONS / 'dirty', tmp_path / 'dirty')
 
-def audit(root: Path, capsys: pytest.CaptureFixture[str], *options: str) -> tuple[int, str]:
-    code = main(['instruction', 'validate', str(root), *options])
-    return code, capsys.readouterr().out
+    def test_clean_fixture_passes_with_only_an_info_finding(
+        self, instruction_tree: InstructionTree, clean_tree: Path
+    ) -> None:
+        code, out = instruction_tree.audit(target=clean_tree)
 
+        assert code == 0
+        assert 'info: CLAUDE.md:1: `@AGENTS.md` expands at launch' in out
+        assert out.splitlines()[-1] == 'PASS clean: 0 error(s), 0 warning(s), 1 info'
 
-def fixture_copy(tmp_path: Path, name: str) -> Path:
-    root = tmp_path / name
-    shutil.copytree(FIXTURES / name, root)
-    return root
+    def test_dirty_fixture_exits_one(
+        self, instruction_tree: InstructionTree, dirty_tree: Path
+    ) -> None:
+        code, out = instruction_tree.audit('--strict', target=dirty_tree)
 
+        assert code == 1
+        assert out.splitlines()[-1].startswith('FAIL dirty: ')
 
-def git(root: Path, *arguments: str) -> None:
-    subprocess.run([*GIT, *arguments], cwd=root, check=True, capture_output=True)  # noqa: S603 - fixed argument list in a test, no shell
 
+class TestWhatIsChecked:
+    EMPTY_PATHS_RULE = '---\npaths:\n---\n# Rule\n'
+    DOCS_SHAPED = '---\npaths:\n  - "src/**/*.py"\n---\n# Python\n\n- Use type hints.\n'
+    HEADING = '# Hi\n'
+    NO_GITHUB_FILES = '- Indentation: 2 spaces\n' * 300
 
-def test_clean_fixture_passes_with_only_an_info_finding(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    code, out = audit(fixture_copy(tmp_path, 'clean'), capsys)
+    def test_directory_runs_the_frontmatter_checks_on_every_rule(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'.claude/rules/a/b.md': self.EMPTY_PATHS_RULE})
 
-    assert code == 0
-    assert 'info: CLAUDE.md:1: `@AGENTS.md` expands at launch' in out
-    assert out.splitlines()[-1] == 'PASS clean: 0 error(s), 0 warning(s), 1 info'
+        code, out = instruction_tree.audit()
 
+        assert code == 1
+        assert 'error: .claude/rules/a/b.md: paths is empty' in out
 
-def test_dirty_fixture_exits_one(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    code, out = audit(fixture_copy(tmp_path, 'dirty'), capsys, '--strict')
+    def test_directory_does_not_run_the_body_checks_on_a_docs_shaped_rule(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'.claude/rules/py.md': self.DOCS_SHAPED, 'CLAUDE.md': self.HEADING})
 
-    assert code == 1
-    assert out.splitlines()[-1].startswith('FAIL dirty: ')
+        code, out = instruction_tree.audit()
 
+        assert code == 0
+        assert 'required section' not in out
 
-def test_directory_runs_the_frontmatter_checks_on_every_rule(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'.claude/rules/a/b.md': '---\npaths:\n---\n# Rule\n'})
+    def test_file_mode_runs_the_body_checks_on_a_docs_shaped_rule(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        rule = instruction_tree.write({'py.md': self.DOCS_SHAPED}) / 'py.md'
 
-    code, out = audit(root, capsys)
+        code, out = instruction_tree.audit(target=rule)
 
-    assert code == 1
-    assert 'error: .claude/rules/a/b.md: paths is empty' in out
+        assert code == 1
+        assert 'error: required section <scope> is missing' in out
 
+    def test_directory_does_not_run_the_rule_checks_on_claude_md(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.HEADING, 'AGENTS.md': self.HEADING})
 
-def test_directory_does_not_run_the_body_checks_on_a_docs_shaped_rule(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    rule = '---\npaths:\n  - "src/**/*.py"\n---\n# Python\n\n- Use type hints.\n'
-    root = project(tmp_path, {'.claude/rules/py.md': rule, 'CLAUDE.md': '# Hi\n'})
+        code, out = instruction_tree.audit()
 
-    code, out = audit(root, capsys)
+        assert code == 0
+        assert 'required section' not in out
 
-    assert code == 0
-    assert 'required section' not in out
+    def test_directory_without_instruction_files_passes(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        code, out = instruction_tree.audit()
 
+        assert code == 0
+        assert out.endswith('0 error(s), 0 warning(s)\n')
 
-def test_file_mode_runs_the_body_checks_on_a_docs_shaped_rule(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    docs_shaped = '---\npaths:\n  - "src/**/*.py"\n---\n# Python\n\n- Use type hints.\n'
-    rule = project(tmp_path, {'py.md': docs_shaped}) / 'py.md'
+    def test_no_github_files_are_read(self, instruction_tree: InstructionTree) -> None:
+        instruction_tree.write(
+            {
+                '.github/instructions/b.instructions.md': self.NO_GITHUB_FILES,
+                '.github/instructions/a.instructions.md': 'no frontmatter\n',
+            }
+        )
 
-    code = main(['instruction', 'validate', str(rule)])
+        code, out = instruction_tree.audit()
 
-    assert code == 1
-    assert 'error: required section <scope> is missing' in capsys.readouterr().out
+        assert code == 0
+        assert out == f'PASS {instruction_tree.root.name}: 0 error(s), 0 warning(s)\n'
 
 
-def test_directory_does_not_run_the_rule_checks_on_claude_md(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    code, out = audit(project(tmp_path, {'CLAUDE.md': '# Hi\n', 'AGENTS.md': '# Hi\n'}), capsys)
+class TestUnusableInput:
+    UNDECODABLE = b'\xff\xfe\x00bad'
 
-    assert code == 0
-    assert 'required section' not in out
+    def test_missing_directory_exits_two_without_a_verdict(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        code, out = instruction_tree.audit(target=instruction_tree.root / 'absent')
 
+        assert code == 2
+        assert out == ''
 
-def test_directory_without_instruction_files_passes(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    code, out = audit(tmp_path, capsys)
+    def test_an_unreadable_instruction_file_exits_two(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        (tmp_path / 'CLAUDE.md').write_bytes(self.UNDECODABLE)
 
-    assert code == 0
-    assert out.endswith('0 error(s), 0 warning(s)\n')
+        code = main(['instruction', 'validate', str(tmp_path)])
 
+        captured = capsys.readouterr()
+        assert code == 2
+        assert 'could not read' in captured.err
+        assert captured.out == ''
 
-def test_a1_always_on_file_over_4_mib_is_an_error(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': 'x' * (4 * 1024 * 1024 + 1)})
 
-    code, out = audit(root, capsys)
+class TestA1FileSize:
+    OVER_4_MIB = 'x' * (4 * 1024 * 1024 + 1)
+    LONG_UNDER_4_MIB = '- a rule\n' * 1200
 
-    assert code == 1
-    assert 'error: CLAUDE.md: over 4 MiB, so Claude Code skips the file entirely' in out
+    def test_a1_always_on_file_over_4_mib_is_an_error(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.OVER_4_MIB})
 
+        code, out = instruction_tree.audit()
 
-def test_a1_a_long_file_under_4_mib_is_not_an_error(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '- a rule\n' * 1200})
+        assert code == 1
+        assert 'error: CLAUDE.md: over 4 MiB, so Claude Code skips the file entirely' in out
 
-    code, out = audit(root, capsys)
+    def test_a1_a_long_file_under_4_mib_is_not_an_error(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.LONG_UNDER_4_MIB})
 
-    assert code == 0
-    assert 'error' not in out.replace('0 error(s)', '')
+        code, out = instruction_tree.audit()
 
+        assert code == 0
+        assert 'error' not in out.replace('0 error(s)', '')
 
-def test_a2_always_on_file_at_200_lines_is_a_warning(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'.claude/CLAUDE.md': '- a rule\n' * 200})
 
-    code, out = audit(root, capsys)
+class TestA2LineTarget:
+    AT_TARGET = '- a rule\n' * 200
+    UNDER_TARGET = '- a rule\n' * 199
+    BIG_RULE = RULE + 'filler\n' * 200
 
-    assert code == 0
-    assert 'warning: .claude/CLAUDE.md: 200 lines, at or over the 200-line target' in out
+    def test_a2_always_on_file_at_200_lines_is_a_warning(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'.claude/CLAUDE.md': self.AT_TARGET})
 
+        code, out = instruction_tree.audit()
 
-def test_a2_a_file_under_the_target_draws_no_warning(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    _, out = audit(project(tmp_path, {'CLAUDE.md': '- a rule\n' * 199}), capsys)
+        assert code == 0
+        assert 'warning: .claude/CLAUDE.md: 200 lines, at or over the 200-line target' in out
 
-    assert 'line target' not in out
+    def test_a2_a_file_under_the_target_draws_no_warning(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.UNDER_TARGET})
 
+        _, out = instruction_tree.audit()
 
-def test_a2_a_rule_file_is_not_held_to_the_claude_md_target(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    _, out = audit(project(tmp_path, {'.claude/rules/big.md': RULE + 'filler\n' * 200}), capsys)
+        assert 'line target' not in out
 
-    assert 'line target' not in out
+    def test_a2_a_rule_file_is_not_held_to_the_claude_md_target(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'.claude/rules/big.md': self.BIG_RULE})
 
+        _, out = instruction_tree.audit()
 
-def test_a3_lint_leakage_is_a_warning(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '# P\n\n- Indentation: 2 spaces\n'})
+        assert 'line target' not in out
 
-    code, out = audit(root, capsys)
 
-    assert code == 0
-    assert 'warning: CLAUDE.md:3: mentions indentation' in out
+class TestA3LintLeakage:
+    LEAKY = '# P\n\n- Indentation: 2 spaces\n'
+    FENCED = '# X\n\n```md\n- Indentation: 2 spaces\n```\n'
+    LEAKY_RULE = RULE + '- Use snake_case names.\n'
 
+    def test_a3_lint_leakage_is_a_warning(self, instruction_tree: InstructionTree) -> None:
+        instruction_tree.write({'CLAUDE.md': self.LEAKY})
 
-def test_a3_lint_leakage_inside_a_code_fence_is_ignored(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '# X\n\n```md\n- Indentation: 2 spaces\n```\n'})
+        code, out = instruction_tree.audit()
 
-    _, out = audit(root, capsys)
+        assert code == 0
+        assert 'warning: CLAUDE.md:3: mentions indentation' in out
 
-    assert 'mentions' not in out
+    def test_a3_lint_leakage_inside_a_code_fence_is_ignored(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.FENCED})
 
+        _, out = instruction_tree.audit()
 
-def test_a3_lint_leakage_is_found_in_a_rule_file(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'.claude/rules/s.md': RULE + '- Use snake_case names.\n'})
+        assert 'mentions' not in out
 
-    _, out = audit(root, capsys)
+    def test_a3_lint_leakage_is_found_in_a_rule_file(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'.claude/rules/s.md': self.LEAKY_RULE})
 
-    assert 'warning: .claude/rules/s.md:' in out
-    assert 'mentions naming case' in out
+        _, out = instruction_tree.audit()
 
+        assert 'warning: .claude/rules/s.md:' in out
+        assert 'mentions naming case' in out
 
-def test_a4_blind_reference_is_a_warning(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '# P\n\nSee `docs/plugin-reorg.md`.\n'})
 
-    code, out = audit(root, capsys)
+class TestA4BlindReferences:
+    BLIND = '# P\n\nSee `docs/plugin-reorg.md`.\n'
+    EXPLAINED = '- `docs/auth.md` covers the token flow.\n'
 
-    assert code == 0
-    assert 'warning: CLAUDE.md:3: references `docs/plugin-reorg.md` without saying' in out
+    def test_a4_blind_reference_is_a_warning(self, instruction_tree: InstructionTree) -> None:
+        instruction_tree.write({'CLAUDE.md': self.BLIND})
 
+        code, out = instruction_tree.audit()
 
-def test_a4_reference_that_says_why_is_fine(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '- `docs/auth.md` covers the token flow.\n'})
+        assert code == 0
+        assert 'warning: CLAUDE.md:3: references `docs/plugin-reorg.md` without saying' in out
 
-    _, out = audit(root, capsys)
+    def test_a4_reference_that_says_why_is_fine(self, instruction_tree: InstructionTree) -> None:
+        instruction_tree.write({'CLAUDE.md': self.EXPLAINED})
 
-    assert 'references' not in out
+        _, out = instruction_tree.audit()
 
+        assert 'references' not in out
 
-def test_a5_conflicting_commands_across_always_on_files(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '- Test: `pnpm test`\n', 'AGENTS.md': '- `npm test`\n'})
 
-    code, out = audit(root, capsys)
+class TestA5ConflictingCommands:
+    PNPM = '- Test: `pnpm test`\n'
+    NPM = '- `npm test`\n'
 
-    assert code == 0
-    assert 'multiple test commands across always-on files: `npm test`, `pnpm test`' in out
+    def test_a5_conflicting_commands_across_always_on_files(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.PNPM, 'AGENTS.md': self.NPM})
 
+        code, out = instruction_tree.audit()
 
-def test_a8_rule_without_paths_is_info_and_never_fails(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'.claude/rules/x.md': '---\nnote: 1\n---\n' + RULE.split('---\n')[2]})
+        assert code == 0
+        assert 'multiple test commands across always-on files: `npm test`, `pnpm test`' in out
 
-    code, out = audit(root, capsys, '--strict')
 
-    assert code == 0
-    assert 'info: .claude/rules/x.md: no paths frontmatter' in out
-    assert out.splitlines()[-1] == f'PASS {root.name}: 0 error(s), 0 warning(s), 1 info'
+class TestA8RulePaths:
+    NO_PATHS = '---\nnote: 1\n---\n' + RULE.split('---\n')[2]
 
+    def test_a8_rule_without_paths_is_info_and_never_fails(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'.claude/rules/x.md': self.NO_PATHS})
 
-def test_a8_rule_with_paths_draws_no_info(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    _, out = audit(project(tmp_path, {'.claude/rules/x.md': RULE}), capsys)
+        code, out = instruction_tree.audit('--strict')
 
-    assert 'no paths frontmatter' not in out
+        assert code == 0
+        assert 'info: .claude/rules/x.md: no paths frontmatter' in out
+        assert (
+            out.splitlines()[-1]
+            == f'PASS {instruction_tree.root.name}: 0 error(s), 0 warning(s), 1 info'
+        )
 
+    def test_a8_rule_with_paths_draws_no_info(self, instruction_tree: InstructionTree) -> None:
+        instruction_tree.write({'.claude/rules/x.md': RULE})
 
-def test_a9_import_is_info_and_never_fails(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '@docs/extra.md\n'})
+        _, out = instruction_tree.audit()
 
-    code, out = audit(root, capsys, '--strict')
+        assert 'no paths frontmatter' not in out
 
-    assert code == 0
-    assert 'info: CLAUDE.md:1: `@docs/extra.md` expands at launch' in out
 
+class TestA9Imports:
+    IMPORT = '@docs/extra.md\n'
+    CODE_SPAN_AND_FENCE = 'Write `@README` to mention it.\n\n```\n@docs/x.md\n```\n'
 
-def test_a9_import_in_a_code_span_or_fence_is_ignored(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(
-        tmp_path, {'CLAUDE.md': 'Write `@README` to mention it.\n\n```\n@docs/x.md\n```\n'}
-    )
+    def test_a9_import_is_info_and_never_fails(self, instruction_tree: InstructionTree) -> None:
+        instruction_tree.write({'CLAUDE.md': self.IMPORT})
 
-    _, out = audit(root, capsys)
+        code, out = instruction_tree.audit('--strict')
 
-    assert 'info' not in out.replace('info\n', '')
-    assert 'expands at launch' not in out
+        assert code == 0
+        assert 'info: CLAUDE.md:1: `@docs/extra.md` expands at launch' in out
 
+    def test_a9_import_in_a_code_span_or_fence_is_ignored(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.CODE_SPAN_AND_FENCE})
 
-def test_a11_claude_md_without_an_agents_import_is_a_warning(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '# Hi\n', 'AGENTS.md': '# Hi\n'})
+        _, out = instruction_tree.audit()
 
-    code, out = audit(root, capsys)
+        assert 'info' not in out.replace('info\n', '')
+        assert 'expands at launch' not in out
 
-    assert code == 0
-    assert 'warning: AGENTS.md: a CLAUDE.md exists but does not import AGENTS.md' in out
 
+class TestA11AgentsImport:
+    HEADING = '# Hi\n'
+    AGENTS_IMPORT = '@AGENTS.md\n'
 
-def test_a11_import_of_agents_md_satisfies_the_check(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '@AGENTS.md\n', 'AGENTS.md': '# Hi\n'})
+    @pytest.fixture
+    def symlinked_claude_md(self, instruction_tree: InstructionTree) -> Path:
+        root = instruction_tree.write({'AGENTS.md': self.HEADING})
+        (root / 'CLAUDE.md').symlink_to('AGENTS.md')
+        return root
 
-    _, out = audit(root, capsys)
+    def test_a11_claude_md_without_an_agents_import_is_a_warning(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.HEADING, 'AGENTS.md': self.HEADING})
 
-    assert 'does not import' not in out
+        code, out = instruction_tree.audit()
 
+        assert code == 0
+        assert 'warning: AGENTS.md: a CLAUDE.md exists but does not import AGENTS.md' in out
 
-def test_a11_symlinked_claude_md_satisfies_the_check(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'AGENTS.md': '# Hi\n'})
-    (root / 'CLAUDE.md').symlink_to('AGENTS.md')
+    def test_a11_import_of_agents_md_satisfies_the_check(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.AGENTS_IMPORT, 'AGENTS.md': self.HEADING})
 
-    _, out = audit(root, capsys)
+        _, out = instruction_tree.audit()
 
-    assert 'does not import' not in out
+        assert 'does not import' not in out
 
+    @pytest.mark.usefixtures('symlinked_claude_md')
+    def test_a11_symlinked_claude_md_satisfies_the_check(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        _, out = instruction_tree.audit()
 
-def test_a11_agents_md_alone_draws_no_finding_about_claude_code_reading_it(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    code, out = audit(project(tmp_path, {'AGENTS.md': '# Hi\n'}), capsys)
+        assert 'does not import' not in out
 
-    assert code == 0
-    assert out == 'PASS ' + tmp_path.name + ': 0 error(s), 0 warning(s)\n'
+    def test_a11_agents_md_alone_draws_no_finding_about_claude_code_reading_it(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'AGENTS.md': self.HEADING})
 
+        code, out = instruction_tree.audit()
 
-def test_a13_single_commit_always_on_file_is_a_warning(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '# Hi\n'})
-    git(root, 'init', '-q')
-    git(root, 'add', 'CLAUDE.md')
-    git(root, 'commit', '-q', '-m', 'init')
+        assert code == 0
+        assert out == 'PASS ' + instruction_tree.root.name + ': 0 error(s), 0 warning(s)\n'
 
-    code, out = audit(root, capsys)
 
-    assert code == 0
-    assert 'warning: CLAUDE.md: only one commit' in out
+class TestA13CommitHistory:
+    HEADING = '# Hi\n'
+    REVISED = '# Hi again\n'
 
+    @pytest.fixture
+    def git(self, instruction_tree: InstructionTree) -> GitRepo:
+        return GitRepo(root=instruction_tree.root)
 
-def test_a13_a_revised_file_draws_no_warning(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '# Hi\n'})
-    git(root, 'init', '-q')
-    git(root, 'add', 'CLAUDE.md')
-    git(root, 'commit', '-q', '-m', 'init')
-    (root / 'CLAUDE.md').write_text('# Hi again\n')
-    git(root, 'commit', '-q', '-am', 'revise')
+    @pytest.fixture
+    def single_commit(self, instruction_tree: InstructionTree, git: GitRepo) -> Path:
+        root = instruction_tree.write({'CLAUDE.md': self.HEADING})
+        git('init', '-q')
+        git('add', 'CLAUDE.md')
+        git('commit', '-q', '-m', 'init')
+        return root
 
-    _, out = audit(root, capsys)
+    @pytest.fixture
+    def revised(self, single_commit: Path, git: GitRepo) -> Path:
+        (single_commit / 'CLAUDE.md').write_text(self.REVISED)
+        git('commit', '-q', '-am', 'revise')
+        return single_commit
 
-    assert 'only one commit' not in out
+    @pytest.fixture
+    def outside_a_work_tree(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv('GIT_CEILING_DIRECTORIES', str(tmp_path.parent))
 
+    @pytest.fixture
+    def without_git(
+        self, single_commit: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> Path:
+        monkeypatch.setenv('PATH', str(tmp_path / 'no-bin'))
+        return single_commit
 
-def test_a13_is_skipped_outside_a_git_work_tree(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv('GIT_CEILING_DIRECTORIES', str(tmp_path.parent))
-    root = project(tmp_path, {'CLAUDE.md': '# Hi\n'})
+    def test_a13_single_commit_always_on_file_is_a_warning(
+        self, instruction_tree: InstructionTree, single_commit: Path
+    ) -> None:
+        code, out = instruction_tree.audit(target=single_commit)
 
-    code, out = audit(root, capsys)
+        assert code == 0
+        assert 'warning: CLAUDE.md: only one commit' in out
 
-    assert code == 0
-    assert out == f'PASS {root.name}: 0 error(s), 0 warning(s)\n'
+    def test_a13_a_revised_file_draws_no_warning(
+        self, instruction_tree: InstructionTree, revised: Path
+    ) -> None:
+        _, out = instruction_tree.audit(target=revised)
 
+        assert 'only one commit' not in out
 
-def test_a13_is_skipped_when_git_is_absent(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    root = project(tmp_path, {'CLAUDE.md': '# Hi\n'})
-    git(root, 'init', '-q')
-    git(root, 'add', 'CLAUDE.md')
-    git(root, 'commit', '-q', '-m', 'init')
-    monkeypatch.setenv('PATH', str(tmp_path / 'no-bin'))
+    @pytest.mark.usefixtures('outside_a_work_tree')
+    def test_a13_is_skipped_outside_a_git_work_tree(
+        self, instruction_tree: InstructionTree
+    ) -> None:
+        instruction_tree.write({'CLAUDE.md': self.HEADING})
 
-    code, out = audit(root, capsys)
+        code, out = instruction_tree.audit()
 
-    assert code == 0
-    assert 'only one commit' not in out
+        assert code == 0
+        assert out == f'PASS {instruction_tree.root.name}: 0 error(s), 0 warning(s)\n'
 
+    def test_a13_is_skipped_when_git_is_absent(
+        self, instruction_tree: InstructionTree, without_git: Path
+    ) -> None:
+        code, out = instruction_tree.audit(target=without_git)
 
-def test_no_github_files_are_read(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    root = project(
-        tmp_path,
-        {
-            '.github/instructions/b.instructions.md': '- Indentation: 2 spaces\n' * 300,
-            '.github/instructions/a.instructions.md': 'no frontmatter\n',
-        },
-    )
+        assert code == 0
+        assert 'only one commit' not in out
 
-    code, out = audit(root, capsys)
 
-    assert code == 0
-    assert out == f'PASS {root.name}: 0 error(s), 0 warning(s)\n'
+class TestInfoFinding:
+    NOTE = 'note'
 
+    def test_info_finding_is_printed_counted_and_never_fails(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        code = report('x', [info(self.NOTE)], strict=True)
 
-def test_missing_directory_exits_two_without_a_verdict(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    code, out = audit(tmp_path / 'absent', capsys)
-
-    assert code == 2
-    assert out == ''
-
-
-def test_an_unreadable_instruction_file_exits_two(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = tmp_path
-    (root / 'CLAUDE.md').write_bytes(b'\xff\xfe\x00bad')
-
-    code = main(['instruction', 'validate', str(root)])
-
-    captured = capsys.readouterr()
-    assert code == 2
-    assert 'could not read' in captured.err
-    assert captured.out == ''
-
-
-def test_info_finding_is_printed_counted_and_never_fails(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    code = report('x', [info('note')], strict=True)
-
-    assert code == 0
-    assert capsys.readouterr().out == 'info: note\nPASS x: 0 error(s), 0 warning(s), 1 info\n'
+        assert code == 0
+        assert capsys.readouterr().out == 'info: note\nPASS x: 0 error(s), 0 warning(s), 1 info\n'

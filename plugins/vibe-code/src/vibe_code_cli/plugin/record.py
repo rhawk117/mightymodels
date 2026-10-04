@@ -2,7 +2,7 @@ import msgspec
 from msgspec import UNSET, UnsetType
 
 from vibe_code_cli.jsondoc import as_object
-from vibe_code_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.kinds import Kinds
 
 PLUGIN_KINDS = ('ecosystem', 'domain', 'workflow', 'integration')
 AUDIENCE_HOW = ('solo', 'team', 'org', 'public')
@@ -11,30 +11,28 @@ STATUSES = ('planned', 'built')
 DECISIONS = ('as planned', 'switched')
 
 
-class Author(msgspec.Struct):
+class Author(msgspec.Struct, frozen=True, kw_only=True):
     name: str = ''
     email: str | UnsetType = UNSET
     url: str | UnsetType = UNSET
 
 
-class Audience(msgspec.Struct):
+class Audience(msgspec.Struct, frozen=True, kw_only=True):
     who: str = ''
     how: str = ''
 
 
-class Distribution(msgspec.Struct):
+class Distribution(msgspec.Struct, frozen=True, kw_only=True):
     channel: str = ''
     install: str | UnsetType = UNSET
 
 
-class Advice(msgspec.Struct):
+class Advice(msgspec.Struct, frozen=True, kw_only=True):
     mechanism: str = ''
     reason: str = ''
 
 
-class Component(msgspec.Struct):
-    """One planned component. The builder defaults to the kind's builder, which `normalise` sets."""
-
+class Component(msgspec.Struct, frozen=True, kw_only=True):
     kind: str = ''
     name: str = ''
     purpose: str = ''
@@ -47,14 +45,14 @@ class Component(msgspec.Struct):
     files: list[str] = []
 
 
-class OutsideItem(msgspec.Struct):
+class OutsideItem(msgspec.Struct, frozen=True, kw_only=True):
     need: str = ''
     what: str = ''
     mechanism: str = ''
     where: str | UnsetType = UNSET
 
 
-class UserConfigOption(msgspec.Struct):
+class UserConfigOption(msgspec.Struct, frozen=True, kw_only=True):
     type: str = ''
     title: str = ''
     description: str = ''
@@ -67,15 +65,13 @@ class UserConfigOption(msgspec.Struct):
     maximum: float | UnsetType = msgspec.field(name='max', default=UNSET)
 
 
-class Dependency(msgspec.Struct):
+class Dependency(msgspec.Struct, frozen=True, kw_only=True):
     name: str
     marketplace: str | UnsetType = UNSET
     version: str | UnsetType = UNSET
 
 
-class Plan(msgspec.Struct):
-    """The plan record the plan-plugin interview writes and the builders read."""
-
+class Plan(msgspec.Struct, frozen=True, kw_only=True):
     name: str = ''
     version: str = '0.1.0'
     description: str = ''
@@ -107,12 +103,10 @@ def distribution_of(plan: Plan) -> Distribution:
 
 
 def decode_plan(document: object) -> Plan:
-    """Convert a parsed record; raise msgspec.ValidationError for the first wrong type."""
     return msgspec.convert(document, Plan)
 
 
 def unknown_keys(document: object) -> list[str]:
-    """Where the record holds a top-level or component key that no field of the record names."""
     plan = as_object(document)
     if plan is None:
         return []
@@ -133,7 +127,6 @@ def field_names(record: type[msgspec.Struct]) -> set[str]:
 
 
 def normalise(plan: Plan) -> Plan:
-    """The plan with each component's builder filled from its kind and the license trimmed."""
     license_name = plan.license.strip() or None if plan.license is not None else None
     return msgspec.structs.replace(
         plan,
@@ -145,5 +138,5 @@ def normalise(plan: Plan) -> Plan:
 def with_builder(component: Component) -> Component:
     if not isinstance(component.builder, UnsetType):
         return component
-    spec = KIND_SPECS.get(component.kind)
+    spec = Kinds().specs.get(component.kind)
     return msgspec.structs.replace(component, builder=spec.builder if spec else None)

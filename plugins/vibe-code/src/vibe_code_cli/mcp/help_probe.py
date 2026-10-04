@@ -15,11 +15,6 @@ MESSAGE_TAIL_CHARACTERS = 200
 
 
 def check_commands(mcp_file: McpFile) -> list[Finding]:
-    """Rows M27 and M28: run `COMMAND ARGS --help` for each stdio server, without a shell.
-
-    A plugin runs in the file's directory, which `${CLAUDE_PLUGIN_ROOT}` names; any other file
-    runs in the current directory.
-    """
     try:
         servers = decode_servers(mcp_file)
     except msgspec.ValidationError:
@@ -40,7 +35,6 @@ def check_commands(mcp_file: McpFile) -> list[Finding]:
 
 
 def stdio_argv(server: McpServer) -> list[str] | None:
-    """The command and its arguments, or None when the server is not a stdio server with one."""
     transport = 'stdio' if isinstance(server.type, UnsetType) else server.type
     if transport != 'stdio' or isinstance(server.command, UnsetType):
         return None

@@ -84,6 +84,20 @@ which needs `uv` on `PATH`. Its first line is a shebang that runs `uv tool run` 
 dependencies pinned by version, and `bin/vibe-code.cmd` runs the same command for `cmd.exe`.
 [plugins/vibe-code/README.md](plugins/vibe-code/README.md) describes both.
 
+Tests are methods of `Test...` classes in `plugins/vibe-code/tests`. The fixtures every concept
+uses are in `plugins/vibe-code/tests/conftest.py`: `fake_services`, `unavailable_services`,
+`assert_error`, `assert_warning`, `sections` and `fill`. Each concept has a support module at
+`plugins/vibe-code/src/vibe_code_cli/<concept>/tests/support.py`, which holds the fixtures only
+that concept's tests use. The `pytest_configure` hook in the conftest registers the six modules
+through `config.pluginmanager.import_plugin`, looping over its `CONCEPTS` tuple.
+
+A registered fixture is visible to every test, and when two support modules define the same
+name, the later one is taken without an error. A support fixture's name therefore starts with its
+concept, as in `skill_root` and `hook_scripts`. Types, constants and plain functions in a support
+module are imported by dotted name. `wheel-exclude = ["tests"]` in `plugins/vibe-code/pyproject.toml`
+keeps these directories out of the built wheel. The "Tests" section of `.claude/rules/python.md`
+holds the rules the tests follow.
+
 The pins select versions and do not verify hashes. To change a dependency, edit
 `plugins/vibe-code/pyproject.toml`, run `uv lock` from the repository root, then put the same
 versions in line 1 of `plugins/vibe-code/bin/vibe-code` and in `plugins/vibe-code/bin/vibe-code.cmd`.

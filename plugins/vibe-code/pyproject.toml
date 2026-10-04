@@ -16,3 +16,4 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "vibe_code_cli"
+wheel-exclude = ["tests"]

@@ -8,9 +8,7 @@ from vibe_code_cli.mcp.file import McpFile
 WRAPPER_KEY = 'mcpServers'
 
 
-class McpServer(msgspec.Struct, rename='camel'):
-    """One server entry, typed as mcp.md shows its keys; `oauth` is read by no check."""
-
+class McpServer(msgspec.Struct, rename='camel', frozen=True, kw_only=True):
     type: str | UnsetType = UNSET
     command: str | UnsetType = UNSET
     args: list[str] = []
@@ -23,37 +21,36 @@ class McpServer(msgspec.Struct, rename='camel'):
     always_load: bool | UnsetType = UNSET
 
 
-class McpConfig(msgspec.Struct, rename='camel'):
-    """A config that holds its servers under `mcpServers`, beside keys no check reads."""
-
+class McpConfig(msgspec.Struct, rename='camel', frozen=True, kw_only=True):
     mcp_servers: dict[str, McpServer] = {}
 
 
-class WrittenConfig(msgspec.Struct, rename='camel'):
-    """The same config with every server as written, so its keys can be listed."""
-
+class WrittenConfig(msgspec.Struct, rename='camel', frozen=True, kw_only=True):
     mcp_servers: dict[str, dict[str, object]] = {}
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ServerEntry:
     server: McpServer
     keys: tuple[str, ...]
 
 
-def decode_servers(mcp_file: McpFile) -> dict[str, ServerEntry]:
-    """The servers a file holds, each with the keys as written.
+def server_entries(
+    servers: dict[str, McpServer], written: dict[str, dict[str, object]]
+) -> dict[str, ServerEntry]:
+    return {
+        name: ServerEntry(server=server, keys=tuple(written[name]))
+        for name, server in servers.items()
+    }
 
-    Raises msgspec.ValidationError when the file has a value of the wrong type. A project or
-    plugin file with no `mcpServers` key is a bare map of names to servers; a user file holds
-    no servers without it.
-    """
+
+def decode_servers(mcp_file: McpFile) -> dict[str, ServerEntry]:
     document = mcp_file.document
     wrapped = mcp_file.kind == 'user' or (isinstance(document, dict) and WRAPPER_KEY in document)
     if wrapped:
         servers = msgspec.convert(document, McpConfig).mcp_servers
         written = msgspec.convert(document, WrittenConfig).mcp_servers
-    else:
-        servers = msgspec.convert(document, dict[str, McpServer])
-        written = msgspec.convert(document, dict[str, dict[str, object]])
-    return {name: ServerEntry(server, tuple(written[name])) for name, server in servers.items()}
+        return server_entries(servers, written)
+    servers = msgspec.convert(document, dict[str, McpServer])
+    written = msgspec.convert(document, dict[str, dict[str, object]])
+    return server_entries(servers, written)

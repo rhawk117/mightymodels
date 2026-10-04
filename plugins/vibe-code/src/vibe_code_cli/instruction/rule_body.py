@@ -4,8 +4,6 @@ from xml.parsers import expat
 from vibe_code_cli.findings import Finding, error, warning
 from vibe_code_cli.subagent.body import Tag, scan_sections, section_tags
 
-# House style from the reference rule template: these sections, in this order, directly under
-# the frontmatter.
 REQUIRED_SECTIONS = ('scope', 'conventions', 'examples', 'anti_patterns', 'verification')
 OPTIONAL_SECTIONS = frozenset({'rationale'})
 VOCABULARY = frozenset(REQUIRED_SECTIONS) | OPTIONAL_SECTIONS

@@ -21,14 +21,14 @@ SCRIPT_REFERENCE = re.compile(
 
 
 def script_findings(handler: Handler, hooks_file: HooksFile) -> list[Finding]:
-    """Rows H23a, H23b, H24 and H25: the scripts a command handler names must exist."""
     hook = handler.hook
     if not isinstance(hook, CommandHook):
         return []
-    if hook.args is UNSET:
-        references = shell_references(hook.command)
-    else:
-        references = exec_form_references(hook.command, hook.args)
+    references = (
+        shell_references(hook.command)
+        if hook.args is UNSET
+        else exec_form_references(hook.command, hook.args)
+    )
     findings = (script_finding(handler, reference, hooks_file) for reference in references)
     return [finding for finding in findings if finding is not None]
 
@@ -47,8 +47,7 @@ def names_a_script(value: str) -> bool:
 
 
 def marked(command: str) -> str:
-    """Swap the path placeholders for markers that hold no whitespace, quotes dropped."""
-    return PLACEHOLDER.sub(lambda match: f'@{match.group(1)}@', command)
+    return PLACEHOLDER.sub(r'@\1@', command)
 
 
 def script_finding(handler: Handler, reference: str, hooks_file: HooksFile) -> Finding | None:
@@ -73,20 +72,16 @@ def missing_script_finding(handler: Handler, path: Path, *, literal_absolute: bo
 
 
 def locate(reference: str, hooks_file: HooksFile) -> tuple[Path, bool] | None:
-    """The path a reference names and whether it was written as an absolute path.
-
-    None means the path cannot be checked from here: its root is unknown, it expands at
-    runtime, or it is relative to a working directory that is only known when the hook runs.
-    """
     roots = (
         (PLUGIN_ROOT_MARKER, hooks_file.plugin_root),
         (PROJECT_DIR_MARKER, hooks_file.project_dir),
     )
-    for marker, root in roots:
-        if reference.startswith(marker):
-            if root is None:
-                return None
-            return (root / reference.removeprefix(marker).lstrip('/')).resolve(), False
+    rooted = next(((marker, root) for marker, root in roots if reference.startswith(marker)), None)
+    if rooted is not None:
+        marker, root = rooted
+        if root is None:
+            return None
+        return (root / reference.removeprefix(marker).lstrip('/')).resolve(), False
     if '$' in reference or '%' in reference or reference.startswith('~'):
         return None
     path = Path(reference.replace('\\', '/'))

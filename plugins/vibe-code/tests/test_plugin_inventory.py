@@ -3,189 +3,169 @@ from pathlib import Path
 
 import pytest
 from vibe_code_cli.cli import main
-
-PLUGIN_ROOT = Path(__file__).parent.parent
-
-MANIFEST = {
-    'name': 'built-plugin',
-    'version': '1.2.0',
-    'description': 'A plugin that already exists.',
-    'keywords': ['demo'],
-    'license': 'MIT',
-    'author': {'name': 'Platform Team'},
-}
+from vibe_code_cli.plugin.tests.support import (
+    PLUGIN_ROOT,
+    PluginFiles,
+    base_manifest,
+    components_of,
+    inventory,
+    markdown,
+)
 
 
-def write(path: Path, text: str) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text)
-    return path
+class TestUsage:
+    def test_inventory_help_exits_zero(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exit_info:
+            main(['plugin', 'inventory', '--help'])
+
+        assert exit_info.value.code == 0
+        assert '--out' in capsys.readouterr().out
 
 
-def markdown(description: str, name: str | None = None) -> str:
-    named = f'name: {name}\n' if name else ''
-    return f'---\n{named}description: {description}\n---\nBody.\n'
-
-
-def build_plugin(root: Path, manifest: dict[str, object] | None = None) -> Path:
-    """A plugin holding one component of every kind."""
-    write(root / '.claude-plugin' / 'plugin.json', json.dumps(manifest or MANIFEST))
-    write(root / 'skills' / 'add-route' / 'SKILL.md', markdown('Add a route.'))
-    write(root / 'agents' / 'sub' / 'runner.md', markdown('Run tests.', name='test-runner'))
-    write(root / 'agents' / 'plain.md', markdown('Plain agent.'))
-    write(root / 'commands' / 'ship-it.md', markdown('Ship it.'))
-    write(root / 'hooks' / 'hooks.json', json.dumps({'hooks': {'PreToolUse': [], 'Stop': []}}))
-    write(root / '.mcp.json', json.dumps({'mcpServers': {'db': {'command': 'uv', 'args': []}}}))
-    write(root / '.lsp.json', json.dumps({'pyright': {'extensionToLanguage': {'.py': 'python'}}}))
-    write(root / 'bin' / 'lint-all', '#!/bin/sh\n')
-    write(root / 'output-styles' / 'terse.md', markdown('Short answers.'))
-    return root
-
-
-def inventory(plugin_dir: Path, *options: str) -> int:
-    return main(['plugin', 'inventory', str(plugin_dir), *options])
-
-
-def components_of(capsys: pytest.CaptureFixture[str]) -> dict[tuple[str, str], dict[str, object]]:
-    record = json.loads(capsys.readouterr().out)
-    return {(c['kind'], c['name']): c for c in record['components']}
-
-
-def test_inventory_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(SystemExit) as exit_info:
-        main(['plugin', 'inventory', '--help'])
-
-    assert exit_info.value.code == 0
-    assert '--out' in capsys.readouterr().out
-
-
-def test_pp_a39_inventory_records_one_built_component_per_file(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    assert inventory(build_plugin(tmp_path / 'built-plugin')) == 0
-
-    found = components_of(capsys)
-    assert set(found) == {
-        ('skill', 'add-route'),
-        ('agent', 'test-runner'),
-        ('agent', 'plain'),
-        ('command', 'ship-it'),
-        ('hook', 'hooks'),
-        ('mcp', 'db'),
-        ('lsp', 'pyright'),
-        ('executable', 'lint-all'),
-        ('output-style', 'terse'),
-    }
-    assert {component['status'] for component in found.values()} == {'built'}
-    assert found[('agent', 'test-runner')]['files'] == ['agents/sub/runner.md']
-    assert found[('skill', 'add-route')]['purpose'] == 'Add a route.'
-    assert found[('lsp', 'pyright')]['purpose'] == 'language server for .py'
-    assert found[('hook', 'hooks')]['purpose'] == 'hooks with events: PreToolUse, Stop'
-
-
-def test_pp_a39_inventory_reads_the_manifest_identity(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    assert inventory(build_plugin(tmp_path / 'built-plugin')) == 0
-
-    record = json.loads(capsys.readouterr().out)
-    assert record['name'] == 'built-plugin'
-    assert record['version'] == '1.2.0'
-    assert record['license'] == 'MIT'
-    assert record['author'] == {'name': 'Platform Team'}
-
-
-def test_pp_a39_inventory_follows_a_manifest_skills_override(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = tmp_path / 'built-plugin'
-    write(root / 'extra' / 'moved' / 'SKILL.md', markdown('Moved skill.'))
-    write(root / '.claude-plugin' / 'plugin.json', json.dumps({**MANIFEST, 'skills': ['./extra']}))
-
-    assert inventory(root) == 0
-
-    found = components_of(capsys)
-    assert found[('skill', 'moved')]['files'] == ['extra/moved/SKILL.md']
-
-
-def test_pp_a39_inventory_reads_inline_manifest_servers_and_hooks(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    manifest = {
-        **MANIFEST,
-        'mcpServers': {'search': {'type': 'http', 'url': 'https://example.com/mcp'}},
-        'hooks': {'hooks': {'SessionStart': []}},
-    }
-    root = tmp_path / 'built-plugin'
-    write(root / '.claude-plugin' / 'plugin.json', json.dumps(manifest))
-
-    assert inventory(root) == 0
-
-    found = components_of(capsys)
-    assert found[('mcp', 'search')]['purpose'] == 'http server: https://example.com/mcp'
-    assert found[('hook', 'hooks')]['files'] == ['.claude-plugin/plugin.json']
-
-
-def test_pp_a39_inventory_ignores_a_manifest_path_that_leaves_the_plugin(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    write(tmp_path / 'outside' / 'stolen' / 'SKILL.md', markdown('Not part of the plugin.'))
-    root = tmp_path / 'built-plugin'
-    write(
-        root / '.claude-plugin' / 'plugin.json', json.dumps({**MANIFEST, 'skills': ['../outside']})
+class TestBuiltPlugin:
+    ONE_PER_FILE = frozenset(
+        {
+            ('skill', 'add-route'),
+            ('agent', 'test-runner'),
+            ('agent', 'plain'),
+            ('command', 'ship-it'),
+            ('hook', 'hooks'),
+            ('mcp', 'db'),
+            ('lsp', 'pyright'),
+            ('executable', 'lint-all'),
+            ('output-style', 'terse'),
+        }
     )
 
-    assert inventory(root) == 0
+    def test_pp_a39_inventory_records_one_built_component_per_file(
+        self, plugin_built: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(plugin_built) == 0
 
-    assert components_of(capsys) == {}
+        found = components_of(capsys)
+        assert set(found) == self.ONE_PER_FILE
+        assert {component['status'] for component in found.values()} == {'built'}
+        assert found[('agent', 'test-runner')]['files'] == ['agents/sub/runner.md']
+        assert found[('skill', 'add-route')]['purpose'] == 'Add a route.'
+        assert found[('lsp', 'pyright')]['purpose'] == 'language server for .py'
+        assert found[('hook', 'hooks')]['purpose'] == 'hooks with events: PreToolUse, Stop'
 
+    def test_pp_a39_inventory_reads_the_manifest_identity(
+        self, plugin_built: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(plugin_built) == 0
 
-def test_inventory_out_writes_a_record_that_plugin_validate_accepts(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    record = tmp_path / 'record.json'
-
-    assert inventory(build_plugin(tmp_path / 'built-plugin'), '--out', str(record)) == 0
-
-    assert f'wrote {record}' in capsys.readouterr().out
-    assert main(['plugin', 'validate', str(record)]) == 0
-
-
-def test_inventory_of_a_plugin_without_a_manifest_names_the_record_for_the_directory(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = tmp_path / 'bare'
-    write(root / 'skills' / 'only' / 'SKILL.md', markdown('Only.'))
-
-    assert inventory(root) == 0
-
-    assert json.loads(capsys.readouterr().out)['name'] == 'bare'
-
-
-def test_inventory_of_a_missing_directory_exits_two(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    assert inventory(tmp_path / 'missing') == 2
-    assert 'is not a directory' in capsys.readouterr().err
+        record = json.loads(capsys.readouterr().out)
+        manifest = base_manifest()
+        assert record['name'] == manifest['name']
+        assert record['version'] == manifest['version']
+        assert record['license'] == manifest['license']
+        assert record['author'] == manifest['author']
 
 
-def test_inventory_of_a_broken_manifest_exits_two(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = tmp_path / 'broken'
-    write(root / '.claude-plugin' / 'plugin.json', '{not json')
+class TestManifestPaths:
+    @pytest.fixture
+    def plugin_with_skills_override(self, plugin_files: PluginFiles) -> Path:
+        plugin_files.write('built-plugin/extra/moved/SKILL.md', markdown('Moved skill.'))
+        manifest = {**base_manifest(), 'skills': ['./extra']}
+        plugin_files.write('built-plugin/.claude-plugin/plugin.json', json.dumps(manifest))
+        return plugin_files.base / 'built-plugin'
 
-    assert inventory(root) == 2
-    assert 'could not inventory' in capsys.readouterr().err
+    @pytest.fixture
+    def plugin_with_inline_servers_and_hooks(self, plugin_files: PluginFiles) -> Path:
+        manifest = {
+            **base_manifest(),
+            'mcpServers': {'search': {'type': 'http', 'url': 'https://example.com/mcp'}},
+            'hooks': {'hooks': {'SessionStart': []}},
+        }
+        plugin_files.write('built-plugin/.claude-plugin/plugin.json', json.dumps(manifest))
+        return plugin_files.base / 'built-plugin'
+
+    @pytest.fixture
+    def plugin_with_path_leaving_it(self, plugin_files: PluginFiles) -> Path:
+        plugin_files.write('outside/stolen/SKILL.md', markdown('Not part of the plugin.'))
+        manifest = {**base_manifest(), 'skills': ['../outside']}
+        plugin_files.write('built-plugin/.claude-plugin/plugin.json', json.dumps(manifest))
+        return plugin_files.base / 'built-plugin'
+
+    def test_pp_a39_inventory_follows_a_manifest_skills_override(
+        self, plugin_with_skills_override: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(plugin_with_skills_override) == 0
+
+        found = components_of(capsys)
+        assert found[('skill', 'moved')]['files'] == ['extra/moved/SKILL.md']
+
+    def test_pp_a39_inventory_reads_inline_manifest_servers_and_hooks(
+        self, plugin_with_inline_servers_and_hooks: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(plugin_with_inline_servers_and_hooks) == 0
+
+        found = components_of(capsys)
+        assert found[('mcp', 'search')]['purpose'] == 'http server: https://example.com/mcp'
+        assert found[('hook', 'hooks')]['files'] == ['.claude-plugin/plugin.json']
+
+    def test_pp_a39_inventory_ignores_a_manifest_path_that_leaves_the_plugin(
+        self, plugin_with_path_leaving_it: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(plugin_with_path_leaving_it) == 0
+
+        assert components_of(capsys) == {}
 
 
-def test_inventory_of_this_plugin_lists_its_skills_and_executable(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    assert inventory(PLUGIN_ROOT) == 0
+class TestRecordOutput:
+    @pytest.fixture
+    def bare_plugin(self, plugin_files: PluginFiles) -> Path:
+        plugin_files.write('bare/skills/only/SKILL.md', markdown('Only.'))
+        return plugin_files.base / 'bare'
 
-    found = components_of(capsys)
-    skills = {name for kind, name in found if kind == 'skill'}
-    expected = {path.parent.name for path in (PLUGIN_ROOT / 'skills').glob('*/SKILL.md')}
-    assert skills == expected
-    assert ('executable', 'vibe-code') in found
+    def test_inventory_out_writes_a_record_that_plugin_validate_accepts(
+        self, plugin_built: Path, plugin_files: PluginFiles, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        record = plugin_files.base / 'record.json'
+
+        assert inventory(plugin_built, '--out', str(record)) == 0
+
+        assert f'wrote {record}' in capsys.readouterr().out
+        assert main(['plugin', 'validate', str(record)]) == 0
+
+    def test_inventory_of_a_plugin_without_a_manifest_names_the_record_for_the_directory(
+        self, bare_plugin: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(bare_plugin) == 0
+
+        assert json.loads(capsys.readouterr().out)['name'] == 'bare'
+
+
+class TestUnreadablePlugin:
+    NOT_JSON = '{not json'
+
+    @pytest.fixture
+    def plugin_with_broken_manifest(self, plugin_files: PluginFiles) -> Path:
+        plugin_files.write('broken/.claude-plugin/plugin.json', self.NOT_JSON)
+        return plugin_files.base / 'broken'
+
+    def test_inventory_of_a_missing_directory_exits_two(
+        self, plugin_files: PluginFiles, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(plugin_files.base / 'missing') == 2
+        assert 'is not a directory' in capsys.readouterr().err
+
+    def test_inventory_of_a_broken_manifest_exits_two(
+        self, plugin_with_broken_manifest: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(plugin_with_broken_manifest) == 2
+        assert 'could not inventory' in capsys.readouterr().err
+
+
+class TestThisPlugin:
+    def test_inventory_of_this_plugin_lists_its_skills_and_executable(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        assert inventory(PLUGIN_ROOT) == 0
+
+        found = components_of(capsys)
+        skills = {name for kind, name in found if kind == 'skill'}
+        expected = {path.parent.name for path in (PLUGIN_ROOT / 'skills').glob('*/SKILL.md')}
+        assert skills == expected
+        assert ('executable', 'vibe-code') in found

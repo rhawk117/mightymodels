@@ -1,25 +1,17 @@
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
 import msgspec
 
 from vibe_code_cli.findings import CannotCheckError
-from vibe_code_cli.jsondoc import JsonObject, as_object, duplicate_keys
+from vibe_code_cli.jsondoc import JsonObject, as_object
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class HooksFile:
-    """A hooks file as read from disk, in one of the two shapes Claude Code loads.
-
-    A plugin `hooks/hooks.json` holds the hooks object under a top-level `hooks` key and
-    allows one other key; a settings file holds the same `hooks` key beside unrelated keys.
-    """
-
     path: Path
     text: str
     config: JsonObject | None
-    duplicate_keys: tuple[str, ...]
 
     @property
     def plugin_shape(self) -> bool:
@@ -27,18 +19,15 @@ class HooksFile:
 
     @property
     def plugin_root(self) -> Path | None:
-        """The parent of `hooks/`, which `${CLAUDE_PLUGIN_ROOT}` names."""
         directory = self.path.resolve().parent
         return directory.parent if directory.name == 'hooks' else None
 
     @property
     def project_dir(self) -> Path | None:
-        """The parent of `.claude/`, which `${CLAUDE_PROJECT_DIR}` names."""
         directory = self.path.resolve().parent
         return directory.parent if directory.name == '.claude' else None
 
     def hooks_text_for_builtin(self) -> str:
-        """The text of a `hooks/hooks.json` that holds this file's hooks object."""
         if self.plugin_shape:
             return self.text
         if self.config is None:
@@ -47,7 +36,7 @@ class HooksFile:
         if 'hooks' not in self.config:
             message = f'{self.path} has no top-level "hooks" key, so there is nothing to validate'
             raise CannotCheckError(message)
-        return json.dumps({'hooks': self.config['hooks']})
+        return msgspec.json.encode({'hooks': self.config['hooks']}).decode()
 
 
 def load_hooks_file(path: Path) -> HooksFile:
@@ -59,5 +48,5 @@ def load_hooks_file(path: Path) -> HooksFile:
     try:
         value = msgspec.json.decode(text)
     except msgspec.DecodeError:
-        return HooksFile(path, text, None, ())
-    return HooksFile(path, text, as_object(value), duplicate_keys(text))
+        return HooksFile(path=path, text=text, config=None)
+    return HooksFile(path=path, text=text, config=as_object(value))

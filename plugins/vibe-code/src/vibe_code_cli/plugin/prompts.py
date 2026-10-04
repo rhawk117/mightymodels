@@ -1,6 +1,6 @@
 from msgspec import UnsetType
 
-from vibe_code_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.kinds import Kinds
 from vibe_code_cli.plugin.layout import component_files, planned
 from vibe_code_cli.plugin.phases import Context
 from vibe_code_cli.plugin.record import Component, Plan, audience_of, distribution_of
@@ -31,7 +31,6 @@ def install_line(plan: Plan) -> str:
 
 
 def install_steps(plan: Plan) -> list[str]:
-    """The commands a user runs, in order: a marketplace has to be added before the install."""
     if distribution_of(plan).channel == 'marketplace':
         return [MARKETPLACE_ADD, install_line(plan)]
     return [install_line(plan)]
@@ -49,7 +48,7 @@ def planning_note(component: Component) -> str:
 
 
 def prompt_opener(component: Component, root: str) -> str:
-    spec = KIND_SPECS[component.kind]
+    spec = Kinds().specs[component.kind]
     opener = spec.opener.format(name=component.name, root=root, purpose=component.purpose)
     return f'/{PLUGIN_NAMESPACE}:{spec.builder} {opener}' if spec.builder else opener
 
@@ -83,8 +82,9 @@ def ready_prompt(ctx: Context, component: Component) -> str:
 
 def verify_prompt(ctx: Context) -> str:
     plan, root = ctx.plan, ctx.root
+    specs = Kinds().specs
     checks = [
-        f'- {KIND_SPECS[c.kind].label} `{c.name}`: {", ".join(component_files(c))}'
+        f'- {specs[c.kind].label} `{c.name}`: {", ".join(component_files(c))}'
         for c in plan.components
     ]
     install = ' && '.join(f'`{step}`' for step in install_steps(plan))

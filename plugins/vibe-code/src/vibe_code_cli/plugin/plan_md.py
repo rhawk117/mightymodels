@@ -1,6 +1,6 @@
 from msgspec import UnsetType
 
-from vibe_code_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.kinds import Kinds
 from vibe_code_cli.plugin.layout import component_files, layout_tree, tree_lines
 from vibe_code_cli.plugin.phases import PHASES, Context, Phase, phase_components, session_ids
 from vibe_code_cli.plugin.prompts import (
@@ -249,7 +249,7 @@ def phase_lines(plan: Plan) -> list[str]:
 
 def component_lines(ctx: Context, component: Component) -> list[str]:
     key = f'component.{component.name}'
-    spec = KIND_SPECS[component.kind]
+    spec = Kinds().specs[component.kind]
     answers = [
         f'{key}.answer.{name}: {render_value(value)}' for name, value in component.answers.items()
     ]
@@ -281,7 +281,7 @@ def agent_lines(ctx: Context) -> list[str]:
 
 
 def render_plan_md(plan: Plan, root: str) -> str:
-    ctx = Context(plan, root, session_ids(plan))
+    ctx = Context(plan=plan, root=root, sessions=session_ids(plan))
     lines = [
         f'# {plan.name}: plugin plan',
         '',
@@ -299,7 +299,8 @@ def render_plan_md(plan: Plan, root: str) -> str:
 
 
 def render_readme(plan: Plan) -> str:
-    ships = [f'- {KIND_SPECS[c.kind].label} `{c.name}`: {c.purpose}' for c in plan.components]
+    specs = Kinds().specs
+    ships = [f'- {specs[c.kind].label} `{c.name}`: {c.purpose}' for c in plan.components]
     lines = [
         f'# {plan.name}',
         '',

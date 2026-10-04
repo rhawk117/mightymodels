@@ -9,13 +9,10 @@ from vibe_code_cli.hook.nodes import Group
 
 CATCH_ALL_MATCHERS = frozenset({'', '*'})
 
-# A matcher made only of these characters is an exact name or a list of names, not a regex.
 EXACT_MATCHER = re.compile(r'[A-Za-z0-9_\- ,|]+')
 NARROW_EXACT_MATCHER = re.compile(r'[A-Za-z0-9_|]+')
 NARROW_EXACT_EVENTS = frozenset({'FileChanged', 'StopFailure'})
 
-# Claude Code tests matchers with JavaScript regexes; Python `re` is only an approximation.
-# These rewrites make JavaScript-only spellings that Python rejects compile.
 JAVASCRIPT_TO_PYTHON = (
     (re.compile(r'\(\?<(?![=!])'), '(?P<'),
     (re.compile(r'\\k<(\w+)>'), r'(?P=\1)'),
@@ -23,9 +20,6 @@ JAVASCRIPT_TO_PYTHON = (
     (re.compile(r'\[\]'), '(?!)'),
 )
 
-# Python errors that JavaScript accepts: identity escapes, `\u{...}` and `\x` read as literals,
-# variable-width lookbehind, numeric backreferences to groups that do not exist, and repeated
-# group names in other alternatives.
 TOLERATED_REGEX_ERRORS = (
     'bad escape',
     'incomplete escape',
@@ -36,7 +30,6 @@ TOLERATED_REGEX_ERRORS = (
 
 
 def matcher_findings(group: Group) -> list[Finding]:
-    """Rows H33, H34 and H35 for one matcher group."""
     matcher = group.matcher
     if matcher is UNSET:
         return missing_matcher_findings(group)
