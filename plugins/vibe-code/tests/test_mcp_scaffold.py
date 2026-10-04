@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.mcp import command as mcp_group
-from ai_engineer_cli.mcp.scaffold import command
-from ai_engineer_cli.mcp.scaffold.render import plan_project, write_project
-from ai_engineer_cli.mcp.scaffold.spec import load_spec
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import CannotCheckError
+from vibe_code_cli.mcp import command as mcp_group
+from vibe_code_cli.mcp.scaffold import command
+from vibe_code_cli.mcp.scaffold.render import plan_project, write_project
+from vibe_code_cli.mcp.scaffold.spec import load_spec
 
 ASSETS = Path(__file__).resolve().parents[1] / 'skills' / 'create-mcp' / 'assets'
 EXAMPLE_SPEC = ASSETS / 'spec.example.json'
@@ -92,7 +92,7 @@ def test_example_spec_scaffolds_parsable_python_and_valid_configs(
 def test_default_template_comes_from_the_exported_plugin_root(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv('AI_ENGINEER_PLUGIN_ROOT', str(tmp_path / 'plugin'))
+    monkeypatch.setenv('VIBE_CODE_PLUGIN_ROOT', str(tmp_path / 'plugin'))
     template = tmp_path / 'plugin' / 'skills' / 'create-mcp' / 'assets' / 'template'
     template.mkdir(parents=True)
     (template / 'NOTE.md').write_text('# __NAME__\n')
@@ -105,7 +105,7 @@ def test_default_template_comes_from_the_exported_plugin_root(
 def test_default_template_without_the_export_is_the_skills_template(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv('AI_ENGINEER_PLUGIN_ROOT', raising=False)
+    monkeypatch.delenv('VIBE_CODE_PLUGIN_ROOT', raising=False)
 
     assert command.default_template() == TEMPLATE
 

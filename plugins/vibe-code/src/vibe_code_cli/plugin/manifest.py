@@ -1,6 +1,6 @@
 import msgspec
 
-from ai_engineer_cli.plugin.record import Plan
+from vibe_code_cli.plugin.record import Plan
 
 MODELLED_KEYS = (
     'name',

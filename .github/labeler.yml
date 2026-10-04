@@ -2,9 +2,9 @@ plugin:mightymodels:
   - changed-files:
       - any-glob-to-any-file: plugins/mightymodels/**
 
-plugin:ai-engineer:
+plugin:vibe-code:
   - changed-files:
-      - any-glob-to-any-file: plugins/ai-engineer/**
+      - any-glob-to-any-file: plugins/vibe-code/**
 
 ci:
   - changed-files:

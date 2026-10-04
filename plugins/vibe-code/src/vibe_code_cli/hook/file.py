@@ -4,8 +4,8 @@ from pathlib import Path
 
 import msgspec
 
-from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.jsondoc import JsonObject, as_object, duplicate_keys
+from vibe_code_cli.findings import CannotCheckError
+from vibe_code_cli.jsondoc import JsonObject, as_object, duplicate_keys
 
 
 @dataclass(frozen=True)

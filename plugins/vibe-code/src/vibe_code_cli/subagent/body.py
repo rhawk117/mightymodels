@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from xml.parsers import expat
 
-from ai_engineer_cli.findings import Finding, error, warning
+from vibe_code_cli.findings import Finding, error, warning
 
 # House style from the reference agent template: these sections, in this order, directly under
 # the frontmatter.

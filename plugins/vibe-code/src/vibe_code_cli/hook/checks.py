@@ -2,19 +2,19 @@ from urllib.parse import urlparse
 
 from msgspec import UNSET
 
-from ai_engineer_cli.findings import CannotCheckError, Finding, error, warning
-from ai_engineer_cli.hook.events import (
+from vibe_code_cli.findings import CannotCheckError, Finding, error, warning
+from vibe_code_cli.hook.events import (
     DEFAULT_TIMEOUT_SECONDS,
     ENFORCEMENT_EVENTS,
     LOWERED_DEFAULT_TIMEOUT_SECONDS,
     SLOW_ENFORCEMENT_SECONDS,
 )
-from ai_engineer_cli.hook.file import HooksFile
-from ai_engineer_cli.hook.matchers import matcher_findings
-from ai_engineer_cli.hook.nodes import DecodedHooks, Event, Handler
-from ai_engineer_cli.hook.schema import CommandHook, HttpHook
-from ai_engineer_cli.hook.scripts import script_findings
-from ai_engineer_cli.jsondoc import JsonObject
+from vibe_code_cli.hook.file import HooksFile
+from vibe_code_cli.hook.matchers import matcher_findings
+from vibe_code_cli.hook.nodes import DecodedHooks, Event, Handler
+from vibe_code_cli.hook.schema import CommandHook, HttpHook
+from vibe_code_cli.hook.scripts import script_findings
+from vibe_code_cli.jsondoc import JsonObject
 
 PLUGIN_TOP_LEVEL_KEYS = frozenset({'hooks', 'description'})
 

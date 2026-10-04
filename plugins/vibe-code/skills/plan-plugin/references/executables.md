@@ -4,7 +4,7 @@ Sources: Claude Code docs, plugins/components (Executables), plugins/manifest-re
 
 ## What it is
 
-Files in `bin/` at the plugin root are on the `PATH` of the Bash tool's shell while the plugin is enabled, so Claude, or a skill's instructions, can run them as bare commands without the user installing anything. This toolkit's own plugin ships `bin/ai-engineer` this way.
+Files in `bin/` at the plugin root are on the `PATH` of the Bash tool's shell while the plugin is enabled, so Claude, or a skill's instructions, can run them as bare commands without the user installing anything. This toolkit's own plugin ships `bin/vibe-code` this way.
 
 ```bash
 #!/bin/bash

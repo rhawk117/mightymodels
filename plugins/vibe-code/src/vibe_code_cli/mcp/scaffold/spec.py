@@ -7,8 +7,8 @@ from typing import Annotated, NoReturn
 import msgspec
 from msgspec import UNSET, UnsetType
 
-from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.jsondoc import JsonObject, as_object
+from vibe_code_cli.findings import CannotCheckError
+from vibe_code_cli.jsondoc import JsonObject, as_object
 
 NAME_PATTERN = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*')
 IDENTIFIER = re.compile(r'[a-z_][a-z0-9_]*')

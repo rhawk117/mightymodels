@@ -5,9 +5,9 @@ from pathlib import Path
 import msgspec
 from msgspec import UnsetType
 
-from ai_engineer_cli.findings import Finding, error
-from ai_engineer_cli.mcp.file import McpFile
-from ai_engineer_cli.mcp.servers import McpServer, decode_servers
+from vibe_code_cli.findings import Finding, error
+from vibe_code_cli.mcp.file import McpFile
+from vibe_code_cli.mcp.servers import McpServer, decode_servers
 
 COMMAND_TIMEOUT_SECONDS = 120
 PLUGIN_ROOT = '${CLAUDE_PLUGIN_ROOT}'

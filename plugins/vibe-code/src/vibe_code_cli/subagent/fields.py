@@ -3,8 +3,8 @@ import re
 import msgspec
 from msgspec import UNSET, UnsetType
 
-from ai_engineer_cli.findings import Finding, decode_problem, error, warning
-from ai_engineer_cli.subagent.tools import is_known_tool, tool_entries, tool_name
+from vibe_code_cli.findings import Finding, decode_problem, error, warning
+from vibe_code_cli.subagent.tools import is_known_tool, tool_entries, tool_name
 
 # The 18 keys in the frontmatter table of https://code.claude.com/docs/en/sub-agents (docs
 # snapshot 2026-10-03, sub-agents.md lines 303-320), including `omitClaudeMd`, `initialPrompt`

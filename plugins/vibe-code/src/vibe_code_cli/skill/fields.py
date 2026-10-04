@@ -5,7 +5,7 @@ from pathlib import Path
 import msgspec
 from msgspec import UNSET, UnsetType
 
-from ai_engineer_cli.findings import Finding, decode_problem, error, warning
+from vibe_code_cli.findings import Finding, decode_problem, error, warning
 
 # The 20 keys in the Claude Code skills frontmatter table.
 KNOWN_KEYS = frozenset(

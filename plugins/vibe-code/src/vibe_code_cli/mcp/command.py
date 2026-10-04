@@ -3,12 +3,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ai_engineer_cli.builtin import run_builtin
-from ai_engineer_cli.findings import CannotCheckError, Finding, report
-from ai_engineer_cli.mcp.checks import check_mcp
-from ai_engineer_cli.mcp.file import KINDS, SERVER_FILE_NAME, McpFile, load_mcp_file
-from ai_engineer_cli.mcp.help_probe import check_commands
-from ai_engineer_cli.mcp.scaffold.command import scaffold_command
+from vibe_code_cli.builtin import run_builtin
+from vibe_code_cli.findings import CannotCheckError, Finding, report
+from vibe_code_cli.mcp.checks import check_mcp
+from vibe_code_cli.mcp.file import KINDS, SERVER_FILE_NAME, McpFile, load_mcp_file
+from vibe_code_cli.mcp.help_probe import check_commands
+from vibe_code_cli.mcp.scaffold.command import scaffold_command
 
 
 def build_group(parser: argparse.ArgumentParser) -> None:

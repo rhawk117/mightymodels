@@ -1,6 +1,6 @@
 # Hook config, by example
 
-Every shape this skill writes, with the matcher patterns that come up in practice. Facts are from the Claude Code hooks reference (snapshot 2026-10-03); check any file with `ai-engineer hook validate FILE`. `assets/hooks.example.json` is a copyable `hooks` object for `.claude/settings.json` with the common entries.
+Every shape this skill writes, with the matcher patterns that come up in practice. Facts are from the Claude Code hooks reference (snapshot 2026-10-03); check any file with `vibe-code hook validate FILE`. `assets/hooks.example.json` is a copyable `hooks` object for `.claude/settings.json` with the common entries.
 
 ## Contents
 
@@ -150,8 +150,8 @@ Plugin: `hooks/hooks.json` at the plugin root, with an optional `description`, s
 }
 ```
 
-`${CLAUDE_PLUGIN_ROOT}` is the plugin's install directory, which changes across updates; state that must survive one goes under `${CLAUDE_PLUGIN_DATA}`. The `hooks` key of `plugin.json` also loads. In `ai-engineer hook validate`, a file named `hooks.json` is read as the plugin shape and any other name as a settings file; the project placeholder resolves only for a file directly under `.claude/`, and the plugin placeholder only under `hooks/`.
+`${CLAUDE_PLUGIN_ROOT}` is the plugin's install directory, which changes across updates; state that must survive one goes under `${CLAUDE_PLUGIN_DATA}`. The `hooks` key of `plugin.json` also loads. In `vibe-code hook validate`, a file named `hooks.json` is read as the plugin shape and any other name as a settings file; the project placeholder resolves only for a file directly under `.claude/`, and the plugin placeholder only under `hooks/`.
 
 ## Where it loads from, and what to check
 
-Hooks merge from the user, project, local, managed and plugin levels; an identical handler in several settings files runs once. Edits to a settings file are normally picked up by a file watcher; `/hooks` lists active hooks with their source; `"disableAllHooks": true` turns off everything the user controls. `ai-engineer hook validate FILE` runs `claude plugin validate` on the hooks first and then checks event spelling, handler fields, timeouts, matcher grammar, script paths and duplicate keys.
+Hooks merge from the user, project, local, managed and plugin levels; an identical handler in several settings files runs once. Edits to a settings file are normally picked up by a file watcher; `/hooks` lists active hooks with their source; `"disableAllHooks": true` turns off everything the user controls. `vibe-code hook validate FILE` runs `claude plugin validate` on the hooks first and then checks event spelling, handler fields, timeouts, matcher grammar, script paths and duplicate keys.

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
+from vibe_code_cli.cli import main
 
 PLUGIN_ROOT = Path(__file__).parent.parent
 
@@ -188,4 +188,4 @@ def test_inventory_of_this_plugin_lists_its_skills_and_executable(
     skills = {name for kind, name in found if kind == 'skill'}
     expected = {path.parent.name for path in (PLUGIN_ROOT / 'skills').glob('*/SKILL.md')}
     assert skills == expected
-    assert ('executable', 'ai-engineer') in found
+    assert ('executable', 'vibe-code') in found

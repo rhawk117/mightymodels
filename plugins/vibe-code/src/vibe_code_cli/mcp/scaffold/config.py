@@ -1,6 +1,6 @@
 import json
 
-from ai_engineer_cli.mcp.scaffold.spec import Spec
+from vibe_code_cli.mcp.scaffold.spec import Spec
 
 TIMEOUT_MS = 120_000
 NETWORK_URL = 'http://127.0.0.1:8000/mcp'

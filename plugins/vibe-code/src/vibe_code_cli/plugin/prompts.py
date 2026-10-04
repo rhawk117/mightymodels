@@ -1,11 +1,11 @@
 from msgspec import UnsetType
 
-from ai_engineer_cli.plugin.kinds import KIND_SPECS
-from ai_engineer_cli.plugin.layout import component_files, planned
-from ai_engineer_cli.plugin.phases import Context
-from ai_engineer_cli.plugin.record import Component, Plan, audience_of, distribution_of
+from vibe_code_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.layout import component_files, planned
+from vibe_code_cli.plugin.phases import Context
+from vibe_code_cli.plugin.record import Component, Plan, audience_of, distribution_of
 
-PLUGIN_NAMESPACE = 'ai-engineer'
+PLUGIN_NAMESPACE = 'vibe-code'
 MARKETPLACE_ADD = 'claude plugin marketplace add <source>'
 CLEAN_CACHE = 'with CLAUDE_CODE_PLUGIN_CACHE_DIR pointing at an empty directory'
 

@@ -1,5 +1,5 @@
 ---
 type: tool_used
 tool: Bash
-input_match: 'ai-engineer\s+mcp\s+scaffold'
+input_match: 'vibe-code\s+mcp\s+scaffold'
 ---

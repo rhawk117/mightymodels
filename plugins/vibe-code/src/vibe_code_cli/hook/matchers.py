@@ -3,9 +3,9 @@ import warnings
 
 from msgspec import UNSET
 
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.hook.events import EVERY_TOOL_CALL_EVENTS, MATCHERLESS_EVENTS
-from ai_engineer_cli.hook.nodes import Group
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.hook.events import EVERY_TOOL_CALL_EVENTS, MATCHERLESS_EVENTS
+from vibe_code_cli.hook.nodes import Group
 
 CATCH_ALL_MATCHERS = frozenset({'', '*'})
 

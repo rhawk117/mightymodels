@@ -1,12 +1,12 @@
 import msgspec
 from msgspec import UnsetType
 
-from ai_engineer_cli.findings import CannotCheckError, Finding, decode_problem, error, warning
-from ai_engineer_cli.jsondoc import Json
-from ai_engineer_cli.mcp.file import SERVER_FILE_NAME, McpFile
-from ai_engineer_cli.mcp.keys import KEYS_BY_TRANSPORT, STDIO_KEYS
-from ai_engineer_cli.mcp.servers import WRAPPER_KEY, McpServer, ServerEntry, decode_servers
-from ai_engineer_cli.mcp.variables import variable_findings
+from vibe_code_cli.findings import CannotCheckError, Finding, decode_problem, error, warning
+from vibe_code_cli.jsondoc import Json
+from vibe_code_cli.mcp.file import SERVER_FILE_NAME, McpFile
+from vibe_code_cli.mcp.keys import KEYS_BY_TRANSPORT, STDIO_KEYS
+from vibe_code_cli.mcp.servers import WRAPPER_KEY, McpServer, ServerEntry, decode_servers
+from vibe_code_cli.mcp.variables import variable_findings
 
 
 def check_mcp(mcp_file: McpFile, *, builtin_errored: bool) -> list[Finding]:

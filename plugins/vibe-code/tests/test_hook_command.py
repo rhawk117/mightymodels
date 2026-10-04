@@ -4,10 +4,10 @@ import shutil
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.builtin import BuiltinUnavailableError, parse_report
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.hook import command as hook_command
+from vibe_code_cli.builtin import BuiltinUnavailableError, parse_report
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.hook import command as hook_command
 
 SCRIPT_COMMAND = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check.py"'
 CLEAN_HOOKS = {
@@ -77,7 +77,7 @@ def test_create_hooks_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert main(['hook']) == 2
-    assert 'usage: ai-engineer' in capsys.readouterr().err
+    assert 'usage: vibe-code' in capsys.readouterr().err
 
 
 def test_clean_plugin_file_exits_zero(

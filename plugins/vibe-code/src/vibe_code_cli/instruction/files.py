@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from ai_engineer_cli.findings import CannotCheckError
+from vibe_code_cli.findings import CannotCheckError
 
 ALWAYS_ON_NAMES = ('CLAUDE.md', '.claude/CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md')
 RULES_GLOB = '.claude/rules/**/*.md'

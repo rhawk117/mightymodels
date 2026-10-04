@@ -20,7 +20,7 @@ Ask every question with the `AskUserQuestion` tool: single select, multi select,
 | E. Pauses                 | which tools pause to ask the person; interview-style tools                         | one question                 |
 | F. Resources and prompts  | inferred from the answers, confirmed                                               | one yes or no                |
 | G. Record                 | the spec JSON, signed off                                                          | one confirmation             |
-| H. Generate and verify    | `ai-engineer mcp scaffold`, `uv sync`, ruff, ty, pytest, shown                     | results                      |
+| H. Generate and verify    | `vibe-code mcp scaffold`, `uv sync`, ruff, ty, pytest, shown                     | results                      |
 | I. Implement              | each use case, asking every question that arises                                   | conversational               |
 | J. Configure and hand off | config for the scope, validated, registered, entrypoint proven                     | results                      |
 
@@ -116,14 +116,14 @@ Write the spec JSON from `assets/spec.example.json` with everything gathered: na
 Run, and show every output:
 
 ```
-ai-engineer mcp scaffold SPEC.json TARGET_DIR
+vibe-code mcp scaffold SPEC.json TARGET_DIR
 cd TARGET_DIR && uv sync
 uv run ruff format . && uv run ruff check .
 uv run ty check
 uv run pytest
 ```
 
-`ai-engineer mcp scaffold --help` lists `--template DIR` and `--force`. The scaffold writes the project from `assets/template/` (pyproject with strict ty and ruff, `src/PKG/{__main__,cli,server,workspace}.py`, one `tools/NAME/{schema,use_case}.py` per tool, `tests/test_NAME.py` per tool, README, and `config/` snippets `mcp.plugin.json`, `mcp.project.json` and, for a network reach, `mcp.network.json`). Generated code passes ruff and ty after `ruff format`. The listing tests pass immediately (each tool is registered with its schema and annotations); the call tests fail with `NotImplementedError` until the use case is implemented. A binary-backed tool with no inputs and string outputs is implemented outright (run the command, map stdout); one with inputs or typed outputs gets the command call generated and a stub for the mapping, because the argument list and the parsing are exactly the questions phase I asks. That is deliberate: a red test per tool is the to-do list for phase I, and green means the model can call it.
+`vibe-code mcp scaffold --help` lists `--template DIR` and `--force`. The scaffold writes the project from `assets/template/` (pyproject with strict ty and ruff, `src/PKG/{__main__,cli,server,workspace}.py`, one `tools/NAME/{schema,use_case}.py` per tool, `tests/test_NAME.py` per tool, README, and `config/` snippets `mcp.plugin.json`, `mcp.project.json` and, for a network reach, `mcp.network.json`). Generated code passes ruff and ty after `ruff format`. The listing tests pass immediately (each tool is registered with its schema and annotations); the call tests fail with `NotImplementedError` until the use case is implemented. A binary-backed tool with no inputs and string outputs is implemented outright (run the command, map stdout); one with inputs or typed outputs gets the command call generated and a stub for the mapping, because the argument list and the parsing are exactly the questions phase I asks. That is deliberate: a red test per tool is the to-do list for phase I, and green means the model can call it.
 
 ## Phase I: implement each use case, with the user
 
@@ -134,9 +134,9 @@ For each tool, open `tools/NAME/use_case.py` and write `run(workspace, params) -
 Write the config for the scope from `config/` (the scaffold already rendered it; `references/mcp-config.md` holds the plugin shape, the entry keys and the `env` and `headers` forms) and validate it:
 
 ```
-ai-engineer mcp validate FILE --kind plugin --check-command
-ai-engineer mcp validate FILE --kind project --check-command
-ai-engineer mcp validate FILE --kind user --check-command
+vibe-code mcp validate FILE --kind plugin --check-command
+vibe-code mcp validate FILE --kind project --check-command
+vibe-code mcp validate FILE --kind user --check-command
 ```
 
 Pick the `--kind` that matches the scope. It runs `claude plugin validate` on the servers first, then the checks that command misses, and `--check-command` runs `uv run --project ... NAME --help` to prove the entrypoint resolves. A first run in a fresh checkout builds the environment, which is why the project shape raises `timeout` to 120000. For a plugin, finish with `claude plugin validate --strict` on the plugin directory.

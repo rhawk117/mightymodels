@@ -3,11 +3,11 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.findings import CannotCheckError, Finding, error, warning
-from ai_engineer_cli.hook.checks import check_hooks
-from ai_engineer_cli.hook.file import load_hooks_file
-from ai_engineer_cli.hook.matchers import regex_problem
-from ai_engineer_cli.hook.nodes import decode_hooks
+from vibe_code_cli.findings import CannotCheckError, Finding, error, warning
+from vibe_code_cli.hook.checks import check_hooks
+from vibe_code_cli.hook.file import load_hooks_file
+from vibe_code_cli.hook.matchers import regex_problem
+from vibe_code_cli.hook.nodes import decode_hooks
 
 SCRIPT_COMMAND = 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check.py"'
 

@@ -5,8 +5,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.plugin.phases import PHASES
+from vibe_code_cli.cli import main
+from vibe_code_cli.plugin.phases import PHASES
 
 EXAMPLE = Path(__file__).parent.parent / 'skills' / 'plan-plugin' / 'assets' / 'plan.example.json'
 RESIDUE = re.compile(r'agent-plugins|\.agent\.md|ask_user|worker', re.IGNORECASE)
@@ -202,10 +202,10 @@ def test_pp_a48_phases_order_the_executable_before_skills_and_agents_last(
 def test_pp_a22_ready_prompts_open_with_the_namespaced_builder(tmp_path: Path) -> None:
     text = plan_md(tmp_path, components=all_kinds())
 
-    assert '\n/ai-engineer:create-skill Create the `add-route` skill' in text
-    assert '\n/ai-engineer:create-hooks Create the `uv-runner` hook' in text
-    assert '\n/ai-engineer:create-subagent Create the `test-runner` agent' in text
-    assert '\n/ai-engineer:create-mcp Create the `db-tools` MCP server' in text
+    assert '\n/vibe-code:create-skill Create the `add-route` skill' in text
+    assert '\n/vibe-code:create-hooks Create the `uv-runner` hook' in text
+    assert '\n/vibe-code:create-subagent Create the `test-runner` agent' in text
+    assert '\n/vibe-code:create-mcp Create the `db-tools` MCP server' in text
     assert '\nAdd the `pyright` language server entry to .lsp.json' in text
 
 

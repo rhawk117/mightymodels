@@ -5,11 +5,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.builtin import BuiltinUnavailableError
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.mcp import command as mcp_group
-from ai_engineer_cli.mcp import help_probe
+from vibe_code_cli.builtin import BuiltinUnavailableError
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.mcp import command as mcp_group
+from vibe_code_cli.mcp import help_probe
 
 STDIO_SERVER = {'command': 'uv', 'args': ['run', 'server']}
 HTTP_SERVER = {'type': 'http', 'url': 'https://example.com/mcp'}
@@ -56,7 +56,7 @@ def test_create_mcp_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert main(['mcp']) == 2
-    assert 'usage: ai-engineer' in capsys.readouterr().err
+    assert 'usage: vibe-code' in capsys.readouterr().err
 
 
 def test_validate_without_a_kind_is_a_usage_error() -> None:

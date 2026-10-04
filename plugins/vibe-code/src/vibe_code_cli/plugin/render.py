@@ -2,11 +2,11 @@ from pathlib import Path
 
 import msgspec
 
-from ai_engineer_cli.jsondoc import as_object
-from ai_engineer_cli.plugin.layout import MANIFEST_PATH, planned_directories
-from ai_engineer_cli.plugin.manifest import json_text, manifest_text, merged_manifest_text
-from ai_engineer_cli.plugin.plan_md import render_plan_md, render_readme
-from ai_engineer_cli.plugin.record import Plan
+from vibe_code_cli.jsondoc import as_object
+from vibe_code_cli.plugin.layout import MANIFEST_PATH, planned_directories
+from vibe_code_cli.plugin.manifest import json_text, manifest_text, merged_manifest_text
+from vibe_code_cli.plugin.plan_md import render_plan_md, render_readme
+from vibe_code_cli.plugin.record import Plan
 
 
 class RenderRefusedError(Exception):

@@ -1,5 +1,5 @@
 import msgspec
-from ai_engineer_cli.plugin.record import Component, Plan, decode_plan, normalise
+from vibe_code_cli.plugin.record import Component, Plan, decode_plan, normalise
 
 
 def test_defaults_fill_every_key_the_record_leaves_out() -> None:

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from ai_engineer_cli.frontmatter import parse_skill_text
+from vibe_code_cli.frontmatter import parse_skill_text
 
 EVALS = Path(__file__).resolve().parents[1] / 'evals'
 

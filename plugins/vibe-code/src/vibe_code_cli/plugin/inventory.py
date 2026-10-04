@@ -4,10 +4,10 @@ from pathlib import Path
 
 import msgspec
 
-from ai_engineer_cli.frontmatter import parse_skill_text
-from ai_engineer_cli.jsondoc import JsonObject, as_object
-from ai_engineer_cli.plugin.layout import MANIFEST_PATH
-from ai_engineer_cli.plugin.record import Component, Plan, decode_plan
+from vibe_code_cli.frontmatter import parse_skill_text
+from vibe_code_cli.jsondoc import JsonObject, as_object
+from vibe_code_cli.plugin.layout import MANIFEST_PATH
+from vibe_code_cli.plugin.record import Component, Plan, decode_plan
 
 HOOKS_FILE = 'hooks/hooks.json'
 MCP_FILE = '.mcp.json'

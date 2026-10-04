@@ -3,8 +3,8 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.cli import main
+from vibe_code_cli.plugin.kinds import KIND_SPECS
 
 EXAMPLE = Path(__file__).parent.parent / 'skills' / 'plan-plugin' / 'assets' / 'plan.example.json'
 
@@ -52,7 +52,7 @@ def test_plugin_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert main(['plugin']) == 2
-    assert 'usage: ai-engineer' in capsys.readouterr().err
+    assert 'usage: vibe-code' in capsys.readouterr().err
 
 
 def test_a_valid_plan_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

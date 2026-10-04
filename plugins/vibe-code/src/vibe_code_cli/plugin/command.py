@@ -4,7 +4,7 @@ from pathlib import Path
 
 import msgspec
 
-from ai_engineer_cli.findings import (
+from vibe_code_cli.findings import (
     CannotCheckError,
     Finding,
     decode_problem,
@@ -12,12 +12,12 @@ from ai_engineer_cli.findings import (
     report,
     warning,
 )
-from ai_engineer_cli.jsondoc import duplicate_keys
-from ai_engineer_cli.plugin.checks import check_plan
-from ai_engineer_cli.plugin.inventory import inventory
-from ai_engineer_cli.plugin.manifest import json_text
-from ai_engineer_cli.plugin.record import Plan, decode_plan, normalise, unknown_keys
-from ai_engineer_cli.plugin.render import RenderRefusedError, render
+from vibe_code_cli.jsondoc import duplicate_keys
+from vibe_code_cli.plugin.checks import check_plan
+from vibe_code_cli.plugin.inventory import inventory
+from vibe_code_cli.plugin.manifest import json_text
+from vibe_code_cli.plugin.record import Plan, decode_plan, normalise, unknown_keys
+from vibe_code_cli.plugin.render import RenderRefusedError, render
 
 
 def build_group(parser: argparse.ArgumentParser) -> None:

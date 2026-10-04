@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from ai_engineer_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.kinds import KIND_SPECS
 
 SKILLS = Path(__file__).resolve().parents[1] / 'skills'
 PLAN_PLUGIN = SKILLS / 'plan-plugin'

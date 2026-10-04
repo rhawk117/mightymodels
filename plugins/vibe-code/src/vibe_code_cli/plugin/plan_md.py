@@ -1,15 +1,15 @@
 from msgspec import UnsetType
 
-from ai_engineer_cli.plugin.kinds import KIND_SPECS
-from ai_engineer_cli.plugin.layout import component_files, layout_tree, tree_lines
-from ai_engineer_cli.plugin.phases import PHASES, Context, Phase, phase_components, session_ids
-from ai_engineer_cli.plugin.prompts import (
+from vibe_code_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.layout import component_files, layout_tree, tree_lines
+from vibe_code_cli.plugin.phases import PHASES, Context, Phase, phase_components, session_ids
+from vibe_code_cli.plugin.prompts import (
     final_sessions,
     install_steps,
     ready_prompt,
     render_value,
 )
-from ai_engineer_cli.plugin.record import Component, OutsideItem, Plan, audience_of, distribution_of
+from vibe_code_cli.plugin.record import Component, OutsideItem, Plan, audience_of, distribution_of
 
 INTERVIEW = (
     ('A. Start', 'mode'),

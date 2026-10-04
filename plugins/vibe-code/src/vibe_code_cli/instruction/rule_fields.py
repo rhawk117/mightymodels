@@ -3,8 +3,8 @@ import re
 import msgspec
 from msgspec import UNSET, UnsetType
 
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.frontmatter import SkillText
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.frontmatter import SkillText
 
 ALWAYS_ON_GLOBS = frozenset({'**', '**/*'})
 ROOT_ONLY_GLOB = re.compile(r'^\*\.[A-Za-z0-9]+$')

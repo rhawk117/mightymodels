@@ -83,7 +83,7 @@ Present the draft with a unified diff against any existing instruction files, an
 
 After writing:
 
-1. Run `ai-engineer instruction validate <project dir>`. It audits the `CLAUDE.md` and `.claude/rules` files of that directory: oversized files, formatter and linter leakage, references that do not say when to read them, conflicting commands, rules without `paths`, and an `AGENTS.md` that no `CLAUDE.md` imports. Show the output and fix what it reports.
+1. Run `vibe-code instruction validate <project dir>`. It audits the `CLAUDE.md` and `.claude/rules` files of that directory: oversized files, formatter and linter leakage, references that do not say when to read them, conflicting commands, rules without `paths`, and an `AGENTS.md` that no `CLAUDE.md` imports. Show the output and fix what it reports.
 2. Tell the user how to confirm discovery in a fresh session: `/memory` lists the `AGENTS.md` path Claude read (v2.1.280 or later), and `/context` lists the `CLAUDE.md` files. An `InstructionsLoaded` hook does not fire for an `AGENTS.md` that Claude read directly.
 3. Warn the user about `CLAUDE.local.md`: if they add one later for personal notes, Claude stops reading `AGENTS.md` unless a `CLAUDE.md` that imports it exists.
 

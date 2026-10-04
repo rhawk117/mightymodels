@@ -4,9 +4,9 @@ from urllib.parse import urlsplit
 
 from msgspec import UnsetType
 
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.plugin.kinds import KIND_SPECS, OUTSIDE_PLUGIN_KINDS, RENAMED_KINDS
-from ai_engineer_cli.plugin.record import (
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.plugin.kinds import KIND_SPECS, OUTSIDE_PLUGIN_KINDS, RENAMED_KINDS
+from vibe_code_cli.plugin.record import (
     AUDIENCE_HOW,
     CHANNELS,
     DECISIONS,

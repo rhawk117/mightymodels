@@ -3,8 +3,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import info, report
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import info, report
 
 FIXTURES = Path(__file__).resolve().parent / 'fixtures' / 'instructions'
 RULE = '---\npaths:\n  - "src/**/*.py"\n---\n' + ''.join(

@@ -5,10 +5,10 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import Finding
-from ai_engineer_cli.hook import command as hook_command
-from ai_engineer_cli.hook.runner import Expectations, HookTest, check_hook, parse_field_expectation
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import Finding
+from vibe_code_cli.hook import command as hook_command
+from vibe_code_cli.hook.runner import Expectations, HookTest, check_hook, parse_field_expectation
 
 SKILL = Path(__file__).resolve().parents[1] / 'skills' / 'create-hooks'
 TEMPLATE = SKILL / 'assets' / 'hook.template.py'

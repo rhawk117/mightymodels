@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import msgspec
 from msgspec import UNSET, UnsetType
 
-from ai_engineer_cli.mcp.file import McpFile
+from vibe_code_cli.mcp.file import McpFile
 
 WRAPPER_KEY = 'mcpServers'
 

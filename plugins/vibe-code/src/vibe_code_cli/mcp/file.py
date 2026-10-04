@@ -4,8 +4,8 @@ from pathlib import Path
 
 import msgspec
 
-from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.jsondoc import Json
+from vibe_code_cli.findings import CannotCheckError
+from vibe_code_cli.jsondoc import Json
 
 KINDS = ('plugin', 'project', 'user')
 SERVER_FILE_NAME = '.mcp.json'

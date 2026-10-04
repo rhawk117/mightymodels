@@ -3,10 +3,10 @@ from pathlib import Path
 
 from msgspec import UNSET
 
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.hook.file import HooksFile
-from ai_engineer_cli.hook.nodes import Handler
-from ai_engineer_cli.hook.schema import CommandHook
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.hook.file import HooksFile
+from vibe_code_cli.hook.nodes import Handler
+from vibe_code_cli.hook.schema import CommandHook
 
 PLUGIN_ROOT_MARKER = '@CLAUDE_PLUGIN_ROOT@'
 PROJECT_DIR_MARKER = '@CLAUDE_PROJECT_DIR@'

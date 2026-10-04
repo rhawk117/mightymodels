@@ -4,9 +4,9 @@ from typing import get_args
 import msgspec
 from msgspec import UnsetType
 
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.hook.schema import EventName, HookHandler, MatcherGroup
-from ai_engineer_cli.jsondoc import JsonObject
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.hook.schema import EventName, HookHandler, MatcherGroup
+from vibe_code_cli.jsondoc import JsonObject
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
+from vibe_code_cli.cli import main
 
 TEMPLATE = (
     Path(__file__).resolve().parents[1]

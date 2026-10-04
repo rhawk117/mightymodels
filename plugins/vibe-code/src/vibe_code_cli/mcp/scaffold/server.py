@@ -1,7 +1,7 @@
 from msgspec import UnsetType
 
-from ai_engineer_cli.mcp.scaffold.spec import PLACEHOLDER, Prompt, Resource, Spec, Tool
-from ai_engineer_cli.mcp.scaffold.text import wrap_literal
+from vibe_code_cli.mcp.scaffold.spec import PLACEHOLDER, Prompt, Resource, Spec, Tool
+from vibe_code_cli.mcp.scaffold.text import wrap_literal
 
 REQUIRES_INTERACTION_KEY = 'anthropic/requiresUserInteraction'
 MAX_RESULT_SIZE_KEY = 'anthropic/maxResultSizeChars'

@@ -9,9 +9,9 @@ from typing import Literal
 
 import msgspec
 
-from ai_engineer_cli.findings import CannotCheckError, Finding, error
-from ai_engineer_cli.hook.events import EXIT_2_IGNORED_EVENTS, PLAIN_TEXT_CONTEXT_EVENTS
-from ai_engineer_cli.jsondoc import as_object
+from vibe_code_cli.findings import CannotCheckError, Finding, error
+from vibe_code_cli.hook.events import EXIT_2_IGNORED_EVENTS, PLAIN_TEXT_CONTEXT_EVENTS
+from vibe_code_cli.jsondoc import as_object
 
 MALFORMED_PAYLOAD = '{not json'
 EXCERPT_CHARACTERS = 300

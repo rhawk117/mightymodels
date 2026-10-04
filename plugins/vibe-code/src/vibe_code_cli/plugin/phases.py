@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from ai_engineer_cli.plugin.layout import planned
-from ai_engineer_cli.plugin.record import Component, Plan
+from vibe_code_cli.plugin.layout import planned
+from vibe_code_cli.plugin.record import Component, Plan
 
 
 @dataclass(frozen=True)

@@ -4,11 +4,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ai_engineer_cli.builtin import run_builtin
-from ai_engineer_cli.findings import CannotCheckError, Finding, error, report
-from ai_engineer_cli.frontmatter import parse_skill_text
-from ai_engineer_cli.skill.body import check_body
-from ai_engineer_cli.skill.fields import check_fields, directory_name_of
+from vibe_code_cli.builtin import run_builtin
+from vibe_code_cli.findings import CannotCheckError, Finding, error, report
+from vibe_code_cli.frontmatter import parse_skill_text
+from vibe_code_cli.skill.body import check_body
+from vibe_code_cli.skill.fields import check_fields, directory_name_of
 
 
 def build_group(parser: argparse.ArgumentParser) -> None:

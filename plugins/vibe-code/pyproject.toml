@@ -1,5 +1,5 @@
 [project]
-name = "ai-engineer-plugin"
+name = "vibe-code-plugin"
 version = "0.3.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -8,11 +8,11 @@ dependencies = [
 ]
 
 [project.scripts]
-ai-engineer = "ai_engineer_cli.cli:main"
+vibe-code = "vibe_code_cli.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "ai_engineer_cli"
+module-name = "vibe_code_cli"

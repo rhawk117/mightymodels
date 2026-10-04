@@ -4,11 +4,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ai_engineer_cli.builtin import run_builtin
-from ai_engineer_cli.findings import CannotCheckError, Finding, error, report
-from ai_engineer_cli.subagent.body import check_body
-from ai_engineer_cli.subagent.fields import check_fields
-from ai_engineer_cli.subagent.text import parse_agent_text
+from vibe_code_cli.builtin import run_builtin
+from vibe_code_cli.findings import CannotCheckError, Finding, error, report
+from vibe_code_cli.subagent.body import check_body
+from vibe_code_cli.subagent.fields import check_fields
+from vibe_code_cli.subagent.text import parse_agent_text
 
 NO_FRONTMATTER_BLOCK = (
     'no frontmatter block: the file must start with a --- line and close the block with '

@@ -3,12 +3,12 @@ import re
 import shutil
 from pathlib import Path
 
-from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.mcp.scaffold.config import render_config
-from ai_engineer_cli.mcp.scaffold.server import server_tokens
-from ai_engineer_cli.mcp.scaffold.spec import LoadedSpec, Spec
-from ai_engineer_cli.mcp.scaffold.text import wrap_literal
-from ai_engineer_cli.mcp.scaffold.tool import render_schema, render_test, render_use_case
+from vibe_code_cli.findings import CannotCheckError
+from vibe_code_cli.mcp.scaffold.config import render_config
+from vibe_code_cli.mcp.scaffold.server import server_tokens
+from vibe_code_cli.mcp.scaffold.spec import LoadedSpec, Spec
+from vibe_code_cli.mcp.scaffold.text import wrap_literal
+from vibe_code_cli.mcp.scaffold.tool import render_schema, render_test, render_use_case
 
 ROOT_VARIABLE = 'CLAUDE_PROJECT_DIR'
 ROOT_VARIABLE_SOURCES = ('env', 'roots')

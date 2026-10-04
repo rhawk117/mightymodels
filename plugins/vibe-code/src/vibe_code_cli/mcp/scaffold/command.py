@@ -3,11 +3,11 @@ import os
 import sys
 from pathlib import Path
 
-from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.mcp.scaffold.render import plan_project, write_project
-from ai_engineer_cli.mcp.scaffold.spec import Spec, load_spec, spec_warnings
+from vibe_code_cli.findings import CannotCheckError
+from vibe_code_cli.mcp.scaffold.render import plan_project, write_project
+from vibe_code_cli.mcp.scaffold.spec import Spec, load_spec, spec_warnings
 
-PLUGIN_ROOT_VARIABLE = 'AI_ENGINEER_PLUGIN_ROOT'
+PLUGIN_ROOT_VARIABLE = 'VIBE_CODE_PLUGIN_ROOT'
 TEMPLATE_PATH = Path('skills') / 'create-mcp' / 'assets' / 'template'
 
 

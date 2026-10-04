@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
+from vibe_code_cli.cli import main
 
 SECTIONS = ('scope', 'conventions', 'examples', 'anti_patterns', 'verification')
 PATH_FRONTMATTER = '---\npaths:\n  - "src/**/*.py"\n---\n'
@@ -37,7 +37,7 @@ def test_group_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert main(['instruction']) == 2
-    assert 'usage: ai-engineer' in capsys.readouterr().err
+    assert 'usage: vibe-code' in capsys.readouterr().err
 
 
 def test_validate_help_shows_the_path_and_strict(capsys: pytest.CaptureFixture[str]) -> None:

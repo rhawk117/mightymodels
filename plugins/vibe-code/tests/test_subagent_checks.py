@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import Finding
-from ai_engineer_cli.subagent import command as subagent_command
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import Finding
+from vibe_code_cli.subagent import command as subagent_command
 
 SECTIONS = ('role', 'context', 'workflow', 'constraints', 'output_format', 'verification')
 DESCRIPTION = 'Reviews code for defects. Use when the user asks for a code review.'

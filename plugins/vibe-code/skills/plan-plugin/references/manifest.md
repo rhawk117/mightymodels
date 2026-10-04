@@ -1,6 +1,6 @@
 # `.claude-plugin/plugin.json`, README and LICENSE
 
-Sources: Claude Code docs, plugins/manifest-reference (Fields, `name`, `dependencies`, User configuration, Unrecognized fields, Path rules). The record fields below are what `ai-engineer plugin render` copies into the manifest.
+Sources: Claude Code docs, plugins/manifest-reference (Fields, `name`, `dependencies`, User configuration, Unrecognized fields, Path rules). The record fields below are what `vibe-code plugin render` copies into the manifest.
 
 ## What the manifest is
 
@@ -57,7 +57,7 @@ A component reads a saved value as `${user_config.KEY}` (MCP and LSP config, exe
 
 ## README and LICENSE
 
-Claude Code loads neither. The README is for the person deciding whether to install: the problem the plugin solves, who it is for, the install lines, what it ships, and what it changes in a session (a hook runs for every user of the plugin, so say so). `ai-engineer plugin render` writes one from the record. The record's `license` is an SPDX string or `null`; when it is `null` the manifest omits the key and no LICENSE file is planned. A declared license needs a LICENSE file whose text matches (convention; `render` does not write it).
+Claude Code loads neither. The README is for the person deciding whether to install: the problem the plugin solves, who it is for, the install lines, what it ships, and what it changes in a session (a hook runs for every user of the plugin, so say so). `vibe-code plugin render` writes one from the record. The record's `license` is an SPDX string or `null`; when it is `null` the manifest omits the key and no LICENSE file is planned. A declared license needs a LICENSE file whose text matches (convention; `render` does not write it).
 
 ## Plan snippet (facts a manifest component carries)
 

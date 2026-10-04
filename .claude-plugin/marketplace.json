@@ -12,9 +12,9 @@
       "version": "0.8.0"
     },
     {
-      "name": "ai-engineer",
-      "source": "./plugins/ai-engineer",
-      "description": "Ten skills for building and hardening Claude Code agents, skills, hooks, instructions, MCP servers, and loops, plus an ai-engineer CLI that needs uv on PATH.",
+      "name": "vibe-code",
+      "source": "./plugins/vibe-code",
+      "description": "Ten skills for building and hardening Claude Code agents, skills, hooks, instructions, MCP servers, and loops, plus an vibe-code CLI that needs uv on PATH.",
       "version": "0.3.0"
     }
   ]

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import msgspec
 
-from ai_engineer_cli.findings import CannotCheckError, Finding, error, warning
+from vibe_code_cli.findings import CannotCheckError, Finding, error, warning
 
 
 class BuiltinUnavailableError(CannotCheckError):

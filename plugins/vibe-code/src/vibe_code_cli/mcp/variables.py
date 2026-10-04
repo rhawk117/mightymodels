@@ -1,14 +1,14 @@
 import os
 import re
 
-from ai_engineer_cli.findings import Finding, warning
-from ai_engineer_cli.mcp.keys import (
+from vibe_code_cli.findings import Finding, warning
+from vibe_code_cli.mcp.keys import (
     CREDENTIAL_VARIABLES,
     PROVIDED_VARIABLES,
     REMOTE_TRANSPORTS,
     USER_CONFIG_PREFIX,
 )
-from ai_engineer_cli.mcp.servers import McpServer
+from vibe_code_cli.mcp.servers import McpServer
 
 # `${VAR}` and `${VAR:-default}`, the two forms mcp.md:633 to mcp.md:634 lists.
 REFERENCE = re.compile(r'\$\{([A-Za-z_][\w.]*)(:-[^}]*)?\}')

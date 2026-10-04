@@ -23,7 +23,7 @@ discovery, and validation.
 | Plugin | What it does |
 | ------------ | --------------------------------------------------------------------------- |
 | mightymodels | Ticket-scoped agent dev loop: per-ticket state, model routing, review stack |
-| ai-engineer | Skills for building and hardening Claude Code agents, skills, and loops |
+| vibe-code | Skills for building and hardening Claude Code agents, skills, and loops |
 
 ### mightymodels
 
@@ -56,10 +56,10 @@ vocabularies, and the two-half brief schema are in
 directory layout are in `plugins/mightymodels/skills/prepare-handoff/references/`. When a skill
 and a contract disagree, the contract wins and the skill gets fixed.
 
-### ai-engineer
+### vibe-code
 
 Ten skills for building and hardening the agents, skills, hooks, and loops that other plugins are
-made of, plus an `ai-engineer` CLI that the skills call to validate what they write. The plugin
+made of, plus an `vibe-code` CLI that the skills call to validate what they write. The plugin
 ships no agents.
 
 | Skill | What it does |
@@ -75,17 +75,17 @@ ships no agents.
 | `plan-plugin` | Interviews you and writes a phased plugin plan and an empty plugin shell |
 | `promptlint` | Reviews and improves a coding-agent prompt for Claude Code |
 
-The CLI needs [uv](https://docs.astral.sh/uv/) on your `PATH`. The plugin's `bin/ai-engineer`
+The CLI needs [uv](https://docs.astral.sh/uv/) on your `PATH`. The plugin's `bin/vibe-code`
 shim exits with status 127 and a message when `uv` is missing, and otherwise runs the CLI from
 the pinned `requirements.lock`. The lock pins versions; installs are not hash-verified. The
-skills are standard `SKILL.md` directories under `plugins/ai-engineer/skills/`.
+skills are standard `SKILL.md` directories under `plugins/vibe-code/skills/`.
 
 ## Layout
 
 ```text
 plugins/         one directory per plugin; each carries its own manifest, skills, and agents
   mightymodels/  the dev loop: twenty skills, seven worker agents
-  ai-engineer/   authoring skills and the `ai-engineer` CLI: ten skills, no agents
+  vibe-code/   authoring skills and the `vibe-code` CLI: ten skills, no agents
 evals/           pydantic-evals harness: package source, per-skill datasets, dated results
 tests/           marketplace-wide contracts: plugin layout, manifest agreement, integrity
 docs/            human documentation for the harness and the mightymodels plugin
@@ -118,7 +118,7 @@ new skill and agent text for injection indicators without any configuration.
 The eval harness covers registered plugins, currently mightymodels: every
 measured skill ships with a baseline delta, and edits re-run the harness before they land.
 Replaying the iteration-1 mightymodels sessions grades 65 of 65 assertions with the skills on,
-against 31 of 65 without them. The ai-engineer eval cases live in `plugins/ai-engineer/evals` and
+against 31 of 65 without them. The vibe-code eval cases live in `plugins/vibe-code/evals` and
 run with `claude plugin eval`, which costs money and is not part of the gate. `evals/README.md` covers the harness;
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the gate a change has to pass, and `make ci` runs the
 whole thing: ruff, ty, shellcheck, markdownlint, the prompt-injection scan over every plugin, and

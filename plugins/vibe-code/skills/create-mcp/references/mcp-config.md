@@ -62,7 +62,7 @@ The generated project shape sets `timeout` to 120000 because the first `uv run` 
 
 `${VAR}` and `${VAR:-default}` expand in `command`, `args`, `env`, `url` and `headers`. A bare `$VAR` is not in the supported syntax, so write the braces.
 
-If a referenced variable is unset and has no default, the config still loads: Claude Code warns in `claude mcp list` and keeps the unexpanded `${VAR}` text. In a remote server's `url` and `headers`, credential variables such as `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK`, `HTTPS_PROXY` and `NPM_TOKEN` read as empty, even with a default; copy the value into a variable with a name of your own and reference that. `ai-engineer mcp validate` warns about each of these cases.
+If a referenced variable is unset and has no default, the config still loads: Claude Code warns in `claude mcp list` and keeps the unexpanded `${VAR}` text. In a remote server's `url` and `headers`, credential variables such as `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK`, `HTTPS_PROXY` and `NPM_TOKEN` read as empty, even with a default; copy the value into a variable with a name of your own and reference that. `vibe-code mcp validate` warns about each of these cases.
 
 `CLAUDE_PROJECT_DIR` is set in the server's own environment, not in Claude Code's. Referenced through `${...}` in a project or user entry it needs a default, as in `${CLAUDE_PROJECT_DIR:-.}`.
 
@@ -86,4 +86,4 @@ A remote entry has `"type": "http"`, `url`, optional `headers` (values may use `
 
 ## The uv entrypoint
 
-`[project.scripts] NAME = "PKG.cli:main"` makes `uv run NAME` start the server after `uv sync`. The generated configs launch `uv run --project <project-dir> NAME`, which resolves the environment from the project's lockfile. `ai-engineer mcp validate --check-command` runs `uv run --project ... NAME --help` to prove the entrypoint resolves before a session depends on it.
+`[project.scripts] NAME = "PKG.cli:main"` makes `uv run NAME` start the server after `uv sync`. The generated configs launch `uv run --project <project-dir> NAME`, which resolves the environment from the project's lockfile. `vibe-code mcp validate --check-command` runs `uv run --project ... NAME --help` to prove the entrypoint resolves before a session depends on it.

@@ -1,6 +1,6 @@
 import msgspec
 import pytest
-from ai_engineer_cli.hook.schema import (
+from vibe_code_cli.hook.schema import (
     AgentHook,
     CommandHook,
     EventName,

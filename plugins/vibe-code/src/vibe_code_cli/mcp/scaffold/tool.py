@@ -1,7 +1,7 @@
 from msgspec import UnsetType
 
-from ai_engineer_cli.mcp.scaffold.spec import Parameter, Spec, Tool
-from ai_engineer_cli.mcp.scaffold.text import docstring, wrap_literal
+from vibe_code_cli.mcp.scaffold.spec import Parameter, Spec, Tool
+from vibe_code_cli.mcp.scaffold.text import docstring, wrap_literal
 
 EXAMPLES = {
     'str': "'example'",

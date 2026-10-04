@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from ai_engineer_cli.findings import Finding, error, warning
+from vibe_code_cli.findings import Finding, error, warning
 
 LINE_BUDGET = 500
 RESOURCE_DIRS = ('scripts', 'references', 'assets')

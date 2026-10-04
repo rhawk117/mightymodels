@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.builtin import BuiltinUnavailableError, parse_report
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.skill import command as skill_command
+from vibe_code_cli.builtin import BuiltinUnavailableError, parse_report
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.skill import command as skill_command
 
 DESCRIPTION = 'Summarize a file. Use when the user asks for a summary of a file.'
 NAME_MAPPING = f'name: {{a: b}}\ndescription: {DESCRIPTION}\n'
@@ -40,7 +40,7 @@ def test_create_skill_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert main(['skill']) == 2
-    assert 'usage: ai-engineer' in capsys.readouterr().err
+    assert 'usage: vibe-code' in capsys.readouterr().err
 
 
 def test_clean_skill_exits_zero(

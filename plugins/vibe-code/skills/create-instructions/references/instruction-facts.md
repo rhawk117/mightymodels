@@ -55,7 +55,7 @@ There is no priority order. All discovered files are concatenated into context r
 | `src/components/*.tsx` | React components in one directory |
 
 - Brace expansion works: `src/**/*.{ts,tsx}` is two patterns.
-- Each brace group multiplies: `src/*.{ts,tsx}` expands to two patterns and `{a,b}/{c,d}/*.{ts,tsx}` to eight. A rule's whole `paths` list shares one budget of 1,000 expanded patterns and 4 MiB, and patterns without braces do not count against it. A pattern that would exceed the budget is used unexpanded, and its literal braces match no files. `ai-engineer instruction validate` errors over the 1,000 patterns; it does not check the 4 MiB half.
+- Each brace group multiplies: `src/*.{ts,tsx}` expands to two patterns and `{a,b}/{c,d}/*.{ts,tsx}` to eight. A rule's whole `paths` list shares one budget of 1,000 expanded patterns and 4 MiB, and patterns without braces do not count against it. A pattern that would exceed the budget is used unexpanded, and its literal braces match no files. `vibe-code instruction validate` errors over the 1,000 patterns; it does not check the 4 MiB half.
 - `[` starts a bracket expression. A pattern with a `[` that cannot be read as one, such as `photos [2024/**`, is invalid and matches nothing, while the rule's other patterns keep working. Escape a literal one as `photos \[2024/**`. `validate` warns on an unescaped invalid `[`.
 
 ## Size

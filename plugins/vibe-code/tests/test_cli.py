@@ -1,5 +1,5 @@
 import pytest
-from ai_engineer_cli.cli import GROUPS, build_parser, main
+from vibe_code_cli.cli import GROUPS, build_parser, main
 
 
 def test_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
@@ -7,12 +7,12 @@ def test_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
         build_parser().parse_args(['--help'])
 
     assert exit_info.value.code == 0
-    assert 'ai-engineer' in capsys.readouterr().out
+    assert 'vibe-code' in capsys.readouterr().out
 
 
 def test_main_without_a_group_prints_usage_and_fails(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([]) == 2
-    assert 'usage: ai-engineer' in capsys.readouterr().err
+    assert 'usage: vibe-code' in capsys.readouterr().err
 
 
 def test_help_lists_the_six_groups(capsys: pytest.CaptureFixture[str]) -> None:

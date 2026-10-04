@@ -95,25 +95,25 @@ scripts; Claude Code merges plugin hooks with the ones in your settings files. U
 loop runs on skills and agents alone, and `create-hooks` can build repo-specific Claude Code hooks
 independently.
 
-## The ai-engineer plugin
+## The vibe-code plugin
 
-`plugins/ai-engineer/` ships ten skills and no agents: `build-a-loop`, `create-agents-md`,
+`plugins/vibe-code/` ships ten skills and no agents: `build-a-loop`, `create-agents-md`,
 `create-hooks`, `create-instructions`, `create-mcp`, `create-skill`, `create-subagent`,
 `humanizer`, `plan-plugin`, and `promptlint`. Install it with
-`/plugin install ai-engineer@rygentic-harness`.
+`/plugin install vibe-code@rygentic-harness`.
 
-The skills call an `ai-engineer` CLI to validate what they write: `skill validate`,
+The skills call an `vibe-code` CLI to validate what they write: `skill validate`,
 `hook validate` and `hook test`, `subagent validate`, `instruction validate`,
 `mcp scaffold` and `mcp validate`, and `plugin validate`, `plugin render`, and `plugin inventory`.
 Claude Code puts a plugin's `bin/` directory on the Bash tool's `PATH` while the plugin is
-enabled, so the skills run `plugins/ai-engineer/bin/ai-engineer` by name.
+enabled, so the skills run `plugins/vibe-code/bin/vibe-code` by name.
 
 The CLI needs [uv](https://docs.astral.sh/uv/) on your `PATH`. Without it the shim exits with
 status 127 and prints a message. With it, the shim runs the CLI under Python 3.12 or newer from
-the versions pinned in `plugins/ai-engineer/requirements.lock`. The lock pins versions;
+the versions pinned in `plugins/vibe-code/requirements.lock`. The lock pins versions;
 `uv run` does not check the hash lines in it, so installs are not hash-verified.
 
-The plugin's eval cases are in `plugins/ai-engineer/evals`. Running them with
+The plugin's eval cases are in `plugins/vibe-code/evals`. Running them with
 `claude plugin eval` costs money and is not part of the quality gate.
 
 ## Known limits

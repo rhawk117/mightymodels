@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.builtin import BuiltinUnavailableError
-from ai_engineer_cli.cli import main
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.subagent import command as subagent_command
+from vibe_code_cli.builtin import BuiltinUnavailableError
+from vibe_code_cli.cli import main
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.subagent import command as subagent_command
 
 SECTIONS = ('role', 'context', 'workflow', 'constraints', 'output_format', 'verification')
 DESCRIPTION = 'Reviews code for defects. Use when the user asks for a code review.'
@@ -79,7 +79,7 @@ def test_create_subagent_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert main(['subagent']) == 2
-    assert 'usage: ai-engineer' in capsys.readouterr().err
+    assert 'usage: vibe-code' in capsys.readouterr().err
 
 
 @pytest.mark.parametrize('plugin', [False, True])

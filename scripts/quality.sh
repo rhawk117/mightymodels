@@ -28,10 +28,10 @@ usage() {
   printf 'usage: %s [--format | --lint]\n' "${0##*/}" >&2
 }
 
-check_ai_engineer_lock() {
-  NO_COLOR=1 uv export --package ai-engineer-plugin --format requirements.txt \
+check_vibe_code_lock() {
+  NO_COLOR=1 uv export --package vibe-code-plugin --format requirements.txt \
     --no-emit-project --no-emit-workspace --frozen |
-    diff - plugins/ai-engineer/requirements.lock
+    diff - plugins/vibe-code/requirements.lock
 }
 
 run_formatter() {
@@ -49,10 +49,10 @@ run_linter() {
 
   run 'ty (3.14)' uv run ty check --config-file .ty.toml
   run 'ty (3.12 skills)' uv run ty check --config-file .ty.toml \
-    --python-version 3.12 plugins/mightymodels/skills plugins/ai-engineer/skills \
-    plugins/ai-engineer/src plugins/ai-engineer/tests
+    --python-version 3.12 plugins/mightymodels/skills plugins/vibe-code/skills \
+    plugins/vibe-code/src plugins/vibe-code/tests
   run 'pytest' uv run pytest
-  run 'ai-engineer lock' check_ai_engineer_lock
+  run 'vibe-code lock' check_vibe_code_lock
 
   if ! command -v claude >/dev/null; then
     log::error 'claude not on PATH: npm install -g @anthropic-ai/claude-code'

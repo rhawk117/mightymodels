@@ -1,6 +1,6 @@
 ---
 type: regex
 target: { source: file, path: fixtures/new/tf-guard/PLAN.md }
-pattern: '(?=[\s\S]*/ai-engineer:create-hooks)(?=[\s\S]*/ai-engineer:create-skill)(?=[\s\S]*everything you would otherwise ask me)'
+pattern: '(?=[\s\S]*/vibe-code:create-hooks)(?=[\s\S]*/vibe-code:create-skill)(?=[\s\S]*everything you would otherwise ask me)'
 flags: i
 ---

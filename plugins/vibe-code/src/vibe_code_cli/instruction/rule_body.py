@@ -1,8 +1,8 @@
 import re
 from xml.parsers import expat
 
-from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.subagent.body import Tag, scan_sections, section_tags
+from vibe_code_cli.findings import Finding, error, warning
+from vibe_code_cli.subagent.body import Tag, scan_sections, section_tags
 
 # House style from the reference rule template: these sections, in this order, directly under
 # the frontmatter.

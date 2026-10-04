@@ -2,7 +2,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from ai_engineer_cli.frontmatter import parse_skill_text, split_frontmatter
+from vibe_code_cli.frontmatter import parse_skill_text, split_frontmatter
 
 UNQUOTED_DESCRIPTION = re.compile(r'^description:[ \t]*(?P<value>[^\s"\'>|].*)$', re.MULTILINE)
 

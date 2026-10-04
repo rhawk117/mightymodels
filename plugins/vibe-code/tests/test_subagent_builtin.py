@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from ai_engineer_cli.cli import main
+from vibe_code_cli.cli import main
 
 # The two tests that spawn the real `claude` are the ones taking no `monkeypatch`.
 CLEAN_BODY = ''.join(

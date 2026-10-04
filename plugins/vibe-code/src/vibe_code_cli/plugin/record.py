@@ -1,8 +1,8 @@
 import msgspec
 from msgspec import UNSET, UnsetType
 
-from ai_engineer_cli.jsondoc import as_object
-from ai_engineer_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.jsondoc import as_object
+from vibe_code_cli.plugin.kinds import KIND_SPECS
 
 PLUGIN_KINDS = ('ecosystem', 'domain', 'workflow', 'integration')
 AUDIENCE_HOW = ('solo', 'team', 'org', 'public')

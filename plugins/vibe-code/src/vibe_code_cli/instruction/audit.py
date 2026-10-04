@@ -2,9 +2,9 @@ import re
 import subprocess
 from pathlib import Path
 
-from ai_engineer_cli.findings import Finding, error, info, warning
-from ai_engineer_cli.frontmatter import parse_skill_text
-from ai_engineer_cli.instruction.files import InstructionFile, strip_code_fences
+from vibe_code_cli.findings import Finding, error, info, warning
+from vibe_code_cli.frontmatter import parse_skill_text
+from vibe_code_cli.instruction.files import InstructionFile, strip_code_fences
 
 # Claude Code loads a CLAUDE.md file of up to 4 MiB in full and skips a larger file.
 SKIP_BYTES = 4 * 1024 * 1024

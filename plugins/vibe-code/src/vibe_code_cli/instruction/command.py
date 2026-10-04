@@ -2,12 +2,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from ai_engineer_cli.findings import CannotCheckError, Finding, report
-from ai_engineer_cli.frontmatter import parse_skill_text
-from ai_engineer_cli.instruction.audit import audit_files
-from ai_engineer_cli.instruction.files import discover, read_text
-from ai_engineer_cli.instruction.rule_body import check_body
-from ai_engineer_cli.instruction.rule_fields import check_frontmatter
+from vibe_code_cli.findings import CannotCheckError, Finding, report
+from vibe_code_cli.frontmatter import parse_skill_text
+from vibe_code_cli.instruction.audit import audit_files
+from vibe_code_cli.instruction.files import discover, read_text
+from vibe_code_cli.instruction.rule_body import check_body
+from vibe_code_cli.instruction.rule_fields import check_frontmatter
 
 
 def build_group(parser: argparse.ArgumentParser) -> None:

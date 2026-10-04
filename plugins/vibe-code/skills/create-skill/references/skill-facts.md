@@ -141,7 +141,7 @@ A bang followed by a backtick-quoted shell command, on its own line or after whi
 | Skill-scoped hooks      | `hooks` frontmatter                                            |
 | Plugin launcher on PATH | files in the plugin's `bin/` are on the shell PATH while the plugin is enabled |
 
-- While a plugin is enabled, its `bin/` folder is on the PATH of the shell Claude runs commands in, so a skill's instructions can run a launcher such as `ai-engineer` by name with nothing installed by the user.
+- While a plugin is enabled, its `bin/` folder is on the PATH of the shell Claude runs commands in, so a skill's instructions can run a launcher such as `vibe-code` by name with nothing installed by the user.
 
 ## Skill or something else
 

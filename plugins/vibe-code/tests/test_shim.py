@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-SHIM = Path(__file__).resolve().parents[1] / 'bin' / 'ai-engineer'
+SHIM = Path(__file__).resolve().parents[1] / 'bin' / 'vibe-code'
 
 
 def test_shim_without_uv_exits_127_naming_uv(tmp_path: Path) -> None:

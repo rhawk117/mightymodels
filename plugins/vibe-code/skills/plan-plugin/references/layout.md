@@ -23,7 +23,7 @@ NAME/
 
 The manifest lives in `.claude-plugin/`; every other file sits at the plugin root, never inside `.claude-plugin/`. Claude Code does not load a `CLAUDE.md` at the plugin root and `claude plugin validate` warns when it finds one, so instructions that must reach Claude go in a skill. The kinds this toolkit plans are the eight in `SKILL.md`; the standard layout has more directories (workflows, themes, monitors, a plugin `settings.json`) that the plan does not cover.
 
-`ai-engineer plugin render` draws this tree for the components in the record and creates the directory each planned component owns: `skills/<name>/`, `hooks/`, `agents/`, `mcp/<name>/`, `bin/`, `output-styles/`. The LSP kind creates none because `.lsp.json` is a file. Nothing is written inside those directories; the builder sessions fill them.
+`vibe-code plugin render` draws this tree for the components in the record and creates the directory each planned component owns: `skills/<name>/`, `hooks/`, `agents/`, `mcp/<name>/`, `bin/`, `output-styles/`. The LSP kind creates none because `.lsp.json` is a file. Nothing is written inside those directories; the builder sessions fill them.
 
 ## Names and namespacing
 

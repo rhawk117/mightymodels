@@ -3,12 +3,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from ai_engineer_cli.builtin import run_builtin
-from ai_engineer_cli.findings import CannotCheckError, Finding, report
-from ai_engineer_cli.hook.checks import check_hooks
-from ai_engineer_cli.hook.file import HooksFile, load_hooks_file
-from ai_engineer_cli.hook.nodes import SchemaFinding, decode_hooks
-from ai_engineer_cli.hook.runner import Expectations, HookTest, check_hook, parse_field_expectation
+from vibe_code_cli.builtin import run_builtin
+from vibe_code_cli.findings import CannotCheckError, Finding, report
+from vibe_code_cli.hook.checks import check_hooks
+from vibe_code_cli.hook.file import HooksFile, load_hooks_file
+from vibe_code_cli.hook.nodes import SchemaFinding, decode_hooks
+from vibe_code_cli.hook.runner import Expectations, HookTest, check_hook, parse_field_expectation
 
 DEFAULT_TEST_TIMEOUT_SECONDS = 15.0
 

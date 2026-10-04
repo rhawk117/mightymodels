@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
-from ai_engineer_cli.plugin.kinds import KIND_SPECS
-from ai_engineer_cli.plugin.record import Component, Plan
+from vibe_code_cli.plugin.kinds import KIND_SPECS
+from vibe_code_cli.plugin.record import Component, Plan
 
 MANIFEST_PATH = '.claude-plugin/plugin.json'
 RENDERED_FILES = (MANIFEST_PATH, 'README.md', 'PLAN.md', 'plugin-plan.json')
