@@ -2,25 +2,46 @@ import msgspec
 
 from ai_engineer_cli.plugin.record import Plan
 
+MODELLED_KEYS = (
+    'name',
+    'version',
+    'description',
+    'keywords',
+    'author',
+    'license',
+    'homepage',
+    'repository',
+    'userConfig',
+    'dependencies',
+)
+ALWAYS_WRITTEN = 4
+
 
 def manifest_document(plan: Plan) -> dict[str, object]:
     """The `plugin.json` fields the record sets; `author`, `license` and the rest only when set."""
-    manifest: dict[str, object] = {
-        'name': plan.name,
-        'version': plan.version,
-        'description': plan.description,
-        'keywords': plan.keywords,
+    values = (
+        plan.name,
+        plan.version,
+        plan.description,
+        plan.keywords,
+        plan.author,
+        plan.license,
+        plan.homepage,
+        plan.repository,
+        plan.user_config,
+        plan.dependencies,
+    )
+    return {
+        key: msgspec.to_builtins(value)
+        for position, (key, value) in enumerate(zip(MODELLED_KEYS, values, strict=True))
+        if position < ALWAYS_WRITTEN or value
     }
-    optional = {
-        'author': plan.author,
-        'license': plan.license,
-        'homepage': plan.homepage,
-        'repository': plan.repository,
-        'userConfig': plan.user_config,
-        'dependencies': plan.dependencies,
-    }
-    manifest.update({key: msgspec.to_builtins(value) for key, value in optional.items() if value})
-    return manifest
+
+
+def merged_manifest_text(plan: Plan, existing: dict[str, object]) -> str:
+    """The record's keys, then every key of the existing manifest the record does not model."""
+    kept = {key: value for key, value in existing.items() if key not in MODELLED_KEYS}
+    return json_text({**manifest_document(plan), **kept})
 
 
 def manifest_text(plan: Plan) -> str:

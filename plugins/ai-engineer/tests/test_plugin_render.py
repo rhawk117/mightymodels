@@ -317,6 +317,68 @@ def test_force_rewrites_the_plan_files_and_deletes_nothing(tmp_path: Path) -> No
     assert manifest_of(tmp_path / 'out')['version'] == '0.2.0'
 
 
+def test_force_keeps_the_manifest_keys_the_record_does_not_model(tmp_path: Path) -> None:
+    target = tmp_path / 'plugin'
+    (target / '.claude-plugin').mkdir(parents=True)
+    (target / 'custom').mkdir()
+    (target / 'custom' / 'hooks.json').write_text('{"hooks": {}}')
+    kept = {
+        'hooks': './custom/hooks.json',
+        'mcpServers': {'db': {'command': 'uvx', 'args': ['db-tools']}},
+        'displayName': 'Py Harness',
+    }
+    manifest = {
+        'name': 'py-harness',
+        'version': '0.1.0',
+        'description': 'Conventions.',
+        'author': {'name': 'Platform Team'},
+        **kept,
+    }
+    (target / '.claude-plugin' / 'plugin.json').write_text(json.dumps(manifest))
+    record = tmp_path / 'record.json'
+    assert main(['plugin', 'inventory', str(target), '--out', str(record)]) == 0
+
+    assert render(record, target, '--force') == 0
+
+    rewritten = manifest_of(target)
+    assert {key: rewritten[key] for key in kept} == kept
+    assert claude_validate(target).returncode == 0
+
+
+def test_force_writes_the_modelled_manifest_keys_from_the_record(tmp_path: Path) -> None:
+    plan = write_plan(tmp_path, license='MIT')
+    assert render(plan, tmp_path / 'out') == 0
+    manifest = tmp_path / 'out' / '.claude-plugin' / 'plugin.json'
+    manifest.write_text(
+        json.dumps({'name': 'old', 'version': '9.9.9', 'keywords': ['old'], 'license': 'MIT'})
+    )
+
+    changed = write_plan(tmp_path, version='0.2.0', keywords=['new'])
+    assert render(changed, tmp_path / 'out', '--force') == 0
+
+    rewritten = manifest_of(tmp_path / 'out')
+    assert rewritten['version'] == '0.2.0'
+    assert rewritten['keywords'] == ['new']
+    assert 'license' not in rewritten
+
+
+@pytest.mark.parametrize('content', ['{not json', '["name"]'])
+def test_force_refuses_a_manifest_that_is_not_a_json_object_and_writes_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], content: str
+) -> None:
+    plan = write_plan(tmp_path)
+    target = tmp_path / 'out'
+    manifest = target / '.claude-plugin' / 'plugin.json'
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(content)
+
+    assert render(plan, target, '--force') == 1
+
+    assert str(manifest) in capsys.readouterr().err
+    assert manifest.read_text() == content
+    assert not (target / 'PLAN.md').exists()
+
+
 def test_every_path_render_writes_resolves_inside_the_target(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -2,8 +2,9 @@ from pathlib import Path
 
 import msgspec
 
+from ai_engineer_cli.jsondoc import as_object
 from ai_engineer_cli.plugin.layout import MANIFEST_PATH, planned_directories
-from ai_engineer_cli.plugin.manifest import json_text, manifest_text
+from ai_engineer_cli.plugin.manifest import json_text, manifest_text, merged_manifest_text
 from ai_engineer_cli.plugin.plan_md import render_plan_md, render_readme
 from ai_engineer_cli.plugin.record import Plan
 
@@ -30,10 +31,23 @@ def inside(root: Path, relative: str) -> Path:
     return path
 
 
+def forced_manifest_text(plan: Plan, manifest: Path) -> str:
+    """The manifest text to write over an existing one; a refusal when that is not a JSON object."""
+    try:
+        existing = as_object(msgspec.json.decode(manifest.read_bytes()))
+    except msgspec.DecodeError:
+        existing = None
+    if existing is None:
+        message = f'{manifest} is not a JSON object; fix or remove it before --force'
+        raise RenderRefusedError(message)
+    return merged_manifest_text(plan, existing)
+
+
 def render(plan: Plan, target: Path, *, force: bool) -> list[str]:
     """Write the four plan files and the planned directories under target; return their paths.
 
     Every path is resolved inside target before the first write, and nothing is deleted.
+    Over an existing manifest, keys the record does not model are kept.
     """
     root = target.resolve()
     if root.exists() and not root.is_dir():
@@ -41,9 +55,12 @@ def render(plan: Plan, target: Path, *, force: bool) -> list[str]:
         raise RenderRefusedError(message)
     files = {inside(root, name): text for name, text in plan_files(plan, root).items()}
     directories = [inside(root, name) for name in planned_directories(plan)]
-    if inside(root, MANIFEST_PATH).exists() and not force:
+    manifest = inside(root, MANIFEST_PATH)
+    if manifest.exists() and not force:
         message = f'{target / MANIFEST_PATH} exists; pass --force to rewrite the plan files'
         raise RenderRefusedError(message)
+    if manifest.exists():
+        files[manifest] = forced_manifest_text(plan, manifest)
     for path, text in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding='utf-8')
