@@ -1,12 +1,11 @@
 import json
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NoReturn
+
+import msgspec
 
 from ai_engineer_cli.findings import CannotCheckError
-
-type JsonObject = dict[str, object]
+from ai_engineer_cli.jsondoc import JsonObject, as_object, duplicate_keys
 
 
 @dataclass(frozen=True)
@@ -57,33 +56,8 @@ def load_hooks_file(path: Path) -> HooksFile:
     except (OSError, UnicodeError) as problem:
         message = f'could not read {path}: {problem}'
         raise CannotCheckError(message) from problem
-    value, duplicate_keys = parse_json(text)
-    config = as_object(value)
-    return HooksFile(path, text, config, duplicate_keys)
-
-
-def as_object(value: object) -> JsonObject | None:
-    if not isinstance(value, dict):
-        return None
-    return {key: item for key, item in value.items() if isinstance(key, str)}
-
-
-def parse_json(text: str) -> tuple[object, tuple[str, ...]]:
-    """Parse text, collecting repeated keys; unparseable text gives None."""
-    duplicates: list[str] = []
-
-    def collect(pairs: list[tuple[str, object]]) -> JsonObject:
-        counts = Counter(key for key, _ in pairs)
-        duplicates.extend(key for key, count in counts.items() if count > 1)
-        return dict(pairs)
-
     try:
-        value = json.loads(text, object_pairs_hook=collect, parse_constant=reject_constant)
-    except ValueError:
-        return None, ()
-    return value, tuple(duplicates)
-
-
-def reject_constant(constant: str) -> NoReturn:
-    message = f'invalid JSON numeric constant {constant!r}'
-    raise ValueError(message)
+        value = msgspec.json.decode(text)
+    except msgspec.DecodeError:
+        return HooksFile(path, text, None, ())
+    return HooksFile(path, text, as_object(value), duplicate_keys(text))

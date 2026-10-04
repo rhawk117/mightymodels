@@ -111,6 +111,11 @@ def check_agent(text: str, *, plugin: bool, builtin_errored: bool) -> list[Findi
     findings: list[Finding] = []
     if agent.fields is not None:
         findings.extend(
-            check_fields(agent.fields, plugin=plugin, unquoted_colon=agent.unquoted_colon)
+            check_fields(
+                agent.fields,
+                plugin=plugin,
+                unquoted_colon=agent.unquoted_colon,
+                builtin_errored=builtin_errored,
+            )
         )
     return [*findings, *check_body(agent.body)]

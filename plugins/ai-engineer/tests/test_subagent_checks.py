@@ -88,7 +88,7 @@ def test_va_3_la_1_la_2_are_left_to_the_builtin_in_a_plugin_agents_directory(
     assert 'frontmatter block' not in output
 
 
-@pytest.mark.parametrize('name', [None, '', '[a, b]'])
+@pytest.mark.parametrize('name', [None, ''])
 def test_va_5_la_12_missing_name_is_an_error_in_claude_agents(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], name: str | None
 ) -> None:
@@ -96,6 +96,15 @@ def test_va_5_la_12_missing_name_is_an_error_in_claude_agents(
 
     assert code == 1
     assert 'error: name is missing or empty' in output
+
+
+def test_a_name_of_the_wrong_type_prints_the_decoder_message(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, output = check(tmp_path, capsys, agent_text({'name': '[a, b]'}))
+
+    assert code == 1
+    assert 'error: Expected `str | null`, got `array` - at `$.name`' in output
 
 
 def test_sa_c11_missing_name_in_a_plugin_agents_directory_is_a_warning(

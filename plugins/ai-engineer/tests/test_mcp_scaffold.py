@@ -337,7 +337,11 @@ def test_spec_values_are_not_printed_by_a_rejection_or_a_success(
 
 @pytest.mark.parametrize(
     ('spec_text', 'reason'),
-    [('{not json', 'not valid JSON'), ('[]', 'JSON object'), ('{"name": "a"}', 'tool')],
+    [
+        ('{not json', 'not valid JSON'),
+        ('[]', 'Expected `object`, got `array`'),
+        ('{"name": "a"}', 'tool'),
+    ],
 )
 def test_spec_it_rejects_exits_two_with_a_reason(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], spec_text: str, reason: str
@@ -347,6 +351,63 @@ def test_spec_it_rejects_exits_two_with_a_reason(
 
     assert scaffold(spec, tmp_path / 'out') == 2
     assert reason in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ('spec_text', 'reason'),
+    [
+        ('{"name": 7}', 'Expected `str`, got `int` - at `$.name`'),
+        ('{"name": "a", "tools": {}}', 'Expected `array`, got `object` - at `$.tools`'),
+        ('{"name": "a", "tools": [{"confirm": "yes"}]}', 'at `$.tools[0].confirm`'),
+        ('{"name": "a", "tools": [{"max_result_chars": 0}]}', 'at `$.tools[0].max_result_chars`'),
+    ],
+)
+def test_a_value_of_the_wrong_type_prints_the_decoder_message_and_writes_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], spec_text: str, reason: str
+) -> None:
+    spec = tmp_path / 'spec.json'
+    spec.write_text(spec_text)
+    target = tmp_path / 'out'
+
+    assert scaffold(spec, target) == 2
+    assert reason in capsys.readouterr().err
+    assert not target.exists()
+
+
+@pytest.mark.parametrize(
+    'text',
+    ['has a \\u007f in it', 'has a \\u0001 in it', 'has a \\u000b in it', 'has a \\ud800 in it'],
+)
+def test_control_characters_and_lone_surrogates_in_spec_text_are_rejected_before_any_write(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str
+) -> None:
+    spec = tmp_path / 'spec.json'
+    spec.write_text(json.dumps(example_spec(description='x')).replace('"x"', f'"{text}"'))
+    target = tmp_path / 'out'
+
+    assert scaffold(spec, target) == 2
+    assert 'has a' not in capsys.readouterr().err
+    assert not target.exists()
+
+
+def test_tab_newline_and_carriage_return_are_allowed_in_spec_text(tmp_path: Path) -> None:
+    target = tmp_path / 'out'
+    spec = write_spec(tmp_path, example_spec(description='one\ttwo\nthree\r\nfour'))
+
+    assert scaffold(spec, target) == 0
+
+
+def test_the_record_keeps_the_spec_keys_in_order_and_appends_the_defaults(
+    tmp_path: Path,
+) -> None:
+    target = scaffolded(tmp_path)
+    record = json.loads((target / 'mcp-spec.json').read_text())
+    written = example_spec()
+
+    assert list(record)[: len(written)] == list(written)
+    assert list(record)[len(written) :] == ['package', 'always_load']
+    assert record['scope'] == 'project'
+    assert list(record['tools'][1])[-3:] == ['binary', 'arguments', 'confirm']
 
 
 def test_missing_spec_exits_two(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

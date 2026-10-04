@@ -1,6 +1,9 @@
 import re
 
-from ai_engineer_cli.findings import Finding, error, warning
+import msgspec
+from msgspec import UNSET, UnsetType
+
+from ai_engineer_cli.findings import Finding, decode_problem, error, warning
 from ai_engineer_cli.subagent.tools import is_known_tool, tool_entries, tool_name
 
 # The 18 keys in the frontmatter table of https://code.claude.com/docs/en/sub-agents (docs
@@ -39,20 +42,42 @@ TRIGGER_PATTERN = re.compile(
 )
 
 
-def check_fields(fields: dict[str, object], *, plugin: bool, unquoted_colon: bool) -> list[Finding]:
+class AgentFrontmatter(msgspec.Struct, rename='camel'):
+    """The frontmatter keys the checks read, typed as the sub-agents page shows them.
+
+    A key left unset is absent; the keys that accept null read it as absent too.
+    """
+
+    name: str | None = None
+    description: str | None = None
+    tools: str | list[str] | None = None
+    disallowed_tools: str | list[str] | UnsetType = UNSET
+    model: str | None = None
+    permission_mode: str | None = None
+    max_turns: int | UnsetType = UNSET
+
+
+def check_fields(
+    fields: dict[str, object], *, plugin: bool, unquoted_colon: bool, builtin_errored: bool
+) -> list[Finding]:
+    unknown = check_unknown_keys(fields)
+    try:
+        frontmatter = msgspec.convert(fields, AgentFrontmatter)
+    except msgspec.ValidationError as problem:
+        return [*unknown, *decode_problem(problem, builtin_errored=builtin_errored)]
     return [
-        *check_name(fields, plugin=plugin),
-        *check_description(fields, unquoted_colon=unquoted_colon),
-        *check_tools(fields),
-        *check_model(fields),
-        *check_unknown_keys(fields),
-        *check_permission_mode(fields, plugin=plugin),
+        *check_name(frontmatter, plugin=plugin),
+        *check_description(frontmatter, unquoted_colon=unquoted_colon),
+        *check_tools(frontmatter),
+        *check_model(frontmatter),
+        *unknown,
+        *check_permission_mode(frontmatter, fields, plugin=plugin),
     ]
 
 
-def check_name(fields: dict[str, object], *, plugin: bool) -> list[Finding]:
-    name = fields.get('name')
-    if isinstance(name, str) and name.strip():
+def check_name(frontmatter: AgentFrontmatter, *, plugin: bool) -> list[Finding]:
+    name = frontmatter.name
+    if name is not None and name.strip():
         return check_name_value(name)
     if plugin:
         return [warning('name is missing or empty; a plugin agent loads under its filename')]
@@ -70,9 +95,9 @@ def check_name_value(name: str) -> list[Finding]:
     ]
 
 
-def check_description(fields: dict[str, object], *, unquoted_colon: bool) -> list[Finding]:
-    description = fields.get('description')
-    if not isinstance(description, str) or not description.strip():
+def check_description(frontmatter: AgentFrontmatter, *, unquoted_colon: bool) -> list[Finding]:
+    description = frontmatter.description
+    if description is None or not description.strip():
         return []  # the built-in warns about a missing description
     findings: list[Finding] = []
     if not TRIGGER_PATTERN.search(description):
@@ -92,8 +117,8 @@ def check_description(fields: dict[str, object], *, unquoted_colon: bool) -> lis
     return findings
 
 
-def check_tools(fields: dict[str, object]) -> list[Finding]:
-    entries = tool_entries(fields.get('tools'))
+def check_tools(frontmatter: AgentFrontmatter) -> list[Finding]:
+    entries = tool_entries(frontmatter.tools)
     if entries is None:
         return [
             warning(
@@ -105,8 +130,8 @@ def check_tools(fields: dict[str, object]) -> list[Finding]:
         return []  # an empty list launches the agent with no tools (errors page)
     return [
         *check_tool_names(entries),
-        *check_denylist(fields),
-        *check_turn_budget(entries, fields),
+        *check_denylist(frontmatter),
+        *check_turn_budget(entries, frontmatter),
     ]
 
 
@@ -121,8 +146,8 @@ def check_tool_names(entries: list[str]) -> list[Finding]:
     ]
 
 
-def check_denylist(fields: dict[str, object]) -> list[Finding]:
-    if 'disallowedTools' not in fields:
+def check_denylist(frontmatter: AgentFrontmatter) -> list[Finding]:
+    if isinstance(frontmatter.disallowed_tools, UnsetType):
         return []
     return [
         warning(
@@ -133,17 +158,17 @@ def check_denylist(fields: dict[str, object]) -> list[Finding]:
     ]
 
 
-def check_turn_budget(entries: list[str], fields: dict[str, object]) -> list[Finding]:
-    if 'Bash' not in map(tool_name, entries) or 'maxTurns' in fields:
+def check_turn_budget(entries: list[str], frontmatter: AgentFrontmatter) -> list[Finding]:
+    if 'Bash' not in map(tool_name, entries) or not isinstance(frontmatter.max_turns, UnsetType):
         return []
     return [
         warning('agent can run commands but sets no maxTurns; a runaway delegation has no stop')
     ]
 
 
-def check_model(fields: dict[str, object]) -> list[Finding]:
-    model = fields.get('model')
-    if not isinstance(model, str) or MODEL_PATTERN.fullmatch(model) or '-' in model:
+def check_model(frontmatter: AgentFrontmatter) -> list[Finding]:
+    model = frontmatter.model
+    if model is None or MODEL_PATTERN.fullmatch(model) or '-' in model:
         return []
     return [
         error(
@@ -160,14 +185,16 @@ def check_unknown_keys(fields: dict[str, object]) -> list[Finding]:
     ]
 
 
-def check_permission_mode(fields: dict[str, object], *, plugin: bool) -> list[Finding]:
+def check_permission_mode(
+    frontmatter: AgentFrontmatter, fields: dict[str, object], *, plugin: bool
+) -> list[Finding]:
     if plugin:
         return [
             warning(f'{key!r} is ignored in a plugin agents/ directory; Claude Code drops it')
             for key in PLUGIN_IGNORED_KEYS
             if key in fields
         ]
-    if fields.get('permissionMode') != 'bypassPermissions':
+    if frontmatter.permission_mode != 'bypassPermissions':
         return []
     return [
         warning(

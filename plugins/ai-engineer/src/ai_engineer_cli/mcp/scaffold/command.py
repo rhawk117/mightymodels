@@ -44,9 +44,9 @@ def prepare(arguments: argparse.Namespace) -> tuple[Spec, dict[str, str]]:
     if not template.is_dir():
         message = f'template {template} is not a directory'
         raise CannotCheckError(message)
-    spec = load_spec(arguments.spec)
+    loaded = load_spec(arguments.spec)
     occupied = target.exists() and (not target.is_dir() or any(target.iterdir()))
     if occupied and not arguments.force:
         message = f'{target} is not empty; pass --force to overwrite template-owned files'
         raise CannotCheckError(message)
-    return spec, plan_project(spec, template)
+    return loaded.spec, plan_project(loaded, template)

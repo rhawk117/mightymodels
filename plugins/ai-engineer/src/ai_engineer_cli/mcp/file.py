@@ -2,8 +2,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import msgspec
+
 from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.hook.file import reject_constant
+from ai_engineer_cli.jsondoc import Json
 
 KINDS = ('plugin', 'project', 'user')
 SERVER_FILE_NAME = '.mcp.json'
@@ -21,7 +23,7 @@ class McpFile:
     path: Path
     kind: str
     text: str
-    document: object
+    document: Json
     valid_json: bool
 
     @property
@@ -43,7 +45,7 @@ def load_mcp_file(path: Path, kind: str) -> McpFile:
         message = f'could not read {path}: {problem}'
         raise CannotCheckError(message) from problem
     try:
-        document = json.loads(text, parse_constant=reject_constant)
-    except ValueError:
+        document = msgspec.json.decode(text)
+    except msgspec.DecodeError:
         return McpFile(path, kind, text, document=None, valid_json=False)
     return McpFile(path, kind, text, document=document, valid_json=True)

@@ -2,7 +2,10 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from ai_engineer_cli.findings import Finding, error, warning
+import msgspec
+from msgspec import UNSET, UnsetType
+
+from ai_engineer_cli.findings import Finding, decode_problem, error, warning
 
 # The 20 keys in the Claude Code skills frontmatter table.
 KNOWN_KEYS = frozenset(
@@ -37,18 +40,43 @@ NAME_PATTERN = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*')
 TOOL_RULE = re.compile(r'\*|[A-Za-z][A-Za-z0-9_.*-]*(?:\([^()\r\n]+\))?')
 TRUE_VALUES = frozenset({'true', 'yes', 'on', '1'})
 FALSE_VALUES = frozenset({'false', 'no', 'off', '0'})
-INVOCATION_FLAGS = ('disable-model-invocation', 'user-invocable')
 
 
-def check_fields(fields: dict[str, object], directory_name: str) -> list[Finding]:
+class SkillFrontmatter(msgspec.Struct, rename='kebab'):
+    """The frontmatter keys the checks read, typed as the skills page shows them.
+
+    A key left unset is absent; `name`, `description` and `when_to_use` also accept null, which
+    the checks read as absent. A flag is a YAML bool, a number, or a string such as `No` or `ON`.
+    A string `metadata` is allowed because the built-in only warns that Claude Code drops it.
+    """
+
+    name: str | None = None
+    description: str | None = None
+    when_to_use: str | None = msgspec.field(name='when_to_use', default=None)
+    license: str | UnsetType = UNSET
+    compatibility: str | UnsetType = UNSET
+    argument_hint: str | UnsetType = UNSET
+    metadata: dict[str, str] | str | UnsetType = UNSET
+    allowed_tools: str | list[str] | UnsetType = UNSET
+    disable_model_invocation: bool | int | str | UnsetType = UNSET
+    user_invocable: bool | int | str | UnsetType = UNSET
+
+
+def check_fields(
+    fields: dict[str, object], directory_name: str, *, builtin_errored: bool
+) -> list[Finding]:
+    unknown = check_unknown_keys(fields)
+    try:
+        frontmatter = msgspec.convert(fields, SkillFrontmatter)
+    except msgspec.ValidationError as problem:
+        return [*unknown, *decode_problem(problem, builtin_errored=builtin_errored)]
     return [
-        *check_unknown_keys(fields),
-        *check_name(fields, directory_name),
-        *check_description(fields),
-        *check_optional_strings(fields),
-        *check_metadata(fields),
-        *check_invocation(fields),
-        *check_allowed_tools(fields),
+        *unknown,
+        *check_name(frontmatter, directory_name),
+        *check_description(frontmatter),
+        *check_optional_strings(frontmatter),
+        *check_invocation(frontmatter),
+        *check_allowed_tools(frontmatter),
     ]
 
 
@@ -56,13 +84,10 @@ def check_unknown_keys(fields: dict[str, object]) -> list[Finding]:
     return [error(f'unknown frontmatter field {key!r}') for key in fields if key not in KNOWN_KEYS]
 
 
-def check_name(fields: dict[str, object], directory_name: str) -> list[Finding]:
-    name = fields.get('name')
-    if name is None:
+def check_name(frontmatter: SkillFrontmatter, directory_name: str) -> list[Finding]:
+    if frontmatter.name is None:
         return [warning('name is missing; Claude Code falls back to the directory name')]
-    if not isinstance(name, str):
-        return []
-    return check_name_value(name, directory_name)
+    return check_name_value(frontmatter.name, directory_name)
 
 
 def check_name_value(name: str, directory_name: str) -> list[Finding]:
@@ -80,9 +105,9 @@ def check_name_value(name: str, directory_name: str) -> list[Finding]:
     return []
 
 
-def check_description(fields: dict[str, object]) -> list[Finding]:
-    description = fields.get('description')
-    if not isinstance(description, str):
+def check_description(frontmatter: SkillFrontmatter) -> list[Finding]:
+    description = frontmatter.description
+    if description is None:
         return []
     if not description.strip():
         return [error('description must not be empty')]
@@ -91,8 +116,7 @@ def check_description(fields: dict[str, object]) -> list[Finding]:
         findings.append(
             error(f'description is {len(description)} chars; the limit is {DESCRIPTION_MAX}')
         )
-    when_to_use = fields.get('when_to_use')
-    listing_length = len(description) + (len(when_to_use) if isinstance(when_to_use, str) else 0)
+    listing_length = len(description) + len(frontmatter.when_to_use or '')
     if listing_length > LISTING_MAX:
         findings.append(
             warning(
@@ -103,38 +127,24 @@ def check_description(fields: dict[str, object]) -> list[Finding]:
     return findings
 
 
-def check_optional_strings(fields: dict[str, object]) -> list[Finding]:
+def check_optional_strings(frontmatter: SkillFrontmatter) -> list[Finding]:
     return [
-        *optional_string(fields, 'license', None),
-        *optional_string(fields, 'compatibility', COMPATIBILITY_MAX),
-        *optional_string(fields, 'argument-hint', None),
+        *optional_string('license', frontmatter.license, None),
+        *optional_string('compatibility', frontmatter.compatibility, COMPATIBILITY_MAX),
+        *optional_string('argument-hint', frontmatter.argument_hint, None),
     ]
 
 
-def optional_string(fields: dict[str, object], key: str, max_length: int | None) -> list[Finding]:
-    if key not in fields:
+def optional_string(key: str, value: str | UnsetType, max_length: int | None) -> list[Finding]:
+    if isinstance(value, UnsetType):
         return []
-    value = fields[key]
-    if not isinstance(value, str):
-        problem = f'{key} must be a string, got {type(value).__name__}'
-    elif not value.strip():
+    if not value.strip():
         problem = f'{key} must not be empty when provided'
     elif max_length is not None and len(value) > max_length:
         problem = f'{key} is {len(value)} chars; the limit is {max_length}'
     else:
         return []
     return [error(problem)]
-
-
-def check_metadata(fields: dict[str, object]) -> list[Finding]:
-    metadata = fields.get('metadata')
-    if not isinstance(metadata, dict):
-        return []
-    return [
-        error(f'metadata must contain only string keys and string values; got {key!r}: {value!r}')
-        for key, value in metadata.items()
-        if not isinstance(key, str) or not isinstance(value, str)
-    ]
 
 
 def as_flag(value: object) -> bool | None:
@@ -146,10 +156,16 @@ def as_flag(value: object) -> bool | None:
     return None
 
 
-def check_invocation(fields: dict[str, object]) -> list[Finding]:
-    flags = {key: as_flag(fields[key]) for key in INVOCATION_FLAGS if key in fields}
+def check_invocation(frontmatter: SkillFrontmatter) -> list[Finding]:
+    written = {
+        'disable-model-invocation': frontmatter.disable_model_invocation,
+        'user-invocable': frontmatter.user_invocable,
+    }
+    flags = {
+        key: as_flag(value) for key, value in written.items() if not isinstance(value, UnsetType)
+    }
     findings = [
-        error(f'{key} must be true or false (or yes, no, on, off, 1, 0), got {fields[key]!r}')
+        error(f'{key} must be true or false (or yes, no, on, off, 1, 0), got {written[key]!r}')
         for key, flag in flags.items()
         if flag is None
     ]
@@ -161,7 +177,7 @@ def check_invocation(fields: dict[str, object]) -> list[Finding]:
                 'neither user-invocable nor model-invocable'
             )
         )
-    if human_only and 'argument-hint' not in fields:
+    if human_only and isinstance(frontmatter.argument_hint, UnsetType):
         findings.append(
             warning('human-only skill has no argument-hint for the slash-command picker')
         )
@@ -191,14 +207,12 @@ def split_tool_string(text: str) -> list[str]:
     return entries
 
 
-def check_allowed_tools(fields: dict[str, object]) -> list[Finding]:
-    value = fields.get('allowed-tools')
+def check_allowed_tools(frontmatter: SkillFrontmatter) -> list[Finding]:
+    value = frontmatter.allowed_tools
     if isinstance(value, str):
         return check_tool_string(value)
     if isinstance(value, list):
-        items = [item.strip() for item in value if isinstance(item, str)]
-        if len(items) == len(value):
-            return check_tool_list(items)
+        return check_tool_list([item.strip() for item in value])
     return []
 
 

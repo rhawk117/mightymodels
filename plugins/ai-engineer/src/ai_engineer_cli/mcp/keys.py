@@ -35,8 +35,3 @@ CREDENTIAL_VARIABLES = frozenset(
         'NPM_TOKEN',
     }
 )
-
-
-def is_remote(server: dict[str, object]) -> bool:
-    transport = server.get('type')
-    return isinstance(transport, str) and transport in REMOTE_TRANSPORTS

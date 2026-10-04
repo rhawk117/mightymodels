@@ -221,7 +221,7 @@ def test_m2_top_level_array_exits_one(
     stub_builtin(monkeypatch)
 
     assert validate('plugin', write_config(tmp_path, [])) == 1
-    assert 'must be a JSON object' in capsys.readouterr().out
+    assert 'error: Expected `object`, got `array`' in capsys.readouterr().out
 
 
 def test_m4_extra_top_level_key_beside_the_servers_exits_one(
@@ -248,7 +248,7 @@ def test_m6_servers_that_are_not_an_object_exits_one(
     stub_builtin(monkeypatch)
 
     assert validate('plugin', write_config(tmp_path, {'mcpServers': []})) == 1
-    assert 'mcpServers must be an object' in capsys.readouterr().out
+    assert 'error: Expected `object`, got `array` - at `$.mcpServers`' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -606,10 +606,22 @@ def test_check_command_does_not_run_a_remote_or_malformed_server(
     stub_builtin(monkeypatch)
     servers: dict[str, object] = {
         'api': HTTP_SERVER,
-        'bad': {'command': 'no-such-command-xyz', 'args': 'x'},
+        'bad': {'args': ['no-such-command-xyz']},
     }
 
     assert validate('plugin', servers_file(tmp_path, servers), '--check-command') == 0
+
+
+def test_check_command_does_not_run_a_server_whose_value_has_the_wrong_type(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stub_builtin(monkeypatch)
+    servers: dict[str, object] = {'bad': {'command': 'no-such-command-xyz', 'args': 'x'}}
+
+    assert validate('plugin', servers_file(tmp_path, servers), '--check-command') == 1
+    output = capsys.readouterr().out
+    assert 'Expected `array`, got `str` - at `$.mcpServers[...].args`' in output
+    assert 'not found on PATH' not in output
 
 
 def test_check_command_for_a_project_file_runs_in_the_current_directory(

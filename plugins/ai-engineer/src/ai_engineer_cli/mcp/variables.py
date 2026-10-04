@@ -5,9 +5,10 @@ from ai_engineer_cli.findings import Finding, warning
 from ai_engineer_cli.mcp.keys import (
     CREDENTIAL_VARIABLES,
     PROVIDED_VARIABLES,
+    REMOTE_TRANSPORTS,
     USER_CONFIG_PREFIX,
-    is_remote,
 )
+from ai_engineer_cli.mcp.servers import McpServer
 
 # `${VAR}` and `${VAR:-default}`, the two forms mcp.md:633 to mcp.md:634 lists.
 REFERENCE = re.compile(r'\$\{([A-Za-z_][\w.]*)(:-[^}]*)?\}')
@@ -15,13 +16,13 @@ BARE_REFERENCE = re.compile(r'\$[A-Za-z_]\w*')
 REMOTE_LOCATIONS = ('url', 'headers.')
 
 
-def variable_findings(name: str, server: dict[str, object]) -> list[Finding]:
+def variable_findings(name: str, server: McpServer) -> list[Finding]:
     """Rows MC-A9 and MC-B4: variable references in the places Claude Code expands them.
 
     A finding names the variable and the key, never the value, because `env` and `headers`
     hold credentials.
     """
-    remote = is_remote(server)
+    remote = server.type in REMOTE_TRANSPORTS
     findings: list[Finding] = []
     for location, text in expandable_values(server):
         credentials_empty = remote and location.startswith(REMOTE_LOCATIONS)
@@ -31,16 +32,12 @@ def variable_findings(name: str, server: dict[str, object]) -> list[Finding]:
     return findings
 
 
-def expandable_values(server: dict[str, object]) -> list[tuple[str, str]]:
+def expandable_values(server: McpServer) -> list[tuple[str, str]]:
     """The string values of `command`, `args`, `env`, `url` and `headers` (mcp.md:640 to 644)."""
-    candidates = [(key, server.get(key)) for key in ('command', 'url')]
-    args = server.get('args')
-    if isinstance(args, list):
-        candidates.extend((f'args[{index}]', value) for index, value in enumerate(args))
-    for key in ('env', 'headers'):
-        mapping = server.get(key)
-        if isinstance(mapping, dict):
-            candidates.extend((f'{key}.{entry}', value) for entry, value in mapping.items())
+    candidates = [('command', server.command), ('url', server.url)]
+    candidates.extend((f'args[{index}]', value) for index, value in enumerate(server.args))
+    for key, mapping in (('env', server.env), ('headers', server.headers)):
+        candidates.extend((f'{key}.{entry}', value) for entry, value in mapping.items())
     return [(location, value) for location, value in candidates if isinstance(value, str)]
 
 

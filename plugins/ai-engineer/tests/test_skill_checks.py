@@ -124,7 +124,9 @@ def test_cs_a32_listing_text_over_1536_chars(tmp_path: Path) -> None:
 
 
 def test_vs17a_license_not_a_string(tmp_path: Path) -> None:
-    assert_error(check(tmp_path, 'license: [MIT]\n'), 'license must be a string, got list')
+    assert_error(
+        check(tmp_path, 'license: [MIT]\n'), 'Expected `str`, got `array` - at `$.license`'
+    )
 
 
 def test_vs17b_license_empty(tmp_path: Path) -> None:
@@ -132,7 +134,9 @@ def test_vs17b_license_empty(tmp_path: Path) -> None:
 
 
 def test_vs18a_compatibility_not_a_string(tmp_path: Path) -> None:
-    assert_error(check(tmp_path, 'compatibility: 3\n'), 'compatibility must be a string, got int')
+    assert_error(
+        check(tmp_path, 'compatibility: 3\n'), 'Expected `str`, got `int` - at `$.compatibility`'
+    )
 
 
 def test_vs18b_compatibility_empty(tmp_path: Path) -> None:
@@ -146,7 +150,10 @@ def test_vs18c_compatibility_over_500_chars(tmp_path: Path) -> None:
 
 
 def test_vs19a_argument_hint_not_a_string(tmp_path: Path) -> None:
-    assert_error(check(tmp_path, 'argument-hint: [file]\n'), 'argument-hint must be a string')
+    assert_error(
+        check(tmp_path, 'argument-hint: [file]\n'),
+        'Expected `str`, got `array` - at `$.argument-hint`',
+    )
 
 
 def test_vs19b_argument_hint_empty(tmp_path: Path) -> None:
@@ -179,13 +186,24 @@ def test_vs21_name_differs_from_directory(tmp_path: Path) -> None:
 
 
 def test_vs22b_metadata_values_not_strings(tmp_path: Path) -> None:
-    assert_error(check(tmp_path, 'metadata:\n  version: 2\n'), "got 'version': 2")
+    assert_error(
+        check(tmp_path, 'metadata:\n  version: 2\n'),
+        'Expected `str`, got `int` - at `$.metadata[...]`',
+    )
 
 
 def test_vs23_flags_must_be_booleans(tmp_path: Path) -> None:
-    findings = check(tmp_path, 'disable-model-invocation: maybe\nuser-invocable: [x]\n')
+    findings = check(tmp_path, 'disable-model-invocation: maybe\nuser-invocable: maybe\n')
 
     assert len(messages(findings, 'error')) == 2
+
+
+def test_vs23_a_flag_of_the_wrong_type_prints_the_decoder_message(tmp_path: Path) -> None:
+    findings = check(tmp_path, 'user-invocable: [x]\n')
+
+    assert messages(findings, 'error') == [
+        'Expected `bool | int | str`, got `array` - at `$.user-invocable`'
+    ]
 
 
 def test_cs_a21_flags_accept_yes_no_on_off_and_digits(tmp_path: Path) -> None:

@@ -8,10 +8,11 @@ from ai_engineer_cli.hook.events import (
     LOWERED_DEFAULT_TIMEOUT_SECONDS,
     SLOW_ENFORCEMENT_SECONDS,
 )
-from ai_engineer_cli.hook.file import HooksFile, JsonObject, as_object
+from ai_engineer_cli.hook.file import HooksFile
 from ai_engineer_cli.hook.matchers import matcher_findings
 from ai_engineer_cli.hook.nodes import Handler, iter_groups, iter_handlers
 from ai_engineer_cli.hook.scripts import script_findings
+from ai_engineer_cli.jsondoc import JsonObject, as_object
 
 PLUGIN_TOP_LEVEL_KEYS = frozenset({'hooks', 'description'})
 

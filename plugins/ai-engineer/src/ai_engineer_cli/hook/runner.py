@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+import msgspec
+
 from ai_engineer_cli.findings import CannotCheckError, Finding, error
 from ai_engineer_cli.hook.events import EXIT_2_IGNORED_EVENTS, PLAIN_TEXT_CONTEXT_EVENTS
-from ai_engineer_cli.hook.file import as_object
+from ai_engineer_cli.jsondoc import as_object
 
 MALFORMED_PAYLOAD = '{not json'
 EXCERPT_CHARACTERS = 300
@@ -101,8 +103,8 @@ def read_payload(payload: Path) -> str:
 def payload_event(payload_text: str, payload: Path) -> str | None:
     """The `hook_event_name` of a payload, which says which event the hook is handling."""
     try:
-        value = json.loads(payload_text)
-    except json.JSONDecodeError as problem:
+        value = msgspec.json.decode(payload_text)
+    except msgspec.DecodeError as problem:
         message = f'payload {payload} is not JSON: {problem}'
         raise CannotCheckError(message) from problem
     event = value.get('hook_event_name') if isinstance(value, dict) else None
@@ -165,8 +167,8 @@ def classify_stdout(raw: str) -> tuple[Stdout, dict[str, object] | None]:
     if not (text.startswith('{') and text.endswith('}')):
         return 'text', None
     try:
-        return 'json', as_object(json.loads(text))
-    except json.JSONDecodeError:
+        return 'json', as_object(msgspec.json.decode(text))
+    except msgspec.DecodeError:
         return 'broken', None
 
 
@@ -217,7 +219,7 @@ def field_problem(output: dict[str, object], expectation: FieldExpectation) -> s
 def matches(value: object, expected: str) -> bool:
     """Compare as JSON when the expected text parses as JSON, as a plain string otherwise."""
     try:
-        wanted: object = json.loads(expected)
-    except json.JSONDecodeError:
+        wanted: object = msgspec.json.decode(expected)
+    except msgspec.DecodeError:
         wanted = expected
     return json.dumps(value, sort_keys=True) == json.dumps(wanted, sort_keys=True)

@@ -75,6 +75,10 @@ def check_skill(skill_dir: Path, *, builtin_errored: bool = False) -> list[Findi
         raise CannotCheckError(message)
     findings = [error(problem) for problem in skill.key_problems]
     if skill.fields is not None:
-        findings.extend(check_fields(skill.fields, directory_name_of(skill_dir)))
+        findings.extend(
+            check_fields(
+                skill.fields, directory_name_of(skill_dir), builtin_errored=builtin_errored
+            )
+        )
     findings.extend(check_body(skill_dir, text, skill.body))
     return findings

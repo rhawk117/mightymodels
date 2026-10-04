@@ -1,5 +1,8 @@
 import re
 
+import msgspec
+from msgspec import UNSET, UnsetType
+
 from ai_engineer_cli.findings import Finding, error, warning
 from ai_engineer_cli.frontmatter import SkillText
 
@@ -8,21 +11,37 @@ ROOT_ONLY_GLOB = re.compile(r'^\*\.[A-Za-z0-9]+$')
 MAX_EXPANDED_PATTERNS = 1000
 
 
+class RuleFrontmatter(msgspec.Struct):
+    """A rule's frontmatter; `paths` is the only key Claude Code reads, and null is no pattern."""
+
+    paths: str | list[str] | UnsetType | None = UNSET
+
+
 def check_frontmatter(rule: SkillText) -> list[Finding]:
     """Frontmatter checks for a rule file; `paths` is the only field Claude Code reads."""
     if rule.yaml_problem is not None:
         return [error(f'frontmatter is not valid YAML ({rule.yaml_problem})')]
-    if not rule.fields or 'paths' not in rule.fields:
+    if not rule.fields:
         return []
-    return check_paths(paths_of(rule.fields['paths']))
+    try:
+        frontmatter = msgspec.convert(rule.fields, RuleFrontmatter)
+    except msgspec.ValidationError as problem:
+        return [error(str(problem))]
+    return check_rule_paths(frontmatter.paths)
 
 
-def paths_of(value: object) -> list[str]:
+def check_rule_paths(paths: str | list[str] | UnsetType | None) -> list[Finding]:
+    if isinstance(paths, UnsetType):
+        return []
+    return check_paths(paths_of(paths))
+
+
+def paths_of(value: str | list[str] | None) -> list[str]:
     """The patterns of a `paths` value: a YAML list, or a comma-separated string."""
     if value is None:
         return []
-    items = value if isinstance(value, list) else split_top_level(str(value))
-    return [text for item in items if (text := str(item).strip())]
+    items = value if isinstance(value, list) else split_top_level(value)
+    return [text for item in items if (text := item.strip())]
 
 
 def split_top_level(text: str) -> list[str]:

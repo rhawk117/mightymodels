@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 
+import msgspec
+
 
 class CannotCheckError(Exception):
     """The skill cannot be fully checked, so the command must give no verdict."""
@@ -22,6 +24,14 @@ def warning(message: str) -> Finding:
 
 def info(message: str) -> Finding:
     return Finding('info', message)
+
+
+def decode_problem(problem: msgspec.ValidationError, *, builtin_errored: bool) -> list[Finding]:
+    """One error finding in msgspec's words, which name types and a path and never a value.
+
+    The built-in's own error covers the same document, so it makes this finding redundant.
+    """
+    return [] if builtin_errored else [error(str(problem))]
 
 
 def report(label: str, findings: list[Finding], *, strict: bool) -> int:

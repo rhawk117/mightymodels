@@ -2,7 +2,10 @@
 name = "ai-engineer-plugin"
 version = "0.3.0"
 requires-python = ">=3.12"
-dependencies = ["pyyaml>=6"]
+dependencies = [
+    "msgspec>=0.22.0",
+    "pyyaml>=6",
+]
 
 [project.scripts]
 ai-engineer = "ai_engineer_cli.cli:main"

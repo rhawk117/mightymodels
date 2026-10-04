@@ -1,4 +1,6 @@
-from ai_engineer_cli.mcp.scaffold.spec import PLACEHOLDER, Spec
+from msgspec import UnsetType
+
+from ai_engineer_cli.mcp.scaffold.spec import PLACEHOLDER, Prompt, Resource, Spec, Tool
 from ai_engineer_cli.mcp.scaffold.text import wrap_literal
 
 REQUIRES_INTERACTION_KEY = 'anthropic/requiresUserInteraction'
@@ -14,52 +16,50 @@ async def roots_workspace_of(ctx: Context[AppState]) -> RepositoryWorkspace:
 """
 
 
-def tool_meta(tool: Spec) -> dict[str, bool | int]:
+def tool_meta(tool: Tool) -> dict[str, bool | int]:
     meta: dict[str, bool | int] = {}
-    if tool['side_effects'] == 'destructive':
+    if tool.side_effects == 'destructive':
         meta[REQUIRES_INTERACTION_KEY] = True
-    if 'max_result_chars' in tool:
-        meta[MAX_RESULT_SIZE_KEY] = tool['max_result_chars']
+    if not isinstance(tool.max_result_chars, UnsetType):
+        meta[MAX_RESULT_SIZE_KEY] = tool.max_result_chars
     return meta
 
 
-def render_decorator(tool: Spec) -> str:
-    read_only = tool['side_effects'] == 'read_only'
-    destructive = tool['side_effects'] == 'destructive'
+def render_decorator(tool: Tool) -> str:
+    read_only = tool.side_effects == 'read_only'
+    destructive = tool.side_effects == 'destructive'
     annotations = (
         f'ToolAnnotations(read_only_hint={read_only}, '
         f'destructive_hint={destructive}, idempotent_hint={read_only}, '
         'open_world_hint=False)'
     )
-    description = wrap_literal(tool['description'], width=70).replace('\n', '\n    ')
+    description = wrap_literal(tool.description, width=70).replace('\n', '\n    ')
     meta = tool_meta(tool)
     meta_argument = f', meta={meta!r}' if meta else ''
     return (
-        f'    @mcp.tool(name={tool["name"]!r}, description={description}, '
+        f'    @mcp.tool(name={tool.name!r}, description={description}, '
         f'annotations={annotations}{meta_argument})'
     )
 
 
-def run_lines(spec: Spec, tool: Spec, indent: str) -> list[str]:
-    name = tool['name']
-    if spec['root_source'] == 'roots':
+def run_lines(spec: Spec, tool: Tool, indent: str) -> list[str]:
+    name = tool.name
+    if spec.root_source == 'roots':
         return [
             f'{indent}workspace = await roots_workspace_of(ctx)',
             f'{indent}return await asyncio.to_thread({name}_use_case.run, workspace, params)',
         ]
     workspace_call = (
-        'workspace_of(ctx, params.root)'
-        if spec['root_source'] == 'parameter'
-        else 'workspace_of(ctx)'
+        'workspace_of(ctx, params.root)' if spec.root_source == 'parameter' else 'workspace_of(ctx)'
     )
     return [f'{indent}return {name}_use_case.run({workspace_call}, params)']
 
 
-def render_registration(spec: Spec, tool: Spec) -> str:
-    name = tool['name']
-    keyword = 'async def' if spec['root_source'] == 'roots' else 'def'
+def render_registration(spec: Spec, tool: Tool) -> str:
+    name = tool.name
+    keyword = 'async def' if spec.root_source == 'roots' else 'def'
     lines: list[str] = []
-    if not tool['confirm']:
+    if not tool.confirm:
         lines += [
             render_decorator(tool),
             (
@@ -99,15 +99,15 @@ def render_registration(spec: Spec, tool: Spec) -> str:
     return '\n'.join(lines)
 
 
-def render_resource(resource: Spec) -> str:
-    function = resource['name']
-    signature = ', '.join(f'{parameter}: str' for parameter in PLACEHOLDER.findall(resource['uri']))
+def render_resource(resource: Resource) -> str:
+    function = resource.name
+    signature = ', '.join(f'{parameter}: str' for parameter in PLACEHOLDER.findall(resource.uri))
     return '\n'.join(
         [
             (
-                f'    @mcp.resource({resource["uri"]!r}, name={function!r}, '
-                f'description={resource["description"]!r}, '
-                f'mime_type={resource["mime_type"]!r})'
+                f'    @mcp.resource({resource.uri!r}, name={function!r}, '
+                f'description={resource.description!r}, '
+                f'mime_type={resource.mime_type!r})'
             ),
             f'    def {function}({signature}) -> str:',
             f"        message = 'resource {function} is not implemented yet'",
@@ -117,13 +117,13 @@ def render_resource(resource: Spec) -> str:
     )
 
 
-def render_prompt(prompt: Spec) -> str:
-    signature = ', '.join(f'{argument["name"]}: str' for argument in prompt['arguments'])
+def render_prompt(prompt: Prompt) -> str:
+    signature = ', '.join(f'{argument.name}: str' for argument in prompt.arguments)
     return '\n'.join(
         [
-            f'    @mcp.prompt(name={prompt["name"]!r}, description={prompt["description"]!r})',
-            f'    def {prompt["name"]}({signature}) -> str:',
-            f'        return f{prompt["template"]!r}',
+            f'    @mcp.prompt(name={prompt.name!r}, description={prompt.description!r})',
+            f'    def {prompt.name}({signature}) -> str:',
+            f'        return f{prompt.template!r}',
             '',
         ]
     )
@@ -131,20 +131,20 @@ def render_prompt(prompt: Spec) -> str:
 
 def server_tokens(spec: Spec) -> dict[str, str]:
     """The server.py placeholders and the text each one becomes for this spec."""
-    package = spec['package']
-    confirming = any(tool['confirm'] for tool in spec['tools'])
-    roots = spec['root_source'] == 'roots'
+    package = spec.package
+    confirming = any(tool.confirm for tool in spec.tools)
+    roots = spec.root_source == 'roots'
     imports = sorted(
         line
-        for tool in spec['tools']
+        for tool in spec.tools
         for line in (
-            f'from {package}.tools.{tool["name"]} import schema as {tool["name"]}_schema',
-            f'from {package}.tools.{tool["name"]} import use_case as {tool["name"]}_use_case',
+            f'from {package}.tools.{tool.name} import schema as {tool.name}_schema',
+            f'from {package}.tools.{tool.name} import use_case as {tool.name}_use_case',
         )
     )
-    registrations = [render_registration(spec, tool) for tool in spec['tools']]
-    registrations += [render_resource(resource) for resource in spec['resources']]
-    registrations += [render_prompt(prompt) for prompt in spec['prompts']]
+    registrations = [render_registration(spec, tool) for tool in spec.tools]
+    registrations += [render_resource(resource) for resource in spec.resources]
+    registrations += [render_prompt(prompt) for prompt in spec.prompts]
     return {
         '__ASYNCIO_IMPORT__': 'import asyncio\n' if roots else '',
         '__TYPING_IMPORT__': '\nfrom typing import Annotated' if confirming else '',
@@ -163,5 +163,5 @@ def server_tokens(spec: Spec) -> dict[str, str]:
         ),
         '__ROOTS_HELPER__': ROOTS_HELPER if roots else '',
         '__TOOL_REGISTRATIONS__': '\n' + '\n'.join(registrations),
-        '__BINARIES__': ''.join(f'{binary!r}, ' for binary in spec['binaries']),
+        '__BINARIES__': ''.join(f'{binary!r}, ' for binary in spec.binaries),
     }

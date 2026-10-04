@@ -8,8 +8,8 @@ NETWORK_URL = 'http://127.0.0.1:8000/mcp'
 
 def render_config(spec: Spec) -> dict[str, str]:
     """The `.mcp.json` shapes for the spec's reach, keyed by the file name written under config/."""
-    name = spec['name']
-    always_load = {'alwaysLoad': True} if spec['always_load'] else {}
+    name = spec.name
+    always_load = {'alwaysLoad': True} if spec.always_load else {}
     plugin = {
         'command': 'uv',
         'args': ['run', '--project', f'${{CLAUDE_PLUGIN_ROOT}}/mcp/{name}', name],
@@ -22,10 +22,10 @@ def render_config(spec: Spec) -> dict[str, str]:
     }
     network = {'type': 'http', 'url': NETWORK_URL}
     shapes = {}
-    if spec['reach'] in ('local', 'both'):
+    if spec.reach in ('local', 'both'):
         shapes['mcp.plugin.json'] = plugin
         shapes['mcp.project.json'] = project
-    if spec['reach'] in ('network', 'both'):
+    if spec.reach in ('network', 'both'):
         shapes['mcp.network.json'] = network
     return {
         filename: json.dumps({'mcpServers': {name: {**entry, **always_load}}}, indent=2) + '\n'

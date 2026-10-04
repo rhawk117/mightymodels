@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from ai_engineer_cli.hook.file import JsonObject, as_object
+from ai_engineer_cli.jsondoc import JsonObject, as_object
 
 
 @dataclass(frozen=True)

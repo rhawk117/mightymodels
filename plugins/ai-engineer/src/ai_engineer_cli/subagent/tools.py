@@ -61,12 +61,12 @@ MCP_TOOL = re.compile(r'mcp__[\w.*-]+')
 COMMA_OUTSIDE_PARENTHESES = re.compile(r'(?:[^,(]|\([^)]*\))+')
 
 
-def tool_entries(value: object) -> list[str] | None:
+def tool_entries(value: str | list[str] | None) -> list[str] | None:
     """The entries of a `tools` or `disallowedTools` value; None when the key is not set."""
     if isinstance(value, str):
         entries = COMMA_OUTSIDE_PARENTHESES.findall(value)
     elif isinstance(value, list):
-        entries = [str(item) for item in value]
+        entries = value
     else:
         return None
     return [entry.strip() for entry in entries if entry.strip()]

@@ -1,13 +1,31 @@
-import json
 import shutil
 import subprocess
 from pathlib import Path
+
+import msgspec
 
 from ai_engineer_cli.findings import CannotCheckError, Finding, error, warning
 
 
 class BuiltinUnavailableError(CannotCheckError):
     """The built-in validator could not run, so no verdict exists."""
+
+
+class ReportItem(msgspec.Struct):
+    message: str
+    path: str | None = None
+
+
+class ReportSection(msgspec.Struct):
+    errors: list[ReportItem] = []
+    warnings: list[ReportItem] = []
+
+
+class Report(msgspec.Struct):
+    """The JSON that `claude plugin validate --json` prints; its other keys are not read."""
+
+    manifest: ReportSection | None = None
+    contents: list[ReportSection] = []
 
 
 def run_builtin(target: Path, *, include_manifest: bool = True) -> list[Finding]:
@@ -34,32 +52,26 @@ def run_builtin(target: Path, *, include_manifest: bool = True) -> list[Finding]
 
 def parse_report(stdout: str, *, include_manifest: bool = True) -> list[Finding]:
     try:
-        report = json.loads(stdout)
-    except json.JSONDecodeError as problem:
+        report = msgspec.json.decode(stdout, type=Report)
+    except msgspec.DecodeError as problem:
         message = f'claude plugin validate printed no JSON report: {problem}'
         raise BuiltinUnavailableError(message) from problem
-    if not isinstance(report, dict):
-        message = 'claude plugin validate printed a JSON report that is not an object'
-        raise BuiltinUnavailableError(message)
-    manifest = [report.get('manifest')] if include_manifest else []
-    sections = [*manifest, *report.get('contents', [])]
+    manifest = [report.manifest] if include_manifest and report.manifest is not None else []
     return [
         finding
-        for section in sections
-        if isinstance(section, dict)
+        for section in [*manifest, *report.contents]
         for finding in section_findings(section)
     ]
 
 
-def section_findings(section: dict[str, list[dict[str, str]]]) -> list[Finding]:
+def section_findings(section: ReportSection) -> list[Finding]:
     return [
-        *(error(finding_text(item)) for item in section.get('errors', [])),
-        *(warning(finding_text(item)) for item in section.get('warnings', [])),
+        *(error(finding_text(item)) for item in section.errors),
+        *(warning(finding_text(item)) for item in section.warnings),
     ]
 
 
-def finding_text(item: dict[str, str]) -> str:
-    path = item.get('path')
-    if isinstance(path, str) and path:
-        return f'{path}: {item["message"]}'
-    return item['message']
+def finding_text(item: ReportItem) -> str:
+    if item.path:
+        return f'{item.path}: {item.message}'
+    return item.message

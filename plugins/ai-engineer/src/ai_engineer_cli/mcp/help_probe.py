@@ -2,10 +2,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import msgspec
+from msgspec import UnsetType
+
 from ai_engineer_cli.findings import Finding, error
-from ai_engineer_cli.hook.file import as_object
-from ai_engineer_cli.mcp.checks import server_map
 from ai_engineer_cli.mcp.file import McpFile
+from ai_engineer_cli.mcp.servers import McpServer, decode_servers
 
 COMMAND_TIMEOUT_SECONDS = 120
 PLUGIN_ROOT = '${CLAUDE_PLUGIN_ROOT}'
@@ -18,12 +20,15 @@ def check_commands(mcp_file: McpFile) -> list[Finding]:
     A plugin runs in the file's directory, which `${CLAUDE_PLUGIN_ROOT}` names; any other file
     runs in the current directory.
     """
-    servers, _ = server_map(mcp_file)
+    try:
+        servers = decode_servers(mcp_file)
+    except msgspec.ValidationError:
+        return []
     plugin = mcp_file.kind == 'plugin'
     directory = mcp_file.directory if plugin else Path.cwd()
     findings: list[Finding] = []
-    for name, server in (servers or {}).items():
-        argv = stdio_argv(server)
+    for name, entry in servers.items():
+        argv = stdio_argv(entry.server)
         if argv is None:
             continue
         if plugin:
@@ -34,17 +39,12 @@ def check_commands(mcp_file: McpFile) -> list[Finding]:
     return findings
 
 
-def stdio_argv(entry: object) -> list[str] | None:
-    """The command and its arguments, or None when the entry is not a well-formed stdio server."""
-    server = as_object(entry)
-    if server is None or server.get('type', 'stdio') != 'stdio':
+def stdio_argv(server: McpServer) -> list[str] | None:
+    """The command and its arguments, or None when the server is not a stdio server with one."""
+    transport = 'stdio' if isinstance(server.type, UnsetType) else server.type
+    if transport != 'stdio' or isinstance(server.command, UnsetType):
         return None
-    command = server.get('command')
-    args = server.get('args', [])
-    if not isinstance(command, str) or not isinstance(args, list):
-        return None
-    strings = [item for item in args if isinstance(item, str)]
-    return [command, *strings] if len(strings) == len(args) else None
+    return [server.command, *server.args]
 
 
 def check_invocation(name: str, argv: list[str], directory: Path) -> Finding | None:
