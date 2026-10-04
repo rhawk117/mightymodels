@@ -94,9 +94,10 @@ differ. The launcher stays on `uv tool run` rather than `uv run`, which would ad
 The vibe-code eval cases are in `plugins/vibe-code/evals`. Running them with
 `claude plugin eval` costs money and is not part of the gate.
 
-`.gitattributes` keeps `plugins/vibe-code/bin/vibe-code` on LF line endings and `*.cmd` files on
-CRLF. `.python-version` at the root and in `plugins/vibe-code` says 3.14, the development
-interpreter; the CLI source and tests still have to run on 3.12.
+`.gitattributes` keeps `plugins/vibe-code/bin/vibe-code` and `plugins/vibe-code/bin/vibe-code.cmd`
+on LF line endings, which the `mixed-line-ending` hook requires. `.python-version` at the root and
+in `plugins/vibe-code` says 3.14, the development interpreter; the CLI source and tests still have
+to run on 3.12.
 
 On WSL, a checked-in script such as `plugins/vibe-code/bin/vibe-code` can lose its
 executable bit. Restore it in the index with

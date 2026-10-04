@@ -67,7 +67,7 @@ It does not use `uv run`. `uv run` adopts the `.venv`, `pyproject.toml` and `uv.
 
 The pins live in two places, line 1 of `bin/vibe-code` and `bin/vibe-code.cmd`, and `tests/test_shim.py` checks both against the versions in the repository's `uv.lock`. To change one, run `uv lock`, then edit the same version in both files. The lock's hashes are not enforced: the pins select versions and do not verify the downloaded artifacts.
 
-`.gitattributes` keeps `bin/vibe-code` on LF line endings and `*.cmd` on CRLF.
+`.gitattributes` keeps `bin/vibe-code` and `bin/vibe-code.cmd` on LF line endings, the form the repository's line-ending hook requires.
 
 ### Windows
 
