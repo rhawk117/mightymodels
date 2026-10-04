@@ -29,20 +29,20 @@ def check(
     rule = tmp_path / '.claude' / 'rules' / 'x.md'
     rule.parent.mkdir(parents=True, exist_ok=True)
     rule.write_text(text)
-    code = main(['create-instructions', 'validate', str(rule), *options])
+    code = main(['instruction', 'validate', str(rule), *options])
     return code, capsys.readouterr().out
 
 
 def test_group_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(['create-instructions']) == 2
+    assert main(['instruction']) == 2
     assert 'usage: ai-engineer' in capsys.readouterr().err
 
 
 def test_validate_help_shows_the_path_and_strict(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
-        main(['create-instructions', 'validate', '--help'])
+        main(['instruction', 'validate', '--help'])
 
     out = capsys.readouterr().out
     assert exit_info.value.code == 0
@@ -124,7 +124,7 @@ def test_ca1_a_plain_md_name_needs_no_instructions_suffix(
 def test_i2_missing_path_exits_two_without_a_verdict(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    code = main(['create-instructions', 'validate', str(tmp_path / 'absent.md')])
+    code = main(['instruction', 'validate', str(tmp_path / 'absent.md')])
 
     captured = capsys.readouterr()
     assert code == 2
@@ -136,7 +136,7 @@ def test_i2_unreadable_file_exits_two(tmp_path: Path, capsys: pytest.CaptureFixt
     rule = tmp_path / 'x.md'
     rule.write_bytes(b'\xff\xfe\x00bad')
 
-    code = main(['create-instructions', 'validate', str(rule)])
+    code = main(['instruction', 'validate', str(rule)])
 
     captured = capsys.readouterr()
     assert code == 2

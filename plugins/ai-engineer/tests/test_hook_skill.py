@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import Finding
-from ai_engineer_cli.hook import command as create_hooks
+from ai_engineer_cli.hook import command as hook_command
 from ai_engineer_cli.hook.runner import Expectations, HookTest, check_hook, parse_field_expectation
 
 SKILL = Path(__file__).resolve().parents[1] / 'skills' / 'create-hooks'
@@ -23,7 +23,7 @@ def stub_builtin(monkeypatch: pytest.MonkeyPatch) -> None:
     def no_findings(_target: Path, **_options: bool) -> list[Finding]:
         return []
 
-    monkeypatch.setattr(create_hooks, 'run_builtin', no_findings)
+    monkeypatch.setattr(hook_command, 'run_builtin', no_findings)
 
 
 def run_template(
@@ -69,7 +69,7 @@ def test_example_validates_strict_with_the_template_at_every_path_it_names(
     stub_builtin(monkeypatch)
     settings = install_example(tmp_path, with_scripts=True)
 
-    assert main(['create-hooks', 'validate', str(settings), '--strict']) == 0
+    assert main(['hook', 'validate', str(settings), '--strict']) == 0
 
 
 def test_example_fails_validation_when_a_script_it_names_is_missing(
@@ -78,7 +78,7 @@ def test_example_fails_validation_when_a_script_it_names_is_missing(
     stub_builtin(monkeypatch)
     settings = install_example(tmp_path, with_scripts=False)
 
-    assert main(['create-hooks', 'validate', str(settings), '--strict']) == 1
+    assert main(['hook', 'validate', str(settings), '--strict']) == 1
     assert 'script not found' in capsys.readouterr().out
 
 

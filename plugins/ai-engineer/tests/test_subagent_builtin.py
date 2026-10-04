@@ -30,7 +30,7 @@ def test_unclosed_description_quote_prints_the_builtin_parse_error_and_exits_one
 ) -> None:
     path = write_agent(tmp_path, agent_text('"unclosed'), plugin=plugin)
 
-    assert main(['create-subagent', 'validate', str(path)]) == 1
+    assert main(['subagent', 'validate', str(path)]) == 1
     output = capsys.readouterr().out
     assert 'YAML frontmatter failed to parse' in output
     assert 'plugin.json' not in output
@@ -43,7 +43,7 @@ def test_without_claude_on_path_exits_two_naming_claude(
     path = write_agent(tmp_path, agent_text('Reviews code. Use when asked.'))
     monkeypatch.setenv('PATH', str(tmp_path))
 
-    assert main(['create-subagent', 'validate', str(path)]) == 2
+    assert main(['subagent', 'validate', str(path)]) == 2
     captured = capsys.readouterr()
     assert 'claude is not on PATH' in captured.err
     assert 'PASS' not in captured.out

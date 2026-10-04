@@ -5,7 +5,7 @@ import pytest
 from ai_engineer_cli.builtin import BuiltinUnavailableError
 from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.subagent import command as create_subagent
+from ai_engineer_cli.subagent import command as subagent_command
 
 SECTIONS = ('role', 'context', 'workflow', 'constraints', 'output_format', 'verification')
 DESCRIPTION = 'Reviews code for defects. Use when the user asks for a code review.'
@@ -38,7 +38,7 @@ def write_agent(
 
 
 def run(path: Path, capsys: pytest.CaptureFixture[str], *options: str) -> tuple[int, str]:
-    code = main(['create-subagent', 'validate', str(path), *options])
+    code = main(['subagent', 'validate', str(path), *options])
     return code, capsys.readouterr().out
 
 
@@ -46,7 +46,7 @@ def run(path: Path, capsys: pytest.CaptureFixture[str], *options: str) -> tuple[
 def builtin_findings(monkeypatch: pytest.MonkeyPatch) -> list[Finding]:
     """What the stubbed built-in reports; a test appends to it."""
     findings: list[Finding] = []
-    monkeypatch.setattr(create_subagent, 'run_builtin', lambda _target, **_options: findings)
+    monkeypatch.setattr(subagent_command, 'run_builtin', lambda _target, **_options: findings)
     return findings
 
 
@@ -67,7 +67,7 @@ pytestmark = pytest.mark.usefixtures('builtin_findings')
 
 def test_validate_help_shows_the_file_and_strict(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
-        main(['create-subagent', 'validate', '--help'])
+        main(['subagent', 'validate', '--help'])
 
     assert exit_info.value.code == 0
     output = capsys.readouterr().out
@@ -78,7 +78,7 @@ def test_validate_help_shows_the_file_and_strict(capsys: pytest.CaptureFixture[s
 def test_create_subagent_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(['create-subagent']) == 2
+    assert main(['subagent']) == 2
     assert 'usage: ai-engineer' in capsys.readouterr().err
 
 
@@ -99,7 +99,7 @@ def test_path_that_is_not_a_markdown_file_exits_two(
     text_file.write_text(agent_text())
 
     for path in (text_file, tmp_path, tmp_path / 'missing.md'):
-        assert main(['create-subagent', 'validate', str(path)]) == 2
+        assert main(['subagent', 'validate', str(path)]) == 2
         captured = capsys.readouterr()
         assert 'is not a .md file' in captured.err
         assert 'PASS' not in captured.out
@@ -113,7 +113,7 @@ def test_unreadable_agent_file_exits_two_naming_the_path(
     if os.access(path, os.R_OK):
         pytest.skip('this user can read a mode 000 file')
 
-    assert main(['create-subagent', 'validate', str(path)]) == 2
+    assert main(['subagent', 'validate', str(path)]) == 2
     captured = capsys.readouterr()
     assert str(path) in captured.err
     assert 'PASS' not in captured.out
@@ -126,7 +126,7 @@ def test_file_that_is_not_utf8_exits_two(
     path = write_agent(tmp_path, '')
     path.write_bytes(b'---\nname: \xff\n---\n')
 
-    assert main(['create-subagent', 'validate', str(path)]) == 2
+    assert main(['subagent', 'validate', str(path)]) == 2
     assert 'could not read' in capsys.readouterr().err
 
 
@@ -144,7 +144,7 @@ def test_invalid_yaml_the_builtin_passed_exits_two_without_a_verdict(
 ) -> None:
     path = write_agent(tmp_path, agent_text({'description': '[unclosed'}))
 
-    assert main(['create-subagent', 'validate', str(path)]) == 2
+    assert main(['subagent', 'validate', str(path)]) == 2
     captured = capsys.readouterr()
     assert 'not valid YAML' in captured.err
     assert 'PASS' not in captured.out
@@ -171,9 +171,9 @@ def test_builtin_that_cannot_run_exits_two_without_a_verdict(
         message = 'claude plugin validate printed no JSON report'
         raise BuiltinUnavailableError(message)
 
-    monkeypatch.setattr(create_subagent, 'run_builtin', unavailable)
+    monkeypatch.setattr(subagent_command, 'run_builtin', unavailable)
 
-    assert main(['create-subagent', 'validate', str(write_agent(tmp_path, agent_text()))]) == 2
+    assert main(['subagent', 'validate', str(write_agent(tmp_path, agent_text()))]) == 2
     assert 'PASS' not in capsys.readouterr().out
 
 
@@ -204,7 +204,7 @@ def record_staging(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
         )
         return []
 
-    monkeypatch.setattr(create_subagent, 'run_builtin', fake)
+    monkeypatch.setattr(subagent_command, 'run_builtin', fake)
     return seen
 
 
@@ -216,7 +216,7 @@ def test_plugin_agent_is_staged_in_a_plugin_with_the_manifest_findings_dropped(
     assert (
         main(
             [
-                'create-subagent',
+                'subagent',
                 'validate',
                 str(write_agent(tmp_path, agent_text(), plugin=True)),
             ]
@@ -243,7 +243,7 @@ def test_any_other_parent_is_staged_as_a_claude_agents_directory(
     path = directory / 'demo-agent.md'
     path.write_text(agent_text())
 
-    assert main(['create-subagent', 'validate', str(path)]) == 0
+    assert main(['subagent', 'validate', str(path)]) == 0
     assert seen[0]['target'] == 'agents'
     assert seen[0]['parent'] == '.claude'
     assert seen[0]['files'] == ['demo-agent.md']
@@ -256,5 +256,5 @@ def test_builtin_runs_on_a_copy_of_the_one_file_not_its_siblings(
     path = write_agent(tmp_path, agent_text())
     (path.parent / 'sibling.md').write_text('no frontmatter\n')
 
-    assert main(['create-subagent', 'validate', str(path)]) == 0
+    assert main(['subagent', 'validate', str(path)]) == 0
     assert seen[0]['files'] == ['demo-agent.md']

@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import CannotCheckError
-from ai_engineer_cli.mcp import command as create_mcp
-from ai_engineer_cli.mcp.scaffold import command as scaffold_command
+from ai_engineer_cli.mcp import command as mcp_group
+from ai_engineer_cli.mcp.scaffold import command
 from ai_engineer_cli.mcp.scaffold.render import write_project
 
 ASSETS = Path(__file__).resolve().parents[1] / 'skills' / 'create-mcp' / 'assets'
@@ -30,7 +30,7 @@ def write_spec(directory: Path, spec: dict[str, Any]) -> Path:
 
 
 def scaffold(spec: Path, target: Path, *options: str) -> int:
-    return main(['create-mcp', 'scaffold', str(spec), str(target), *options])
+    return main(['mcp', 'scaffold', str(spec), str(target), *options])
 
 
 def scaffolded(tmp_path: Path, **changes: object) -> Path:
@@ -57,7 +57,7 @@ def test_scaffold_help_shows_spec_target_and_options(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exit_info:
-        main(['create-mcp', 'scaffold', '--help'])
+        main(['mcp', 'scaffold', '--help'])
 
     assert exit_info.value.code == 0
     output = capsys.readouterr().out
@@ -68,7 +68,7 @@ def test_scaffold_help_shows_spec_target_and_options(
 def test_example_spec_scaffolds_parsable_python_and_valid_configs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(create_mcp, 'run_builtin', lambda _target, **_options: [])
+    monkeypatch.setattr(mcp_group, 'run_builtin', lambda _target, **_options: [])
     target = tmp_path / 'out'
 
     assert scaffold(EXAMPLE_SPEC, target, '--template', str(TEMPLATE)) == 0
@@ -84,7 +84,7 @@ def test_example_spec_scaffolds_parsable_python_and_valid_configs(
         ('mcp.network.json', 'project'),
     ]:
         config = target / 'config' / name
-        assert main(['create-mcp', 'validate', str(config), '--kind', kind]) == 0
+        assert main(['mcp', 'validate', str(config), '--kind', kind]) == 0
 
 
 def test_default_template_comes_from_the_exported_plugin_root(
@@ -105,7 +105,7 @@ def test_default_template_without_the_export_is_the_skills_template(
 ) -> None:
     monkeypatch.delenv('AI_ENGINEER_PLUGIN_ROOT', raising=False)
 
-    assert scaffold_command.default_template() == TEMPLATE
+    assert command.default_template() == TEMPLATE
 
 
 def test_mc_a28_rendered_configs_are_the_three_mcp_json_shapes(tmp_path: Path) -> None:

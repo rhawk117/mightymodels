@@ -23,7 +23,7 @@ def project(root: Path, files: dict[str, str]) -> Path:
 
 
 def audit(root: Path, capsys: pytest.CaptureFixture[str], *options: str) -> tuple[int, str]:
-    code = main(['create-instructions', 'validate', str(root), *options])
+    code = main(['instruction', 'validate', str(root), *options])
     return code, capsys.readouterr().out
 
 
@@ -83,7 +83,7 @@ def test_file_mode_runs_the_body_checks_on_a_docs_shaped_rule(
     docs_shaped = '---\npaths:\n  - "src/**/*.py"\n---\n# Python\n\n- Use type hints.\n'
     rule = project(tmp_path, {'py.md': docs_shaped}) / 'py.md'
 
-    code = main(['create-instructions', 'validate', str(rule)])
+    code = main(['instruction', 'validate', str(rule)])
 
     assert code == 1
     assert 'error: required section <scope> is missing' in capsys.readouterr().out
@@ -393,7 +393,7 @@ def test_an_unreadable_instruction_file_exits_two(
     root = tmp_path
     (root / 'CLAUDE.md').write_bytes(b'\xff\xfe\x00bad')
 
-    code = main(['create-instructions', 'validate', str(root)])
+    code = main(['instruction', 'validate', str(root)])
 
     captured = capsys.readouterr()
     assert code == 2

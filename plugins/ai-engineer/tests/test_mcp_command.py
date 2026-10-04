@@ -8,8 +8,8 @@ import pytest
 from ai_engineer_cli.builtin import BuiltinUnavailableError
 from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.mcp import command as create_mcp
-from ai_engineer_cli.mcp import help_probe as mcp_command
+from ai_engineer_cli.mcp import command as mcp_group
+from ai_engineer_cli.mcp import help_probe
 
 STDIO_SERVER = {'command': 'uv', 'args': ['run', 'server']}
 HTTP_SERVER = {'type': 'http', 'url': 'https://example.com/mcp'}
@@ -27,11 +27,11 @@ def write_config(
 
 
 def stub_builtin(monkeypatch: pytest.MonkeyPatch, findings: list[Finding] | None = None) -> None:
-    monkeypatch.setattr(create_mcp, 'run_builtin', lambda _target, **_options: findings or [])
+    monkeypatch.setattr(mcp_group, 'run_builtin', lambda _target, **_options: findings or [])
 
 
 def validate(kind: str, path: Path, *options: str) -> int:
-    return main(['create-mcp', 'validate', str(path), '--kind', kind, *options])
+    return main(['mcp', 'validate', str(path), '--kind', kind, *options])
 
 
 def servers_file(directory: Path, servers: dict[str, object], kind: str = 'plugin') -> Path:
@@ -44,7 +44,7 @@ def test_mc_a29_validate_help_shows_the_file_kind_and_options(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exit_info:
-        main(['create-mcp', 'validate', '--help'])
+        main(['mcp', 'validate', '--help'])
 
     assert exit_info.value.code == 0
     output = capsys.readouterr().out
@@ -55,13 +55,13 @@ def test_mc_a29_validate_help_shows_the_file_kind_and_options(
 def test_create_mcp_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(['create-mcp']) == 2
+    assert main(['mcp']) == 2
     assert 'usage: ai-engineer' in capsys.readouterr().err
 
 
 def test_validate_without_a_kind_is_a_usage_error() -> None:
     with pytest.raises(SystemExit) as exit_info:
-        main(['create-mcp', 'validate', 'x.json'])
+        main(['mcp', 'validate', 'x.json'])
 
     assert exit_info.value.code == 2
 
@@ -129,7 +129,7 @@ def test_builtin_that_cannot_run_exits_two_without_a_verdict(
         message = 'claude plugin validate printed no JSON report'
         raise BuiltinUnavailableError(message)
 
-    monkeypatch.setattr(create_mcp, 'run_builtin', unavailable)
+    monkeypatch.setattr(mcp_group, 'run_builtin', unavailable)
 
     assert validate('plugin', write_config(tmp_path)) == 2
     captured = capsys.readouterr()
@@ -178,7 +178,7 @@ def stage(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
         staged['include_manifest'] = include_manifest
         return []
 
-    monkeypatch.setattr(create_mcp, 'run_builtin', capture)
+    monkeypatch.setattr(mcp_group, 'run_builtin', capture)
     return staged
 
 
@@ -559,7 +559,7 @@ def test_m28_help_that_outlives_the_timeout_exits_one(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     stub_builtin(monkeypatch)
-    monkeypatch.setattr(mcp_command, 'COMMAND_TIMEOUT_SECONDS', 0.5)
+    monkeypatch.setattr(help_probe, 'COMMAND_TIMEOUT_SECONDS', 0.5)
     path = command_config(tmp_path, sys.executable, ['-c', 'import time; time.sleep(30)'])
 
     assert validate('plugin', path, '--check-command') == 1

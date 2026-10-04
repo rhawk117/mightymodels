@@ -1,5 +1,5 @@
 import pytest
-from ai_engineer_cli.cli import build_parser, main
+from ai_engineer_cli.cli import GROUPS, build_parser, main
 
 
 def test_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
@@ -13,3 +13,38 @@ def test_help_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
 def test_main_without_a_group_prints_usage_and_fails(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([]) == 2
     assert 'usage: ai-engineer' in capsys.readouterr().err
+
+
+def test_help_lists_the_five_groups(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(['--help'])
+
+    output = capsys.readouterr().out
+    for group in ('skill', 'hook', 'subagent', 'instruction', 'mcp'):
+        assert group in output
+
+
+def test_parser_accepts_exactly_the_five_groups() -> None:
+    assert set(GROUPS) == {'skill', 'hook', 'subagent', 'instruction', 'mcp'}
+
+
+@pytest.mark.parametrize(
+    'old_name',
+    [
+        'create-skill',
+        'create-hooks',
+        'create-subagent',
+        'create-instructions',
+        'create-mcp',
+        'plan-plugin',
+    ],
+)
+def test_old_group_names_fail_as_invalid_choices(
+    old_name: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main([old_name, 'validate', '--help'])
+
+    assert exit_info.value.code == 2
+    assert 'invalid choice' in capsys.readouterr().err

@@ -56,6 +56,6 @@ def test_filled_template_passes_strict_validation(
     rule.parent.mkdir(parents=True)
     rule.write_text(fill(TEMPLATE.read_text()))
 
-    code = main(['create-instructions', 'validate', str(rule), '--strict'])
+    code = main(['instruction', 'validate', str(rule), '--strict'])
 
     assert code == 0, capsys.readouterr().out

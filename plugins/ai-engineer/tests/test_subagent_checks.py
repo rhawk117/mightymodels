@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import Finding
-from ai_engineer_cli.subagent import command as create_subagent
+from ai_engineer_cli.subagent import command as subagent_command
 
 SECTIONS = ('role', 'context', 'workflow', 'constraints', 'output_format', 'verification')
 DESCRIPTION = 'Reviews code for defects. Use when the user asks for a code review.'
@@ -36,7 +36,7 @@ def write_agent(
 
 
 def run(path: Path, capsys: pytest.CaptureFixture[str], *options: str) -> tuple[int, str]:
-    code = main(['create-subagent', 'validate', str(path), *options])
+    code = main(['subagent', 'validate', str(path), *options])
     return code, capsys.readouterr().out
 
 
@@ -44,7 +44,7 @@ def run(path: Path, capsys: pytest.CaptureFixture[str], *options: str) -> tuple[
 def builtin_findings(monkeypatch: pytest.MonkeyPatch) -> list[Finding]:
     """What the stubbed built-in reports; a test appends to it."""
     findings: list[Finding] = []
-    monkeypatch.setattr(create_subagent, 'run_builtin', lambda _target, **_options: findings)
+    monkeypatch.setattr(subagent_command, 'run_builtin', lambda _target, **_options: findings)
     return findings
 
 

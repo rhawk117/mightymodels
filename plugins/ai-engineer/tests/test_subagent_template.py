@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import Finding
-from ai_engineer_cli.subagent import command as create_subagent
+from ai_engineer_cli.subagent import command as subagent_command
 
 TEMPLATE = (
     Path(__file__).resolve().parents[1]
@@ -56,11 +56,11 @@ def test_filled_template_passes_strict_validation(
     def no_findings(_target: Path, **_options: bool) -> list[Finding]:
         return []
 
-    monkeypatch.setattr(create_subagent, 'run_builtin', no_findings)
+    monkeypatch.setattr(subagent_command, 'run_builtin', no_findings)
     agent = tmp_path / directory / 'demo.md'
     agent.parent.mkdir(parents=True)
     agent.write_text(fill(TEMPLATE.read_text()))
 
-    code = main(['create-subagent', 'validate', str(agent), '--strict'])
+    code = main(['subagent', 'validate', str(agent), '--strict'])
 
     assert code == 0, capsys.readouterr().out

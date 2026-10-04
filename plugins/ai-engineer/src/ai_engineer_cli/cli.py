@@ -2,11 +2,11 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
-from ai_engineer_cli.hook import command as create_hooks
-from ai_engineer_cli.instruction import command as create_instructions
-from ai_engineer_cli.mcp import command as create_mcp
-from ai_engineer_cli.skill import command as create_skill
-from ai_engineer_cli.subagent import command as create_subagent
+from ai_engineer_cli.hook import command as hook_command
+from ai_engineer_cli.instruction import command as instruction_command
+from ai_engineer_cli.mcp import command as mcp_group
+from ai_engineer_cli.skill import command as skill_command
+from ai_engineer_cli.subagent import command as subagent_command
 
 GroupBuilder = Callable[[argparse.ArgumentParser], None]
 
@@ -18,11 +18,11 @@ class Arguments(argparse.Namespace):
 
 
 GROUPS: dict[str, GroupBuilder] = {
-    'create-skill': create_skill.build_group,
-    'create-hooks': create_hooks.build_group,
-    'create-subagent': create_subagent.build_group,
-    'create-instructions': create_instructions.build_group,
-    'create-mcp': create_mcp.build_group,
+    'skill': skill_command.build_group,
+    'hook': hook_command.build_group,
+    'subagent': subagent_command.build_group,
+    'instruction': instruction_command.build_group,
+    'mcp': mcp_group.build_group,
 }
 
 
@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog='ai-engineer',
         description='Validate and scaffold the artifacts the ai-engineer skills author.',
     )
-    subparsers = parser.add_subparsers(dest='group', metavar='GROUP')
+    subparsers = parser.add_subparsers(dest='group')
     for name, build_group in GROUPS.items():
         build_group(subparsers.add_parser(name))
     return parser

@@ -5,7 +5,7 @@ import pytest
 from ai_engineer_cli.builtin import BuiltinUnavailableError, parse_report
 from ai_engineer_cli.cli import main
 from ai_engineer_cli.findings import Finding, error, warning
-from ai_engineer_cli.skill import command as create_skill
+from ai_engineer_cli.skill import command as skill_command
 
 DESCRIPTION = 'Summarize a file. Use when the user asks for a summary of a file.'
 NAME_MAPPING = f'name: {{a: b}}\ndescription: {DESCRIPTION}\n'
@@ -21,14 +21,14 @@ def write_skill(root: Path, frontmatter: str | None = None, directory: str = 'de
 
 
 def stub_builtin(monkeypatch: pytest.MonkeyPatch, findings: list[Finding]) -> None:
-    monkeypatch.setattr(create_skill, 'run_builtin', lambda _target: findings)
+    monkeypatch.setattr(skill_command, 'run_builtin', lambda _target: findings)
 
 
 def test_validate_help_shows_the_skill_directory_and_strict(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exit_info:
-        main(['create-skill', 'validate', '--help'])
+        main(['skill', 'validate', '--help'])
 
     assert exit_info.value.code == 0
     output = capsys.readouterr().out
@@ -39,7 +39,7 @@ def test_validate_help_shows_the_skill_directory_and_strict(
 def test_create_skill_without_a_command_prints_usage_and_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(['create-skill']) == 2
+    assert main(['skill']) == 2
     assert 'usage: ai-engineer' in capsys.readouterr().err
 
 
@@ -48,7 +48,7 @@ def test_clean_skill_exits_zero(
 ) -> None:
     stub_builtin(monkeypatch, [])
 
-    assert main(['create-skill', 'validate', str(write_skill(tmp_path))]) == 0
+    assert main(['skill', 'validate', str(write_skill(tmp_path))]) == 0
     assert 'PASS demo-skill' in capsys.readouterr().out
 
 
@@ -57,7 +57,7 @@ def test_builtin_error_exits_one(
 ) -> None:
     stub_builtin(monkeypatch, [error('name must be a string, got object.')])
 
-    assert main(['create-skill', 'validate', str(write_skill(tmp_path))]) == 1
+    assert main(['skill', 'validate', str(write_skill(tmp_path))]) == 1
     assert 'error: name must be a string' in capsys.readouterr().out
 
 
@@ -65,7 +65,7 @@ def test_own_check_error_exits_one(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     stub_builtin(monkeypatch, [])
     skill_dir = write_skill(tmp_path, f'name: other\ndescription: {DESCRIPTION}\n')
 
-    assert main(['create-skill', 'validate', str(skill_dir)]) == 1
+    assert main(['skill', 'validate', str(skill_dir)]) == 1
 
 
 def test_warning_exits_zero_and_strict_turns_it_into_one(
@@ -74,8 +74,8 @@ def test_warning_exits_zero_and_strict_turns_it_into_one(
     stub_builtin(monkeypatch, [warning('No description in frontmatter.')])
     skill_dir = str(write_skill(tmp_path))
 
-    assert main(['create-skill', 'validate', skill_dir]) == 0
-    assert main(['create-skill', 'validate', skill_dir, '--strict']) == 1
+    assert main(['skill', 'validate', skill_dir]) == 0
+    assert main(['skill', 'validate', skill_dir, '--strict']) == 1
 
 
 def test_builtin_that_cannot_run_exits_two(
@@ -85,16 +85,16 @@ def test_builtin_that_cannot_run_exits_two(
         message = 'claude plugin validate printed no JSON report'
         raise BuiltinUnavailableError(message)
 
-    monkeypatch.setattr(create_skill, 'run_builtin', unavailable)
+    monkeypatch.setattr(skill_command, 'run_builtin', unavailable)
 
-    assert main(['create-skill', 'validate', str(write_skill(tmp_path))]) == 2
+    assert main(['skill', 'validate', str(write_skill(tmp_path))]) == 2
     assert 'PASS' not in capsys.readouterr().out
 
 
 def test_path_that_is_not_a_directory_exits_two(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert main(['create-skill', 'validate', str(tmp_path / 'missing')]) == 2
+    assert main(['skill', 'validate', str(tmp_path / 'missing')]) == 2
     assert 'is not a directory' in capsys.readouterr().err
 
 
@@ -104,7 +104,7 @@ def test_without_claude_on_path_exits_two_naming_claude(
     skill_dir = write_skill(tmp_path)
     monkeypatch.setenv('PATH', str(tmp_path))
 
-    assert main(['create-skill', 'validate', str(skill_dir)]) == 2
+    assert main(['skill', 'validate', str(skill_dir)]) == 2
     captured = capsys.readouterr()
     assert 'claude is not on PATH' in captured.err
     assert 'PASS' not in captured.out
@@ -148,7 +148,7 @@ def test_builtin_runs_for_a_skill_under_a_directory_named_skills(
     skill_dir = write_skill(skills, NAME_MAPPING)
     write_skill(skills, NO_DESCRIPTION, directory='sibling-skill')
 
-    assert main(['create-skill', 'validate', str(skill_dir)]) == 1
+    assert main(['skill', 'validate', str(skill_dir)]) == 1
     output = capsys.readouterr().out
     assert 'name must be a string' in output
     assert 'No description in frontmatter' not in output
@@ -162,7 +162,7 @@ def test_builtin_runs_for_a_skill_under_a_directory_with_another_name(
     skill_dir = write_skill(collection, NAME_MAPPING)
     write_skill(collection, NO_DESCRIPTION, directory='sibling-skill')
 
-    assert main(['create-skill', 'validate', str(skill_dir)]) == 1
+    assert main(['skill', 'validate', str(skill_dir)]) == 1
     output = capsys.readouterr().out
     assert 'name must be a string' in output
     assert 'No description in frontmatter' not in output
@@ -174,7 +174,7 @@ def test_invalid_yaml_the_builtin_passed_exits_two_without_a_verdict(
     stub_builtin(monkeypatch, [])
     skill_dir = write_skill(tmp_path, 'name: demo-skill\ndescription: [unclosed\n')
 
-    assert main(['create-skill', 'validate', str(skill_dir)]) == 2
+    assert main(['skill', 'validate', str(skill_dir)]) == 2
     captured = capsys.readouterr()
     assert 'not valid YAML' in captured.err
     assert 'PASS' not in captured.out
@@ -187,7 +187,7 @@ def test_invalid_yaml_the_builtin_reported_exits_one(
     stub_builtin(monkeypatch, [error('YAML frontmatter failed to parse')])
     skill_dir = write_skill(tmp_path, 'name: demo-skill\ndescription: "unclosed\n')
 
-    assert main(['create-skill', 'validate', str(skill_dir)]) == 1
+    assert main(['skill', 'validate', str(skill_dir)]) == 1
     assert 'FAIL demo-skill' in capsys.readouterr().out
 
 
@@ -200,7 +200,7 @@ def test_unreadable_skill_file_exits_two_naming_the_path(
     if os.access(skill_md, os.R_OK):
         pytest.skip('this user can read a mode 000 file')
 
-    assert main(['create-skill', 'validate', str(skill_dir)]) == 2
+    assert main(['skill', 'validate', str(skill_dir)]) == 2
     captured = capsys.readouterr()
     assert str(skill_md) in captured.err
     assert 'PASS' not in captured.out
