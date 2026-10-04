@@ -61,7 +61,7 @@ def count_files(params: Input, ctx: Context[AppState]) -> Output: ...
 
 ## Client and tests
 
-- `from mcp import Client`; `Client(mcp)` for in-process, `Client(StdioServerParameters(command='uv', args=[...], env={...}))` for a subprocess, `Client('http://host:port/mcp')` for HTTP; `async with` connects, then `list_tools()`, `call_tool(name, arguments)`, `list_prompts()`, `read_resource()`. observed
+- `from mcp import Client`; `Client(mcp)` for in-process, `Client(StdioServerParameters(command='uv', args=[...], env={...}))` for a subprocess, `Client(URL)`, the server's `/mcp` endpoint URL, for HTTP; `async with` connects, then `list_tools()`, `call_tool(name, arguments)`, `list_prompts()`, `read_resource()`. observed
 - The stdio child receives only an allow-list of environment variables; pass others through `env=`. doc-verified
 - In-process tests negotiate 2026-07-28. observed
 
