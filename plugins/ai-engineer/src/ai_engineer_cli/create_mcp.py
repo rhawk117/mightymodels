@@ -8,6 +8,7 @@ from ai_engineer_cli.findings import CannotCheckError, Finding, report
 from ai_engineer_cli.mcp_checks import check_mcp
 from ai_engineer_cli.mcp_command import check_commands
 from ai_engineer_cli.mcp_file import KINDS, SERVER_FILE_NAME, McpFile, load_mcp_file
+from ai_engineer_cli.scaffold_command import scaffold_command
 
 
 def build_group(parser: argparse.ArgumentParser) -> None:
@@ -32,6 +33,22 @@ def build_group(parser: argparse.ArgumentParser) -> None:
     )
     validate.add_argument('--strict', action='store_true', help='exit 1 on warnings too')
     validate.set_defaults(handler=validate_command)
+    scaffold = commands.add_parser(
+        'scaffold',
+        help='render an MCP server project and its .mcp.json shapes from an interview spec',
+    )
+    scaffold.add_argument('spec', type=Path, metavar='SPEC', help='interview spec JSON')
+    scaffold.add_argument('target', type=Path, metavar='TARGET', help='directory to write into')
+    scaffold.add_argument(
+        '--template',
+        type=Path,
+        metavar='DIR',
+        help='project template (default: assets/template of the create-mcp skill)',
+    )
+    scaffold.add_argument(
+        '--force', action='store_true', help='write into a non-empty TARGET, replacing its src/'
+    )
+    scaffold.set_defaults(handler=scaffold_command)
 
 
 def validate_command(arguments: argparse.Namespace) -> int:
