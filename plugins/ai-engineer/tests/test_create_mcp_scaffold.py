@@ -1,6 +1,7 @@
 import ast
 import json
 import re
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -392,3 +393,17 @@ def test_spec_text_is_substituted_once_and_cannot_break_out_of_a_docstring(
     for path in target.rglob('*.py'):
         ast.parse(path.read_text(), filename=str(path))
     assert 'description = "uses __NAME__' in (target / 'pyproject.toml').read_text()
+
+
+def test_template_pyproject_is_valid_toml() -> None:
+    project = tomllib.loads((TEMPLATE / 'pyproject.toml').read_text())['project']
+
+    assert project['description'] == '__DESCRIPTION_TOML__'
+
+
+def test_description_round_trips_through_the_generated_pyproject(tmp_path: Path) -> None:
+    description = 'says "hi" with a \\ backslash and \U0001f600'
+    target = scaffolded(tmp_path, description=description)
+
+    project = tomllib.loads((target / 'pyproject.toml').read_text(encoding='utf-8'))['project']
+    assert project['description'] == description

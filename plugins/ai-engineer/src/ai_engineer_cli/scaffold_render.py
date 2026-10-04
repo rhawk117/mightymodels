@@ -28,7 +28,7 @@ def template_tokens(spec: Spec) -> dict[str, str]:
         '__PKG__': spec['package'],
         '__NAME__': spec['name'],
         '__DESCRIPTION__': spec['description'],
-        '__DESCRIPTION_TOML__': json.dumps(spec['description']),
+        '__DESCRIPTION_TOML__': json.dumps(spec['description'], ensure_ascii=False)[1:-1],
         '__DESCRIPTION_LITERAL__': wrap_literal(spec['description']),
         '__INSTRUCTIONS_LITERAL__': wrap_literal(spec['instructions']),
         '__TRANSPORTS__': transports,
