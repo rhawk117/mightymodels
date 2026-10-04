@@ -14,7 +14,7 @@
     {
       "name": "vibe-code",
       "source": "./plugins/vibe-code",
-      "description": "Ten skills for building and hardening Claude Code agents, skills, hooks, instructions, MCP servers, and loops, plus an vibe-code CLI that needs uv on PATH.",
+      "description": "Ten skills for building and hardening Claude Code agents, skills, hooks, instructions, MCP servers, and loops, plus a vibe-code CLI that needs uv on PATH.",
       "version": "0.3.0"
     }
   ]

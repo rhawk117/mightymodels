@@ -44,10 +44,8 @@ the negative space ("not for X"). You can always bypass selection by naming the 
 slash. Plugin skills surface as `/mightymodels:agents-assemble`, and the short form
 `/agents-assemble` works whenever the name is unambiguous in your session.
 
-The trigger datasets under `evals/datasets/<plugin>/<skill>/trigger.yaml` exist for this selection layer.
-They pair should-trigger prompts with near-misses, and they ship without an executor because
-triggering is retrieval-specific; wire them to your own oracle and assert the should-trigger
-queries rank the skill in the top k.
+No trigger datasets ship in this repository, so nothing here measures selection. A skill that
+runs when named but never self-selects has a description problem; see Known limits.
 
 ## Agents
 
@@ -102,16 +100,23 @@ independently.
 `humanizer`, `plan-plugin`, and `promptlint`. Install it with
 `/plugin install vibe-code@rygentic-harness`.
 
-The skills call an `vibe-code` CLI to validate what they write: `skill validate`,
+The skills call a `vibe-code` CLI to validate what they write: `skill validate`,
 `hook validate` and `hook test`, `subagent validate`, `instruction validate`,
 `mcp scaffold` and `mcp validate`, and `plugin validate`, `plugin render`, and `plugin inventory`.
 Claude Code puts a plugin's `bin/` directory on the Bash tool's `PATH` while the plugin is
-enabled, so the skills run `plugins/vibe-code/bin/vibe-code` by name.
+enabled, so the skills run `vibe-code` by name.
 
-The CLI needs [uv](https://docs.astral.sh/uv/) on your `PATH`. Without it the shim exits with
-status 127 and prints a message. With it, the shim runs the CLI under Python 3.12 or newer from
-the versions pinned in `plugins/vibe-code/requirements.lock`. The lock pins versions;
-`uv run` does not check the hash lines in it, so installs are not hash-verified.
+The CLI needs [uv](https://docs.astral.sh/uv/) on your `PATH`. Without it the launcher exits with
+status 127. `bin/vibe-code` is a Python script whose shebang runs `uv tool run`, not `uv run`,
+because `uv run` adopts the `.venv`, `pyproject.toml` and `uv.toml` of the caller's working
+directory. The dependency versions are pinned on line 1 of `bin/vibe-code` and in
+`bin/vibe-code.cmd`, which `tests/test_shim.py` checks against `uv.lock`. The pins select versions
+and do not verify hashes. Four commands (`skill validate`, `hook validate`, `subagent validate`
+and `mcp validate`) call `claude plugin validate --json`, so they need a Claude Code that has
+that flag. Windows was exercised by hand on one machine and no automated test covers it; one
+thing to know is that PowerShell starting `vibe-code.cmd` lets `cmd.exe` re-read the command line,
+so an unquoted argument holding `&` runs what follows it. The details are in
+[the plugin README](../plugins/vibe-code/README.md).
 
 The plugin's eval cases are in `plugins/vibe-code/evals`. Running them with
 `claude plugin eval` costs money and is not part of the quality gate.

@@ -46,8 +46,6 @@ problem in one pass:
 - `ty` at Python 3.14, then a second `ty` pass at Python 3.12 over the skills trees and
   `plugins/vibe-code/src` and `plugins/vibe-code/tests`
 - `pytest`, which runs the vibe-code tests in `plugins/vibe-code/tests`
-- the vibe-code lock check, which fails when `plugins/vibe-code/requirements.lock` is stale
-  (see The vibe-code package)
 - `claude plugin validate --strict` for each plugin under `plugins/`, then for the root
   marketplace
 
@@ -81,24 +79,24 @@ targeted `noqa` or `ty: ignore` needs a comment with the reason.
 `plugins/vibe-code` is also a uv workspace member, the `vibe-code-plugin` package. Its source
 is `plugins/vibe-code/src/vibe_code_cli`, with one sub-package per concept (`skill`, `hook`,
 `subagent`, `instruction`, `mcp`, `plugin`) and the shared modules beside them. Its tests are in
-`plugins/vibe-code/tests`. The plugin's skills run the CLI through the `bin/vibe-code` shim,
-which needs `uv` on `PATH` and starts the CLI from `plugins/vibe-code/requirements.lock`.
+`plugins/vibe-code/tests`. The plugin's skills run the CLI through the `bin/vibe-code` launcher,
+which needs `uv` on `PATH`. Its first line is a shebang that runs `uv tool run` with the runtime
+dependencies pinned by version, and `bin/vibe-code.cmd` runs the same command for `cmd.exe`.
+[plugins/vibe-code/README.md](plugins/vibe-code/README.md) describes both.
 
-The lock pins the package's runtime dependencies by version. The shim's `uv run` does not
-enforce the hash lines in it, so treat the file as a version pin, not as artifact verification.
-After you change the dependencies in `plugins/vibe-code/pyproject.toml` or `uv.lock`,
-regenerate it from the repository root:
-
-```sh
-NO_COLOR=1 uv export --package vibe-code-plugin --format requirements.txt \
-  --no-emit-project --no-emit-workspace --frozen > plugins/vibe-code/requirements.lock
-```
-
-`scripts/quality.sh --lint` runs the same export and diffs it against the checked-in file, so a
-stale lock fails the gate.
+The pins select versions and do not verify hashes. To change a dependency, edit
+`plugins/vibe-code/pyproject.toml`, run `uv lock` from the repository root, then put the same
+versions in line 1 of `plugins/vibe-code/bin/vibe-code` and in `plugins/vibe-code/bin/vibe-code.cmd`.
+`plugins/vibe-code/tests/test_shim.py` compares both files with `uv.lock` and fails when they
+differ. The launcher stays on `uv tool run` rather than `uv run`, which would adopt the caller's
+`.venv`, `pyproject.toml` and `uv.toml`.
 
 The vibe-code eval cases are in `plugins/vibe-code/evals`. Running them with
 `claude plugin eval` costs money and is not part of the gate.
+
+`.gitattributes` keeps `plugins/vibe-code/bin/vibe-code` on LF line endings and `*.cmd` files on
+CRLF. `.python-version` at the root and in `plugins/vibe-code` says 3.14, the development
+interpreter; the CLI source and tests still have to run on 3.12.
 
 On WSL, a checked-in script such as `plugins/vibe-code/bin/vibe-code` can lose its
 executable bit. Restore it in the index with
