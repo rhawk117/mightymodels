@@ -25,6 +25,7 @@ from mightymodels_plugin.tools.tests.support import (
     DatabaseActivity,
     StateServer,
     ToolCall,
+    text_of,
     tree,
 )
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
@@ -61,6 +62,7 @@ HOSTILE = [
     pytest.param('~root', id='tilde'),
     pytest.param('retry queue', id='space'),
     pytest.param('x' * (SLUG_LIMIT + 1), id='too-long'),
+    pytest.param('archives', id='reserved'),
 ]
 HOSTILE_RUN_IDS = [
     pytest.param('../../etc', id='parents'),
@@ -208,6 +210,39 @@ class TestSlugType:
             )
             for schema in schemas.values()
         )
+
+
+class TestReservedName:
+    WRITE_OF_THE_RESERVED_NAME: ToolCall = (
+        'ticket',
+        {'action': 'write', 'fields': ANSWERS, 'slug': 'archives'},
+    )
+
+    def test_slug_reservation_a_parsed_slug_says_the_name_is_reserved(self) -> None:
+        refusal = parsed_slug('archives')
+
+        assert isinstance(refusal, InvalidSlugError)
+        assert "never 'archives', the name reserved for the archive directory" in str(refusal)
+
+    def test_slug_reservation_a_tool_call_says_the_name_is_reserved(
+        self, state_server: StateServer
+    ) -> None:
+        (result,) = state_server.call(self.WRITE_OF_THE_RESERVED_NAME)
+
+        assert result.is_error
+        assert "'archives' is reserved for the archive directory" in text_of(result)
+
+    @pytest.mark.parametrize(
+        'raw',
+        [
+            pytest.param('archives-2', id='suffixed'),
+            pytest.param('my-archives', id='prefixed'),
+        ],
+    )
+    def test_slug_reservation_a_name_that_only_contains_the_reserved_one_stays_a_slug(
+        self, raw: str
+    ) -> None:
+        assert parsed_slug(raw) == Slug(raw)
 
 
 @pytest.fixture

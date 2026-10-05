@@ -8,6 +8,7 @@ from types import MappingProxyType
 
 import pytest
 from mightymodels_plugin.clock import now
+from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.routing import Depth
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
@@ -44,7 +45,8 @@ from mightymodels_plugin.tools.review.schema import (
 )
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.task.repository import Attempt, Transition, task_transaction
-from mightymodels_plugin.tools.task.schema import Implementer, Status
+from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskStart
+from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.tests.support import StateServer, tree
 from mightymodels_plugin.tools.ticket.repository import ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
@@ -536,6 +538,24 @@ class TestClose:
 
         assert refused.is_error
         assert tree(connected_server.root) == tree_after_the_connect
+
+
+class TestAClosedTicket:
+    CI_FIX = TaskStart(by=Implementer.ENGINEER, owned=('src/lint.py',))
+
+    @pytest.fixture
+    def closed(self, repo: Repo) -> Repo:
+        repo.closings.close(TICKET, CLOSING)
+        return repo
+
+    def test_a_closed_ticket_takes_no_new_task_and_stays_closed(
+        self, closed: Repo, task_service: TaskService
+    ) -> None:
+        with pytest.raises(StateError) as refusal:
+            task_service.start(TICKET, 'C1', self.CI_FIX)
+
+        assert f'{SLUG} is closed, and a closed ticket is final' in str(refusal.value)
+        assert closed.ticket_status() == 'closed'
 
 
 class TestLedgerDecisions:

@@ -4,6 +4,10 @@
 ticket service never sees a session. A domain that reads ticket rows inside its own transaction
 builds a `TicketRepository` on that transaction's session.
 
+A closed ticket is final. `unclosed_row` hands out the row of a ticket that still takes work and
+refuses a closed one, and `mark_in_progress` writes through it, so no closed ticket reads in
+progress again.
+
 A ticket links investigations by id, and `unrecorded_investigations` says which of them have no
 ledger, read through the investigation repository on the same session.
 """
@@ -28,6 +32,15 @@ class NotStagedError(StateError):
         self.slug = slug
 
 
+class ClosedTicketError(StateError):
+    def __init__(self, slug: Slug) -> None:
+        super().__init__(
+            f'{slug} is {TicketStatus.CLOSED}, and a closed ticket is final; '
+            'new work needs a new ticket, staged with open-ticket'
+        )
+        self.slug = slug
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TicketRepository:
     session: Session
@@ -39,6 +52,12 @@ class TicketRepository:
         row = self.row(slug)
         if row is None:
             raise NotStagedError(slug)
+        return row
+
+    def unclosed_row(self, slug: Slug) -> TicketRow:
+        row = self.staged_row(slug)
+        if row.status == TicketStatus.CLOSED:
+            raise ClosedTicketError(slug)
         return row
 
     def stage(self, slug: Slug, section: TicketSection, declared: Sequence[str]) -> TicketRow:
@@ -67,7 +86,7 @@ class TicketRepository:
         return [slug for slug in linked if not investigations.has_entries(slug)]
 
     def mark_in_progress(self, slug: Slug) -> None:
-        self.staged_row(slug).status = TicketStatus.IN_PROGRESS
+        self.unclosed_row(slug).status = TicketStatus.IN_PROGRESS
 
     def mark_closed(self, slug: Slug) -> None:
         self.staged_row(slug).status = TicketStatus.CLOSED

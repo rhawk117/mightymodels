@@ -22,12 +22,13 @@ from mightymodels_plugin.tools.task.schema import (
     TaskView,
 )
 from mightymodels_plugin.tools.task.service import TaskService, records_of
-from mightymodels_plugin.tools.task.tables import TransitionRow
+from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
+from mightymodels_plugin.tools.ticket.repository import ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 type GitRunner = Callable[..., str]
 
@@ -35,6 +36,7 @@ SLUG = 'retry-queue'
 TICKET = Slug(SLUG)
 ADVANCED, BLOCKED, REJECTED = 0, 1, 2
 IDENTITY = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
+TASK_TABLES = (TaskRow, AttemptRow, TransitionRow)
 ANSWERS = TicketAnswers.model_validate(
     {
         'summary': 'Retry queue drains slowly',
@@ -556,6 +558,68 @@ class TestVerify:
 
         assert outcome.code == BLOCKED
         assert outcome.out == 'T1 blocked\n  - the task has no valid base commit\n'
+
+
+def ticket_status(repo: Repo) -> str:
+    with ticket_transaction(repo.tasks.database) as repository:
+        return repository.staged_row(TICKET).status
+
+
+def task_row_counts(repo: Repo) -> list[int | None]:
+    queries = [select(func.count()).select_from(table) for table in TASK_TABLES]
+    with repo.tasks.database.transaction() as session:
+        return [session.scalar(query) for query in queries]
+
+
+class TestAClosedTicket:
+    REFUSAL = (
+        f'{SLUG} is closed, and a closed ticket is final; '
+        'new work needs a new ticket, staged with open-ticket'
+    )
+
+    @pytest.fixture
+    def closed(self, repo: Repo) -> Repo:
+        start(repo)
+        with ticket_transaction(repo.tasks.database) as repository:
+            repository.mark_closed(TICKET)
+        return repo
+
+    @pytest.fixture
+    def task_row_counts_when_closed(self, closed: Repo) -> list[int | None]:
+        return task_row_counts(closed)
+
+    @pytest.mark.parametrize(
+        ('action', 'task_id', 'change'),
+        [
+            pytest.param('start', 'T2', {'by': 'engineer', 'owned': ['src/queue.py']}, id='start'),
+            pytest.param('verify', 'T1', {'commit': 'HEAD'}, id='verify'),
+            pytest.param('mark', 'T1', {'to': 'failed', 'reason': 'AC-1 still red'}, id='mark'),
+        ],
+    )
+    def test_a_closed_ticket_refuses_the_action_stays_closed_and_gains_no_row(
+        self,
+        closed: Repo,
+        task_row_counts_when_closed: list[int | None],
+        *,
+        action: str,
+        task_id: str,
+        change: dict[str, object],
+    ) -> None:
+        with pytest.raises(StateError) as refusal:
+            act(closed.tasks, action, task_id, change)
+
+        assert str(refusal.value) == self.REFUSAL
+        assert ticket_status(closed) == 'closed'
+        assert task_row_counts(closed) == task_row_counts_when_closed
+
+    @pytest.mark.parametrize(
+        'action', [pytest.param('show', id='show'), pytest.param('ready', id='ready')]
+    )
+    def test_a_closed_ticket_still_answers_show_and_ready(self, closed: Repo, action: str) -> None:
+        outcome = closed.run(action)
+
+        assert (outcome.err, 'T1' in outcome.out) == ('', True)
+        assert ticket_status(closed) == 'closed'
 
 
 class TestShow:

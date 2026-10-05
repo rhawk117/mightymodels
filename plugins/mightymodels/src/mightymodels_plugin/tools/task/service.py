@@ -5,6 +5,9 @@ ticket in progress. `start` records an attempt and the HEAD it starts from, `ver
 to verified or blocked on the proof in `gates.py`, `mark` closes or parks one with a reason,
 `show` lists a ticket's tasks and `ready` is the gate before any push.
 
+A closed ticket is final. `start`, `verify` and `mark` refuse one before they read a task, and
+`show` and `ready` still answer for it.
+
 The ladder is the skills': an engineer attempt, one architect implementation attempt, one
 more in systemic-refactor mode after an approved scope expansion, which may take over a task
 that is still in progress, and diagnose-replan passes that never count against the limit. A
@@ -195,7 +198,7 @@ class TaskService:
 
     def start(self, slug: Slug, task_id: str, change: TaskStart) -> TaskView:
         with task_transaction(self.database) as repository:
-            repository.tickets.staged_row(slug)
+            repository.tickets.unclosed_row(slug)
             if (error := mode_error(change)) is not None:
                 raise error
             mode = architect_mode(change)
@@ -223,7 +226,7 @@ class TaskService:
 
     def verify(self, slug: Slug, task_id: str, change: TaskVerification) -> TaskView:
         with task_transaction(self.database) as repository:
-            repository.tickets.staged_row(slug)
+            repository.tickets.unclosed_row(slug)
             row = repository.row(slug, task_id)
             before = status_of(row)
             if row is None or Status.VERIFIED not in ALLOWED[before]:
@@ -248,7 +251,7 @@ class TaskService:
 
     def mark(self, slug: Slug, task_id: str, change: TaskMark) -> TaskView:
         with task_transaction(self.database) as repository:
-            repository.tickets.staged_row(slug)
+            repository.tickets.unclosed_row(slug)
             row = repository.row(slug, task_id)
             before = status_of(row)
             if row is None or change.to not in ALLOWED[before]:

@@ -33,7 +33,7 @@ from types import MappingProxyType
 
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.run_id import RunId
-from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.slug import ARCHIVES_DIRECTORY, Slug
 from mightymodels_plugin.tools.review.schema import Persona
 
 PROJECT_DIR_VARIABLE = 'CLAUDE_PROJECT_DIR'
@@ -44,7 +44,6 @@ TICKET_FILE = 'ticket.yml'
 TICKET_DRAFT = f'{TICKET_FILE}.tmp'
 EXCLUDE_LINE = f'{STATE_DIRECTORY}/'
 HANDOFFS_DIRECTORY = 'handoffs'
-ARCHIVES_DIRECTORY = 'archives'
 SNAPSHOT_NAME = 'snapshot'
 LIVE_DEBUG_FILE = 'whats-broken.md'
 SAFE_REVISION = re.compile(r'[0-9A-Za-z][0-9A-Za-z._/-]*')
