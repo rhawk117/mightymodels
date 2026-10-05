@@ -101,6 +101,7 @@ def table_of(read: TomlRead | None) -> ConfigTable:
 @dataclass(frozen=True, slots=True)
 class ScanContext:
     root: Path
+    boundary: Path
     directories: tuple[Path, ...]
     project_directories: tuple[Path, ...]
     pyprojects: Mapping[Path, TomlRead]
@@ -184,6 +185,7 @@ def open_scan_context(cwd: Path, options: ScanOptions, variables: Mapping[str, s
     lock = read_workspace_lock(workspace_root, root, options)
     return ScanContext(
         root=root,
+        boundary=boundary,
         directories=directories,
         project_directories=list_ancestors_to(root, workspace_root),
         pyprojects=pyprojects,

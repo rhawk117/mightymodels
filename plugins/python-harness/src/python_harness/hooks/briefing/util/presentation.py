@@ -12,6 +12,7 @@ from python_harness.hooks.briefing.domain import (
     ExtendChainTooLong,
     ExtendCycle,
     ExtendTargetMissing,
+    ExtendTargetOutside,
     PackageFacts,
     ProjectScan,
     PythonFacts,
@@ -123,6 +124,12 @@ def describe_long_chain(problem: ExtendChainTooLong, _limit: int) -> str:
 @describe_problem.register
 def describe_missing_target(problem: ExtendTargetMissing, limit: int) -> str:
     return f'ruff extend target {quoted(problem.path, limit)} does not exist'
+
+
+@describe_problem.register
+def describe_outside_target(problem: ExtendTargetOutside, limit: int) -> str:
+    target = quoted(problem.path, limit)
+    return f'ruff extend target {target} is outside the project and was not read'
 
 
 @describe_problem.register

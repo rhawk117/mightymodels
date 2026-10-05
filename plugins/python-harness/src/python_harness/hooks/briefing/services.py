@@ -21,6 +21,7 @@ from python_harness.hooks.briefing.domain import (
     ExtendChainTooLong,
     ExtendCycle,
     ExtendTargetMissing,
+    ExtendTargetOutside,
     IniDocument,
     MissingFile,
     Orchestrator,
@@ -53,6 +54,7 @@ from python_harness.hooks.briefing.store import (
     has_file,
     open_scan_context,
     read_text,
+    read_toml,
 )
 from python_harness.hooks.briefing.util.configs import (
     PYTEST_SETTINGS,
@@ -93,6 +95,12 @@ EMPTY_CONFIG: Mapping[str, str] = MappingProxyType[str, str]({})
 class FoundConfig:
     path: Path
     source: ConfigSource
+
+
+@dataclass(frozen=True, slots=True)
+class ExtendTarget:
+    path: Path
+    written: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,19 +158,24 @@ def ruff_table_of(document: ConfigTable, path: Path) -> ConfigTable:
     return document
 
 
-def extend_target(table: ConfigTable, config_path: Path, context: ScanContext) -> Path | None:
+def extend_target(
+    table: ConfigTable, config_path: Path, context: ScanContext
+) -> ExtendTarget | None:
     extend = read_string(table, 'extend')
     if extend is None:
         return None
     expanded = Path(expand_variables(extend, context.variables)).expanduser()
-    return config_path.parent.joinpath(expanded)
+    return ExtendTarget(config_path.parent.joinpath(expanded), extend)
 
 
 def find_chain_stop(
-    target: Path, visited: frozenset[Path], context: ScanContext
+    target: ExtendTarget, visited: frozenset[Path], context: ScanContext
 ) -> ScanProblem | None:
-    if target.resolve() in visited:
-        return ExtendCycle(context.display(target))
+    resolved = target.path.resolve()
+    if not resolved.is_relative_to(context.boundary.resolve()):
+        return ExtendTargetOutside(target.written)
+    if resolved in visited:
+        return ExtendCycle(target.written)
     limit = context.options.max_extend_depth
     if len(visited) >= limit:
         return ExtendChainTooLong(limit)
@@ -178,17 +191,20 @@ def extend_chain(
     stop = find_chain_stop(target, visited, context)
     if stop is not None:
         return RuffChain((table,), (), (stop,))
-    parent = load_ruff_chain(target, context, visited | {target.resolve()})
-    extended = (context.display(target), *parent.extended)
+    seen = visited | {target.path.resolve()}
+    parent = load_ruff_chain(target.path, target.written, context, visited=seen)
+    extended = (target.written, *parent.extended)
     return RuffChain((table, *parent.tables), extended, parent.problems)
 
 
-def load_ruff_chain(path: Path, context: ScanContext, visited: frozenset[Path]) -> RuffChain:
-    read = context.read_toml(path)
+def load_ruff_chain(
+    path: Path, label: str, context: ScanContext, *, visited: frozenset[Path]
+) -> RuffChain:
+    read = read_toml(path, label, context.options.max_file_bytes)
     if isinstance(read, UnreadableFile):
         return RuffChain((), (), (read,))
     if isinstance(read, MissingFile):
-        return RuffChain((), (), (ExtendTargetMissing(context.display(path)),))
+        return RuffChain((), (), (ExtendTargetMissing(label),))
     table = ruff_table_of(read.table, path)
     return extend_chain(table, path, context, visited=visited)
 
@@ -205,7 +221,8 @@ def scan_ruff(context: ScanContext) -> ToolScan:
     found = next((config for config in configs if config is not None), None)
     if found is None:
         return ToolScan(Tool.RUFF, package, None, (), ())
-    loaded = load_ruff_chain(found.path, context, frozenset({found.path.resolve()}))
+    visited = frozenset({found.path.resolve()})
+    loaded = load_ruff_chain(found.path, found.source.path, context, visited=visited)
     settings = (
         *extends_settings(loaded),
         *collect_settings(merge_chain(loaded.tables), RUFF_SETTINGS),

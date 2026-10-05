@@ -12,6 +12,7 @@ from python_harness.hooks.briefing.domain import (
     ExtendChainTooLong,
     ExtendCycle,
     ExtendTargetMissing,
+    ExtendTargetOutside,
     Orchestrator,
     PackageFacts,
     ProjectScan,
@@ -213,6 +214,11 @@ class TestDescribeProblem:
                 ExtendTargetMissing('b.toml'),
                 'ruff extend target `b.toml` does not exist',
                 id='missing-target',
+            ),
+            pytest.param(
+                ExtendTargetOutside('../c.toml'),
+                'ruff extend target `../c.toml` is outside the project and was not read',
+                id='outside-target',
             ),
             pytest.param(
                 ConflictingPytestTables('pyproject.toml'),

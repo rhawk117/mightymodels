@@ -1,12 +1,17 @@
 """Markdown both hooks write: code spans that survive backticks, and short lines."""
 
+import re
+
 ELLIPSIS = '...'
+BACKTICK_RUN = re.compile(r'`+')
 
 
 def code_span(text: str) -> str:
-    if '`' in text:
-        return f'`` {text} ``'
-    return f'`{text}`'
+    longest_run = max(map(len, BACKTICK_RUN.findall(text)), default=0)
+    if longest_run == 0:
+        return f'`{text}`'
+    delimiter = '`' * (longest_run + 1)
+    return f'{delimiter} {text} {delimiter}'
 
 
 def shorten_line(text: str, limit: int) -> str:

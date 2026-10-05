@@ -97,6 +97,12 @@ class ExtendTargetMissing:
 
 
 @dataclass(frozen=True, slots=True)
+class ExtendTargetOutside:
+    path: str
+    kind: Literal['extend_target_outside'] = field(default='extend_target_outside', init=False)
+
+
+@dataclass(frozen=True, slots=True)
 class ConflictingPytestTables:
     path: str
     kind: Literal['conflicting_pytest_tables'] = field(
@@ -109,6 +115,7 @@ type ScanProblem = (
     | ExtendCycle
     | ExtendChainTooLong
     | ExtendTargetMissing
+    | ExtendTargetOutside
     | ConflictingPytestTables
 )
 
