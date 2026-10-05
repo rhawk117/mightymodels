@@ -36,7 +36,7 @@ Answers already given are confirmed in the summary, not re-asked.
 
 1. **Name** this unit of work; options: a slug proposed from the triage target, a shorter one.
 2. **Tracker**: GitHub issue, Jira ticket, both, or none.
-3. **Branch**: the current checkout as-is, or a new branch from HEAD (the user types the name).
+3. **Branch**: the current checkout as-is, or a new branch from HEAD (propose its name in the option).
 4. **Compaction**: would implementing this likely cause at least one compaction?
 5. **Scope** of each anticipated task: sm, med, or large.
 

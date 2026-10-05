@@ -52,7 +52,7 @@ Anchors, flow collections (`[a, b]`, `{a: b}`), single quotes, and block scalars
 
 **plan-first**: `true` when the user expects at least one compaction. `true` also means the baton-pass handoff prompt carries the switch-models reminder, and the next session's low-tier primary writes the plan before any dispatch.
 
-**Reviewer split** (decision of record, 2026-08-29; carried to the reviewer workers 2026-09-28): `uncle-bob-reviewer` runs `sonnet` and `merge-vader-reviewer` runs `opus`. The split is by role and report, not model — uncle-bob grades abstraction and structure, merge-vader runs the adversarial pre-merge pass, and their reports land separately so neither hedges the other. A ticket value is used for a deep review; a quick review runs both on `haiku` and a standard one on `sonnet`, whatever the ticket says. Everything else in this block is user-overridable per ticket.
+**Reviewer split** (decision of record, 2026-08-29; carried to the reviewer workers 2026-09-28): `uncle-bob-reviewer` runs `sonnet` and `merge-vader-reviewer` runs `opus`. The split is by role and report, not model — uncle-bob grades abstraction and structure, merge-vader runs the adversarial pre-merge pass, and their reports land separately so neither hedges the other. A ticket value is used for a deep review; a quick review runs its one persona on `haiku` and a standard review runs on `sonnet`, whatever the ticket says. Everything else in this block is user-overridable per ticket.
 
 ## Field discipline
 

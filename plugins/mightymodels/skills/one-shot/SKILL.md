@@ -44,7 +44,7 @@ questions the context has not answered. The full set, in open-ticket's order, mi
 - Slug for this unit of work (the options are one derived from the target and a shorter variant).
 - Scope of each anticipated task: sm, med, or large. This derives the engineer model per the
   ticket schema, same as open-ticket.
-- Branch: current, or a new one (the user types the name).
+- Branch: current, or a new one (propose the name in the option).
 - Progress view: a GitHub issue, or a local `issue-body.md`; task progress is the `task`
   tool's rows either way.
 
