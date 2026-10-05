@@ -7,10 +7,10 @@ For the prompt that opens the next primary session, which baton-pass prints in c
 ```text
 <objective>Continue ticket <slug>: <focus line, verbatim, or the ramp's one-line purpose>.</objective>
 <discovery>
-Read, in order: .mightymodels/<slug>/ticket.yml; <the issue or checklist reference>; <.mightymodels/<slug>/handoffs/snapshot.md and handoffs/BATON.md when baton-pass wrote them>.
+Read, in order: .mightymodels/<slug>/ticket.yml; <the issue or plan>; <.mightymodels/<slug>/handoffs/snapshot.md and handoffs/BATON.md when baton-pass wrote them>.
 Invoke prompting-subagents before the first dispatch.
 </discovery>
 <constraints>Invoke <the one skill: agents-assemble | game-plan | one-shot | stick-the-landing | review-circus> and follow it. Treat the files above as the only source of state.</constraints>
 ```
 
-Slots: slug · focus or purpose · tracker reference · snapshot and baton paths when present · next skill.
+Slots: slug · focus or purpose · issue or plan · snapshot and baton paths when present · next skill.

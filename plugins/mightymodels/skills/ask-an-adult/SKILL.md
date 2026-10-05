@@ -7,15 +7,16 @@ description: >-
   defensible options, a hard-to-reverse choice, conflicting scout reports, a
   failure that survived two attempts, or a guess about user intent. Builds the
   escalation packet, dispatches wingman, then puts wingman's questions to the
-  user through ask_user before any work resumes. Not for retrieving facts (send a
+  user through `AskUserQuestion` before any work resumes. Not for retrieving facts (send a
   scout), not for work you can simply do, and not for confirming a plan you have
   already committed to.
 ---
 
 # ask-an-adult
 
-`wingman` is a one-shot advisor on `gpt-5.6-sol` with **no tools**. It sees
-nothing except what this dispatch contains. The quality of its answer is capped
+`wingman` is a one-shot advisor on the ticket's alias (`opus`). Its one tool is `ticket` with
+action `show`, so it can read the active ticket and nothing else; the packet you send
+remains its evidence. The quality of its answer is capped
 by the quality of the packet you send it, and a thin packet wastes a frontier
 turn.
 
@@ -43,7 +44,7 @@ usual reason wingman comes back at low confidence.
 State your lean honestly. wingman is instructed to form its own view first and to lead with
 disagreement, so hiding your preference buys nothing and costs the advisor a useful signal.
 
-Run the template's ten-second checklist, then send the packet to `mightymodels:wingman`. Do not
+Run the template's ten-second checklist, then send the packet to `mightymodels:wingman` through the `Agent` tool, its `model` the ticket's alias. Do not
 paraphrase file contents you have not read, and do not summarize scout findings into
 conclusions: pass the citations through as they came back.
 
@@ -56,15 +57,16 @@ wingman returns a `<report agent="wingman">` block. Handle it in this order:
    without addressing it.
 2. **Check `<confidence>`.** At `low`, the recommendation is provisional -
    resolve `<missing>` before acting on it.
-3. **Run `<ask_user>` immediately.** Put wingman's questions to the user through
-   `ask_user`, using the options it supplied. This is the point of the call.
+3. **Run `<user_questions>` immediately.** Put wingman's questions to the user through
+   `AskUserQuestion` (up to four questions a call, two to four options each), using the
+   options it supplied. This is the point of the call.
 4. **Dispatch scouts for `<missing>` items marked `scout`:** code-scout for repository
    facts, web-scout for external documentation. Do those in parallel
    with the user's answer where possible.
 5. **Carry `<verify>` into the work.** It is the acceptance criterion for
    whatever gets built next.
 
-Surface `<verdict>`, `<confidence>`, and `<ask_user>` to the user verbatim.
+Surface `<verdict>`, `<confidence>`, and `<user_questions>` to the user verbatim.
 Summarizing an advisor whose whole value is its reasoning defeats the call.
 
 The user decides; this skill is the only tie-break path. When the user cannot choose and
@@ -75,14 +77,13 @@ decision to defer to it, in those words. Do not escalate the same packet again.
 
 A decision escalated once and then lost to compaction gets escalated again, so persist it
 before any work resumes. When an investigation is active, or the ticket's `investigations`
-list links one, append it through lets-investigate's ledger:
+list links one, append it through lets-investigate's ledger. Call
+`mcp__plugin_mightymodels_state__investigation` with action `add`:
 
-```bash
-python3 BASE/../lets-investigate/scripts/ledger.py add --id ID --round N <<'JSON'
-[{"kind": "decision", "text": "<the choice> (wingman: <verdict, one line>; user: <answer>)", "source": "user"}]
-JSON
+```json
+{"action": "add", "investigation_id": "ID", "request": {"round": 1}, "entries": [{"kind": "decision", "text": "<the choice> (wingman: <verdict, one line>; user: <answer>)", "source": "user"}]}
 ```
 
-`BASE` is the `Base directory for this skill` line and `N` is the ledger's latest round
-(`ledger.py render` shows it). With no investigation, say in chat that the decision is not
+`ID` is the investigation's id and the `round` is the ledger's latest one (`investigation`
+`render` shows it). With no investigation, say in chat that the decision is not
 persisted yet; baton-pass records settled decisions when the session is handed off.

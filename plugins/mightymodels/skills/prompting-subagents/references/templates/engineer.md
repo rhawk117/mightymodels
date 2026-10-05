@@ -1,6 +1,6 @@
 # Template: engineer dispatch (emits the ASKED stanza)
 
-For one task dispatch inside an active mightymodels sprint. This template's first output block IS the brief's `## ASKED` half — write it once, paste it to the top of `.mightymodels/<slug>/briefs/task-NN.md`, and include it in the dispatch. The engineer's standing contract (report format, scope rules, blast-radius doctrine) lives in engineer.agent.md — do not restate it.
+For one task dispatch inside an active mightymodels sprint. This template's first output block IS the brief's `## ASKED` half — write it once, paste it to the top of `.mightymodels/<slug>/briefs/task-NN.md`, and include it in the dispatch. The engineer's standing contract (report format, scope rules, blast-radius doctrine) lives in the engineer agent file — do not restate it.
 
 **Ten-second checklist:** every AC is checkable — a runnable command or an assertion with a location; "works correctly" is a placeholder, reject it · files-in-scope is disjoint from any other open group's set · the verification commands actually exist in this repo (check the runner config before promising them) · tier bump, if any, has its reason logged.
 
@@ -25,11 +25,11 @@ Dispatch wrapper around the stanza:
 
 <ASKED stanza here>
 
-<constraints>Commit when done with message "<message>". <Push only if this dispatch is remediation-mode: "push after committing.">
+<constraints>Commit when done with message "<message>" and never push.
 </constraints>
 ```
 
-Slots: objective · ACs · verification · files-in-scope · tier(+reason) · brief path · commit message · push flag.
+Slots: objective · ACs · verification · files-in-scope · tier(+reason) · brief path · commit message.
 
 ## Residual variant
 
@@ -43,7 +43,7 @@ For one named residual with a bounded fix: a verification leftover, a mechanical
 files-in-scope: [<every file the Fix touches>]
 Fix: <verbatim from the finding or verification failure>
 Verify: <verbatim check>
-<constraints>Commit as "<message>". <"Push after committing." only in remediation mode.> One attempt: if Verify still fails, report failed with the output tail; if the Fix needs a file outside files-in-scope, report blocked.</constraints>
+<constraints>Commit as "<message>" and never push. One attempt: if Verify still fails, report failed with the output tail; if the Fix needs a file outside files-in-scope, report blocked.</constraints>
 ```
 
-Slots: issue id · source line · files-in-scope · Fix · Verify · commit message · push flag.
+Slots: issue id · source line · files-in-scope · Fix · Verify · commit message.

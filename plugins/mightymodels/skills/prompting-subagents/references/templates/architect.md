@@ -1,6 +1,6 @@
 # Template: architect dispatch
 
-For escalating one task to the recovery tier after engineer returned `failed` or `blocked`, or after a designated reviewer rejected an implementation for poor code quality with structured evidence. The architect's standing contract (modes, envelope rules, result shape) lives in architect.agent.md; carry only what varies per dispatch.
+For escalating one task to the recovery tier after engineer returned `failed` or `blocked`, or after a designated reviewer rejected an implementation for poor code quality with structured evidence. The architect's standing contract (modes, envelope rules, result shape) lives in the architect agent file; carry only what varies per dispatch.
 
 **Ten-second checklist:** the trigger is pasted verbatim (the engineer's report, or the reviewer's finding with future pressure, expected churn, clean extension path, and locations) · the ASKED contract is the one the engineer received, unedited · files-in-scope is the original owned set, and `systemic-refactor` appears only with an approved expanded envelope attached · the brief path is named when the task has one · this is the task's first architect dispatch; a second failure goes to whats-broken, not back here.
 
@@ -14,8 +14,8 @@ Trigger: <engineer failed | engineer blocked | reviewer rejection>, verbatim bel
 <the task's ASKED stanza, unedited, including files-in-scope>
 
 <constraints>
-Envelope: <files-in-scope from ASKED | the approved expanded envelope, listed>. Commit when done with message "<message>". <Push only in remediation mode: "push after committing.">
+Envelope: <files-in-scope from ASKED | the approved expanded envelope, listed>. Commit when done with message "<message>" and never push.
 </constraints>
 ```
 
-Slots: task id · mode · brief path · trigger text · ASKED stanza · envelope · commit message · push flag.
+Slots: task id · mode · brief path · trigger text · ASKED stanza · envelope · commit message.
