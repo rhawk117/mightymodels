@@ -1,0 +1,30 @@
+{
+  "description": "pythonista: brief each session on the project's Python toolchain, and add a note when a Bash command runs plain python instead of uv run python.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pythonista\" hooks session-start",
+            "timeout": 300,
+            "statusMessage": "pythonista: scanning the Python toolchain"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(*python*)",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pythonista\" hooks guard-python",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

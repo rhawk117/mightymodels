@@ -1,0 +1,19 @@
+{
+  "name": "python-harness",
+  "version": "0.3.0",
+  "description": "Python engineering for Claude Code: reviews and refactor plans grounded in deterministic facts and cited pylens fact-gathering, standard-library docs on demand, and hooks that brief each session on the project's Python toolchain and a note whenever a Bash command runs plain python instead of uv run python.",
+  "author": {
+    "name": "Ryan",
+    "email": "hawkinsry19@gmail.com"
+  },
+  "keywords": [
+    "python",
+    "code-review",
+    "refactoring",
+    "uv",
+    "ruff",
+    "ty",
+    "pytest",
+    "hooks"
+  ]
+}

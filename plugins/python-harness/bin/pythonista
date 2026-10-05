@@ -1,0 +1,52 @@
+#!/bin/sh
+set -u
+
+if [ "${1:-}" = hooks ]; then
+    failure_status=1
+else
+    failure_status=2
+fi
+
+fail() {
+    printf 'pythonista: %s\n' "$1" >&2
+    exit "$failure_status"
+}
+
+plugin_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd) ||
+    fail "cannot resolve the plugin directory from $0"
+
+command -v uv >/dev/null 2>&1 ||
+    fail "uv is not on PATH; install it (https://docs.astral.sh/uv/getting-started/installation/), then start a new session"
+
+for required in pyproject.toml uv.lock; do
+    [ -f "$plugin_root/$required" ] ||
+        fail "$plugin_root/$required is missing; reinstall the plugin"
+done
+
+if [ -n "${XDG_CACHE_HOME:-}" ]; then
+    cache_home="$XDG_CACHE_HOME/pythonista"
+elif [ -n "${HOME:-}" ]; then
+    cache_home="$HOME/.cache/pythonista"
+else
+    fail "neither XDG_CACHE_HOME nor HOME is set, so there is nowhere to keep the CLI's virtualenv"
+fi
+
+root_key=$(printf '%s' "$plugin_root" | cksum | cut -d ' ' -f 1)
+
+export UV_PROJECT="$plugin_root"
+export UV_PROJECT_ENVIRONMENT="$cache_home/venv-$root_key"
+export UV_NO_DEV=1
+export UV_FROZEN=1
+export PYTHONPYCACHEPREFIX="$cache_home/pycache"
+
+if [ ! -x "$UV_PROJECT_ENVIRONMENT/bin/pythonista" ]; then
+    uv sync --quiet ||
+        fail "uv could not build the CLI environment in $UV_PROJECT_ENVIRONMENT (its message is above); update uv (uv self update) and check it can reach PyPI and download Python 3.14"
+fi
+
+if [ "$failure_status" -eq 1 ]; then
+    uv run --quiet pythonista "$@" || exit 1
+    exit 0
+fi
+
+exec uv run --quiet pythonista "$@"

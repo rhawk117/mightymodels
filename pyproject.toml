@@ -33,4 +33,8 @@ dev = [{ include-group = "check" }, { include-group = "test" }]
 default-groups = ['dev']
 
 [tool.uv.workspace]
-members = ["plugins/mightymodels", "plugins/vibe-code"]
+members = [
+    "plugins/mightymodels",
+    "plugins/vibe-code",
+    "plugins/python-harness",
+]
