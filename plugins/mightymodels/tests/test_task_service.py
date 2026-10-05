@@ -7,22 +7,22 @@ from types import MappingProxyType
 
 import pytest
 from mightymodels_plugin.clock import now
-from mightymodels_plugin.db.checkout import Checkout, Checkouts
-from mightymodels_plugin.db.tables import TransitionRow
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.task import (
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.repository import contract_transaction
+from mightymodels_plugin.tools.contract.schema import ContractCommand, Phase, Receipt
+from mightymodels_plugin.tools.contract.schema import Outcome as ReceiptOutcome
+from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.task.repository import task_transaction
+from mightymodels_plugin.tools.task.schema import (
     TaskMark,
     TaskRecord,
     TaskStart,
     TaskVerification,
     TaskView,
 )
-from mightymodels_plugin.services import task
-from mightymodels_plugin.slug import Slug
-from mightymodels_plugin.tools.contract.repository import contract_transaction
-from mightymodels_plugin.tools.contract.schema import ContractCommand, Phase, Receipt
-from mightymodels_plugin.tools.contract.schema import Outcome as ReceiptOutcome
-from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.task.service import TaskService, records_of
+from mightymodels_plugin.tools.task.tables import TransitionRow
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tables import TicketRow
@@ -47,13 +47,13 @@ ANSWERS = TicketAnswers.model_validate(
 
 
 LISTINGS: Mapping[str, Callable[..., TaskView]] = MappingProxyType(
-    {'show': task.show, 'ready': task.ready}
+    {'show': TaskService.show, 'ready': TaskService.ready}
 )
 CHANGES: Mapping[str, tuple[Callable[..., TaskView], type[BaseModel]]] = MappingProxyType(
     {
-        'start': (task.start, TaskStart),
-        'verify': (task.verify, TaskVerification),
-        'mark': (task.mark, TaskMark),
+        'start': (TaskService.start, TaskStart),
+        'verify': (TaskService.verify, TaskVerification),
+        'mark': (TaskService.mark, TaskMark),
     }
 )
 
@@ -66,23 +66,23 @@ class Outcome:
 
 
 def act(
-    checkout: Checkout, action: str, task_id: str | None, change: dict[str, object]
+    tasks: TaskService, action: str, task_id: str | None, change: dict[str, object]
 ) -> TaskView:
     if action in LISTINGS:
-        return LISTINGS[action](checkout, TICKET)
+        return LISTINGS[action](tasks, TICKET)
     service, model = CHANGES[action]
-    return service(checkout, TICKET, task_id=task_id, change=model.model_validate(change))
+    return service(tasks, TICKET, task_id, model.model_validate(change))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Repo:
-    checkouts: Checkouts
+    tasks: TaskService
     contracts: ContractService
     runner: GitRunner
 
     @property
     def root(self) -> Path:
-        return self.checkouts.workspace.root
+        return self.tasks.workspace.root
 
     def git(self, *args: str) -> str:
         return self.runner(self.root, *IDENTITY, *args).strip()
@@ -97,8 +97,7 @@ class Repo:
 
     def run(self, action: str, task_id: str | None = None, **change: object) -> Outcome:
         try:
-            with self.checkouts.begin() as checkout:
-                view = act(checkout, action, task_id, change)
+            view = act(self.tasks, action, task_id, change)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, out='', err=str(error))
         return Outcome(code=ADVANCED if view.advanced else BLOCKED, out=view.text, err='')
@@ -108,13 +107,13 @@ class Repo:
         return self.root.joinpath('.mightymodels', SLUG)
 
     def task(self, task_id: str) -> TaskRecord:
-        with self.checkouts.begin() as checkout:
-            return task.records_of(checkout, TICKET)[task_id]
+        with task_transaction(self.tasks.database) as repository:
+            return records_of(repository, TICKET)[task_id]
 
     def transitions(self) -> list[tuple[str, str]]:
         query = select(TransitionRow).order_by(TransitionRow.id)
-        with self.checkouts.begin() as checkout:
-            return [(row.before, row.after) for row in checkout.session.scalars(query)]
+        with self.tasks.database.transaction() as session:
+            return [(row.before, row.after) for row in session.scalars(query)]
 
     def approve(self, *command_ids: str) -> None:
         commands = [
@@ -152,12 +151,12 @@ class Repo:
 
 @pytest.fixture
 def repo(
-    checkouts: Checkouts,
+    task_service: TaskService,
     ticket_service: TicketService,
     contract_service: ContractService,
     git: GitRunner,
 ) -> Repo:
-    space = Repo(checkouts=checkouts, contracts=contract_service, runner=git)
+    space = Repo(tasks=task_service, contracts=contract_service, runner=git)
     space.commit('src/queue.py', 'base\n')
     ticket_service.write(TICKET, ANSWERS)
     ticket_service.validate(TICKET)
@@ -272,8 +271,8 @@ def test_option_shaped_revisions_are_refused(repo: Repo) -> None:
 
 
 def test_an_unstaged_ticket_is_refused(repo: Repo) -> None:
-    with repo.checkouts.begin() as checkout:
-        checkout.session.execute(delete(TicketRow))
+    with repo.tasks.database.transaction() as session:
+        session.execute(delete(TicketRow))
     outcome = start(repo)
     assert 'stage the ticket with open-ticket first' in outcome.err
 
@@ -534,14 +533,14 @@ class TestVerify:
     @pytest.fixture
     def unborn(
         self,
-        checkouts: Checkouts,
+        task_service: TaskService,
         ticket_service: TicketService,
         contract_service: ContractService,
         git: GitRunner,
     ) -> Repo:
         ticket_service.write(TICKET, ANSWERS)
         ticket_service.validate(TICKET)
-        return Repo(checkouts=checkouts, contracts=contract_service, runner=git)
+        return Repo(tasks=task_service, contracts=contract_service, runner=git)
 
     def test_a_task_that_never_started_cannot_be_verified(self, repo: Repo) -> None:
         outcome = repo.run('verify', 'T1', commit=repo.git('rev-parse', 'HEAD'))

@@ -1,11 +1,25 @@
-"""The `task` tool."""
+"""The `task` tool: each handler checks the call's arguments and asks the task service.
+
+`ResolvedTasks` is a plain assignment because the SDK does not see a `Resolve` marker behind a
+PEP 695 `type` alias and would put the parameter in the tool's schema.
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Annotated
 
-from mightymodels_plugin.db.checkout import Checkout
-from mightymodels_plugin.models.task import (
+from mcp.server.mcpserver import Context, Resolve
+
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.protocol import (
+    ActionTool,
+    LifespanState,
+    MissingArgumentsError,
+    ServiceHandler,
+    dispatch_to_service,
+)
+from mightymodels_plugin.tools.task.schema import (
     TaskAction,
     TaskChange,
     TaskId,
@@ -14,15 +28,7 @@ from mightymodels_plugin.models.task import (
     TaskVerification,
     TaskView,
 )
-from mightymodels_plugin.services import task as service
-from mightymodels_plugin.slug import Slug
-from mightymodels_plugin.tools.protocol import (
-    ActionHandler,
-    ActionTool,
-    MissingArgumentsError,
-    ResolvedCheckouts,
-    dispatch_action,
-)
+from mightymodels_plugin.tools.task.service import TaskService
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -32,35 +38,42 @@ class TaskCall:
     change: TaskChange | None
 
 
-def start_task(checkout: Checkout, call: TaskCall) -> TaskView:
+def start_task(tasks: TaskService, call: TaskCall) -> TaskView:
     if call.task_id is None or not isinstance(call.change, TaskStart):
         raise MissingArgumentsError(TaskAction.START, 'task_id and a change holding by and owned')
-    return service.start(checkout, call.slug, task_id=call.task_id, change=call.change)
+    return tasks.start(call.slug, call.task_id, call.change)
 
 
-def verify_task(checkout: Checkout, call: TaskCall) -> TaskView:
+def verify_task(tasks: TaskService, call: TaskCall) -> TaskView:
     if call.task_id is None or not isinstance(call.change, TaskVerification):
         raise MissingArgumentsError(TaskAction.VERIFY, 'task_id and a change holding commit')
-    return service.verify(checkout, call.slug, task_id=call.task_id, change=call.change)
+    return tasks.verify(call.slug, call.task_id, call.change)
 
 
-def mark_task(checkout: Checkout, call: TaskCall) -> TaskView:
+def mark_task(tasks: TaskService, call: TaskCall) -> TaskView:
     if call.task_id is None or not isinstance(call.change, TaskMark):
         raise MissingArgumentsError(TaskAction.MARK, 'task_id and a change holding to and reason')
-    return service.mark(checkout, call.slug, task_id=call.task_id, change=call.change)
+    return tasks.mark(call.slug, call.task_id, call.change)
 
 
-def show_tasks(checkout: Checkout, call: TaskCall) -> TaskView:
-    return service.show(checkout, call.slug)
+def show_tasks(tasks: TaskService, call: TaskCall) -> TaskView:
+    return tasks.show(call.slug)
 
 
-def gate_readiness(checkout: Checkout, call: TaskCall) -> TaskView:
-    return service.ready(checkout, call.slug)
+def gate_readiness(tasks: TaskService, call: TaskCall) -> TaskView:
+    return tasks.ready(call.slug)
+
+
+def lifespan_tasks(ctx: Context[LifespanState]) -> TaskService:
+    return ctx.request_context.lifespan_context.tasks
+
+
+ResolvedTasks = Annotated[TaskService, Resolve(lifespan_tasks)]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TaskTool:
-    handlers: Mapping[TaskAction, ActionHandler[TaskCall, TaskView]]
+    handlers: Mapping[TaskAction, ServiceHandler[TaskService, TaskCall, TaskView]]
 
     def task(  # noqa: PLR0913 - four arguments are the schema the model sees and the SDK injects the fifth
         self,
@@ -69,11 +82,11 @@ class TaskTool:
         *,
         task_id: TaskId | None = None,
         change: TaskChange | None = None,
-        checkouts: ResolvedCheckouts,
+        tasks: ResolvedTasks,
     ) -> TaskView:
         """Start, mark, verify or list tasks, and gate the ticket on readiness."""
         call = TaskCall(slug=slug, task_id=task_id, change=change)
-        return dispatch_action(self.handlers, action, call, checkouts=checkouts)
+        return dispatch_to_service(self.handlers, action, call, service=tasks)
 
 
 task_tool = TaskTool(
@@ -87,4 +100,4 @@ task_tool = TaskTool(
         }
     )
 )
-task_action_tool: ActionTool[TaskAction, Checkout, TaskCall, TaskView] = task_tool
+task_action_tool: ActionTool[TaskAction, TaskService, TaskCall, TaskView] = task_tool

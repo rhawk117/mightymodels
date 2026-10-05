@@ -6,12 +6,11 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-from mightymodels_plugin.db.checkout import Checkouts
-from mightymodels_plugin.db.tables import TaskRow
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.task import Implementer, Status, TaskStart
-from mightymodels_plugin.services import task
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskStart
+from mightymodels_plugin.tools.task.service import TaskService
+from mightymodels_plugin.tools.task.tables import TaskRow
 from mightymodels_plugin.tools.ticket.repository import ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import (
     TicketAnswers,
@@ -80,8 +79,8 @@ class Workspace:
         return self.tickets.workspace.root
 
     @property
-    def checkouts(self) -> Checkouts:
-        return Checkouts(workspace=self.tickets.workspace, database=self.tickets.database)
+    def task_service(self) -> TaskService:
+        return TaskService(workspace=self.tickets.workspace, database=self.tickets.database)
 
     def run(self, command: str, answers: object = None) -> Outcome:
         try:
@@ -99,14 +98,13 @@ class Workspace:
             return unit_of(repository.staged_row(TICKET))
 
     def tasks(self) -> dict[str, str]:
-        with self.checkouts.begin() as checkout:
-            return {record.id: record.status for record in task.show(checkout, TICKET).tasks}
+        return {record.id: record.status for record in self.task_service.show(TICKET).tasks}
 
     def verify_first_task(self) -> None:
         change = TaskStart(by=Implementer.ENGINEER, owned=('src/queue.py',))
-        with self.checkouts.begin() as checkout:
-            task.start(checkout, TICKET, task_id='T1', change=change)
-            checkout.session.execute(update(TaskRow).values(status=Status.VERIFIED))
+        self.task_service.start(TICKET, 'T1', change)
+        with self.tickets.database.transaction() as session:
+            session.execute(update(TaskRow).values(status=Status.VERIFIED))
 
     def edit(self, old: str, new: str) -> None:
         text = self.ticket.read_text(encoding='utf-8')

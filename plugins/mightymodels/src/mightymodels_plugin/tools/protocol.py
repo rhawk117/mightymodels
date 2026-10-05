@@ -10,16 +10,16 @@ Each tool module binds its instance a second time under `ActionTool`, as `<domai
 which is what makes the type checker hold the tool to the interface. Annotating the instance
 itself would hide its registered method from the server.
 
-A handler takes its domain's service and the call. The `ticket` and `contract` tools are in that
-shape: each resolves the service the lifespan built and dispatches through `dispatch_to_service`,
-and the service opens its own transactions. The `task` and `review` tools are not there yet: their
-handlers take a `Checkout`, so `dispatch_action` opens one transaction around the handler.
-`ActionHandler`, `ResolvedCheckouts`, `lifespan_checkouts` and `dispatch_action` go when the last
-of the two is rebuilt.
+A handler takes its domain's service and the call. The `ticket`, `task` and `contract` tools are
+in that shape: each resolves the service the lifespan built and dispatches through
+`dispatch_to_service`, and the service opens its own transactions. The `review` tool is not there
+yet: its handlers take a `Checkout`, so `dispatch_action` opens one transaction around the handler.
+`ActionHandler`, `ResolvedCheckouts`, `lifespan_checkouts` and `dispatch_action` are kept for the
+`review` tool alone and go when it is rebuilt.
 
-`LifespanState` is what the tools need from the server's lifespan state: each service, and until
-the two are rebuilt the workspace and the database every call joins into its `Checkouts`. The
-server's `AppState` satisfies it, and it is declared here because the server imports the tools.
+`LifespanState` is what the tools need from the server's lifespan state: each service, and for the
+`review` tool alone the workspace and the database its calls join into `Checkouts`. The server's
+`AppState` satisfies it, and it is declared here because the server imports the tools.
 
 `ResolvedCheckouts` is a plain assignment because the SDK does not see a `Resolve` marker behind a
 PEP 695 `type` alias and would put the parameter in the tool's schema.
@@ -36,6 +36,7 @@ from mightymodels_plugin.database import Database
 from mightymodels_plugin.db.checkout import Checkout, Checkouts
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.workspace import Workspace
 
@@ -66,6 +67,9 @@ class LifespanState(Protocol):
 
     @property
     def tickets(self) -> TicketService: ...
+
+    @property
+    def tasks(self) -> TaskService: ...
 
     @property
     def contracts(self) -> ContractService: ...

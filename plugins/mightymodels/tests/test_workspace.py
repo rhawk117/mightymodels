@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 from mcp.types import CallToolResult
 from mightymodels_plugin.cli import main
-from mightymodels_plugin.db.tables import TransitionRow
-from mightymodels_plugin.db.tests.support import checkouts_at
+from mightymodels_plugin.database import open_database
 from mightymodels_plugin.models.review import Persona
 from mightymodels_plugin.models.run_id import RunId
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.task.tables import TransitionRow
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
 from mightymodels_plugin.workspace import (
     OutsideStateDirectoryError,
@@ -94,8 +94,9 @@ class Project:
 
     def transitions(self) -> list[tuple[str, str]]:
         query = select(TransitionRow).order_by(TransitionRow.id)
-        with checkouts_at(self.server.root) as checkouts, checkouts.begin() as checkout:
-            return [(row.before, row.after) for row in checkout.session.scalars(query)]
+        database_file = workspace_at(self.server.root).database_file()
+        with open_database(database_file) as database, database.transaction() as session:
+            return [(row.before, row.after) for row in session.scalars(query)]
 
     def command_states(self) -> list[str]:
         (status,) = slug_results(self.server, STATUS)

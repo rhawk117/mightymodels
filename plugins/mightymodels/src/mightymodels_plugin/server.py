@@ -6,7 +6,7 @@ repository the state directory is excluded from it, and outside one, or with no 
 server starts all the same.
 
 `AppState` holds a service per rebuilt tool. It keeps the workspace and the database for the
-tools whose handlers still take a `Checkout`.
+`review` tool alone, whose handlers still take a `Checkout`.
 """
 
 import os
@@ -21,6 +21,7 @@ from mightymodels_plugin.database import Database, open_database
 from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.contract.tool import contract_tool
 from mightymodels_plugin.tools.review.tool import review_tool
+from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.task.tool import task_tool
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tool import ticket_tool
@@ -35,6 +36,7 @@ class AppState:
     workspace: Workspace
     database: Database
     tickets: TicketService
+    tasks: TaskService
     contracts: ContractService
 
 
@@ -48,6 +50,7 @@ def build_server(root: Path) -> MCPServer[AppState]:
                 workspace=workspace,
                 database=database,
                 tickets=TicketService(workspace=workspace, database=database),
+                tasks=TaskService(workspace=workspace, database=database),
                 contracts=ContractService(workspace=workspace, database=database),
             )
 

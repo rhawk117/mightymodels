@@ -11,6 +11,7 @@ from mightymodels_plugin.db.tests.support import ActivityKind, DatabaseActivity
 from mightymodels_plugin.server import SERVER_NAME, TOOLS, AppState
 from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
+from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
 from mightymodels_plugin.tools.ticket.service import TicketService
 
@@ -109,12 +110,14 @@ class TestToolProtocol:
         self,
         checkouts: Checkouts,
         ticket_service: TicketService,
+        task_service: TaskService,
         contract_service: ContractService,
     ) -> AppState:
         return AppState(
             workspace=checkouts.workspace,
             database=checkouts.database,
             tickets=ticket_service,
+            tasks=task_service,
             contracts=contract_service,
         )
 

@@ -5,8 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-TASK_ID_PATTERN = r'^[TCR][0-9]{1,6}$'
-PLAN_TASK = 'T'
+from mightymodels_plugin.task_id import TASK_ID_PATTERN
 
 type TaskId = Annotated[str, StringConstraints(pattern=TASK_ID_PATTERN)]
 type OwnedFiles = Annotated[tuple[str, ...], Field(min_length=1)]

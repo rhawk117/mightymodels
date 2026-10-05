@@ -58,6 +58,9 @@ class TicketRepository:
         )
         return self.session.merge(row)
 
+    def mark_in_progress(self, slug: Slug) -> None:
+        self.staged_row(slug).status = TicketStatus.IN_PROGRESS
+
 
 @contextmanager
 def ticket_transaction(database: Database) -> Generator[TicketRepository]:
