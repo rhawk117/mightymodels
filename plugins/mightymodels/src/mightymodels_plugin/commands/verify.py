@@ -14,8 +14,8 @@ from mightymodels_plugin.database import open_database
 from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.contract import Phase
-from mightymodels_plugin.models.slug import InvalidSlugError, parsed_slug
 from mightymodels_plugin.services.verify import RunRequest, run_approved
+from mightymodels_plugin.slug import InvalidSlugError, parsed_slug
 from mightymodels_plugin.workspace import find_root, workspace_at
 
 EXIT_FAILED = 1

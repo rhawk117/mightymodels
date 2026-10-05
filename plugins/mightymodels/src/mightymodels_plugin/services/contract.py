@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 
+from mightymodels_plugin.clock import now
 from mightymodels_plugin.db.checkout import Checkout
 from mightymodels_plugin.db.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.errors import StateError
@@ -21,9 +22,8 @@ from mightymodels_plugin.models.contract import (
     Outcome,
     Phase,
 )
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.models.task import TASK_ID_PATTERN
-from mightymodels_plugin.services.clock import now
+from mightymodels_plugin.slug import Slug
 
 SHORT_SHA = 12
 TASK_ID = re.compile(TASK_ID_PATTERN)

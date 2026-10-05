@@ -4,8 +4,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.routing import Scope
+from mightymodels_plugin.slug import Slug
 
 
 class TicketAction(StrEnum):

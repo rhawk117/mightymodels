@@ -8,6 +8,7 @@ from mightymodels_plugin.db.tests.support import ActivityKind, DatabaseActivity
 from mightymodels_plugin.server import SERVER_NAME, TOOLS, AppState
 from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
+from mightymodels_plugin.tools.ticket.service import TicketService
 
 SLUG = 'retry-queue'
 ANSWERS = {
@@ -96,8 +97,10 @@ class TestToolSchemas:
 
 class TestToolProtocol:
     @pytest.fixture
-    def app_state(self, checkouts: Checkouts) -> AppState:
-        return AppState(workspace=checkouts.workspace, database=checkouts.database)
+    def app_state(self, checkouts: Checkouts, ticket_service: TicketService) -> AppState:
+        return AppState(
+            workspace=checkouts.workspace, database=checkouts.database, tickets=ticket_service
+        )
 
     @pytest.mark.parametrize(
         'tool', [pytest.param(tool.__self__, id=tool.__name__) for tool in TOOLS]
@@ -111,25 +114,26 @@ class TestToolProtocol:
 
 class TestLifespanState:
     @pytest.fixture
-    def activity_of_two_calls(
+    def activity_of_a_file_write_and_two_database_calls(
         self, state_server: StateServer, database_activity: DatabaseActivity
     ) -> DatabaseActivity:
         ticket_results(
             state_server,
             ('ticket', {'action': 'write', 'fields': ANSWERS}),
             ('ticket', {'action': 'validate'}),
+            ('ticket', {'action': 'show'}),
         )
         return database_activity
 
     def test_one_engine_serves_every_call_and_is_disposed_when_the_client_closes(
-        self, activity_of_two_calls: DatabaseActivity
+        self, activity_of_a_file_write_and_two_database_calls: DatabaseActivity
     ) -> None:
-        assert activity_of_two_calls.kinds() == [
+        assert activity_of_a_file_write_and_two_database_calls.kinds() == [
             ActivityKind.TRANSACTION_OPENED,
             ActivityKind.TRANSACTION_OPENED,
             ActivityKind.ENGINE_DISPOSED,
         ]
-        assert len(activity_of_two_calls.engines()) == 1
+        assert len(activity_of_a_file_write_and_two_database_calls.engines()) == 1
 
 
 class TestOutsideARepository:

@@ -1,9 +1,12 @@
 """The `state` MCP server the plugin registers in `.mcp.json`: its lifespan state and its tools.
 
-The lifespan builds one workspace and opens the database once when a client connects, and
-disposes the engine when the client closes. Git is optional: inside a repository the state
-directory is excluded from it, and outside one, or with no git binary, the server starts all the
-same.
+The lifespan builds one workspace, opens the database once and builds each service over the two
+when a client connects, and disposes the engine when the client closes. Git is optional: inside a
+repository the state directory is excluded from it, and outside one, or with no git binary, the
+server starts all the same.
+
+`AppState` holds a service per rebuilt tool. It keeps the workspace and the database for the
+tools whose handlers still take a `Checkout`.
 """
 
 import os
@@ -18,6 +21,7 @@ from mightymodels_plugin.database import Database, open_database
 from mightymodels_plugin.tools.contract.tool import contract_tool
 from mightymodels_plugin.tools.review.tool import review_tool
 from mightymodels_plugin.tools.task.tool import task_tool
+from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tool import ticket_tool
 from mightymodels_plugin.workspace import Workspace, find_root, workspace_at
 
@@ -29,6 +33,7 @@ TOOLS = (ticket_tool.ticket, task_tool.task, contract_tool.contract, review_tool
 class AppState:
     workspace: Workspace
     database: Database
+    tickets: TicketService
 
 
 def build_server(root: Path) -> MCPServer[AppState]:
@@ -37,7 +42,11 @@ def build_server(root: Path) -> MCPServer[AppState]:
         workspace = workspace_at(root)
         workspace.exclude_state_from_git()
         with open_database(workspace.database_file()) as database:
-            yield AppState(workspace=workspace, database=database)
+            yield AppState(
+                workspace=workspace,
+                database=database,
+                tickets=TicketService(workspace=workspace, database=database),
+            )
 
     server = MCPServer(SERVER_NAME, lifespan=lifespan)
     for tool in TOOLS:

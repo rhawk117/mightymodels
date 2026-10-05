@@ -6,12 +6,12 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
+from mightymodels_plugin.clock import now
 from mightymodels_plugin.db.checkout import Checkout, Checkouts
-from mightymodels_plugin.db.tables import TicketRow, TransitionRow
+from mightymodels_plugin.db.tables import TransitionRow
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.contract import ContractCommand, Phase
 from mightymodels_plugin.models.contract import Outcome as ReceiptOutcome
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.models.task import (
     TaskMark,
     TaskRecord,
@@ -19,9 +19,11 @@ from mightymodels_plugin.models.task import (
     TaskVerification,
     TaskView,
 )
-from mightymodels_plugin.models.ticket import TicketAnswers
-from mightymodels_plugin.services import contract, task, ticket
-from mightymodels_plugin.services.clock import now
+from mightymodels_plugin.services import contract, task
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.ticket.schema import TicketAnswers
+from mightymodels_plugin.tools.ticket.service import TicketService
+from mightymodels_plugin.tools.ticket.tables import TicketRow
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import delete, select
 
@@ -147,12 +149,11 @@ class Repo:
 
 
 @pytest.fixture
-def repo(checkouts: Checkouts, git: GitRunner) -> Repo:
+def repo(checkouts: Checkouts, ticket_service: TicketService, git: GitRunner) -> Repo:
     space = Repo(checkouts=checkouts, runner=git)
     space.commit('src/queue.py', 'base\n')
-    with checkouts.begin() as checkout:
-        ticket.write(checkout, TICKET, ANSWERS)
-        ticket.validate(checkout, TICKET)
+    ticket_service.write(TICKET, ANSWERS)
+    ticket_service.validate(TICKET)
     return space
 
 
@@ -524,10 +525,9 @@ class TestEscalationLadder:
 
 class TestVerify:
     @pytest.fixture
-    def unborn(self, checkouts: Checkouts, git: GitRunner) -> Repo:
-        with checkouts.begin() as checkout:
-            ticket.write(checkout, TICKET, ANSWERS)
-            ticket.validate(checkout, TICKET)
+    def unborn(self, checkouts: Checkouts, ticket_service: TicketService, git: GitRunner) -> Repo:
+        ticket_service.write(TICKET, ANSWERS)
+        ticket_service.validate(TICKET)
         return Repo(checkouts=checkouts, runner=git)
 
     def test_a_task_that_never_started_cannot_be_verified(self, repo: Repo) -> None:

@@ -11,11 +11,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from mightymodels_plugin.clock import now
 from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.models.contract import Outcome, Phase
-from mightymodels_plugin.models.slug import Slug
-from mightymodels_plugin.services.clock import now
 from mightymodels_plugin.services.contract import Approved, Receipt, approved, record
+from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.workspace import Git, Workspace
 
 TAIL_LINES = 40

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from mightymodels_plugin.db.checkout import Checkout
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.models.task import (
     TaskAction,
     TaskChange,
@@ -16,6 +15,7 @@ from mightymodels_plugin.models.task import (
     TaskView,
 )
 from mightymodels_plugin.services import task as service
+from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.protocol import (
     ActionHandler,
     MissingArgumentsError,

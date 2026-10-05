@@ -5,8 +5,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.routing import Depth
+from mightymodels_plugin.slug import Slug
 
 SOURCE_ID_PATTERN = r'^(MV|UB)-\d+$'
 FINDING_ID_PATTERN = r'^F\d+$'

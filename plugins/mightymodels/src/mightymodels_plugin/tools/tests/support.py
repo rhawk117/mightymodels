@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,7 +7,9 @@ import pytest
 from mcp import Client
 from mcp.types import CallToolResult, TextContent, Tool
 
+from mightymodels_plugin.database import Database, open_database
 from mightymodels_plugin.server import build_server
+from mightymodels_plugin.workspace import Workspace, workspace_at
 
 type ToolCall = tuple[str, dict[str, object]]
 
@@ -52,6 +54,19 @@ class StateServer:
 
     def connect(self) -> None:
         self.call()
+
+
+@pytest.fixture
+def repository_workspace(repository: Path) -> Workspace:
+    workspace = workspace_at(repository)
+    workspace.exclude_state_from_git()
+    return workspace
+
+
+@pytest.fixture
+def repository_database(repository_workspace: Workspace) -> Generator[Database]:
+    with open_database(repository_workspace.database_file()) as database:
+        yield database
 
 
 @pytest.fixture

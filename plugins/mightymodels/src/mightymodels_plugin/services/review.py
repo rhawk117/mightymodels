@@ -13,13 +13,13 @@ from types import MappingProxyType
 
 from sqlalchemy import select
 
+from mightymodels_plugin.clock import now
 from mightymodels_plugin.db.checkout import Checkout
 from mightymodels_plugin.db.tables import (
     ReviewDispositionRow,
     ReviewFindingRow,
     ReviewOutcomeRow,
     ReviewRunRow,
-    TicketRow,
 )
 from mightymodels_plugin.models.review import (
     Decision,
@@ -40,9 +40,7 @@ from mightymodels_plugin.models.review import (
     StartPayload,
 )
 from mightymodels_plugin.models.run_id import RunId
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.routing import Depth, Worker, reviewer_model
-from mightymodels_plugin.services.clock import now
 from mightymodels_plugin.services.redact import redact
 from mightymodels_plugin.services.review_errors import (
     BaseRequiredError,
@@ -68,6 +66,8 @@ from mightymodels_plugin.services.review_render import (
     verdict_of,
 )
 from mightymodels_plugin.services.review_report import parse_report
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.ticket.repository import TicketRepository
 from mightymodels_plugin.workspace import revision_error
 
 STANDARD_THRESHOLD = 0.25
@@ -194,7 +194,7 @@ def reviewed_base(payload: StartPayload) -> str | None:
 
 
 def ticket_models(checkout: Checkout, slug: Slug | None) -> Mapping[str, str | None]:
-    ticket = checkout.session.get(TicketRow, slug.root) if slug else None
+    ticket = TicketRepository(session=checkout.session).row(slug) if slug else None
     if ticket is None:
         return dict[str, str | None]()
     return ticket.models

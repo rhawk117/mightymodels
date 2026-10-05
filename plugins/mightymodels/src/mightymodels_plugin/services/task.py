@@ -20,18 +20,17 @@ from types import MappingProxyType
 
 from sqlalchemy import select
 
+from mightymodels_plugin.clock import now
 from mightymodels_plugin.db.checkout import Checkout
 from mightymodels_plugin.db.tables import (
     AttemptRow,
     CommandRow,
     ReceiptRow,
     TaskRow,
-    TicketRow,
     TransitionRow,
 )
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.contract import Outcome
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.models.task import (
     PLAN_TASK,
     ArchitectMode,
@@ -43,10 +42,11 @@ from mightymodels_plugin.models.task import (
     TaskVerification,
     TaskView,
 )
-from mightymodels_plugin.models.ticket import TicketStatus
-from mightymodels_plugin.services.clock import now
 from mightymodels_plugin.services.contract import commands_of, latest_receipts
-from mightymodels_plugin.services.ticket import staged_row
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.ticket.repository import TicketRepository
+from mightymodels_plugin.tools.ticket.schema import TicketStatus
+from mightymodels_plugin.tools.ticket.tables import TicketRow
 from mightymodels_plugin.workspace import Git
 
 ARCHITECT_LIMIT = 1
@@ -214,7 +214,7 @@ def start_error(task_id: str, before: Status, mode: ArchitectMode | None) -> Sta
 
 
 def start(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskStart) -> TaskView:
-    ticket = staged_row(checkout, slug)
+    ticket = TicketRepository(session=checkout.session).staged_row(slug)
     mode = architect_mode(change)
     limit = ARCHITECT_LIMIT + int(mode is ArchitectMode.SYSTEMIC_REFACTOR)
     spent = implementation_attempts(checkout, slug, task_id)
@@ -347,7 +347,7 @@ def evidence_for(
 
 
 def verify(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskVerification) -> TaskView:
-    ticket = staged_row(checkout, slug)
+    ticket = TicketRepository(session=checkout.session).staged_row(slug)
     row = row_of(checkout, slug, task_id)
     before = status_of(row)
     if row is None or Status.VERIFIED not in ALLOWED[before]:
@@ -374,7 +374,7 @@ def verify(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskVerifica
 
 
 def mark(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskMark) -> TaskView:
-    ticket = staged_row(checkout, slug)
+    ticket = TicketRepository(session=checkout.session).staged_row(slug)
     row = row_of(checkout, slug, task_id)
     before = status_of(row)
     if row is None or change.to not in ALLOWED[before]:
@@ -395,7 +395,7 @@ def mark(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskMark) -> T
 
 
 def show(checkout: Checkout, slug: Slug) -> TaskView:
-    staged_row(checkout, slug)
+    TicketRepository(session=checkout.session).staged_row(slug)
     records = tuple(records_of(checkout, slug).values())
     rows = [
         f'{record.id}\t{record.status}\tattempts {record.attempts}\t{"; ".join(record.reasons)}\n'
@@ -427,7 +427,7 @@ def readiness_problems(records: Sequence[TaskRecord]) -> list[str]:
 
 
 def ready(checkout: Checkout, slug: Slug) -> TaskView:
-    staged_row(checkout, slug)
+    TicketRepository(session=checkout.session).staged_row(slug)
     head = checkout.workspace.git.resolve_head()
     records = tuple(records_of(checkout, slug).values())
     superseded = {record.id for record in records if record.status is Status.SUPERSEDED}

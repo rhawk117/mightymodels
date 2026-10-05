@@ -6,22 +6,26 @@ misread.
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.slug import Slug
-from mightymodels_plugin.models.ticket import TicketAnswers
 from mightymodels_plugin.routing import models_at
-from mightymodels_plugin.services.clock import now
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 
-type Node = dict[str, Node] | list[Node] | str | int | bool | None
+type Node = Tree | list[Node] | str | int | bool | None
+type Tree = dict[str, Node]
 type Scalar = str | int | bool | None
 
 INDENT = 2
 PRIMARY_AGENT = 'primary-agent'
 CONTEXT_KEY = 'context'
 DECODER = json.JSONDecoder()
+PLAIN_SCALARS: Mapping[str, bool | None] = MappingProxyType(
+    {'true': True, 'false': False, '': None}
+)
 
 
 class SubsetError(StateError):
@@ -64,12 +68,12 @@ def list_lines(key: str, values: Sequence[str], depth: int) -> list[str]:
     return [f'{pad}{key}:', *items]
 
 
-def ticket_text(slug: Slug, answers: TicketAnswers) -> str:
+def ticket_text(slug: Slug, answers: TicketAnswers, *, triaged_at: str) -> str:
     models: dict[str, str | None] = {PRIMARY_AGENT: None, **models_at(answers.scope)}
     lines = [
         entry_line('task', 0, value=slug.root),
         entry_line('summary', 0, value=answers.summary),
-        entry_line('triaged-at', 0, value=now()),
+        entry_line('triaged-at', 0, value=triaged_at),
         *list_lines(CONTEXT_KEY, answers.context, 0),
         'companion-docs:',
         entry_line('issue-number', 1, value=answers.issue),
@@ -112,19 +116,16 @@ def source_lines(source: str) -> list[Line]:
 
 def quoted_scalar(text: str, number: int) -> str:
     try:
-        value, end = DECODER.raw_decode(text)
+        decoded, end = DECODER.raw_decode(text)
     except json.JSONDecodeError as error:
         raise SubsetError(number, 'unterminated quoted string') from error
     rest = text[end:].strip()
     if rest and not rest.startswith('#'):
         raise SubsetError(number, f'unexpected text after the string: {rest}')
-    return str(value)
+    return str(decoded)
 
 
-PLAIN_SCALARS: dict[str, bool | None] = {'true': True, 'false': False, '': None}
-
-
-def scalar(text: str, number: int) -> Node:
+def parsed_scalar(text: str, number: int) -> Node:
     if text.startswith('"'):
         return quoted_scalar(text, number)
     if text in PLAIN_SCALARS:
@@ -147,55 +148,55 @@ def indent_at(lines: Sequence[Line], index: int) -> int:
     return lines[index].indent if index < len(lines) else -1
 
 
-def sequence(lines: Sequence[Line], index: int) -> tuple[list[Node], int]:
+def sequence_at(lines: Sequence[Line], index: int) -> tuple[list[Node], int]:
     indent = lines[index].indent
     items: list[Node] = []
     while indent_at(lines, index) == indent:
         line = lines[index]
         if not line.text.startswith('- '):
             raise SubsetError(line.number, 'mixed list and mapping at one level')
-        items.append(scalar(value_text(line.text[2:].strip()), line.number))
+        items.append(parsed_scalar(value_text(line.text[2:].strip()), line.number))
         index += 1
     return items, index
 
 
-def mapping(lines: Sequence[Line], index: int) -> tuple[dict[str, Node], int]:
+def mapping_at(lines: Sequence[Line], index: int) -> tuple[Tree, int]:
     indent = lines[index].indent
-    result: dict[str, Node] = {}
+    result: Tree = {}
     while indent_at(lines, index) == indent:
         line = lines[index]
         key, rest = split_key(line)
         if key in result:
             raise SubsetError(line.number, f'duplicate key {key}')
-        result[key], index = value(lines, index, rest)
+        result[key], index = value_at(lines, index, rest)
     if indent_at(lines, index) > indent:
         raise SubsetError(lines[index].number, 'unexpected indentation')
     return result, index
 
 
-def block(lines: Sequence[Line], index: int) -> tuple[Node, int]:
+def block_at(lines: Sequence[Line], index: int) -> tuple[Node, int]:
     if lines[index].text.startswith('- '):
-        return sequence(lines, index)
-    return mapping(lines, index)
+        return sequence_at(lines, index)
+    return mapping_at(lines, index)
 
 
-def value(lines: Sequence[Line], index: int, rest: str) -> tuple[Node, int]:
+def value_at(lines: Sequence[Line], index: int, rest: str) -> tuple[Node, int]:
     line = lines[index]
     text = value_text(rest)
     if text:
-        return scalar(text, line.number), index + 1
+        return parsed_scalar(text, line.number), index + 1
     if indent_at(lines, index + 1) > line.indent:
-        return block(lines, index + 1)
+        return block_at(lines, index + 1)
     return None, index + 1
 
 
-def parse(source: str) -> dict[str, Node]:
+def parse(source: str) -> Tree:
     lines = source_lines(source)
     if not lines:
         return {}
     if lines[0].indent:
         raise SubsetError(lines[0].number, 'unexpected indentation')
-    tree, _ = block(lines, 0)
+    tree, _ = block_at(lines, 0)
     if not isinstance(tree, dict):
         raise SubsetError(lines[0].number, 'the top level must be a mapping')
     return tree

@@ -8,9 +8,9 @@ import pytest
 from sqlalchemy import Engine, event
 from sqlalchemy.orm import Session, SessionTransaction
 
-from mightymodels_plugin.database import open_database
+from mightymodels_plugin.database import Database, open_database
 from mightymodels_plugin.db.checkout import Checkouts
-from mightymodels_plugin.workspace import workspace_at
+from mightymodels_plugin.workspace import Workspace, workspace_at
 
 
 class ActivityKind(StrEnum):
@@ -53,9 +53,8 @@ def checkouts_at(root: Path) -> Generator[Checkouts]:
 
 
 @pytest.fixture
-def checkouts(repository: Path) -> Generator[Checkouts]:
-    with checkouts_at(repository) as opened:
-        yield opened
+def checkouts(repository_workspace: Workspace, repository_database: Database) -> Checkouts:
+    return Checkouts(workspace=repository_workspace, database=repository_database)
 
 
 @pytest.fixture

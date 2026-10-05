@@ -1,5 +1,5 @@
 import pytest
-from mightymodels_plugin.services.ticket_file import SubsetError, parse, with_context
+from mightymodels_plugin.tools.ticket.ticket_file import SubsetError, parse, with_context
 
 
 class TestParse:

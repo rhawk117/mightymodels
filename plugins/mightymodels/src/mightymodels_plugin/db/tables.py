@@ -1,39 +1,8 @@
-"""The tables of `.mightymodels/mightymodels.db`; deleting the file resets the state."""
+"""The tables of `.mightymodels/mightymodels.db` that have not moved to a domain package yet."""
 
-from types import MappingProxyType
-from typing import Annotated
+from sqlalchemy.orm import Mapped
 
-from sqlalchemy import JSON
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-type Models = dict[str, str | None]
-type Weights = dict[str, float]
-type Texts = list[str]
-type Key = Annotated[str, mapped_column(primary_key=True)]
-type Serial = Annotated[int, mapped_column(primary_key=True)]
-type Indexed = Annotated[str, mapped_column(index=True)]
-
-
-class Base(DeclarativeBase):
-    type_annotation_map = MappingProxyType({Models: JSON, Texts: JSON, Weights: JSON})
-
-
-class TicketRow(Base):
-    __tablename__ = 'tickets'
-
-    slug: Mapped[Key]
-    status: Mapped[str]
-    ticket: Mapped[str]
-    summary: Mapped[str]
-    branch: Mapped[str]
-    scope: Mapped[str]
-    plan_first: Mapped[bool]
-    issue: Mapped[int | None]
-    jira: Mapped[str | None]
-    models: Mapped[Models]
-    context: Mapped[Texts]
-    investigations: Mapped[Texts]
-    validated_at: Mapped[str]
+from mightymodels_plugin.declarative import Base, Indexed, Key, Models, Serial, Texts, Weights
 
 
 class TaskRow(Base):

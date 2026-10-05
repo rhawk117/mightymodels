@@ -1,25 +1,31 @@
-"""The `ticket` tool."""
+"""The `ticket` tool: each handler checks the call's arguments and asks the ticket service.
+
+`ResolvedTickets` is a plain assignment because the SDK does not see a `Resolve` marker behind a
+PEP 695 `type` alias and would put the parameter in the tool's schema.
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Annotated
 
-from mightymodels_plugin.db.checkout import Checkout
-from mightymodels_plugin.models.slug import Slug
-from mightymodels_plugin.models.ticket import (
+from mcp.server.mcpserver import Context, Resolve
+
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.protocol import (
+    LifespanState,
+    MissingArgumentsError,
+    ServiceHandler,
+    dispatch_to_service,
+)
+from mightymodels_plugin.tools.ticket.schema import (
     TicketAction,
     TicketAnswers,
     TicketContext,
     TicketFields,
     TicketView,
 )
-from mightymodels_plugin.services import ticket as service
-from mightymodels_plugin.tools.protocol import (
-    ActionHandler,
-    MissingArgumentsError,
-    ResolvedCheckouts,
-    dispatch_action,
-)
+from mightymodels_plugin.tools.ticket.service import TicketService
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -28,31 +34,38 @@ class TicketCall:
     fields: TicketFields | None
 
 
-def write_ticket(checkout: Checkout, call: TicketCall) -> TicketView:
+def write_ticket(tickets: TicketService, call: TicketCall) -> TicketView:
     if not isinstance(call.fields, TicketAnswers):
         raise MissingArgumentsError(TicketAction.WRITE, 'fields holding the interview answers')
-    return service.write(checkout, call.slug, call.fields)
+    return tickets.write(call.slug, call.fields)
 
 
-def validate_ticket(checkout: Checkout, call: TicketCall) -> TicketView:
-    return service.validate(checkout, call.slug)
+def validate_ticket(tickets: TicketService, call: TicketCall) -> TicketView:
+    return tickets.validate(call.slug)
 
 
-def show_ticket(checkout: Checkout, call: TicketCall) -> TicketView:
-    return service.show(checkout, call.slug)
+def show_ticket(tickets: TicketService, call: TicketCall) -> TicketView:
+    return tickets.show(call.slug)
 
 
-def update_ticket_context(checkout: Checkout, call: TicketCall) -> TicketView:
+def update_ticket_context(tickets: TicketService, call: TicketCall) -> TicketView:
     if not isinstance(call.fields, TicketContext):
         raise MissingArgumentsError(
             TicketAction.UPDATE_CONTEXT, 'fields holding only the context lines'
         )
-    return service.update_context(checkout, call.slug, call.fields)
+    return tickets.update_context(call.slug, call.fields)
+
+
+def lifespan_tickets(ctx: Context[LifespanState]) -> TicketService:
+    return ctx.request_context.lifespan_context.tickets
+
+
+ResolvedTickets = Annotated[TicketService, Resolve(lifespan_tickets)]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TicketTool:
-    handlers: Mapping[TicketAction, ActionHandler[TicketCall, TicketView]]
+    handlers: Mapping[TicketAction, ServiceHandler[TicketService, TicketCall, TicketView]]
 
     def ticket(
         self,
@@ -60,11 +73,11 @@ class TicketTool:
         slug: Slug,
         fields: TicketFields | None = None,
         *,
-        checkouts: ResolvedCheckouts,
+        tickets: ResolvedTickets,
     ) -> TicketView:
         """Create, validate, read or update a ticket's context lines; derives model routing by scope."""  # noqa: E501 - the SDK serves this line as the tool description and the schema snapshot pins its text
         call = TicketCall(slug=slug, fields=fields)
-        return dispatch_action(self.handlers, action, call, checkouts=checkouts)
+        return dispatch_to_service(self.handlers, action, call, service=tickets)
 
 
 ticket_tool = TicketTool(

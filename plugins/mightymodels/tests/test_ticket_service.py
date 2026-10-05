@@ -1,4 +1,4 @@
-"""The `ticket` tool's service, with the tests moved from ticket_state.py's entry point."""
+"""The ticket service, with the tests moved from ticket_state.py's entry point."""
 
 from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
@@ -6,26 +6,28 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-from mightymodels_plugin.db.checkout import Checkout, Checkouts
+from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.db.tables import TaskRow
-from mightymodels_plugin.db.tests.support import checkouts_at
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.models.task import Implementer, Status, TaskStart
-from mightymodels_plugin.models.ticket import (
+from mightymodels_plugin.services import task
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.ticket.repository import ticket_transaction
+from mightymodels_plugin.tools.ticket.schema import (
     TicketAnswers,
     TicketContext,
     TicketView,
     Tracker,
     WorkUnit,
 )
-from mightymodels_plugin.services import task, ticket
-from mightymodels_plugin.services.ticket_file import parse
+from mightymodels_plugin.tools.ticket.service import TicketService, unit_of
+from mightymodels_plugin.tools.ticket.tests.support import ticket_service_at
+from mightymodels_plugin.tools.ticket.ticket_file import parse
 from pydantic import ValidationError
 from sqlalchemy import update
 
 type GitRunner = Callable[..., str]
-type Command = Callable[[Checkout, object], TicketView]
+type Command = Callable[[TicketService, object], TicketView]
 
 REJECTED = 2
 SLUG = 'retry-queue'
@@ -41,20 +43,20 @@ ANSWERS = {
 }
 
 
-def write(checkout: Checkout, answers: object) -> TicketView:
-    return ticket.write(checkout, TICKET, TicketAnswers.model_validate(answers))
+def write(tickets: TicketService, answers: object) -> TicketView:
+    return tickets.write(TICKET, TicketAnswers.model_validate(answers))
 
 
-def validate(checkout: Checkout, _answers: object) -> TicketView:
-    return ticket.validate(checkout, TICKET)
+def validate(tickets: TicketService, _answers: object) -> TicketView:
+    return tickets.validate(TICKET)
 
 
-def show(checkout: Checkout, _answers: object) -> TicketView:
-    return ticket.show(checkout, TICKET)
+def show(tickets: TicketService, _answers: object) -> TicketView:
+    return tickets.show(TICKET)
 
 
-def update_context(checkout: Checkout, answers: object) -> TicketView:
-    return ticket.update_context(checkout, TICKET, TicketContext.model_validate(answers))
+def update_context(tickets: TicketService, answers: object) -> TicketView:
+    return tickets.update_context(TICKET, TicketContext.model_validate(answers))
 
 
 COMMANDS: Mapping[str, Command] = MappingProxyType(
@@ -71,16 +73,19 @@ class Outcome:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Workspace:
-    checkouts: Checkouts
+    tickets: TicketService
 
     @property
     def root(self) -> Path:
-        return self.checkouts.workspace.root
+        return self.tickets.workspace.root
+
+    @property
+    def checkouts(self) -> Checkouts:
+        return Checkouts(workspace=self.tickets.workspace, database=self.tickets.database)
 
     def run(self, command: str, answers: object = None) -> Outcome:
         try:
-            with self.checkouts.begin() as checkout:
-                view = COMMANDS[command](checkout, answers)
+            view = COMMANDS[command](self.tickets, answers)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, out='', err=str(error))
         return Outcome(code=0, out=view.text, err='')
@@ -90,8 +95,8 @@ class Workspace:
         return self.root.joinpath('.mightymodels', SLUG, 'ticket.yml')
 
     def unit(self) -> WorkUnit:
-        with self.checkouts.begin() as checkout:
-            return ticket.unit_of(ticket.staged_row(checkout, TICKET))
+        with ticket_transaction(self.tickets.database) as repository:
+            return unit_of(repository.staged_row(TICKET))
 
     def tasks(self) -> dict[str, str]:
         with self.checkouts.begin() as checkout:
@@ -109,8 +114,8 @@ class Workspace:
 
 
 @pytest.fixture
-def workspace(checkouts: Checkouts) -> Workspace:
-    return Workspace(checkouts=checkouts)
+def workspace(ticket_service: TicketService) -> Workspace:
+    return Workspace(tickets=ticket_service)
 
 
 @pytest.fixture
@@ -120,16 +125,16 @@ def worktree_workspace(repository: Path, tmp_path: Path, git: GitRunner) -> Gene
     worktree = tmp_path.joinpath('feature')
     git(repository, 'worktree', 'add', '--quiet', str(worktree), '-b', 'feature')
     repository.joinpath('.git', 'info', 'exclude').unlink(missing_ok=True)
-    with checkouts_at(worktree) as opened:
-        yield Workspace(checkouts=opened)
+    with ticket_service_at(worktree) as tickets:
+        yield Workspace(tickets=tickets)
 
 
 @pytest.fixture
 def workspace_outside_a_repository(tmp_path: Path) -> Generator[Workspace]:
     directory = tmp_path.joinpath('plain-directory')
     directory.mkdir()
-    with checkouts_at(directory) as opened:
-        yield Workspace(checkouts=opened)
+    with ticket_service_at(directory) as tickets:
+        yield Workspace(tickets=tickets)
 
 
 @pytest.mark.parametrize(

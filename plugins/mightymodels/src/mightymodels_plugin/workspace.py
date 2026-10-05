@@ -23,7 +23,7 @@ from types import MappingProxyType
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.review import Persona
 from mightymodels_plugin.models.run_id import RunId
-from mightymodels_plugin.models.slug import Slug
+from mightymodels_plugin.slug import Slug
 
 PROJECT_DIR_VARIABLE = 'CLAUDE_PROJECT_DIR'
 STATE_DIRECTORY = '.mightymodels'

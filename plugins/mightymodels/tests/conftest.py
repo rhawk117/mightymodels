@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-CONCEPTS = ('db', 'tools')
+CONCEPTS = ('db', 'tools', 'tools.ticket')
 
 
 def pytest_configure(config: pytest.Config) -> None:

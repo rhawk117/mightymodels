@@ -1,3 +1,4 @@
+import json
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -13,8 +14,10 @@ from mightymodels_plugin.workspace import (
     find_root,
     workspace_at,
 )
+from sqlalchemy import text
 
 type GitRunner = Callable[..., str]
+type MasterRow = dict[str, str | None]
 
 
 class TestFindRoot:
@@ -118,6 +121,15 @@ class TestOpenRepository:
 
 
 class TestOpenDatabase:
+    TABLES_SNAPSHOT = Path(__file__).parent.joinpath('fixtures', 'database-tables.json')
+    MASTER_ROWS = text('SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name')
+
+    @pytest.fixture
+    def master_rows_of_a_fresh_database(self, tmp_path: Path) -> list[MasterRow]:
+        database_file = tmp_path.joinpath('fresh', DATABASE_NAME)
+        with open_database(database_file) as opened, opened.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(self.MASTER_ROWS).mappings()]
+
     @pytest.fixture
     def root_with_url_characters(self, tmp_path: Path, git: GitRunner) -> Path:
         root = tmp_path.joinpath('odd?mode=memory#cache')
@@ -136,6 +148,13 @@ class TestOpenDatabase:
         assert located == str(database)
         assert database.stat().st_size > 0
         assert [path.name for path in tmp_path.iterdir()] == [root_with_url_characters.name]
+
+    def test_database_tables_of_a_fresh_database_equal_the_snapshot_taken_before_the_rework(
+        self, master_rows_of_a_fresh_database: list[MasterRow]
+    ) -> None:
+        assert master_rows_of_a_fresh_database == json.loads(
+            self.TABLES_SNAPSHOT.read_text(encoding='utf-8')
+        )
 
 
 class TestOutsideARepository:

@@ -7,8 +7,8 @@ import pytest
 from mightymodels_plugin.cli import build_parser, main
 from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.models.contract import ContractCommand
-from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.services import contract
+from mightymodels_plugin.slug import Slug
 from pytest_mock import MockerFixture
 
 SLUG = 'retry-queue'

@@ -1,21 +1,29 @@
-"""The `ticket` tool's service: ticket.yml stays a file, and validating it stages a row.
+"""The ticket service: ticket.yml stays a file, and validating it stages a row.
 
 `write` renders the interview answers into ticket.yml and refuses to overwrite a ticket the
 user may have tweaked. `validate` reads the file back, hand edits included, and stages or
 refreshes the ticket's row without touching task progress. `update_context` replaces the
-context lines in the file and restages it.
+context lines in the file and restages it. `show` reads the staged row back.
+
+The service is built once by whoever owns the workspace and the database, and holds both. A
+method that touches the database opens one transaction through `ticket_transaction`, which hands
+it the repository; `write` only writes the file and opens none. Everything above the class reads
+no service state: it checks a parsed ticket, or maps one shape of a ticket to another.
 """
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from mightymodels_plugin.db.checkout import Checkout
-from mightymodels_plugin.db.tables import TicketRow
+from mightymodels_plugin.clock import now
+from mightymodels_plugin.database import Database
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.slug import InvalidSlugError, Slug, parsed_slug
-from mightymodels_plugin.models.ticket import (
+from mightymodels_plugin.routing import Scope, Worker
+from mightymodels_plugin.slug import InvalidSlugError, Slug, parsed_slug
+from mightymodels_plugin.tools.ticket.repository import ticket_transaction
+from mightymodels_plugin.tools.ticket.schema import (
     TicketAnswers,
     TicketContext,
     TicketSection,
@@ -24,12 +32,12 @@ from mightymodels_plugin.models.ticket import (
     Tracker,
     WorkUnit,
 )
-from mightymodels_plugin.routing import Scope, Worker
-from mightymodels_plugin.services.clock import now
-from mightymodels_plugin.services.ticket_file import (
+from mightymodels_plugin.tools.ticket.tables import TicketRow
+from mightymodels_plugin.tools.ticket.ticket_file import (
     CONTEXT_KEY,
     PRIMARY_AGENT,
     Node,
+    Tree,
     parse,
     ticket_text,
     with_context,
@@ -37,7 +45,7 @@ from mightymodels_plugin.services.ticket_file import (
 from mightymodels_plugin.workspace import Workspace
 
 CONTEXT_LIMIT = 6
-TOP_LEVEL = frozenset(
+TOP_LEVEL_KEYS = frozenset(
     {
         'task',
         'summary',
@@ -75,13 +83,7 @@ class InvalidTicketError(StateError):
         self.problems = problems
 
 
-class NotStagedError(StateError):
-    def __init__(self, slug: Slug) -> None:
-        super().__init__(f'{slug} is not staged; stage the ticket with open-ticket first')
-        self.slug = slug
-
-
-def as_mapping(node: Node) -> dict[str, Node]:
+def as_mapping(node: Node) -> Tree:
     return node if isinstance(node, dict) else {}
 
 
@@ -89,14 +91,14 @@ def as_list(node: Node) -> list[Node]:
     return node if isinstance(node, list) else []
 
 
-def failed(checks: Iterable[Check]) -> list[str]:
+def failed_messages(checks: Iterable[Check]) -> list[str]:
     return [message for passed, message in checks if not passed]
 
 
-def top_problems(tree: dict[str, Node], slug: Slug) -> list[str]:
-    unknown = sorted(set(tree) - TOP_LEVEL)
+def top_level_problems(tree: Tree, slug: Slug) -> list[str]:
+    unknown = sorted(set(tree) - TOP_LEVEL_KEYS)
     context = tree.get(CONTEXT_KEY)
-    return failed(
+    return failed_messages(
         (
             (not unknown, f'unknown top-level keys {unknown}; no consumer reads them'),
             (tree.get('task') == slug.root, f'task must be {slug.root!r}'),
@@ -109,10 +111,10 @@ def top_problems(tree: dict[str, Node], slug: Slug) -> list[str]:
     )
 
 
-def model_problems(models: dict[str, Node]) -> list[str]:
+def model_problems(models: Tree) -> list[str]:
     unknown = sorted(set(models) - KNOWN_WORKERS)
     missing = sorted(IMPLEMENTERS - {worker for worker, model in models.items() if model})
-    return failed(
+    return failed_messages(
         (
             (not unknown, f'subagent-models has unknown workers {unknown}'),
             (not missing, f'subagent-models needs a model for {missing}'),
@@ -120,10 +122,10 @@ def model_problems(models: dict[str, Node]) -> list[str]:
     )
 
 
-def handoff_problems(handoff: dict[str, Node]) -> list[str]:
+def handoff_problems(handoff: Tree) -> list[str]:
     unknown = sorted(set(handoff) - HANDOFF_KEYS)
     scopes = sorted(scope.value for scope in Scope)
-    return failed(
+    return failed_messages(
         (
             (not unknown, f'handoff-context has unknown keys {unknown}'),
             (handoff.get('scope') in scopes, f'scope must be one of {scopes}'),
@@ -133,10 +135,10 @@ def handoff_problems(handoff: dict[str, Node]) -> list[str]:
     )
 
 
-def companion_problems(companions: dict[str, Node]) -> list[str]:
+def companion_problems(companions: Tree) -> list[str]:
     unknown = sorted(set(companions) - COMPANION_KEYS)
     issue = companions.get('issue-number')
-    return failed(
+    return failed_messages(
         (
             (not unknown, f'companion-docs has unknown keys {unknown}'),
             (issue is None or isinstance(issue, int), 'issue-number must be a number'),
@@ -153,7 +155,7 @@ def investigation_problem(workspace: Workspace, investigation: Node) -> str | No
     return None
 
 
-def investigation_problems(tree: dict[str, Node], workspace: Workspace) -> list[str]:
+def investigation_problems(tree: Tree, workspace: Workspace) -> list[str]:
     investigations = tree.get('investigations') or []
     if not isinstance(investigations, list):
         return ['investigations must be a list']
@@ -161,25 +163,22 @@ def investigation_problems(tree: dict[str, Node], workspace: Workspace) -> list[
     return [problem for problem in problems if problem is not None]
 
 
-def checked_tree(source: str, workspace: Workspace, slug: Slug) -> dict[str, Node]:
-    tree = parse(source)
+def ticket_error(tree: Tree, workspace: Workspace, slug: Slug) -> InvalidTicketError | None:
     problems = [
-        *top_problems(tree, slug),
+        *top_level_problems(tree, slug),
         *model_problems(as_mapping(tree.get('subagent-models'))),
         *handoff_problems(as_mapping(tree.get('handoff-context'))),
         *companion_problems(as_mapping(tree.get('companion-docs'))),
         *investigation_problems(tree, workspace),
     ]
-    if problems:
-        raise InvalidTicketError(problems)
-    return tree
+    return InvalidTicketError(problems) if problems else None
 
 
-def section_of(tree: dict[str, Node], checkout: Checkout, slug: Slug) -> TicketSection:
+def section_of(tree: Tree, *, ticket: str, validated_at: str) -> TicketSection:
     handoff = as_mapping(tree.get('handoff-context'))
     companions = as_mapping(tree.get('companion-docs'))
     fields = {
-        'ticket': checkout.workspace.relative_to_root(checkout.workspace.ticket_file(slug)),
+        'ticket': ticket,
         'summary': tree.get('summary'),
         'branch': handoff.get('branch-name'),
         'scope': handoff.get('scope'),
@@ -187,7 +186,7 @@ def section_of(tree: dict[str, Node], checkout: Checkout, slug: Slug) -> TicketS
         'models': as_mapping(tree.get('subagent-models')),
         'tracker': {'issue': companions.get('issue-number'), 'jira': companions.get('jira-key')},
         'context': as_list(tree.get(CONTEXT_KEY)),
-        'validated_at': now(),
+        'validated_at': validated_at,
     }
     try:
         return TicketSection.model_validate(fields)
@@ -196,6 +195,10 @@ def section_of(tree: dict[str, Node], checkout: Checkout, slug: Slug) -> TicketS
             f'{".".join(map(str, detail["loc"]))}: {detail["msg"]}' for detail in error.errors()
         ]
         raise InvalidTicketError(problems) from error
+
+
+def declared_investigations(tree: Tree) -> list[str]:
+    return [str(investigation) for investigation in as_list(tree.get('investigations'))]
 
 
 def unit_of(row: TicketRow) -> WorkUnit:
@@ -218,35 +221,8 @@ def unit_of(row: TicketRow) -> WorkUnit:
     )
 
 
-def staged_row(checkout: Checkout, slug: Slug) -> TicketRow:
-    row = checkout.session.get(TicketRow, slug.root)
-    if row is None:
-        raise NotStagedError(slug)
-    return row
-
-
-def stage(checkout: Checkout, slug: Slug, tree: dict[str, Node]) -> WorkUnit:
-    section = section_of(tree, checkout, slug)
-    existing = checkout.session.get(TicketRow, slug.root)
-    previous = [] if existing is None else existing.investigations
-    declared = [str(investigation) for investigation in as_list(tree.get('investigations'))]
-    added = [investigation for investigation in declared if investigation not in previous]
-    row = TicketRow(
-        slug=slug.root,
-        status=TicketStatus.STAGED if existing is None else existing.status,
-        ticket=section.ticket,
-        summary=section.summary,
-        branch=section.branch,
-        scope=section.scope,
-        plan_first=section.plan_first,
-        issue=section.tracker.issue,
-        jira=section.tracker.jira,
-        models=section.models,
-        context=list(section.context),
-        investigations=[*previous, *added],
-        validated_at=section.validated_at,
-    )
-    return unit_of(checkout.session.merge(row))
+def staged_text(unit: WorkUnit) -> str:
+    return f'staged {unit.slug} (status {unit.status}, {len(unit.investigations)} investigations)\n'
 
 
 def atomic_write(path: Path, text: str, *, temporary: Path) -> None:
@@ -254,41 +230,51 @@ def atomic_write(path: Path, text: str, *, temporary: Path) -> None:
     temporary.replace(path)
 
 
-def staged_text(unit: WorkUnit) -> str:
-    return f'staged {unit.slug} (status {unit.status}, {len(unit.investigations)} investigations)\n'
+@dataclass(slots=True, kw_only=True, frozen=True)
+class TicketService:
+    workspace: Workspace
+    database: Database
 
+    def checked_tree(self, source: str, slug: Slug) -> Tree:
+        tree = parse(source)
+        if (error := ticket_error(tree, self.workspace, slug)) is not None:
+            raise error
+        return tree
 
-def write(checkout: Checkout, slug: Slug, answers: TicketAnswers) -> TicketView:
-    path = checkout.workspace.ticket_file(slug)
-    if path.exists():
-        raise TicketExistsError(path)
-    text = ticket_text(slug, answers)
-    checked_tree(text, checkout.workspace, slug)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(path, text, temporary=checkout.workspace.ticket_draft(slug))
-    relative = checkout.workspace.relative_to_root(path)
-    return TicketView(text=f'wrote {relative}; review it, then run validate\n')
+    def write(self, slug: Slug, answers: TicketAnswers) -> TicketView:
+        path = self.workspace.ticket_file(slug)
+        if path.exists():
+            raise TicketExistsError(path)
+        text = ticket_text(slug, answers, triaged_at=now())
+        self.checked_tree(text, slug)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(path, text, temporary=self.workspace.ticket_draft(slug))
+        relative = self.workspace.relative_to_root(path)
+        return TicketView(text=f'wrote {relative}; review it, then run validate\n')
 
+    def validate(self, slug: Slug) -> TicketView:
+        path = self.workspace.ticket_file(slug)
+        if not path.is_file():
+            raise MissingTicketError(path)
+        tree = self.checked_tree(path.read_text(encoding='utf-8'), slug)
+        section = section_of(tree, ticket=self.workspace.relative_to_root(path), validated_at=now())
+        with ticket_transaction(self.database) as repository:
+            unit = unit_of(repository.stage(slug, section, declared_investigations(tree)))
+        return TicketView(text=f'valid; {staged_text(unit)}', unit=unit)
 
-def validate(checkout: Checkout, slug: Slug) -> TicketView:
-    path = checkout.workspace.ticket_file(slug)
-    if not path.is_file():
-        raise MissingTicketError(path)
-    tree = checked_tree(path.read_text(encoding='utf-8'), checkout.workspace, slug)
-    unit = stage(checkout, slug, tree)
-    return TicketView(text=f'valid; {staged_text(unit)}', unit=unit)
+    def show(self, slug: Slug) -> TicketView:
+        with ticket_transaction(self.database) as repository:
+            unit = unit_of(repository.staged_row(slug))
+        return TicketView(text=staged_text(unit), unit=unit)
 
-
-def show(checkout: Checkout, slug: Slug) -> TicketView:
-    unit = unit_of(staged_row(checkout, slug))
-    return TicketView(text=staged_text(unit), unit=unit)
-
-
-def update_context(checkout: Checkout, slug: Slug, change: TicketContext) -> TicketView:
-    path = checkout.workspace.ticket_file(slug)
-    if not path.is_file():
-        raise MissingTicketError(path)
-    text = with_context(path.read_text(encoding='utf-8'), change.context)
-    unit = stage(checkout, slug, checked_tree(text, checkout.workspace, slug))
-    atomic_write(path, text, temporary=checkout.workspace.ticket_draft(slug))
-    return TicketView(text=f'context updated; {staged_text(unit)}', unit=unit)
+    def update_context(self, slug: Slug, change: TicketContext) -> TicketView:
+        path = self.workspace.ticket_file(slug)
+        if not path.is_file():
+            raise MissingTicketError(path)
+        text = with_context(path.read_text(encoding='utf-8'), change.context)
+        tree = self.checked_tree(text, slug)
+        section = section_of(tree, ticket=self.workspace.relative_to_root(path), validated_at=now())
+        with ticket_transaction(self.database) as repository:
+            unit = unit_of(repository.stage(slug, section, declared_investigations(tree)))
+            atomic_write(path, text, temporary=self.workspace.ticket_draft(slug))
+        return TicketView(text=f'context updated; {staged_text(unit)}', unit=unit)

@@ -13,7 +13,7 @@ from mightymodels_plugin.db.tables import TransitionRow
 from mightymodels_plugin.db.tests.support import checkouts_at
 from mightymodels_plugin.models.review import Persona
 from mightymodels_plugin.models.run_id import RunId
-from mightymodels_plugin.models.slug import Slug
+from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
 from mightymodels_plugin.workspace import (
     OutsideStateDirectoryError,

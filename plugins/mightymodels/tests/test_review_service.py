@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.db.checkout import Checkout, Checkouts
-from mightymodels_plugin.db.tables import ReviewFindingRow, ReviewRunRow, TicketRow
+from mightymodels_plugin.db.tables import ReviewFindingRow, ReviewRunRow
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.review import (
     DisposePayload,
@@ -19,9 +19,11 @@ from mightymodels_plugin.models.review import (
     Verdict,
 )
 from mightymodels_plugin.models.run_id import InvalidRunIdError, RunId, parsed_run_id
-from mightymodels_plugin.models.slug import Slug
-from mightymodels_plugin.models.ticket import TicketAnswers
-from mightymodels_plugin.services import review, ticket
+from mightymodels_plugin.services import review
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.ticket.schema import TicketAnswers
+from mightymodels_plugin.tools.ticket.service import TicketService
+from mightymodels_plugin.tools.ticket.tables import TicketRow
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -74,6 +76,7 @@ def finding(source: str, severity: str, location: str, **extra: object) -> Findi
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Workspace:
     checkouts: Checkouts
+    tickets: TicketService
     runner: GitRunner
 
     @property
@@ -143,17 +146,17 @@ def commit(workspace: Workspace) -> str:
 
 
 def pin_models(workspace: Workspace, models: Mapping[str, str | None]) -> None:
+    workspace.tickets.write(Slug(SLUG), ANSWERS)
+    workspace.tickets.validate(Slug(SLUG))
     with workspace.checkouts.begin() as checkout:
-        ticket.write(checkout, Slug(SLUG), ANSWERS)
-        ticket.validate(checkout, Slug(SLUG))
         row = checkout.session.get(TicketRow, SLUG)
         assert row is not None
         row.models = dict(models)
 
 
 @pytest.fixture
-def workspace(checkouts: Checkouts, git: GitRunner) -> Workspace:
-    return Workspace(checkouts=checkouts, runner=git)
+def workspace(checkouts: Checkouts, ticket_service: TicketService, git: GitRunner) -> Workspace:
+    return Workspace(checkouts=checkouts, tickets=ticket_service, runner=git)
 
 
 def test_deep_review_runs_both_personas_on_the_ticket_models(workspace: Workspace) -> None:

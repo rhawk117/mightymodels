@@ -10,17 +10,17 @@ from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.db.tables import ReviewFindingRow
 from mightymodels_plugin.db.tests.support import ActivityKind, DatabaseActivity
 from mightymodels_plugin.models.review import StartPayload
-from mightymodels_plugin.models.slug import (
+from mightymodels_plugin.server import TOOLS
+from mightymodels_plugin.slug import (
     SLUG_LIMIT,
     SLUG_PATTERN,
     InvalidSlugError,
     Slug,
     parsed_slug,
 )
-from mightymodels_plugin.models.ticket import TicketAnswers
-from mightymodels_plugin.server import TOOLS
-from mightymodels_plugin.services import ticket
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, tree
+from mightymodels_plugin.tools.ticket.schema import TicketAnswers
+from mightymodels_plugin.tools.ticket.service import InvalidTicketError, TicketService
 from mightymodels_plugin.workspace import workspace_at
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -230,31 +230,30 @@ class TestInsideTheStateDirectory:
         (name, {**arguments, 'slug': 'retry-queue'}) for _, name, arguments in TOOL_CALLS
     )
 
-    def stage(self, checkouts: Checkouts, investigations: list[str]) -> str:
+    def stage(self, tickets: TicketService, investigations: list[str]) -> str:
         answers = TicketAnswers.model_validate({**ANSWERS, 'investigations': investigations})
         try:
-            with checkouts.begin() as checkout:
-                ticket.write(checkout, Slug('retry-queue'), answers)
-                return ticket.validate(checkout, Slug('retry-queue')).text
-        except ticket.InvalidTicketError as error:
+            tickets.write(Slug('retry-queue'), answers)
+            return tickets.validate(Slug('retry-queue')).text
+        except InvalidTicketError as error:
             return str(error)
 
     def test_slug_confinement_a_written_investigation_id_cannot_name_a_file_outside(
-        self, project: Path, checkouts: Checkouts
+        self, project: Path, ticket_service: TicketService
     ) -> None:
-        assert f'investigation {OUTSIDE} is not a valid id' in self.stage(checkouts, [OUTSIDE])
+        assert f'investigation {OUTSIDE} is not a valid id' in self.stage(ticket_service, [OUTSIDE])
         assert not workspace_at(project).ticket_file(Slug('retry-queue')).exists()
 
     def test_slug_confinement_a_hand_edited_investigation_id_cannot_name_a_file_outside(
-        self, project: Path, checkouts: Checkouts
+        self, project: Path, ticket_service: TicketService
     ) -> None:
-        self.stage(checkouts, [])
+        self.stage(ticket_service, [])
         path = workspace_at(project).ticket_file(Slug('retry-queue'))
         text = path.read_text(encoding='utf-8')
         path.write_text(f'{text}  - "{OUTSIDE}"\n', encoding='utf-8')
 
-        with pytest.raises(ticket.InvalidTicketError) as error, checkouts.begin() as checkout:
-            ticket.validate(checkout, Slug('retry-queue'))
+        with pytest.raises(InvalidTicketError) as error:
+            ticket_service.validate(Slug('retry-queue'))
 
         assert error.value.problems == [f'investigation {OUTSIDE} is not a valid id']
 
