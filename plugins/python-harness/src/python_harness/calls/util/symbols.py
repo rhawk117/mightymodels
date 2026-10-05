@@ -11,9 +11,11 @@ from python_harness.calls.domain import (
     SymbolKind,
     TargetedProject,
 )
-from python_harness.core.sources import ParsedModule
-from python_harness.core.syntax import DEFINITION_TYPES, FUNCTION_TYPES
+from python_harness.core.sources import ParsedModule, UnparsableSource
+from python_harness.core.syntax import DEFINITION_TYPES, FUNCTION_TYPES, dotted_name
 from python_harness.imports.domain import ImportGraph, ProjectIndex
+
+TOO_DEEP_MESSAGE = 'nested too deeply to walk'
 
 
 def is_dunder(name: str) -> bool:
@@ -74,10 +76,25 @@ def scope_project(project: Iterable[ParsedModule], graph: ImportGraph) -> Mappin
     return MappingProxyType({scope.name: scope for scope in scopes})
 
 
+def can_walk_references(module: ParsedModule) -> bool:
+    attributes = (node for node in ast.walk(module.tree) if isinstance(node, ast.Attribute))
+    try:
+        tuple(map(dotted_name, attributes))
+    except RecursionError:
+        return False
+    return True
+
+
 def select_targets(index: ProjectIndex, target_paths: frozenset[str]) -> TargetedProject:
-    scopes = scope_project(index.sources.modules, index.graph)
+    modules = index.sources.modules
+    walkable = tuple(module for module in modules if can_walk_references(module))
+    too_deep = tuple(module for module in modules if module not in walkable)
+    scopes = scope_project(walkable, index.graph)
     targeted = (scopes[name] for name in sorted(scopes))
     targets = tuple(scope for scope in targeted if scope.path in target_paths)
-    reported = index.sources.unparsable
+    reported = (
+        *index.sources.unparsable,
+        *(UnparsableSource(module.source.path, None, TOO_DEEP_MESSAGE) for module in too_deep),
+    )
     unparsable = tuple(item for item in reported if item.path in target_paths)
     return TargetedProject(index.graph, scopes, targets, unparsable)

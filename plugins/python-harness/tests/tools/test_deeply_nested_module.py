@@ -7,24 +7,28 @@ from python_harness.tools.tests.support import document_of
 
 DEEP = 'src/deep/chain.py'
 SIBLING = 'src/deep/plain.py'
+ATTRIBUTE_CHAIN = 'x = a' + '.b' * 3000 + '\n'
+DEEP_SOURCES = [
+    pytest.param(ATTRIBUTE_CHAIN, id='attribute-chain'),
+    pytest.param('x = ' + '1 + ' * 3000 + '1\n', id='binary-operator-chain'),
+    pytest.param('x = f' + '()' * 3000 + '\n', id='call-chain'),
+]
+
+
+def write_project(project_builder: ProjectBuilder, deep_source: str) -> None:
+    project_builder.write(
+        {DEEP: deep_source, SIBLING: 'def plain() -> int:\n    return 1\n'},
+    )
 
 
 @pytest.fixture
 def deep_project(project_builder: ProjectBuilder) -> None:
-    project_builder.write(
-        {DEEP: 'x = a' + '.b' * 3000 + '\n', SIBLING: 'def plain() -> int:\n    return 1\n'}
-    )
+    write_project(project_builder, ATTRIBUTE_CHAIN)
 
 
 @pytest.mark.anyio
-@pytest.mark.usefixtures('deep_project')
 class TestDeeplyNestedModule:
-    async def test_facts_list_the_module_as_unparsable(self, project_client: Client) -> None:
-        result = await project_client.call_tool('collect_python_facts', {'paths': ['src/deep']})
-
-        facts = document_of(result)
-        assert (result.is_error, [item['path'] for item in facts['unparsable']]) == (False, [DEEP])
-
+    @pytest.mark.usefixtures('deep_project')
     async def test_calls_still_answer_for_a_sibling(self, project_client: Client) -> None:
         result = await project_client.call_tool('map_python_calls', {'paths': [SIBLING]})
 
@@ -33,3 +37,35 @@ class TestDeeplyNestedModule:
             False,
             [SIBLING],
         )
+
+    @pytest.mark.usefixtures('deep_project')
+    async def test_calls_list_the_requested_module_as_unparsable(
+        self, project_client: Client
+    ) -> None:
+        result = await project_client.call_tool('map_python_calls', {'paths': [DEEP]})
+
+        calls = document_of(result)
+        reported = ([item['path'] for item in calls['unparsable']], calls['modules'])
+        assert (result.is_error, reported) == (False, ([DEEP], []))
+
+    @pytest.mark.usefixtures('deep_project')
+    async def test_symbol_search_answers_with_the_module_in_the_project(
+        self, project_client: Client
+    ) -> None:
+        arguments = {'paths': [SIBLING], 'symbol': 'plain'}
+
+        result = await project_client.call_tool('map_python_calls', arguments)
+
+        assert result.is_error is False
+
+    @pytest.mark.parametrize('deep_source', DEEP_SOURCES)
+    async def test_each_deep_shape_is_reported_by_facts_and_answered_by_calls(
+        self, project_client: Client, project_builder: ProjectBuilder, deep_source: str
+    ) -> None:
+        write_project(project_builder, deep_source)
+
+        facts = await project_client.call_tool('collect_python_facts', {'paths': ['src/deep']})
+        calls = await project_client.call_tool('map_python_calls', {'paths': [DEEP]})
+
+        unparsable = [item['path'] for item in document_of(facts)['unparsable']]
+        assert (facts.is_error, unparsable, calls.is_error) == (False, [DEEP], False)

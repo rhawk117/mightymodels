@@ -87,15 +87,6 @@ def collect_references(scope: ModuleScope, wanted: frozenset[str]) -> Iterator[F
     yield from collect_name_references(scope, wanted)
 
 
-def collect_scope_references(
-    scope: ModuleScope, wanted: frozenset[str]
-) -> tuple[FoundReference, ...]:
-    try:
-        return tuple(collect_references(scope, wanted))
-    except RecursionError:
-        return ()
-
-
 def group_references(found: Iterable[FoundReference]) -> ReferenceIndex:
     grouped: defaultdict[str, list[Reference]] = defaultdict(list)
     for qualified, reference in found:
@@ -108,7 +99,7 @@ def index_references(
     definitions: Iterable[SymbolDefinition], scopes: Iterable[ModuleScope]
 ) -> ReferenceIndex:
     wanted = frozenset(item.qualified_name() for item in definitions)
-    found = chain.from_iterable(collect_scope_references(scope, wanted) for scope in scopes)
+    found = chain.from_iterable(collect_references(scope, wanted) for scope in scopes)
     return group_references(found)
 
 
