@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from itertools import chain
 from operator import attrgetter
 
-from python_harness.core.sources import ParsedModule, load_sources
+from python_harness.core.sources import ParsedModule, UnparsableSource, load_sources
 from python_harness.core.workspace import Workspace
 from python_harness.facts.domain import FactCollector, FactsReport, ModuleFacts, NodeDetector
 from python_harness.facts.util.annotations import ANNOTATION_DETECTORS
@@ -63,10 +63,21 @@ def collect_module_facts(module: ParsedModule, catalog: FactCatalog) -> ModuleFa
     return ModuleFacts(module.source.path, module.source.line_count, ordered)
 
 
+def collect_facts_or_unparsable(
+    module: ParsedModule, catalog: FactCatalog
+) -> ModuleFacts | UnparsableSource:
+    try:
+        return collect_module_facts(module, catalog)
+    except RecursionError:
+        return UnparsableSource(module.source.path, None, 'nested too deeply to walk')
+
+
 def collect_facts(
     workspace: Workspace, paths: Iterable[str], catalog: FactCatalog | None = None
 ) -> FactsReport:
     chosen = FactCatalog() if catalog is None else catalog
     loaded = load_sources(workspace, workspace.python_files_in(paths))
-    modules = tuple(collect_module_facts(module, chosen) for module in loaded.modules)
-    return FactsReport(modules, loaded.unparsable)
+    outcomes = tuple(collect_facts_or_unparsable(module, chosen) for module in loaded.modules)
+    modules = tuple(item for item in outcomes if isinstance(item, ModuleFacts))
+    too_deep = tuple(item for item in outcomes if isinstance(item, UnparsableSource))
+    return FactsReport(modules, (*loaded.unparsable, *too_deep))
