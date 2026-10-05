@@ -242,12 +242,11 @@ class TestToolCalls:
         name: str,
         arguments: dict[str, object],
         connected_server: StateServer,
+        tree_after_the_connect: dict[str, bytes],
         database_activity: DatabaseActivity,
     ) -> None:
-        after_the_connect = tree(connected_server.root)
-
         (result,) = ticket_results(connected_server, (name, arguments))
 
         assert result.is_error
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(connected_server.root) == after_the_connect
+        assert tree(connected_server.root) == tree_after_the_connect

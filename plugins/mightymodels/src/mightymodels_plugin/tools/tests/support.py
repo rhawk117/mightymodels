@@ -63,3 +63,8 @@ def state_server(repository: Path) -> StateServer:
 def connected_server(state_server: StateServer) -> StateServer:
     state_server.connect()
     return state_server
+
+
+@pytest.fixture
+def tree_after_the_connect(connected_server: StateServer) -> dict[str, bytes]:
+    return tree(connected_server.root)

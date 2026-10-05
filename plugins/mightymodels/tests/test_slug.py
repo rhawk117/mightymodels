@@ -175,45 +175,52 @@ class TestSlugType:
         )
 
 
+@pytest.fixture
+def tmp_path_tree_after_the_connect(connected_server: StateServer) -> dict[str, bytes]:
+    return tree(connected_server.root.parent)
+
+
 @pytest.mark.usefixtures('project')
 class TestHostileSlug:
+    @pytest.fixture
+    def tmp_path_tree_before_the_run(self, tmp_path: Path) -> dict[str, bytes]:
+        return tree(tmp_path)
+
     @pytest.mark.parametrize('raw', HOSTILE)
     @pytest.mark.parametrize(('name', 'arguments'), CALLS)
     def test_slug_confinement_a_tool_reads_and_writes_nothing_for_a_hostile_slug(
         self,
         tmp_path: Path,
         connected_server: StateServer,
+        tmp_path_tree_after_the_connect: dict[str, bytes],
         database_activity: DatabaseActivity,
         *,
         name: str,
         arguments: dict[str, object],
         raw: str,
     ) -> None:
-        after_the_connect = tree(tmp_path)
-
         (result,) = connected_server.call((name, {**arguments, 'slug': raw}))
 
         assert result.is_error
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(tmp_path) == after_the_connect
+        assert tree(tmp_path) == tmp_path_tree_after_the_connect
 
     @pytest.mark.parametrize('raw', HOSTILE)
     def test_slug_confinement_verify_run_reads_and_writes_nothing_for_a_hostile_slug(
         self,
         tmp_path: Path,
+        tmp_path_tree_before_the_run: dict[str, bytes],
         database_activity: DatabaseActivity,
         *,
         raw: str,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        before = tree(tmp_path)
-
         code = main(['verify', 'run', f'--slug={raw}', '--all'])
 
         assert code == REJECTED
         assert 'is not a slug' in capsys.readouterr().err
         assert database_activity.kinds() == []
-        assert tree(tmp_path) == before
+        assert tree(tmp_path) == tmp_path_tree_before_the_run
 
 
 class TestInsideTheStateDirectory:
@@ -275,17 +282,16 @@ class TestReviewConfinement:
         self,
         tmp_path: Path,
         connected_server: StateServer,
+        tmp_path_tree_after_the_connect: dict[str, bytes],
         database_activity: DatabaseActivity,
         raw: str,
     ) -> None:
-        after_the_connect = tree(tmp_path)
-
         payload = {**START_PAYLOAD, 'scope': 'ticket', 'base': 'main', 'slug': raw}
         (result,) = connected_server.call(('review', {'action': 'start', 'payload': payload}))
 
         assert result.is_error
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(tmp_path) == after_the_connect
+        assert tree(tmp_path) == tmp_path_tree_after_the_connect
 
     @pytest.mark.parametrize('raw', HOSTILE_RUN_IDS)
     @pytest.mark.parametrize('arguments', RUN_CALLS)
@@ -293,18 +299,17 @@ class TestReviewConfinement:
         self,
         tmp_path: Path,
         connected_server: StateServer,
+        tmp_path_tree_after_the_connect: dict[str, bytes],
         database_activity: DatabaseActivity,
         *,
         arguments: dict[str, object],
         raw: str,
     ) -> None:
-        after_the_connect = tree(tmp_path)
-
         (result,) = connected_server.call(('review', {**arguments, 'run_id': raw}))
 
         assert result.is_error
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(tmp_path) == after_the_connect
+        assert tree(tmp_path) == tmp_path_tree_after_the_connect
 
     def test_slug_confinement_a_run_without_a_ticket_keeps_its_directory_under_runtime(
         self, project: Path, state_server: StateServer
