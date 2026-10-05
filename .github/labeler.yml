@@ -6,6 +6,10 @@ plugin:vibe-code:
   - changed-files:
       - any-glob-to-any-file: plugins/vibe-code/**
 
+plugin:python-harness:
+  - changed-files:
+      - any-glob-to-any-file: plugins/python-harness/**
+
 ci:
   - changed-files:
       - any-glob-to-any-file: .github/**

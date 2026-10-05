@@ -24,6 +24,7 @@ discovery, and validation.
 | ------------ | --------------------------------------------------------------------------- |
 | mightymodels | Ticket-scoped agent dev loop: per-ticket state, model routing, review stack |
 | vibe-code | Skills for building and hardening Claude Code agents, skills, and loops |
+| python-harness | Python review skill, read-only fact agent, toolchain hooks, CLI, MCP server |
 
 ### mightymodels
 
@@ -83,6 +84,27 @@ versions and do not verify hashes. The skills are standard `SKILL.md` directorie
 `plugins/vibe-code/skills/`. [plugins/vibe-code/README.md](plugins/vibe-code/README.md) covers
 install, the CLI, the launcher and Windows.
 
+### python-harness
+
+A review skill, a fact-gathering agent, two hooks, a CLI and an MCP server for Python projects.
+`/python-harness:what-would-ryan-say` reviews a PR, a branch or a codebase and writes
+`PYTHON-REVIEW.md` or `REFACTOR-PLAN.md`. It never edits code and runs only when you type it. It
+dispatches the read-only `pylens` agent, which returns cited facts. The SessionStart hook briefs
+each session on the project's Python toolchain, and the PreToolUse hook adds a note when a Bash
+command runs plain `python` instead of `uv run python`. Neither blocks a command.
+
+The `python-harness` CLI has two commands, `inspect survey` and `inspect gate`. The MCP server,
+also named `python-harness`, has six tools. `search_python_docs` and `read_python_docs` read
+standard-library documentation from `docs.python.org`. `collect_python_facts`, `map_python_calls`,
+`check_citations` and `plan_review_surface` read the project Claude Code was started in.
+
+The plugin needs [uv](https://docs.astral.sh/uv/) on your `PATH` and a POSIX system (Linux, macOS
+or WSL). The CLI launcher and the server both start through `uv tool run` with the dependency
+versions pinned. The pins select versions and do not verify hashes. The hooks and the server have
+not yet been run inside a live Claude Code session.
+[plugins/python-harness/README.md](plugins/python-harness/README.md) covers install, the hooks,
+the server, the launcher and the known limitations.
+
 ## Layout
 
 ```text
@@ -90,6 +112,8 @@ plugins/         one directory per plugin; each carries its own manifest and ski
   mightymodels/  the dev loop: twenty skills, seven worker agents
   vibe-code/     authoring skills and the `vibe-code` CLI: ten skills, no agents,
                  with its own tests and eval cases
+  python-harness/ Python review: one skill, one agent, hooks, the `python-harness` CLI
+                 and an MCP server, with its own tests
 docs/            human documentation for the harness and the mightymodels plugin
 scripts/         the quality gate (`quality.sh`), checkout setup, and a log helper
 .claude-plugin/  the rygentic-harness marketplace manifest
@@ -113,6 +137,7 @@ frontmatter. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
 | [docs/state.md](docs/state.md) | The `.mightymodels/` directory and `ticket.yml` |
 | [docs/claude-code.md](docs/claude-code.md) | Running under Claude Code |
 | [plugins/vibe-code/README.md](plugins/vibe-code/README.md) | The vibe-code plugin: install, skills, CLI, launcher |
+| [plugins/python-harness/README.md](plugins/python-harness/README.md) | The python-harness plugin: install, hooks, server, launcher, limitations |
 
 ## Evals
 
@@ -124,9 +149,10 @@ a change has to pass: `make check`, which syncs the locked environment, runs pre
 
 ## Status
 
-vibe-code is at 0.3.0. mightymodels is at 0.8.0 and is the marketplace's first plugin. Its hook
-layer (session covenant injection, verification gates at Stop, PreCompact ticket snapshots) and
-the team/personal overlay split are designed but not yet shipped. CHANGELOG.md has the full trail.
+vibe-code is at 0.3.0. python-harness is at 0.1.0. mightymodels is at 0.8.0 and is the
+marketplace's first plugin. Its hook layer (session covenant injection, verification gates at
+Stop, PreCompact ticket snapshots) and the team/personal overlay split are designed but not yet
+shipped. CHANGELOG.md has the full trail.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR, and
 [SECURITY.md](SECURITY.md) for reporting anything sensitive.
