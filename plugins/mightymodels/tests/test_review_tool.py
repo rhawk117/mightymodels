@@ -97,6 +97,15 @@ class TestReviewCalls:
             pytest.param(
                 {'action': 'resolve', 'run_id': '20260101-000000'}, 'resolve needs', id='resolve'
             ),
+            pytest.param(
+                {
+                    'action': 'report',
+                    'run_id': '20260101-000000',
+                    'payload': {'persona': 'merge-vader'},
+                },
+                'report needs no payload, or a payload holding only shape',
+                id='report-with-a-persona',
+            ),
         ],
     )
     def test_an_action_missing_its_arguments_says_what_it_needs(

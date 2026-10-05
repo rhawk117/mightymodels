@@ -87,7 +87,11 @@ def resolve_finding(reviews: ReviewService, call: ReviewCall) -> ReviewView:
 
 def render_report(reviews: ReviewService, call: ReviewCall) -> ReviewView:
     run = run_id_for(ReviewAction.REPORT, call)
-    payload = call.payload if isinstance(call.payload, ReportPayload) else ReportPayload()
+    payload = ReportPayload() if call.payload is None else call.payload
+    if not isinstance(payload, ReportPayload):
+        raise MissingArgumentsError(
+            ReviewAction.REPORT, 'no payload, or a payload holding only shape'
+        )
     return reviews.report(run, payload.shape)
 
 

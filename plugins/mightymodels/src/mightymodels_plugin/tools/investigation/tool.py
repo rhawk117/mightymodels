@@ -76,7 +76,11 @@ def render_knowns(
     investigations: InvestigationService, call: InvestigationCall
 ) -> InvestigationView:
     investigation = investigation_for(InvestigationAction.KNOWNS, call)
-    selection = call.request if isinstance(call.request, KnownsFilter) else KnownsFilter()
+    selection = KnownsFilter() if call.request is None else call.request
+    if not isinstance(selection, KnownsFilter):
+        raise MissingArgumentsError(
+            InvestigationAction.KNOWNS, 'no request, or a request holding only kinds and limit'
+        )
     return investigations.knowns(investigation, selection)
 
 

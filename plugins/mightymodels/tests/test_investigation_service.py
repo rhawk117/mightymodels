@@ -721,6 +721,11 @@ class TestTheTool:
             pytest.param(
                 {'action': 'knowns'}, 'knowns needs investigation_id', id='knowns-of-nothing'
             ),
+            pytest.param(
+                {'action': 'knowns', 'investigation_id': 'a', 'request': {'round': 1}},
+                'knowns needs no request, or a request holding only kinds and limit',
+                id='knowns-with-a-round',
+            ),
         ],
     )
     def test_an_action_missing_its_part_says_what_it_needs(
