@@ -5,7 +5,7 @@ import os
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 
@@ -137,11 +137,11 @@ class TestPins:
     def test_python_spec_equals_requires_python(self, launch: Launch, requires_python: str) -> None:
         assert option_values(launch.args, '--python') == [requires_python]
 
-    def test_resolution_is_capped_at_one_iso_date(self, launch: Launch) -> None:
+    def test_resolution_is_capped_at_one_utc_timestamp(self, launch: Launch) -> None:
         cutoffs = option_values(launch.args, '--exclude-newer')
 
-        assert [date.fromisoformat(cutoff).isoformat() for cutoff in cutoffs] == cutoffs
         assert len(cutoffs) == 1
+        assert datetime.fromisoformat(cutoffs[0]).utcoffset() == timedelta(0)
 
 
 def write_decoy_module(module: Path, marker: Path) -> None:
