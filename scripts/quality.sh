@@ -47,6 +47,11 @@ run_linter() {
     plugins/vibe-code/src plugins/vibe-code/tests
   run 'pytest' uv run pytest
 
+  for plugin in plugins/*/; do
+    run "[${plugin#plugins/}] coverage" \
+      uv run coverage report --rcfile=.coveragerc.ini --include="${plugin}*"
+  done
+
   if ! command -v claude >/dev/null; then
     log::error 'claude not on PATH: npm install -g @anthropic-ai/claude-code'
     FAILURES+=('Claude CLI')
