@@ -93,6 +93,12 @@ PRESETS: Mapping[Emphasis, Mapping[Persona, float]] = MappingProxyType(
         Emphasis.BALANCED: MappingProxyType({Persona.MERGE_VADER: 0.5, Persona.UNCLE_BOB: 0.5}),
     }
 )
+REPORT_FILES: Mapping[Persona, str] = MappingProxyType(
+    {
+        Persona.MERGE_VADER: 'MERGE-VADER-REPORT.md',
+        Persona.UNCLE_BOB: 'UNCLE-BOB-REPORT.md',
+    }
+)
 REVIEWERS: Mapping[Persona, Worker] = MappingProxyType(
     {
         Persona.MERGE_VADER: Worker.MERGE_VADER_REVIEWER,
@@ -312,7 +318,9 @@ class ReviewService:
     def add(self, run: RunId, persona: Persona) -> ReviewView:
         with review_transaction(self.database) as repository:
             started_run = run_of(repository.started_run_row(run))
-            report = self.workspace.persona_report(started_run.slug, run, persona=persona)
+            report = self.workspace.persona_report(
+                started_run.slug, run, name=REPORT_FILES[persona]
+            )
             if report.file is None or not report.file.is_file():
                 raise ReportMissingError(persona, report.relative)
             batch = parse_report(report.file.read_text(encoding='utf-8'), persona)

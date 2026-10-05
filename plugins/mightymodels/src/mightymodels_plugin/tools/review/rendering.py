@@ -11,6 +11,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from mightymodels_plugin.head import short_head
 from mightymodels_plugin.tools.review.finding_merge import RANK, number_of
 from mightymodels_plugin.tools.review.schema import (
     Decision,
@@ -26,7 +27,6 @@ from mightymodels_plugin.tools.review.schema import (
 )
 
 COMMENT_LIMIT = 10
-SHORT_SHA = 12
 UNDECIDED = 'undecided'
 CLOSED_BY_DECISION = frozenset({Decision.DISMISS})
 SOURCE_PERSONA: Mapping[str, Persona] = MappingProxyType(
@@ -134,13 +134,12 @@ def counts(findings: Sequence[Finding]) -> str:
 def header_lines(findings: Sequence[Finding], standing: Standing) -> list[str]:
     run = standing.run
     scope = run.scope if run.base is None else f'{run.scope} against {run.base}'
-    head = 'unknown' if run.head is None else run.head
     models = ', '.join(f'{name} ({model})' for name, model in run.models.items())
     return [
         f'**Verdict: {verdict_of(findings, standing)}**',
         '',
         (
-            f'Review run `{run.run_id}` at `{head[:SHORT_SHA]}`: '
+            f'Review run `{run.run_id}` at `{short_head(run.head)}`: '
             f'{scope}, {run.depth} depth, {run.emphasis} emphasis. Reviewers: {models}.'
         ),
         '',

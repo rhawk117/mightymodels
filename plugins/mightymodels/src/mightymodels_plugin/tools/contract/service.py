@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.head import SHORT_SHA, short_head
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.executor import receipt_for
 from mightymodels_plugin.tools.contract.repository import Approval, contract_transaction
@@ -33,8 +34,6 @@ from mightymodels_plugin.tools.contract.schema import (
 )
 from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.workspace import Workspace
-
-SHORT_SHA = 12
 
 type ArgvById = Mapping[str, tuple[str, ...]]
 
@@ -165,8 +164,7 @@ class ContractService:
                 for command in repository.commands(slug)
             )
         rows = ''.join(f'{state.id} {state.state}\n' for state in states)
-        shown_head = 'unknown' if head is None else head
-        header = f'HEAD {shown_head[:SHORT_SHA]}\n'
+        header = f'HEAD {short_head(head)}\n'
         return ContractView(
             text=header + (rows or 'no matching commands\n'),
             passing=all(state.state.split(' ', 1)[0] == Outcome.PASSED for state in states),

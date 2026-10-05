@@ -13,9 +13,8 @@ from mightymodels_plugin.tools.review.schema import (
     ReviewScope,
     StartPayload,
 )
-from mightymodels_plugin.tools.review.service import ReviewService
+from mightymodels_plugin.tools.review.service import REPORT_FILES, ReviewService
 from mightymodels_plugin.tools.review.tables import ReviewFindingRow
-from mightymodels_plugin.workspace import REPORT_FILES
 from sqlalchemy import select
 
 type Stored = tuple[str, str, str, str, bool, str, str, tuple[str, str | None] | None]

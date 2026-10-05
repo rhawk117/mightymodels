@@ -22,6 +22,7 @@ from itertools import islice
 
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.head import short_head
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.schema import Outcome
 from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
@@ -46,7 +47,7 @@ from mightymodels_plugin.tools.snapshot.schema import (
 )
 from mightymodels_plugin.tools.task.gates import STUCK
 from mightymodels_plugin.tools.task.schema import Status, TaskRecord
-from mightymodels_plugin.tools.task.service import records_of, short_head
+from mightymodels_plugin.tools.task.service import records_of
 from mightymodels_plugin.tools.task.tables import TransitionRow
 from mightymodels_plugin.tools.ticket.schema import WorkUnit
 from mightymodels_plugin.tools.ticket.service import unit_of

@@ -26,6 +26,7 @@ from types import MappingProxyType
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.head import short_head
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.task_id import is_plan_task, task_number
 from mightymodels_plugin.tools.task.gates import (
@@ -54,7 +55,6 @@ from mightymodels_plugin.tools.task.tables import TaskRow
 from mightymodels_plugin.workspace import Workspace
 
 ARCHITECT_LIMIT = 1
-SHORT_SHA = 12
 
 TERMINAL = frozenset[Status]()
 ALLOWED: Mapping[Status, frozenset[Status]] = MappingProxyType(
@@ -159,10 +159,6 @@ def start_error(task_id: str, before: Status, mode: ArchitectMode | None) -> Tra
 
 def start_reasons(worker: Implementer, mode: ArchitectMode | None) -> list[str]:
     return [f'by {worker}', *([] if mode is None else [f'in {mode} mode'])]
-
-
-def short_head(head: str | None) -> str:
-    return ('unknown' if head is None else head)[:SHORT_SHA]
 
 
 def problem_lines(problems: Sequence[str]) -> str:

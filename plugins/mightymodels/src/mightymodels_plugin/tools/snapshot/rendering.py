@@ -6,6 +6,7 @@ missing one. Warnings get a section only when there are any.
 
 from collections.abc import Iterable
 
+from mightymodels_plugin.head import short_head
 from mightymodels_plugin.tools.snapshot.schema import (
     CheckState,
     FailedAttempt,
@@ -16,7 +17,6 @@ from mightymodels_plugin.tools.snapshot.schema import (
     SnapshotRecord,
     TaskState,
 )
-from mightymodels_plugin.tools.task.service import short_head
 
 
 def bullet_lines(items: Iterable[str], empty: str) -> list[str]:

@@ -29,12 +29,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum, auto
 from pathlib import Path
-from types import MappingProxyType
 
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import ARCHIVES_DIRECTORY, Slug
-from mightymodels_plugin.tools.review.schema import Persona
 
 PROJECT_DIR_VARIABLE = 'CLAUDE_PROJECT_DIR'
 STATE_DIRECTORY = '.mightymodels'
@@ -47,12 +45,6 @@ HANDOFFS_DIRECTORY = 'handoffs'
 SNAPSHOT_NAME = 'snapshot'
 LIVE_DEBUG_FILE = 'whats-broken.md'
 SAFE_REVISION = re.compile(r'[0-9A-Za-z][0-9A-Za-z._/-]*')
-REPORT_FILES: Mapping[Persona, str] = MappingProxyType(
-    {
-        Persona.MERGE_VADER: 'MERGE-VADER-REPORT.md',
-        Persona.UNCLE_BOB: 'UNCLE-BOB-REPORT.md',
-    }
-)
 
 
 class OutsideStateDirectoryError(StateError):
@@ -277,8 +269,7 @@ class Workspace:
     def review_directory(self, slug: Slug | None, run: RunId) -> Path:
         return self.contained(*review_parts(slug, run))
 
-    def persona_report(self, slug: Slug | None, run: RunId, *, persona: Persona) -> PersonaReport:
-        name = REPORT_FILES[persona]
+    def persona_report(self, slug: Slug | None, run: RunId, *, name: str) -> PersonaReport:
         parts = (*review_parts(slug, run), name)
         directory = self.review_directory(slug, run)
         is_symlink = self._state_directory.joinpath(*parts).is_symlink()
