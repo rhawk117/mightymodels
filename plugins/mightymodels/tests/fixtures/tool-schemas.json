@@ -246,7 +246,7 @@
           "type": "string"
         },
         "FindingId": {
-          "pattern": "^F\\d+$",
+          "pattern": "^F[0-9]+$",
           "type": "string"
         },
         "Persona": {
@@ -365,7 +365,7 @@
           "title": "RunId"
         },
         "RunIdText": {
-          "pattern": "^\\d{8}-\\d{6}$",
+          "pattern": "^[0-9]{8}-[0-9]{6}$",
           "type": "string"
         },
         "Shape": {

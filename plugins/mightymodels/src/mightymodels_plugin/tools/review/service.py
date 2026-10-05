@@ -4,7 +4,9 @@ A run records its scope, depth, persona weights and reviewer models at HEAD. `ad
 persona's report from the run directory and records its findings; the reports and the metrics
 file are the only files a run keeps, and `report` returns its text for the agent to write.
 Every write is validated in full before anything is stored, so a rejected batch stores nothing.
-Only the user's dispositions move a finding to remediation.
+Only the user's dispositions move a finding to remediation, and a decision stands for the finding
+as the user saw it: when a later `add` merges into a decided finding and changes it, its decision
+and its fix outcome are deleted and `add` names it as back to undecided.
 
 The service is built once by whoever owns the workspace and the database, the server in its
 lifespan, and holds both. Each action opens one transaction through `review_transaction`, which
@@ -13,7 +15,7 @@ that transaction and mapped to values there, so what the rendering takes and wha
 returns holds no row. Everything above the class reads no service state.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
@@ -146,15 +148,16 @@ def findings_of(repository: ReviewRepository, run: RunId) -> dict[str, Finding]:
 def dispositions_of(repository: ReviewRepository, run: RunId) -> dict[str, Disposition]:
     return {
         row.finding_id: Disposition(decision=Decision(row.decision), reason=row.reason)
-        for row in repository.disposition_rows(run)
+        for row in repository.decisions.disposition_rows(run)
     }
 
 
 def standing_of(repository: ReviewRepository, run: ReviewRun) -> Standing:
+    outcomes = repository.decisions.outcome_rows(run.run_id)
     return Standing(
         run=run,
         dispositions=dispositions_of(repository, run.run_id),
-        results={row.finding_id: Result(row.result) for row in repository.outcome_rows(run.run_id)},
+        results={row.finding_id: Result(row.result) for row in outcomes},
     )
 
 
@@ -218,14 +221,28 @@ def started_text(started_run: ReviewRun, relative: str) -> str:
     return f'run {started_run.run_id} at {relative}\n{started_run.depth} review: {listed}\n'
 
 
+def reopened_ids(
+    recorded: Mapping[str, Finding], changed: Sequence[Finding], decided: Collection[str]
+) -> list[str]:
+    return [
+        finding.id
+        for finding in changed
+        if finding.id in decided and recorded[finding.id] != finding
+    ]
+
+
 def record_batch(
     repository: ReviewRepository, run: RunId, batch: Sequence[FindingInput]
 ) -> ReviewView:
     incoming = [normalized(entry, index) for index, entry in enumerate(batch)]
-    changed = fold(findings_of(repository, run), incoming)
+    recorded = findings_of(repository, run)
+    changed = fold(recorded, incoming)
+    reopened = reopened_ids(recorded, changed, dispositions_of(repository, run))
     repository.record_findings(run, changed)
+    repository.decisions.reopen(run, reopened)
     ids = ', '.join(finding.id for finding in changed) or 'none'
-    text = f'{len(incoming)} findings in, {len(changed)} recorded: {ids}\n'
+    tail = f'; back to undecided: {", ".join(reopened)}' if reopened else ''
+    text = f'{len(incoming)} findings in, {len(changed)} recorded: {ids}{tail}\n'
     return ReviewView(text=text, run_id=run.root)
 
 
@@ -326,7 +343,7 @@ class ReviewService:
                 decided_finding(finding_id, entry, by=payload.by)
                 for finding_id, entry in payload.decisions.items()
             ]
-            repository.record_dispositions(run, decided)
+            repository.decisions.record_dispositions(run, decided)
             disposed = set(dispositions_of(repository, run)) | set(payload.decisions)
         undecided = sorted(set(findings) - disposed, key=finding_number)
         tail = f'; undecided: {", ".join(undecided)}' if undecided else ''
@@ -342,7 +359,7 @@ class ReviewService:
                 raise NotChosenError(payload.finding)
             if (error := resolution_error(payload)) is not None:
                 raise error
-            repository.record_outcome(
+            repository.decisions.record_outcome(
                 run,
                 ResolvedFinding(
                     finding_id=payload.finding,

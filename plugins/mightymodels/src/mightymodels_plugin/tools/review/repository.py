@@ -5,15 +5,19 @@ so the review service never sees a session. Starting a run also reads the ticket
 repository carries a `TicketRepository`, built here on that same session and nowhere else: one
 transaction serves the two.
 
+The user's decisions and the fix outcomes sit on a `DecisionRepository` that the review
+repository carries the same way. Its `reopen` is the only delete here: the findings it is given
+lose their decision and their outcome and read as undecided again.
+
 A method that writes takes values and builds the rows itself. `DecidedFinding` and
 `ResolvedFinding` are what the user decided and what a fix came to, as they are stored.
 """
 
-from collections.abc import Generator, Iterable
+from collections.abc import Collection, Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
@@ -105,9 +109,35 @@ def outcome_row_of(run: RunId, resolved: ResolvedFinding) -> ReviewOutcomeRow:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class DecisionRepository:
+    session: Session
+
+    def disposition_rows(self, run: RunId) -> list[ReviewDispositionRow]:
+        query = select(ReviewDispositionRow).where(ReviewDispositionRow.run_id == run.root)
+        return list(self.session.scalars(query))
+
+    def outcome_rows(self, run: RunId) -> list[ReviewOutcomeRow]:
+        query = select(ReviewOutcomeRow).where(ReviewOutcomeRow.run_id == run.root)
+        return list(self.session.scalars(query))
+
+    def record_dispositions(self, run: RunId, decided: Iterable[DecidedFinding]) -> None:
+        for decision in decided:
+            self.session.merge(disposition_row_of(run, decision))
+
+    def record_outcome(self, run: RunId, resolved: ResolvedFinding) -> None:
+        self.session.merge(outcome_row_of(run, resolved))
+
+    def reopen(self, run: RunId, finding_ids: Collection[str]) -> None:
+        for row_type in (ReviewDispositionRow, ReviewOutcomeRow):
+            named = row_type.finding_id.in_(finding_ids)
+            self.session.execute(delete(row_type).where(row_type.run_id == run.root, named))
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ReviewRepository:
     session: Session
     tickets: TicketRepository
+    decisions: DecisionRepository
 
     def run_row(self, run: RunId) -> ReviewRunRow | None:
         return self.session.get(ReviewRunRow, run.root)
@@ -125,14 +155,6 @@ class ReviewRepository:
         query = select(ReviewFindingRow).where(ReviewFindingRow.run_id == run.root)
         return list(self.session.scalars(query))
 
-    def disposition_rows(self, run: RunId) -> list[ReviewDispositionRow]:
-        query = select(ReviewDispositionRow).where(ReviewDispositionRow.run_id == run.root)
-        return list(self.session.scalars(query))
-
-    def outcome_rows(self, run: RunId) -> list[ReviewOutcomeRow]:
-        query = select(ReviewOutcomeRow).where(ReviewOutcomeRow.run_id == run.root)
-        return list(self.session.scalars(query))
-
     def record_run(self, run: ReviewRun) -> None:
         self.session.add(run_row_of(run))
 
@@ -140,15 +162,12 @@ class ReviewRepository:
         for finding in findings:
             self.session.merge(finding_row_of(run, finding))
 
-    def record_dispositions(self, run: RunId, decided: Iterable[DecidedFinding]) -> None:
-        for decision in decided:
-            self.session.merge(disposition_row_of(run, decision))
-
-    def record_outcome(self, run: RunId, resolved: ResolvedFinding) -> None:
-        self.session.merge(outcome_row_of(run, resolved))
-
 
 @contextmanager
 def review_transaction(database: Database) -> Generator[ReviewRepository]:
     with database.transaction() as session:
-        yield ReviewRepository(session=session, tickets=TicketRepository(session=session))
+        yield ReviewRepository(
+            session=session,
+            tickets=TicketRepository(session=session),
+            decisions=DecisionRepository(session=session),
+        )

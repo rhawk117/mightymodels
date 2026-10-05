@@ -1,10 +1,10 @@
-r"""Arguments and results of the `review` tool, and the values its service and rendering share.
+"""Arguments and results of the `review` tool, and the values its service and rendering share.
 
 `FindingInput` is one finding as a persona reports it and `Finding` is one as the run holds it.
 `ReviewRun` is a run as it is recorded and read back.
 
-The finding id pattern is published in the tool's schema, where `\d` means an ASCII digit. The
-server matches it against any Unicode digit, so the type also requires ASCII text.
+The finding id pattern is published in the tool's schema and names its digits as `[0-9]`, so the
+schema and the server accept the same ASCII digits and no others.
 """
 
 from collections.abc import Mapping
@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated
 
-from annotated_types import Predicate
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from mightymodels_plugin.routing import Depth
@@ -20,12 +19,10 @@ from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
 
 SOURCE_ID_PATTERN = r'^(MV|UB)-\d+$'
-FINDING_ID_PATTERN = r'^F\d+$'
+FINDING_ID_PATTERN = r'^F[0-9]+$'
 
 type SourceId = Annotated[str, StringConstraints(pattern=SOURCE_ID_PATTERN)]
-type FindingId = Annotated[
-    str, StringConstraints(pattern=FINDING_ID_PATTERN), Predicate(str.isascii)
-]
+type FindingId = Annotated[str, StringConstraints(pattern=FINDING_ID_PATTERN)]
 type Approver = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 type Sources = Annotated[tuple[SourceId, ...], Field(min_length=1)]
 

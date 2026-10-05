@@ -1,19 +1,18 @@
-r"""The review run id, the only caller-chosen text besides a slug that becomes a path component.
+"""The review run id, the only caller-chosen text besides a slug that becomes a path component.
 
-The pattern is published in the `review` tool's schema, where `\d` means an ASCII digit. The server
-matches it against any Unicode digit, so the type also requires ASCII text.
+The pattern is published in the `review` tool's schema and names its digits as `[0-9]`, so the
+schema and the server accept the same ASCII digits and no others.
 """
 
 from typing import Annotated, override
 
-from annotated_types import Predicate
 from pydantic import ConfigDict, RootModel, StringConstraints, ValidationError
 
 from mightymodels_plugin.errors import StateError
 
-RUN_ID_PATTERN = r'^\d{8}-\d{6}$'
+RUN_ID_PATTERN = r'^[0-9]{8}-[0-9]{6}$'
 
-type RunIdText = Annotated[str, StringConstraints(pattern=RUN_ID_PATTERN), Predicate(str.isascii)]
+type RunIdText = Annotated[str, StringConstraints(pattern=RUN_ID_PATTERN)]
 
 
 class InvalidRunIdError(StateError):

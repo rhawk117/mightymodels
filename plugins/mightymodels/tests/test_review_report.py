@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.run_id import RunId
-from mightymodels_plugin.tools.review.schema import Persona, ReviewScope, StartPayload
+from mightymodels_plugin.tools.review.schema import (
+    DisposePayload,
+    Persona,
+    ReviewScope,
+    StartPayload,
+)
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.review.tables import ReviewFindingRow
 from mightymodels_plugin.workspace import REPORT_FILES
@@ -451,3 +456,28 @@ class TestWhereTheReportComesFrom:
 
         assert ingest.add(UNCLE_BOB).startswith('4 findings in')
         assert len(ingest.stored()) == 5
+
+
+class TestAReportThatMergesIntoADecidedFinding:
+    DEFERRED = DisposePayload.model_validate(
+        {'by': 'user', 'decisions': {'F2': {'decision': 'defer', 'reason': 'ticketed as PLAT-9'}}}
+    )
+
+    @pytest.fixture
+    def deferred(self, ingest: Ingest) -> None:
+        ingest.write(MERGE_VADER, merge_vader(MERGE_VADER_BLOCK + TYPED))
+        ingest.write(UNCLE_BOB, uncle_bob(UNCLE_BOB_BLOCK + TYPED, severity='High'))
+        ingest.add(MERGE_VADER)
+        ingest.reviews.dispose(ingest.run, self.DEFERRED)
+
+    @pytest.mark.usefixtures('deferred')
+    def test_a_second_personas_report_that_raises_a_decided_finding_puts_it_back_to_undecided(
+        self, ingest: Ingest
+    ) -> None:
+        assert ingest.add(UNCLE_BOB) == '1 findings in, 1 recorded: F2; back to undecided: F2\n'
+        assert ingest.reviews.gate(ingest.run).text.splitlines()[0].endswith('\tundecided')
+
+    @pytest.mark.usefixtures('deferred')
+    def test_the_same_report_added_again_keeps_the_decision(self, ingest: Ingest) -> None:
+        assert ingest.add(MERGE_VADER) == '2 findings in, 2 recorded: F1, F2\n'
+        assert ingest.reviews.gate(ingest.run).text.splitlines()[1].endswith('\tdefer')
