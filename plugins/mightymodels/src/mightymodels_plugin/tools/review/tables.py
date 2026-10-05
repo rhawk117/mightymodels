@@ -1,4 +1,7 @@
-"""The tables of `.mightymodels/mightymodels.db` that have not moved to a domain package yet."""
+"""The `review_runs`, `review_findings`, `review_dispositions` and `review_outcomes` tables.
+
+A run, the findings recorded for it, the user's decision per finding and the outcome of each fix.
+"""
 
 from sqlalchemy.orm import Mapped
 

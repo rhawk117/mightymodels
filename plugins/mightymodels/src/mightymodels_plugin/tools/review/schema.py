@@ -1,18 +1,31 @@
-"""Arguments and results of the `review` tool, and the typed finding batch its service takes."""
+r"""Arguments and results of the `review` tool, and the values its service and rendering share.
 
+`FindingInput` is one finding as a persona reports it and `Finding` is one as the run holds it.
+`ReviewRun` is a run as it is recorded and read back.
+
+The finding id pattern is published in the tool's schema, where `\d` means an ASCII digit. The
+server matches it against any Unicode digit, so the type also requires ASCII text.
+"""
+
+from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated
 
+from annotated_types import Predicate
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from mightymodels_plugin.routing import Depth
+from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
 
 SOURCE_ID_PATTERN = r'^(MV|UB)-\d+$'
 FINDING_ID_PATTERN = r'^F\d+$'
 
 type SourceId = Annotated[str, StringConstraints(pattern=SOURCE_ID_PATTERN)]
-type FindingId = Annotated[str, StringConstraints(pattern=FINDING_ID_PATTERN)]
+type FindingId = Annotated[
+    str, StringConstraints(pattern=FINDING_ID_PATTERN), Predicate(str.isascii)
+]
 type Approver = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 type Sources = Annotated[tuple[SourceId, ...], Field(min_length=1)]
 
@@ -189,3 +202,18 @@ class ReviewView(BaseModel):
     text: str
     run_id: str | None = None
     verdict: Verdict | None = None
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ReviewRun:
+    run_id: RunId
+    slug: Slug | None
+    scope: ReviewScope
+    base: str | None
+    head: str | None
+    depth: Depth
+    emphasis: Emphasis
+    weights: Mapping[Persona, float]
+    personas: tuple[Persona, ...]
+    models: Mapping[str, str | None]
+    created_at: str

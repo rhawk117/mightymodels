@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from mightymodels_plugin.db.checkout import Checkout, Checkouts
-from mightymodels_plugin.db.tables import ReviewFindingRow, ReviewRunRow
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.review import (
+from mightymodels_plugin.run_id import InvalidRunIdError, RunId, parsed_run_id
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.review.schema import (
     DisposePayload,
     FindingInput,
     ResolvePayload,
@@ -18,9 +18,12 @@ from mightymodels_plugin.models.review import (
     StartPayload,
     Verdict,
 )
-from mightymodels_plugin.models.run_id import InvalidRunIdError, RunId, parsed_run_id
-from mightymodels_plugin.services import review
-from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.review.service import ReviewService
+from mightymodels_plugin.tools.review.tables import (
+    ReviewDispositionRow,
+    ReviewFindingRow,
+    ReviewRunRow,
+)
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tables import TicketRow
@@ -33,6 +36,7 @@ SLUG = 'retry-queue'
 ADVANCED, REJECTED = 0, 2
 IDENTITY = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
 BALANCED = {'scope': 'ticket', 'slug': SLUG, 'base': 'main', 'emphasis': 'balanced'}
+NON_ASCII_DIGIT_RUN_ID = '2026010\u0662-000000'
 ANSWERS = TicketAnswers.model_validate(
     {
         'summary': 'Retry queue drains slowly',
@@ -75,18 +79,17 @@ def finding(source: str, severity: str, location: str, **extra: object) -> Findi
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Workspace:
-    checkouts: Checkouts
+    reviews: ReviewService
     tickets: TicketService
     runner: GitRunner
 
     @property
     def root(self) -> Path:
-        return self.checkouts.workspace.root
+        return self.reviews.workspace.root
 
-    def attempt(self, act: Callable[[Checkout], ReviewView]) -> Outcome:
+    def attempt(self, act: Callable[[ReviewService], ReviewView]) -> Outcome:
         try:
-            with self.checkouts.begin() as checkout:
-                view = act(checkout)
+            view = act(self.reviews)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, view=None, err=str(error))
         return Outcome(code=ADVANCED, view=view, err='')
@@ -94,7 +97,7 @@ class Workspace:
     def try_start(self, payload: dict[str, object], started: datetime | None = None) -> Outcome:
         model = StartPayload.model_validate(payload)
         moment = started or datetime.now(tz=UTC)
-        return self.attempt(lambda checkout: review.start(checkout, model, started=moment))
+        return self.attempt(lambda reviews: reviews.start(model, started=moment))
 
     def start(self, *, started: datetime | None = None, **payload: object) -> RunId:
         outcome = self.try_start({**BALANCED, **payload}, started)
@@ -102,26 +105,26 @@ class Workspace:
         return RunId(outcome.view.run_id or '')
 
     def add(self, run: RunId, batch: list[FindingInput]) -> Outcome:
-        return self.attempt(lambda checkout: review.add_findings(checkout, run, batch))
+        return self.attempt(lambda reviews: reviews.add_findings(run, batch))
 
     def gate(self, run: RunId) -> Outcome:
-        return self.attempt(lambda checkout: review.gate(checkout, run))
+        return self.attempt(lambda reviews: reviews.gate(run))
 
     def dispose(self, run: RunId, **payload: object) -> Outcome:
         model = DisposePayload.model_validate(payload)
-        return self.attempt(lambda checkout: review.dispose(checkout, run, model))
+        return self.attempt(lambda reviews: reviews.dispose(run, model))
 
     def resolve(self, run: RunId, **payload: object) -> Outcome:
         model = ResolvePayload.model_validate(payload)
-        return self.attempt(lambda checkout: review.resolve(checkout, run, model))
+        return self.attempt(lambda reviews: reviews.resolve(run, model))
 
     def report(self, run: RunId, shape: Shape = Shape.FULL) -> Outcome:
-        return self.attempt(lambda checkout: review.report(checkout, run, shape))
+        return self.attempt(lambda reviews: reviews.report(run, shape))
 
 
 def run_state(workspace: Workspace, run: RunId) -> dict[str, object]:
-    with workspace.checkouts.begin() as checkout:
-        row = checkout.session.get(ReviewRunRow, run.root)
+    with workspace.reviews.database.transaction() as session:
+        row = session.get(ReviewRunRow, run.root)
         assert row is not None
         return {
             'personas': row.personas,
@@ -133,8 +136,8 @@ def run_state(workspace: Workspace, run: RunId) -> dict[str, object]:
 
 def stored_texts(workspace: Workspace, run: RunId) -> list[str]:
     query = select(ReviewFindingRow).where(ReviewFindingRow.run_id == run.root)
-    with workspace.checkouts.begin() as checkout:
-        rows = checkout.session.scalars(query).all()
+    with workspace.reviews.database.transaction() as session:
+        rows = session.scalars(query).all()
         return [str(getattr(row, c.name)) for row in rows for c in row.__table__.columns]
 
 
@@ -148,15 +151,17 @@ def commit(workspace: Workspace) -> str:
 def pin_models(workspace: Workspace, models: Mapping[str, str | None]) -> None:
     workspace.tickets.write(Slug(SLUG), ANSWERS)
     workspace.tickets.validate(Slug(SLUG))
-    with workspace.checkouts.begin() as checkout:
-        row = checkout.session.get(TicketRow, SLUG)
+    with workspace.reviews.database.transaction() as session:
+        row = session.get(TicketRow, SLUG)
         assert row is not None
         row.models = dict(models)
 
 
 @pytest.fixture
-def workspace(checkouts: Checkouts, ticket_service: TicketService, git: GitRunner) -> Workspace:
-    return Workspace(checkouts=checkouts, tickets=ticket_service, runner=git)
+def workspace(
+    review_service: ReviewService, ticket_service: TicketService, git: GitRunner
+) -> Workspace:
+    return Workspace(reviews=review_service, tickets=ticket_service, runner=git)
 
 
 def test_deep_review_runs_both_personas_on_the_ticket_models(workspace: Workspace) -> None:
@@ -325,6 +330,30 @@ def test_a_path_shaped_run_id_is_refused() -> None:
         RunId('../../etc')
 
 
+def test_a_run_id_holding_a_non_ascii_digit_is_refused() -> None:
+    refused = parsed_run_id(NON_ASCII_DIGIT_RUN_ID)
+    assert isinstance(refused, InvalidRunIdError)
+    with pytest.raises(ValidationError):
+        RunId(NON_ASCII_DIGIT_RUN_ID)
+
+
+class TestDecidedBy:
+    LEAKING_BY = 'user password=hunter22'
+
+    @pytest.fixture
+    def stored_by(self, workspace: Workspace) -> str:
+        run = workspace.start(depth='deep')
+        workspace.add(run, [finding('MV-1', 'High', 'a.py:1')])
+        workspace.dispose(run, by=self.LEAKING_BY, decisions={'F1': {'decision': 'fix'}})
+        with workspace.reviews.database.transaction() as session:
+            row = session.get(ReviewDispositionRow, (run.root, 'F1'))
+            assert row is not None
+            return row.by
+
+    def test_a_secret_in_by_is_redacted_in_the_stored_row(self, stored_by: str) -> None:
+        assert stored_by == 'user [REDACTED:assignment]'
+
+
 class TestVerdict:
     @pytest.fixture
     def run(self, workspace: Workspace) -> RunId:
@@ -425,11 +454,11 @@ class TestRuns:
         )
         second = workspace.start(started=datetime(2026, 1, 1, 12, 0, 5, tzinfo=UTC), depth='deep')
         workspace.add(second, [finding('MV-1', 'High', 'a.py:1')])
-        listed = workspace.attempt(review.listing)
+        listed = workspace.attempt(ReviewService.listing)
         assert listed.out.splitlines() == [
             f'{first}\t{SLUG}\tquick\t0 findings\tCLEAR',
             f'{second}\t{SLUG}\tdeep\t1 findings\tBLOCK',
         ]
 
     def test_the_list_of_no_runs_says_so(self, workspace: Workspace) -> None:
-        assert workspace.attempt(review.listing).out == 'no review runs\n'
+        assert workspace.attempt(ReviewService.listing).out == 'no review runs\n'

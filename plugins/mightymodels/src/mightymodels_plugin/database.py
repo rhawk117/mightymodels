@@ -17,14 +17,14 @@ from pathlib import Path
 from sqlalchemy import URL, Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from mightymodels_plugin.db.tables import (
+from mightymodels_plugin.declarative import Base
+from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
+from mightymodels_plugin.tools.review.tables import (
     ReviewDispositionRow,
     ReviewFindingRow,
     ReviewOutcomeRow,
     ReviewRunRow,
 )
-from mightymodels_plugin.declarative import Base
-from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 

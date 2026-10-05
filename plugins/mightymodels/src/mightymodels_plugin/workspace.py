@@ -2,10 +2,15 @@
 
 Each edge builds one workspace, the server in its lifespan and `verify run` for its one command.
 
-Every path under the state directory comes from `Workspace.contained`, which resolves it and
-refuses one that leaves the resolved state directory, so a symlink planted below it carries no
-read and no write outside. A persona report is the one path whose last part is not resolved: its
-directory is contained and `review add` refuses a report that is a symlink wherever it points.
+Every path under the state directory comes whole from `Workspace.contained`, which resolves it
+and refuses one that leaves the resolved state directory, so a symlink planted below it carries no
+read and no write outside. The state directory is held privately, so nothing outside this module
+joins a part onto it and every path passes through `contained`.
+
+A persona report is the one path a symlink may not stand in for, wherever the symlink points.
+Resolving the report would hide that its last part is one, so `Workspace.persona_report` looks at
+the name as the reviewer wrote it before resolving it, and hands out a contained file only when
+that name is no symlink.
 
 Git runs in `Git._answer` and nowhere else. A missing git binary is an answer without an exit
 code, never an exception, so HEAD is absent there as it is outside a repository or before the
@@ -21,9 +26,9 @@ from pathlib import Path
 from types import MappingProxyType
 
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.review import Persona
-from mightymodels_plugin.models.run_id import RunId
+from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.review.schema import Persona
 
 PROJECT_DIR_VARIABLE = 'CLAUDE_PROJECT_DIR'
 STATE_DIRECTORY = '.mightymodels'
@@ -84,6 +89,12 @@ class GitAnswer:
     stderr: str
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class PersonaReport:
+    relative: str
+    file: Path | None
+
+
 def find_root(environ: Mapping[str, str], cwd: Path) -> Path:
     project_dir = environ.get(PROJECT_DIR_VARIABLE)
     return Path(project_dir) if project_dir else cwd
@@ -94,6 +105,12 @@ def revision_error(*revisions: str) -> UnsafeRevisionError | None:
         (revision for revision in revisions if not SAFE_REVISION.fullmatch(revision)), None
     )
     return None if unsafe is None else UnsafeRevisionError(unsafe)
+
+
+def review_parts(slug: Slug | None, run: RunId) -> tuple[str, ...]:
+    if slug is None:
+        return RUNTIME_DIRECTORY, 'reviews', run.root
+    return slug.root, 'review', run.root
 
 
 def exclude_state(common_directory: Path) -> None:
@@ -169,17 +186,17 @@ class Git:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Workspace:
     root: Path
-    state_directory: Path
+    _state_directory: Path
     git: Git
 
     def contained(self, *parts: str) -> Path:
-        resolved = self.state_directory.joinpath(*parts).resolve()
-        if not resolved.is_relative_to(self.state_directory):
+        resolved = self._state_directory.joinpath(*parts).resolve()
+        if not resolved.is_relative_to(self._state_directory):
             raise OutsideStateDirectoryError(str(Path(STATE_DIRECTORY, *parts)))
         return resolved
 
     def relative_to_root(self, contained: Path) -> str:
-        return str(Path(STATE_DIRECTORY).joinpath(contained.relative_to(self.state_directory)))
+        return str(Path(STATE_DIRECTORY).joinpath(contained.relative_to(self._state_directory)))
 
     def database_file(self) -> Path:
         return self.contained(DATABASE_NAME)
@@ -197,12 +214,17 @@ class Workspace:
         return self.contained(RUNTIME_DIRECTORY, 'investigations', f'{investigation.root}.jsonl')
 
     def review_directory(self, slug: Slug | None, run: RunId) -> Path:
-        if slug is None:
-            return self.contained(RUNTIME_DIRECTORY, 'reviews', run.root)
-        return self.contained(slug.root, 'review', run.root)
+        return self.contained(*review_parts(slug, run))
 
-    def persona_report(self, slug: Slug | None, run: RunId, *, persona: Persona) -> Path:
-        return self.review_directory(slug, run).joinpath(REPORT_FILES[persona])
+    def persona_report(self, slug: Slug | None, run: RunId, *, persona: Persona) -> PersonaReport:
+        name = REPORT_FILES[persona]
+        parts = (*review_parts(slug, run), name)
+        directory = self.review_directory(slug, run)
+        is_symlink = self._state_directory.joinpath(*parts).is_symlink()
+        return PersonaReport(
+            relative=str(Path(self.relative_to_root(directory), name)),
+            file=None if is_symlink else self.contained(*parts),
+        )
 
     def exclude_state_from_git(self) -> None:
         common_directory = self.git.common_directory()
@@ -215,6 +237,6 @@ def workspace_at(root: Path) -> Workspace:
     resolved = root.resolve()
     return Workspace(
         root=resolved,
-        state_directory=resolved.joinpath(STATE_DIRECTORY).resolve(),
+        _state_directory=resolved.joinpath(STATE_DIRECTORY).resolve(),
         git=Git(root=resolved),
     )

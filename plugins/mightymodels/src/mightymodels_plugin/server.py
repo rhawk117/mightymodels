@@ -5,8 +5,8 @@ when a client connects, and disposes the engine when the client closes. Git is o
 repository the state directory is excluded from it, and outside one, or with no git binary, the
 server starts all the same.
 
-`AppState` holds a service per rebuilt tool. It keeps the workspace and the database for the
-`review` tool alone, whose handlers still take a `Checkout`.
+`AppState` holds one service per tool and nothing else: the workspace and the database are
+reached only through the services built over them.
 """
 
 import os
@@ -17,15 +17,16 @@ from pathlib import Path
 
 from mcp.server import MCPServer
 
-from mightymodels_plugin.database import Database, open_database
+from mightymodels_plugin.database import open_database
 from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.contract.tool import contract_tool
+from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.review.tool import review_tool
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.task.tool import task_tool
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tool import ticket_tool
-from mightymodels_plugin.workspace import Workspace, find_root, workspace_at
+from mightymodels_plugin.workspace import find_root, workspace_at
 
 SERVER_NAME = 'state'
 TOOLS = (ticket_tool.ticket, task_tool.task, contract_tool.contract, review_tool.review)
@@ -33,11 +34,10 @@ TOOLS = (ticket_tool.ticket, task_tool.task, contract_tool.contract, review_tool
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class AppState:
-    workspace: Workspace
-    database: Database
     tickets: TicketService
     tasks: TaskService
     contracts: ContractService
+    reviews: ReviewService
 
 
 def build_server(root: Path) -> MCPServer[AppState]:
@@ -47,11 +47,10 @@ def build_server(root: Path) -> MCPServer[AppState]:
         workspace.exclude_state_from_git()
         with open_database(workspace.database_file()) as database:
             yield AppState(
-                workspace=workspace,
-                database=database,
                 tickets=TicketService(workspace=workspace, database=database),
                 tasks=TaskService(workspace=workspace, database=database),
                 contracts=ContractService(workspace=workspace, database=database),
+                reviews=ReviewService(workspace=workspace, database=database),
             )
 
     server = MCPServer(SERVER_NAME, lifespan=lifespan)

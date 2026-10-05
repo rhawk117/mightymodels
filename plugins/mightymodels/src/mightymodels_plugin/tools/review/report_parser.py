@@ -14,15 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from mightymodels_plugin.models.review import (
-    Evidence,
-    EvidenceKind,
-    FindingInput,
-    Kind,
-    Persona,
-    ReportedSeverity,
-)
-from mightymodels_plugin.services.review_errors import (
+from mightymodels_plugin.tools.review.errors import (
     EvidenceKindError,
     ForeignSourceError,
     NoFindingsSectionError,
@@ -30,6 +22,14 @@ from mightymodels_plugin.services.review_errors import (
     UnknownSeverityHeadingError,
     UnplacedFindingError,
     UnreadableHeadingError,
+)
+from mightymodels_plugin.tools.review.schema import (
+    Evidence,
+    EvidenceKind,
+    FindingInput,
+    Kind,
+    Persona,
+    ReportedSeverity,
 )
 
 FINDINGS_HEADING = '## Findings'
@@ -95,7 +95,7 @@ def findings_section(lines: Sequence[str]) -> Sequence[str]:
 
 def severity_of_heading(heading: str) -> ReportedSeverity:
     named = SEVERITY_HEADING.match(heading)
-    severity = SEVERITIES.get(named['severity'].lower()) if named else None
+    severity = None if named is None else SEVERITIES.get(named['severity'].lower())
     if severity is None:
         raise UnknownSeverityHeadingError(heading)
     return severity
@@ -110,11 +110,16 @@ def blocks_of(lines: Sequence[str]) -> list[Block]:
         heading = lines[start].rstrip()
         if not heading.startswith(BLOCK_LEVEL):
             severity = severity_of_heading(heading)
-        elif severity is None:
+            continue
+        if severity is None:
             raise UnplacedFindingError(heading)
-        else:
-            blocks.append(Block(severity=severity, heading=heading, body=lines[start + 1 : end]))
+        blocks.append(Block(severity=severity, heading=heading, body=lines[start + 1 : end]))
     return blocks
+
+
+def bullet_key(named: re.Match[str]) -> BulletKey:
+    kind = '' if named['kind'] is None else str(named['kind'])
+    return str(named['key']).lower(), kind
 
 
 def bullets_of(body: Sequence[str]) -> Bullets:
@@ -122,10 +127,11 @@ def bullets_of(body: Sequence[str]) -> Bullets:
     current: BulletKey | None = None
     for line in body:
         named = BULLET.match(line)
-        if named:
-            current = (str(named['key']).lower(), str(named['kind'] or ''))
+        if named is not None:
+            current = bullet_key(named)
             bullets[current] = named['value'].strip()
-        elif current and line.strip():
+            continue
+        if current is not None and line.strip():
             bullets[current] = f'{bullets[current]} {line.strip()}'
     return bullets
 
@@ -150,8 +156,14 @@ def merge_vader_basis(at: Pointer, rest: str, bullets: Bullets) -> Basis:
 
 def uncle_bob_basis(_at: Pointer, rest: str, _bullets: Bullets) -> Basis:
     named = BOB_HEADING.match(rest)
-    title, location = (named['title'].strip(), named['location'].strip()) if named else (rest, '')
-    return Basis(title=title, location=location, kind=Kind.QUALITY, security=False)
+    if named is None:
+        return Basis(title=rest, location='', kind=Kind.QUALITY, security=False)
+    return Basis(
+        title=named['title'].strip(),
+        location=named['location'].strip(),
+        kind=Kind.QUALITY,
+        security=False,
+    )
 
 
 BASES: Mapping[Persona, BasisReader] = MappingProxyType(
@@ -170,8 +182,8 @@ def typed_evidence(at: Pointer, bullets: Bullets) -> Evidence | None:
     kind, cite = typed
     try:
         return Evidence(kind=EvidenceKind(kind.strip().lower()), cite=cite)
-    except ValueError:
-        raise EvidenceKindError(index, [source], kind) from None
+    except ValueError as error:
+        raise EvidenceKindError(index, [source], kind) from error
 
 
 def finding_of(index: int, block: Block, persona: Persona) -> FindingInput:

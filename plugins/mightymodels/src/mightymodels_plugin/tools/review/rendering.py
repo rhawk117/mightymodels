@@ -2,38 +2,45 @@
 
 Weights order findings inside a severity; they never filter or downgrade one. The verdict is
 computed from the findings, the user's dispositions and the remediation outcomes, never written.
+
+Everything here takes values: `Standing` holds the run, the decision per finding and the result
+per finding as the service read them, and no table row.
 """
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from mightymodels_plugin.db.tables import ReviewDispositionRow, ReviewOutcomeRow, ReviewRunRow
-from mightymodels_plugin.models.review import (
+from mightymodels_plugin.tools.review.finding_merge import RANK, number_of
+from mightymodels_plugin.tools.review.schema import (
     Decision,
+    Disposition,
     Finding,
     Kind,
+    Persona,
     Result,
+    ReviewRun,
     Severity,
     Shape,
     Verdict,
 )
-from mightymodels_plugin.services.review_findings import RANK, number_of
 
 COMMENT_LIMIT = 10
 SHORT_SHA = 12
 UNDECIDED = 'undecided'
 CLOSED_BY_DECISION = frozenset({Decision.DISMISS})
-SOURCE_PERSONA: Mapping[str, str] = MappingProxyType({'MV': 'merge-vader', 'UB': 'uncle-bob'})
+SOURCE_PERSONA: Mapping[str, Persona] = MappingProxyType(
+    {'MV': Persona.MERGE_VADER, 'UB': Persona.UNCLE_BOB}
+)
 
 type Renderer = Callable[[Standing, Sequence[Finding]], str]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Standing:
-    run: ReviewRunRow
-    dispositions: Mapping[str, ReviewDispositionRow]
-    outcomes: Mapping[str, ReviewOutcomeRow]
+    run: ReviewRun
+    dispositions: Mapping[str, Disposition]
+    results: Mapping[str, Result]
 
 
 def heaviest_weight(finding: Finding, standing: Standing) -> float:
@@ -41,7 +48,7 @@ def heaviest_weight(finding: Finding, standing: Standing) -> float:
     return max(weights.get(SOURCE_PERSONA[source.split('-')[0]], 0) for source in finding.sources)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class GateOrder:
     standing: Standing
 
@@ -55,12 +62,12 @@ class GateOrder:
 
 
 def ordered(findings: Sequence[Finding], standing: Standing) -> list[Finding]:
-    return sorted(findings, key=GateOrder(standing))
+    return sorted(findings, key=GateOrder(standing=standing))
 
 
 def decision_of(finding: Finding, standing: Standing) -> str:
     disposition = standing.dispositions.get(finding.id)
-    return disposition.decision if disposition else UNDECIDED
+    return UNDECIDED if disposition is None else disposition.decision
 
 
 def label(finding: Finding) -> str:
@@ -78,9 +85,9 @@ def gate_line(finding: Finding, standing: Standing) -> str:
         f'{finding.id}\t{label(finding)}\t[{sources}]\t{finding.location}\t'
         f'{finding.title}\t{decision_of(finding, standing)}\n'
     )
-    if finding.conflict:
-        line += f'\tconflict: {finding.conflict}\n'
-    return line
+    if finding.conflict is None:
+        return line
+    return f'{line}\tconflict: {finding.conflict}\n'
 
 
 def gate_text(findings: Sequence[Finding], standing: Standing) -> str:
@@ -90,8 +97,7 @@ def gate_text(findings: Sequence[Finding], standing: Standing) -> str:
 
 
 def is_open(finding: Finding, standing: Standing) -> bool:
-    outcome = standing.outcomes.get(finding.id)
-    fixed = outcome is not None and outcome.result == Result.FIXED
+    fixed = standing.results.get(finding.id) is Result.FIXED
     return not fixed and decision_of(finding, standing) not in CLOSED_BY_DECISION
 
 
@@ -113,8 +119,8 @@ def verdict_of(findings: Sequence[Finding], standing: Standing) -> Verdict:
 
 
 def status_of(finding: Finding, standing: Standing) -> str:
-    outcome = standing.outcomes.get(finding.id)
-    return outcome.result if outcome else decision_of(finding, standing)
+    result = standing.results.get(finding.id)
+    return decision_of(finding, standing) if result is None else result
 
 
 def counts(findings: Sequence[Finding]) -> str:
@@ -127,13 +133,14 @@ def counts(findings: Sequence[Finding]) -> str:
 
 def header_lines(findings: Sequence[Finding], standing: Standing) -> list[str]:
     run = standing.run
-    scope = f'{run.scope} against {run.base}' if run.base else run.scope
+    scope = run.scope if run.base is None else f'{run.scope} against {run.base}'
+    head = 'unknown' if run.head is None else run.head
     models = ', '.join(f'{name} ({model})' for name, model in run.models.items())
     return [
         f'**Verdict: {verdict_of(findings, standing)}**',
         '',
         (
-            f'Review run `{run.run_id}` at `{(run.head or "unknown")[:SHORT_SHA]}`: '
+            f'Review run `{run.run_id}` at `{head[:SHORT_SHA]}`: '
             f'{scope}, {run.depth} depth, {run.emphasis} emphasis. Reviewers: {models}.'
         ),
         '',
@@ -151,12 +158,12 @@ def finding_block(finding: Finding, standing: Standing) -> list[str]:
         f'- Fix: {finding.fix}',
         f'- Verify: {finding.verify}',
     ]
-    if finding.evidence:
+    if finding.evidence is not None:
         lines.append(f'- Evidence ({finding.evidence.kind}): {finding.evidence.cite}')
-    if finding.conflict:
+    if finding.conflict is not None:
         lines.append(f'- Severity conflict: {finding.conflict}')
     disposition = standing.dispositions.get(finding.id)
-    if disposition and disposition.reason:
+    if disposition is not None and disposition.reason:
         lines.append(f'- Decision reason: {disposition.reason}')
     return [*lines, '']
 

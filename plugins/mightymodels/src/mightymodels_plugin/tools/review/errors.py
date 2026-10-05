@@ -3,8 +3,8 @@
 from collections.abc import Sequence
 
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.review import Decision, Persona, Result, ReviewScope
-from mightymodels_plugin.models.run_id import RunId
+from mightymodels_plugin.run_id import RunId
+from mightymodels_plugin.tools.review.schema import Decision, Persona, Result, ReviewScope
 
 
 class WeightRangeError(StateError):

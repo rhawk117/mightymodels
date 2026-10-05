@@ -5,12 +5,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from mightymodels_plugin.db.checkout import Checkouts
-from mightymodels_plugin.db.tables import ReviewFindingRow
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.review import Persona, ReviewScope, StartPayload
-from mightymodels_plugin.models.run_id import RunId
-from mightymodels_plugin.services import review
+from mightymodels_plugin.run_id import RunId
+from mightymodels_plugin.tools.review.schema import Persona, ReviewScope, StartPayload
+from mightymodels_plugin.tools.review.service import ReviewService
+from mightymodels_plugin.tools.review.tables import ReviewFindingRow
+from mightymodels_plugin.workspace import REPORT_FILES
 from sqlalchemy import select
 
 type Stored = tuple[str, str, str, str, bool, str, str, tuple[str, str | None] | None]
@@ -164,11 +164,12 @@ def uncle_bob(*blocks: str, severity: str = 'Medium') -> str:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Ingest:
-    checkouts: Checkouts
+    reviews: ReviewService
     run: RunId
 
     def report(self, persona: Persona) -> Path:
-        return self.checkouts.workspace.persona_report(None, self.run, persona=persona)
+        directory = self.reviews.workspace.review_directory(None, self.run)
+        return directory.joinpath(REPORT_FILES[persona])
 
     def write(self, persona: Persona, text: str) -> Path:
         path = self.report(persona)
@@ -176,8 +177,7 @@ class Ingest:
         return path
 
     def add(self, persona: Persona) -> str:
-        with self.checkouts.begin() as checkout:
-            return review.add(checkout, self.run, persona).text
+        return self.reviews.add(self.run, persona).text
 
     def attempt(self, persona: Persona) -> str:
         with pytest.raises(StateError) as error:
@@ -186,7 +186,7 @@ class Ingest:
 
     def stored(self) -> list[Stored]:
         query = select(ReviewFindingRow).order_by(ReviewFindingRow.finding_id)
-        with self.checkouts.begin() as checkout:
+        with self.reviews.database.transaction() as session:
             return [
                 (
                     row.sources[0],
@@ -198,15 +198,14 @@ class Ingest:
                     row.verify,
                     (row.evidence_kind, row.evidence_cite) if row.evidence_kind else None,
                 )
-                for row in checkout.session.scalars(query)
+                for row in session.scalars(query)
             ]
 
 
 @pytest.fixture
-def ingest(checkouts: Checkouts) -> Ingest:
-    with checkouts.begin() as checkout:
-        view = review.start(checkout, START, started=datetime.now(tz=UTC))
-    return Ingest(checkouts=checkouts, run=RunId(view.run_id or ''))
+def ingest(review_service: ReviewService) -> Ingest:
+    view = review_service.start(START, started=datetime.now(tz=UTC))
+    return Ingest(reviews=review_service, run=RunId(view.run_id or ''))
 
 
 def fixture_text(name: str) -> str:
@@ -437,8 +436,8 @@ class TestWhereTheReportComesFrom:
 
         ingest.add(MERGE_VADER)
 
-        with ingest.checkouts.begin() as checkout:
-            titles = [row.title for row in checkout.session.scalars(select(ReviewFindingRow))]
+        with ingest.reviews.database.transaction() as session:
+            titles = [row.title for row in session.scalars(select(ReviewFindingRow))]
         assert 'hunter22' not in ' '.join(titles)
         assert 'Hardcoded [REDACTED:assignment] in the store' in titles
 

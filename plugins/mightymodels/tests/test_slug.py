@@ -6,10 +6,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import main
-from mightymodels_plugin.db.checkout import Checkouts
-from mightymodels_plugin.db.tables import ReviewFindingRow
-from mightymodels_plugin.db.tests.support import ActivityKind, DatabaseActivity
-from mightymodels_plugin.models.review import StartPayload
+from mightymodels_plugin.database import Database
 from mightymodels_plugin.server import TOOLS
 from mightymodels_plugin.slug import (
     SLUG_LIMIT,
@@ -18,7 +15,15 @@ from mightymodels_plugin.slug import (
     Slug,
     parsed_slug,
 )
-from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, tree
+from mightymodels_plugin.tools.review.schema import StartPayload
+from mightymodels_plugin.tools.review.tables import ReviewFindingRow
+from mightymodels_plugin.tools.tests.support import (
+    ActivityKind,
+    DatabaseActivity,
+    StateServer,
+    ToolCall,
+    tree,
+)
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import InvalidTicketError, TicketService
 from mightymodels_plugin.workspace import workspace_at
@@ -74,6 +79,28 @@ RUN_CALLS = [
         id='resolve',
     ),
     pytest.param({'action': 'report'}, id='report'),
+]
+NON_ASCII_DIGIT_RUN_ID = '2026010\u0662-000000'
+NON_ASCII_DIGIT_FINDING_ID = 'F\u0662'
+WELL_FORMED_RUN_ID = '20260101-000000'
+NON_ASCII_DIGIT_FINDING_CALLS = [
+    pytest.param(
+        {
+            'action': 'dispose',
+            'payload': {
+                'by': 'user',
+                'decisions': {NON_ASCII_DIGIT_FINDING_ID: {'decision': 'fix'}},
+            },
+        },
+        id='dispose',
+    ),
+    pytest.param(
+        {
+            'action': 'resolve',
+            'payload': {'finding': NON_ASCII_DIGIT_FINDING_ID, 'result': 'failed', 'reason': 'r'},
+        },
+        id='resolve',
+    ),
 ]
 START_PAYLOAD = {'scope': 'codebase', 'depth': 'deep', 'emphasis': 'balanced'}
 TOOL_CALLS = (
@@ -312,6 +339,38 @@ class TestReviewConfinement:
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
         assert tree(tmp_path) == tmp_path_tree_after_the_connect
 
+    @pytest.mark.parametrize('arguments', RUN_CALLS)
+    def test_slug_confinement_a_run_id_holding_a_non_ascii_digit_reads_and_writes_nothing(
+        self,
+        tmp_path: Path,
+        connected_server: StateServer,
+        tmp_path_tree_after_the_connect: dict[str, bytes],
+        database_activity: DatabaseActivity,
+        arguments: dict[str, object],
+    ) -> None:
+        call = ('review', {**arguments, 'run_id': NON_ASCII_DIGIT_RUN_ID})
+        (result,) = connected_server.call(call)
+
+        assert result.is_error
+        assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
+        assert tree(tmp_path) == tmp_path_tree_after_the_connect
+
+    @pytest.mark.parametrize('arguments', NON_ASCII_DIGIT_FINDING_CALLS)
+    def test_slug_confinement_a_finding_id_holding_a_non_ascii_digit_reads_and_writes_nothing(
+        self,
+        tmp_path: Path,
+        connected_server: StateServer,
+        tmp_path_tree_after_the_connect: dict[str, bytes],
+        database_activity: DatabaseActivity,
+        arguments: dict[str, object],
+    ) -> None:
+        call = ('review', {**arguments, 'run_id': WELL_FORMED_RUN_ID})
+        (result,) = connected_server.call(call)
+
+        assert result.is_error
+        assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
+        assert tree(tmp_path) == tmp_path_tree_after_the_connect
+
     def test_slug_confinement_a_run_without_a_ticket_keeps_its_directory_under_runtime(
         self, project: Path, state_server: StateServer
     ) -> None:
@@ -336,7 +395,10 @@ class TestReviewConfinement:
         assert {path.name for path in state.iterdir()} == {'retry-queue', 'mightymodels.db'}
 
     def test_slug_confinement_a_report_with_secrets_is_redacted_in_the_stored_rows(
-        self, run_with_a_leaking_report: str, state_server: StateServer, checkouts: Checkouts
+        self,
+        run_with_a_leaking_report: str,
+        state_server: StateServer,
+        repository_database: Database,
     ) -> None:
         (added,) = state_server.call(
             (
@@ -349,8 +411,8 @@ class TestReviewConfinement:
             )
         )
 
-        with checkouts.begin() as checkout:
-            rows = checkout.session.scalars(select(ReviewFindingRow)).all()
+        with repository_database.transaction() as session:
+            rows = session.scalars(select(ReviewFindingRow)).all()
             stored = ' '.join(
                 str(getattr(row, column.name)) for row in rows for column in row.__table__.columns
             )

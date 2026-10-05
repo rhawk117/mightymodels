@@ -9,19 +9,19 @@ import re
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
-from mightymodels_plugin.models.review import (
+from mightymodels_plugin.redaction import redact
+from mightymodels_plugin.tools.review.errors import (
+    FieldRequiredError,
+    LocationShapeError,
+    UnsupportedQualityError,
+)
+from mightymodels_plugin.tools.review.schema import (
     Evidence,
     Finding,
     FindingInput,
     Kind,
     ReportedSeverity,
     Severity,
-)
-from mightymodels_plugin.services.redact import redact
-from mightymodels_plugin.services.review_errors import (
-    FieldRequiredError,
-    LocationShapeError,
-    UnsupportedQualityError,
 )
 
 LOCATION = re.compile(r'^(?P<path>[^\s:]+):(?P<start>\d+)(?:-(?P<end>\d+))?$')
@@ -58,10 +58,10 @@ def span_of(location: str) -> Span:
         return location, 0, 0
     path = str(match['path'])
     start = int(match['start'])
-    return path, start, int(match['end'] or start)
+    return path, start, start if match['end'] is None else int(match['end'])
 
 
-def required(index: int, sources: Sequence[str], field: str, *, value: str) -> str:
+def required_text(index: int, sources: Sequence[str], field: str, *, value: str) -> str:
     text = value.strip()
     if not text:
         raise FieldRequiredError(index, sources, field)
@@ -71,14 +71,13 @@ def required(index: int, sources: Sequence[str], field: str, *, value: str) -> s
 def evidence_of(index: int, sources: Sequence[str], evidence: Evidence | None) -> Evidence | None:
     if evidence is None:
         return None
-    return Evidence(
-        kind=evidence.kind, cite=required(index, sources, 'evidence cite', value=evidence.cite)
-    )
+    cite = required_text(index, sources, 'evidence cite', value=evidence.cite)
+    return Evidence(kind=evidence.kind, cite=cite)
 
 
 def normalized(entry: FindingInput, index: int) -> Finding:
     sources = sorted(set(entry.sources))
-    location = required(index, sources, 'location', value=entry.location)
+    location = required_text(index, sources, 'location', value=entry.location)
     if not LOCATION.match(location):
         raise LocationShapeError(index, sources)
     severity = STORED_SEVERITY[entry.severity]
@@ -88,10 +87,10 @@ def normalized(entry: FindingInput, index: int) -> Finding:
         severity=severity,
         kind=entry.kind,
         security=entry.security,
-        title=required(index, sources, 'title', value=entry.title),
+        title=required_text(index, sources, 'title', value=entry.title),
         location=location,
-        fix=required(index, sources, 'fix', value=entry.fix),
-        verify=required(index, sources, 'verify', value=entry.verify),
+        fix=required_text(index, sources, 'fix', value=entry.fix),
+        verify=required_text(index, sources, 'verify', value=entry.verify),
         evidence=evidence_of(index, sources, entry.evidence),
     )
     supported = finding.evidence is not None or severity is Severity.LOW
@@ -117,11 +116,8 @@ def conflict_between(keep: Finding, other: Finding, current: str | None) -> str 
 
 
 def merged(existing: Finding, incoming: Finding) -> Finding:
-    keep, other = (
-        (incoming, existing)
-        if RANK[incoming.severity] < RANK[existing.severity]
-        else (existing, incoming)
-    )
+    incoming_is_higher = RANK[incoming.severity] < RANK[existing.severity]
+    keep, other = (incoming, existing) if incoming_is_higher else (existing, incoming)
     return Finding(
         id=existing.id,
         sources=tuple(sorted(set(existing.sources) | set(incoming.sources))),
@@ -132,21 +128,23 @@ def merged(existing: Finding, incoming: Finding) -> Finding:
         location=keep.location,
         fix=keep.fix,
         verify=keep.verify,
-        evidence=keep.evidence or other.evidence,
+        evidence=other.evidence if keep.evidence is None else keep.evidence,
         conflict=conflict_between(keep, other, existing.conflict),
     )
+
+
+def placed(recorded: Mapping[str, Finding], incoming: Finding) -> Finding:
+    overlapped = next((old for old in recorded.values() if overlaps(old, incoming)), None)
+    if overlapped is not None:
+        return merged(overlapped, incoming)
+    number = max(map(number_of, recorded.values()), default=0) + 1
+    return incoming.model_copy(update={'id': f'F{number}'})
 
 
 def fold(current: Mapping[str, Finding], incoming: Sequence[Finding]) -> list[Finding]:
     working = dict(current)
     changed: dict[str, Finding] = {}
-    next_number = max((number_of(finding) for finding in working.values()), default=0) + 1
     for finding in incoming:
-        match = next((old for old in working.values() if overlaps(old, finding)), None)
-        if match is None:
-            result = finding.model_copy(update={'id': f'F{next_number}'})
-            next_number += 1
-        else:
-            result = merged(match, finding)
+        result = placed(working, finding)
         working[result.id] = changed[result.id] = result
     return sorted(changed.values(), key=number_of)
