@@ -24,6 +24,7 @@ discovery, and validation.
 | ------------ | --------------------------------------------------------------------------- |
 | mightymodels | Ticket-scoped agent dev loop: per-ticket state, model routing, review stack |
 | vibe-code | Skills for building and hardening Claude Code agents, skills, and loops |
+| python-harness | Python review skill, read-only fact agent, toolchain hooks, CLI, MCP server |
 
 ### mightymodels
 
@@ -82,6 +83,27 @@ through `uv tool run`, with the dependency versions pinned on its first line. Th
 versions and do not verify hashes. The skills are standard `SKILL.md` directories under
 `plugins/vibe-code/skills/`. [plugins/vibe-code/README.md](plugins/vibe-code/README.md) covers
 install, the CLI, the launcher and Windows.
+
+### python-harness
+
+A review skill, a fact-gathering agent, two hooks, a CLI and an MCP server for Python projects.
+`/python-harness:what-would-ryan-say` reviews a PR, a branch or a codebase and writes
+`PYTHON-REVIEW.md` or `REFACTOR-PLAN.md`. It never edits code and runs only when you type it. It
+dispatches the read-only `pylens` agent, which returns cited facts. The SessionStart hook briefs
+each session on the project's Python toolchain, and the PreToolUse hook adds a note when a Bash
+command runs plain `python` instead of `uv run python`. Neither blocks a command.
+
+The `python-harness` CLI has two commands, `inspect survey` and `inspect gate`. The MCP server,
+also named `python-harness`, has six tools. `search_python_docs` and `read_python_docs` read
+standard-library documentation from `docs.python.org`. `collect_python_facts`, `map_python_calls`,
+`check_citations` and `plan_review_surface` read the project Claude Code was started in.
+
+The plugin needs [uv](https://docs.astral.sh/uv/) on your `PATH` and a POSIX system (Linux, macOS
+or WSL). The CLI launcher and the server both start through `uv tool run` with the dependency
+versions pinned. The pins select versions and do not verify hashes. The hooks and the server have
+not yet been run inside a live Claude Code session.
+[plugins/python-harness/README.md](plugins/python-harness/README.md) covers install, the hooks,
+the server, the launcher and the known limitations.
 
 ## Layout
 

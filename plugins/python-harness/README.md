@@ -5,28 +5,71 @@ A Claude Code plugin for Python engineering. It ships:
 | Component | Path | What it does |
 | --- | --- | --- |
 | Skill `what-would-ryan-say` | `skills/what-would-ryan-say/` | `/python-harness:what-would-ryan-say pr <num\|branch> \| codebase [path]  report \| plan`: reviews Python against Ryan's guide and philosophy, writes `PYTHON-REVIEW.md` or `REFACTOR-PLAN.md`, never edits code. Runs only when you type it. |
-| Agent `pylens` | `agents/pylens.md` | Read-only fact gatherer (`Read`, `Grep`, `Glob`) on Haiku, dispatched by the skill as `python-harness:pylens`. CLAUDE.md is not loaded for it. |
+| Agent `pylens` | `agents/pylens.md` | Read-only fact gatherer on Haiku, dispatched by the skill as `python-harness:pylens`. It has `Read`, `Grep`, `Glob` and three of the server's tools (`collect_python_facts`, `map_python_calls`, `check_citations`), and returns cited facts as Markdown tables. CLAUDE.md is not loaded for it. |
 | Hooks | `hooks/hooks.json` | SessionStart: briefs the session on the project's Python toolchain. PreToolUse (Bash): adds a note when a command runs plain `python`/`python3`, suggesting `uv run python`. Never blocks. |
-| CLI `python-harness inspect` | `src/python_harness/`, launcher `bin/python-harness` | `survey \| gate \| surface \| facts \| calls \| cite`: facts as JSON, never verdicts. |
+| MCP server `python-harness` | `.mcp.json`, `src/python_harness/server.py` | Six tools over stdio. `search_python_docs` and `read_python_docs` read the standard-library documentation on `docs.python.org`. `collect_python_facts`, `map_python_calls`, `check_citations` and `plan_review_surface` read the project Claude Code was started in and return JSON. |
+| CLI `python-harness inspect` | `src/python_harness/`, launcher `bin/python-harness` | `inspect survey` reports the project's layout, manifest, inferred mode and domains. `inspect gate` runs the project's own ruff check, ruff format check, ty and pytest. Each prints one JSON document: facts, never verdicts. |
 | CLI `python-harness hooks` | `src/python_harness/hooks/` | `session-start \| guard-python`: the hook handlers, event JSON on stdin and hook JSON on stdout. |
 
 ## Requirements
 
 - Claude Code, with `uv` on `PATH`, on a POSIX system (Linux, macOS, WSL). The launcher does not run on native Windows.
-- The CLI needs Python 3.14; `uv` fetches it when it is missing.
+- The CLI and the MCP server need Python 3.14 or newer; `uv` fetches it when it is missing.
+- Network access to `docs.python.org` for the two documentation tools, and to a package index the first time `uv` builds each environment.
 
-## Load it
+## Install
 
-```sh
-claude --plugin-dir ./python-harness      # load it for one session while developing
-claude plugin validate --strict ./python-harness
+```text
+/plugin marketplace add <owner>/rygentic-harness
+/plugin install python-harness@rygentic-harness
 ```
 
-To install it for good, list the directory in a plugin marketplace and install it from there (see the Claude Code plugin docs). Hooks and agents are read when a session starts, so start a new session after changing them.
+To load it from a checkout for one session instead, run this from the repository root:
+
+```sh
+claude --plugin-dir plugins/python-harness
+```
+
+Start Claude Code in the root of the Python project you want to work on: the server's four project tools read that directory and no other. Hooks and agents are read when a session starts, so start a new session after changing them.
 
 - Claude Code puts the plugin's `bin/` on the Bash tool's `PATH`, after your own entries, so the model can run `python-harness` as a bare command. claude.ai and Cowork refuse to install a plugin that has a top-level `bin/` directory, so this plugin is for Claude Code only.
 - Plugin agents cannot be hidden, so `python-harness:pylens` appears in `@` completion. Its description tells Claude not to delegate other work to it.
-- pylens runs on Haiku. If many of its citations fail the skill's `inspect cite` check, set `model: sonnet` in `agents/pylens.md`.
+- pylens runs on Haiku. If many of its citations fail `check_citations`, set `model: sonnet` in `agents/pylens.md`.
+
+## The MCP server
+
+`.mcp.json` declares one stdio server named `python-harness`. It has six tools, and the skill and `pylens` call each one as `mcp__plugin_python-harness_python-harness__<tool>`.
+
+| Tool | Reads | What it returns |
+| --- | --- | --- |
+| `search_python_docs` | `docs.python.org` | Standard-library symbols that match a name, for one Python version. Each match is labeled exact, prefix or approximate. |
+| `read_python_docs` | `docs.python.org` | One symbol's documentation as Markdown, one page at a time. |
+| `collect_python_facts` | The project | Mechanical AST facts for the modules under `paths`, by line and kind. `with_function_shapes` adds one entry per function. |
+| `map_python_calls` | The project | Where the project references the symbols of the modules under `paths`. With `symbol`, every reference of that one symbol by path and line. |
+| `check_citations` | The project | Whether each `path.py:line` citation and its backticked quote in a Markdown document matches the code. The document is a `path` or inline `text`, exactly one. |
+| `plan_review_surface` | The project | A review surface as import-graph clusters of modules, for `paths` or for the modules changed since `diff_base`. |
+
+`skills/what-would-ryan-say/references/inspect-cli.md` gives the shape of each JSON document.
+
+### How it starts
+
+`.mcp.json` runs `uv tool run` with `--python >=3.14`, one `--with name==version` for each of twelve dependencies (the CLI's two and the server's ten) and an `--exclude-newer` UTC timestamp, then `python ${CLAUDE_PLUGIN_ROOT}/bin/python-harness-mcp`. The pins sit in `.mcp.json` because twelve of them do not fit in the 127 bytes of a shebang line. As with the CLI launcher, `uv tool run` builds an isolated environment from those arguments alone and adopts nothing from the directory it starts in. The launch names `bin/python-harness-mcp` by path, so Python puts `bin/` first on `sys.path`, and a module in the project's directory cannot shadow `python_harness` or `mcp`.
+
+The pins fix the versions of those twelve packages. For the packages those twelve depend on, the timestamp stops `uv` from choosing a release uploaded after it. The pins select versions and do not verify hashes. `tests/plugin/test_mcp_json.py` compares the pins with `pyproject.toml` and the repository's `uv.lock`. It also starts the server from a directory holding a decoy `pyproject.toml`, `.venv`, `python_harness` package and `mcp.py`, and fails if any decoy runs or if the server lists anything but the six tools.
+
+Measured once on one machine, when the server had only the two documentation tools, it took 6.12 s from process start to its tool listing with an empty `uv` cache and about 2.2 s with a warm one.
+
+When the tools are missing from a session, the server did not start. Check the plugin's Errors tab in `/plugin` and the server in `/mcp`.
+
+### The project tools
+
+`collect_python_facts`, `map_python_calls`, `check_citations` and `plan_review_surface` read one project: the directory in `CLAUDE_PROJECT_DIR`, which `.mcp.json` passes to the server through `env`. No tool takes another root. Every path input is relative to that directory. An absolute path outside it, a `..` path that leaves it and a symlink that points outside it are tool errors, and a directory input skips entries that resolve outside it. When `CLAUDE_PROJECT_DIR` is unset, empty, relative or names no directory, these four return a tool error and the documentation tools still work.
+
+Each tool returns one JSON document as its text result and writes no files. `plan_review_surface` runs `git` to list the files a diff changed; the others only read files.
+
+### The documentation tools
+
+`search_python_docs` and `read_python_docs` request `docs.python.org` over HTTPS and no other host. They do not follow redirects, so a redirect to another host comes back as a tool error. `tests/test_server.py` asserts both. Inventories and pages are cached in memory for up to 24 hours and nothing is written to disk. A call that takes longer than 45 seconds ends with a tool error. Those limits and the others are fields of `src/python_harness/documentation/settings.py`, and an environment variable named `PYTHON_HARNESS_DOCS_<FIELD_NAME>` overrides one.
 
 ## Hooks
 
@@ -88,29 +131,31 @@ Nothing is checked before the CLI starts:
 
 `uv tool run` puts its environment's `bin` first on `PATH` and sets `UV`. `inspect gate` removes both, and an inherited `VIRTUAL_ENV` with that virtualenv's `bin`, before running the reviewed project's tools. It runs them through `uv run --isolated` with caches and bytecode writing turned off, so the gate leaves no lockfile, `.venv` or cache behind. Some build backends still write into the tree (setuptools writes `*.egg-info`). The gate reports any path that appeared in `created_paths` and never deletes anything.
 
-Command groups load only when they run, so the interpreter hook never imports the docs group's HTTP and HTML stack or the session scan.
+Command groups load only when they run, so a hook never imports the `inspect` commands, and the interpreter hook never imports the session scan.
+
+## Limitations
+
+- As of 0.1.0, the server and both hooks have not been run inside a live Claude Code session. The tests run the hook handlers and both launch commands directly and call the tools through an MCP client. Three things in particular are unconfirmed: that Claude Code expands `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PROJECT_DIR}` in `.mcp.json`, that it names the tools `mcp__plugin_python-harness_python-harness__<tool>`, and that `pylens` on Haiku can drive its three tools. If the name form is wrong, `pylens` starts without them.
+- The four project tools are plain synchronous functions, which `mcp` 2.3.0 (the pinned version) runs on a worker thread. In `tests/tools/test_concurrent_calls.py`, a `search_python_docs` call returned while a `collect_python_facts` call was held open on a FIFO, so on that version a slow project call did not delay a documentation call. That test uses an in-memory client. Nothing has been observed over stdio, which is how Claude Code talks to the server.
+- The four project tools cannot be pointed at a sub-project. They read `CLAUDE_PROJECT_DIR` and take no other root, and from a parent directory they would resolve the sub-project's imports against the wrong root. To review a project nested in a larger repository, start Claude Code inside it.
+- A review's citations can be re-checked only by calling `check_citations`. No shell command does it. After editing `PYTHON-REVIEW.md` or `REFACTOR-PLAN.md`, ask Claude Code, in a session started in the project with the plugin enabled, to call `check_citations` on the file.
+- No test sends a real request to `docs.python.org`. All HTTP in the tests is faked.
+- There is no Windows launcher. The plugin needs a POSIX system.
 
 ## Develop
 
-```sh
-uv sync
-uv run ruff format --check .
-uv run ruff check .
-uv run ty check
-uv run pytest
-claude plugin validate --strict .
-```
-
-`ruff.toml` extends Ryan's standing config (`skills/what-would-ryan-say/assets/ruff.toml`, which is also the gate's fallback). It adds the test `S101` exemption and the eval-fixture excludes, and it sets `src` again, because ruff resolves `src` relative to the file that declares it. With the plugin loaded, the interpreter note fires on your own Bash calls here too: run Python as `uv run python`.
-
-## Evaluate the skill
-
-The eval suite lives in `evals/`: eight cases in Claude Code's `claude plugin eval` format. Each case's scaffold builds its fixture git repository and installs the pinned CPython into the run's temporary home, so `--scaffold` is required:
+The plugin is a member of the repository's uv workspace, the `python-harness-plugin` package. It has no lint, type or test configuration of its own: the root `.ruff.toml`, `.ty.toml` and `.pytest.toml` apply. Run the repository's commands from the repository root:
 
 ```sh
-claude plugin eval . --scaffold \
-  --allow-tools Bash Write Edit "WebFetch(domain:pypi.org)" "WebFetch(domain:files.pythonhosted.org)" \
-  --judge-model sonnet
+make setup    # once: install the pre-commit hook and sync the workspace
+make check    # the gate: sync the locked environment, run pre-commit, then scripts/quality.sh
+make format   # let the formatters fix what they can
+make lint     # report only
+uv run pytest plugins/python-harness/tests   # this plugin's tests alone
 ```
 
-Add `--model <id>` to pin the agent model, and add `--trust-plugin --no-publish --json results.json` in CI. Linux needs `bubblewrap` and `socat`. `evals/README.md` covers the network and Python requirements, how the old criteria map to graders, and what is still unverified. The suite has not been run yet: eval runs need an authenticated Claude Code.
+`make lint` runs ruff, mdformat on the root Markdown, `ty`, the whole pytest suite, and `claude plugin validate --strict` for each plugin and for the marketplace, so `claude` has to be on `PATH`. [CONTRIBUTING.md](../../CONTRIBUTING.md) has the rest.
+
+The pins are in two places. Line 1 of `bin/python-harness` has the CLI's two dependencies, and the `args` of `.mcp.json` have those two plus the server's ten. When `uv.lock` moves one of them to a new version, put that version wherever the package is pinned; `tests/plugin/test_launcher.py` and `tests/plugin/test_mcp_json.py` fail while they differ. Move the `--exclude-newer` timestamp in `.mcp.json` forward when a pin needs a release uploaded after it.
+
+With the plugin loaded, the interpreter note fires on your own Bash calls here too: run Python as `uv run python`.
