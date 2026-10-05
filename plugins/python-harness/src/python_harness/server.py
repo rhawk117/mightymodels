@@ -164,16 +164,14 @@ class ProjectTools:
         with tool_errors():
             return render_document(calls_use_case.run(open_project(self.environment), request))
 
-    def check_citations(
-        self, *, path: DocumentPath | None = None, text: DocumentText | None = None
-    ) -> str:
+    def check_citations(self, *, path: DocumentPath = '', text: DocumentText = '') -> str:
         """Check every path.py:line citation and its backticked quote in Markdown, as JSON.
 
         Give exactly one of path and text. The report lists each failing citation with
         its problem and each table row that holds no citation; passed is true when both
         lists are empty. A failed check is a report, not an error.
         """
-        request = CitationsRequest(path=path, text=text)
+        request = CitationsRequest(path=path or None, text=text or None)
         with tool_errors():
             return render_document(citations_use_case.run(open_project(self.environment), request))
 

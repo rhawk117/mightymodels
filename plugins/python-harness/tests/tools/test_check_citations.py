@@ -63,6 +63,16 @@ class TestInlineText:
         rows = (report['checked'], report['uncited_rows'], report['passed'])
         assert rows == self.MALFORMED_ROWS
 
+    @pytest.mark.usefixtures('shop')
+    @pytest.mark.parametrize('text', ['[]', '{"a": 1}', 'null'])
+    async def test_text_that_is_a_whole_json_value_is_checked_as_text(
+        self, project_client: Client, text: str
+    ) -> None:
+        result = await project_client.call_tool(TOOL, {'text': text})
+
+        report = document_of(result)
+        assert (result.is_error, report['document'], report['checked']) == (False, '<text>', 0)
+
 
 @pytest.mark.anyio
 class TestDocumentChoice:

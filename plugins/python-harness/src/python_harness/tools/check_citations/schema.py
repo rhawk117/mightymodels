@@ -3,19 +3,27 @@
 from dataclasses import dataclass
 from typing import Annotated
 
-from pydantic import Field
-
-from python_harness.tools.project import ProjectPath
+from pydantic import Field, StringConstraints
 
 INLINE_DOCUMENT_NAME = '<text>'
 
-type DocumentPath = Annotated[
-    ProjectPath,
-    Field(description='A Markdown file inside the project, relative to its root.'),
-]
-type DocumentText = Annotated[
+DocumentPath = Annotated[
     str,
-    Field(description='The Markdown to check, verbatim, when it is not a file in the project.'),
+    StringConstraints(pattern=r'^[^\x00]*$'),
+    Field(
+        description=(
+            'A Markdown file inside the project, relative to its root. Empty means not given.'
+        )
+    ),
+]
+DocumentText = Annotated[
+    str,
+    Field(
+        description=(
+            'The Markdown to check, verbatim, when it is not a file in the project.'
+            ' Empty means not given.'
+        )
+    ),
 ]
 
 
