@@ -72,14 +72,14 @@ reports are in the directory step 4 deletes.
 
 The tool has no prune. This step is Bash and removes `.mightymodels/SLUG`, nothing else. List
 what will go: that directory and its contents. The ticket's rows, its linked ledgers included,
-stay in the database, and so do both archive files. Ask once through
+stay in the database, and both archive files stay under `.mightymodels/archives/`. Ask once through
 `AskUserQuestion`, one question with two options: delete the directory, or keep it. Only on a
 yes, call `close` with action `check` again, call `mcp__plugin_mightymodels_state__ticket` with
 action `show` and read `status closed`, and confirm both archive files exist at the paths step 2
 wrote. Any miss: stop and delete nothing, so a failed close never becomes a lost ticket. Then,
 from the repository root, with `SLUG` the slug those calls accepted (the tools take only
 letters, digits, `-` and `_`, starting with a letter or digit, so the path has no separator
-and no `..`):
+and no `..`; a ticket named `archives` is never pruned, since that directory holds every archive):
 
 ```bash
 rm -r -- .mightymodels/SLUG
