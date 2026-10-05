@@ -770,7 +770,7 @@ def archive_paths(paths: Paths) -> tuple[Path, Path]:
     while (paths.archives / f'{stem}.md').exists():
         stem = f'{paths.slug}-{suffix}'
         suffix += 1
-        
+
     return paths.archives / f'{stem}.md', paths.archives / f'{stem}.json'
 
 
