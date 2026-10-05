@@ -6,15 +6,19 @@ handlers and its arguments to a dispatch, which runs the one handler. The SDK sh
 text of a `ToolError` and hides everything else as a crash, so the failures the services
 anticipate are translated in `state_errors_as_tool_errors` and nowhere else.
 
-A handler takes its domain's service and the call. The `ticket` tool is in that shape: it resolves
-the `TicketService` the lifespan built and dispatches through `dispatch_to_service`, and the
-service opens its own transactions. The `task`, `contract` and `review` tools are not there yet:
-their handlers take a `Checkout`, so `dispatch_action` opens one transaction around the handler.
+Each tool module binds its instance a second time under `ActionTool`, as `<domain>_action_tool`,
+which is what makes the type checker hold the tool to the interface. Annotating the instance
+itself would hide its registered method from the server.
+
+A handler takes its domain's service and the call. The `ticket` and `contract` tools are in that
+shape: each resolves the service the lifespan built and dispatches through `dispatch_to_service`,
+and the service opens its own transactions. The `task` and `review` tools are not there yet: their
+handlers take a `Checkout`, so `dispatch_action` opens one transaction around the handler.
 `ActionHandler`, `ResolvedCheckouts`, `lifespan_checkouts` and `dispatch_action` go when the last
-of the three is rebuilt.
+of the two is rebuilt.
 
 `LifespanState` is what the tools need from the server's lifespan state: each service, and until
-the three are rebuilt the workspace and the database every call joins into its `Checkouts`. The
+the two are rebuilt the workspace and the database every call joins into its `Checkouts`. The
 server's `AppState` satisfies it, and it is declared here because the server imports the tools.
 
 `ResolvedCheckouts` is a plain assignment because the SDK does not see a `Resolve` marker behind a
@@ -31,6 +35,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.db.checkout import Checkout, Checkouts
 from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.workspace import Workspace
 
@@ -61,6 +66,9 @@ class LifespanState(Protocol):
 
     @property
     def tickets(self) -> TicketService: ...
+
+    @property
+    def contracts(self) -> ContractService: ...
 
 
 def lifespan_checkouts(ctx: Context[LifespanState]) -> Checkouts:

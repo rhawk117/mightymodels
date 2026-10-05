@@ -20,6 +20,7 @@ from mightymodels_plugin.models.run_id import RunId
 from mightymodels_plugin.services import review as service
 from mightymodels_plugin.tools.protocol import (
     ActionHandler,
+    ActionTool,
     MissingArgumentsError,
     ResolvedCheckouts,
     dispatch_action,
@@ -115,3 +116,4 @@ review_tool = ReviewTool(
         }
     )
 )
+review_action_tool: ActionTool[ReviewAction, Checkout, ReviewCall, ReviewView] = review_tool

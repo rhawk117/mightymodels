@@ -7,12 +7,11 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import main
-from mightymodels_plugin.db.checkout import Checkouts
-from mightymodels_plugin.db.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.contract import ContractCommand
-from mightymodels_plugin.services import contract
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.schema import ContractCommand
+from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -51,12 +50,12 @@ class Recorded:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Workspace:
-    checkouts: Checkouts
+    contracts: ContractService
     capsys: pytest.CaptureFixture[str]
 
     @property
     def root(self) -> Path:
-        return self.checkouts.workspace.root
+        return self.contracts.workspace.root
 
     def run(self, *argv: str, slug: str = SLUG) -> Outcome:
         code = main(['verify', 'run', '--slug', slug, *argv])
@@ -69,20 +68,18 @@ class Workspace:
                 ContractCommand.model_validate({'approved_by': 'user', **command})
                 for command in commands
             ]
-            with self.checkouts.begin() as checkout:
-                view = contract.approve(checkout, Slug(slug), approved)
+            view = self.contracts.approve(Slug(slug), approved)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, out='', err=str(error))
         return Outcome(code=PASSED, out=view.text, err='')
 
     def status(self) -> Outcome:
-        with self.checkouts.begin() as checkout:
-            view = contract.status(checkout, Slug(SLUG))
+        view = self.contracts.status(Slug(SLUG))
         return Outcome(code=PASSED if view.passing else FAILED, out=view.text, err='')
 
     def receipts(self) -> list[Recorded]:
         query = select(ReceiptRow).order_by(ReceiptRow.id)
-        with self.checkouts.begin() as checkout:
+        with self.contracts.database.transaction() as session:
             return [
                 Recorded(
                     slug=row.slug,
@@ -95,13 +92,13 @@ class Workspace:
                     stderr_tail=row.stderr_tail,
                     digest=row.digest,
                 )
-                for row in checkout.session.scalars(query)
+                for row in session.scalars(query)
             ]
 
     def planned(self) -> dict[str, str | None]:
         query = select(CommandRow).order_by(CommandRow.command_id)
-        with self.checkouts.begin() as checkout:
-            return {row.command_id: row.task_id for row in checkout.session.scalars(query)}
+        with self.contracts.database.transaction() as session:
+            return {row.command_id: row.task_id for row in session.scalars(query)}
 
     def point_head(self, sha: str) -> None:
         git = self.root.joinpath('.git')
@@ -112,10 +109,12 @@ class Workspace:
 
 @pytest.fixture
 def workspace(
-    checkouts: Checkouts, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    contract_service: ContractService,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> Workspace:
-    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(checkouts.workspace.root))
-    space = Workspace(checkouts=checkouts, capsys=capsys)
+    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(contract_service.workspace.root))
+    space = Workspace(contracts=contract_service, capsys=capsys)
     space.point_head(SHA_A)
     return space
 

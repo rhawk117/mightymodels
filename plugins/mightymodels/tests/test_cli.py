@@ -5,10 +5,9 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import build_parser, main
-from mightymodels_plugin.db.checkout import Checkouts
-from mightymodels_plugin.models.contract import ContractCommand
-from mightymodels_plugin.services import contract
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.schema import ContractCommand
+from mightymodels_plugin.tools.contract.service import ContractService
 from pytest_mock import MockerFixture
 
 SLUG = 'retry-queue'
@@ -60,10 +59,9 @@ class TestCli:
 
 class TestVerifyRun:
     @pytest.fixture
-    def approved_command(self, checkouts: Checkouts) -> None:
+    def approved_command(self, contract_service: ContractService) -> None:
         command = ContractCommand(id='I1', argv=('git', '--version'), approved_by='user')
-        with checkouts.begin() as checkout:
-            contract.approve(checkout, Slug(SLUG), [command])
+        contract_service.approve(Slug(SLUG), [command])
 
     def test_help_shows_its_options(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exit_info:

@@ -1,18 +1,25 @@
-"""The `contract` tool."""
+"""The `contract` tool: each handler checks the call's arguments and asks the contract service.
+
+`ResolvedContracts` is a plain assignment because the SDK does not see a `Resolve` marker behind a
+PEP 695 `type` alias and would put the parameter in the tool's schema.
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Annotated
 
-from mightymodels_plugin.db.checkout import Checkout
-from mightymodels_plugin.models.contract import ContractAction, ContractCommand, ContractView
-from mightymodels_plugin.services import contract as service
+from mcp.server.mcpserver import Context, Resolve
+
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.schema import ContractAction, ContractCommand, ContractView
+from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.protocol import (
-    ActionHandler,
+    ActionTool,
+    LifespanState,
     MissingArgumentsError,
-    ResolvedCheckouts,
-    dispatch_action,
+    ServiceHandler,
+    dispatch_to_service,
 )
 
 
@@ -22,19 +29,26 @@ class ContractCall:
     commands: list[ContractCommand] | None
 
 
-def approve_commands(checkout: Checkout, call: ContractCall) -> ContractView:
+def approve_commands(contracts: ContractService, call: ContractCall) -> ContractView:
     if call.commands is None:
         raise MissingArgumentsError(ContractAction.APPROVE, 'the commands the user approved')
-    return service.approve(checkout, call.slug, call.commands)
+    return contracts.approve(call.slug, call.commands)
 
 
-def report_status(checkout: Checkout, call: ContractCall) -> ContractView:
-    return service.status(checkout, call.slug)
+def report_status(contracts: ContractService, call: ContractCall) -> ContractView:
+    return contracts.status(call.slug)
+
+
+def lifespan_contracts(ctx: Context[LifespanState]) -> ContractService:
+    return ctx.request_context.lifespan_context.contracts
+
+
+ResolvedContracts = Annotated[ContractService, Resolve(lifespan_contracts)]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ContractTool:
-    handlers: Mapping[ContractAction, ActionHandler[ContractCall, ContractView]]
+    handlers: Mapping[ContractAction, ServiceHandler[ContractService, ContractCall, ContractView]]
 
     def contract(
         self,
@@ -42,11 +56,11 @@ class ContractTool:
         slug: Slug,
         commands: list[ContractCommand] | None = None,
         *,
-        checkouts: ResolvedCheckouts,
+        contracts: ResolvedContracts,
     ) -> ContractView:
         """Approve verification commands, or report the latest result per command."""
         call = ContractCall(slug=slug, commands=commands)
-        return dispatch_action(self.handlers, action, call, checkouts=checkouts)
+        return dispatch_to_service(self.handlers, action, call, service=contracts)
 
 
 contract_tool = ContractTool(
@@ -56,4 +70,7 @@ contract_tool = ContractTool(
             ContractAction.STATUS: report_status,
         }
     )
+)
+contract_action_tool: ActionTool[ContractAction, ContractService, ContractCall, ContractView] = (
+    contract_tool
 )

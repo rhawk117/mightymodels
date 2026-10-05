@@ -22,15 +22,8 @@ from sqlalchemy import select
 
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.db.checkout import Checkout
-from mightymodels_plugin.db.tables import (
-    AttemptRow,
-    CommandRow,
-    ReceiptRow,
-    TaskRow,
-    TransitionRow,
-)
+from mightymodels_plugin.db.tables import AttemptRow, TaskRow, TransitionRow
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.contract import Outcome
 from mightymodels_plugin.models.task import (
     PLAN_TASK,
     ArchitectMode,
@@ -42,8 +35,10 @@ from mightymodels_plugin.models.task import (
     TaskVerification,
     TaskView,
 )
-from mightymodels_plugin.services.contract import commands_of, latest_receipts
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.repository import ContractRepository
+from mightymodels_plugin.tools.contract.schema import Outcome
+from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.tools.ticket.repository import TicketRepository
 from mightymodels_plugin.tools.ticket.schema import TicketStatus
 from mightymodels_plugin.tools.ticket.tables import TicketRow
@@ -176,7 +171,7 @@ def records_of(checkout: Checkout, slug: Slug) -> dict[str, TaskRecord]:
     known = {record.id for record in started}
     planned = {
         command.task_id
-        for command in commands_of(checkout, slug)
+        for command in ContractRepository(session=checkout.session).commands(slug)
         if command.task_id is not None and is_plan_task(command.task_id)
     }
     pending = [TaskRecord(id=task_id, status=Status.PENDING) for task_id in planned - known]
@@ -335,14 +330,16 @@ def evidence_for(
 ) -> Evidence:
     planned = is_plan_task(row.task_id)
     commands = [
-        command for command in commands_of(checkout, slug) if command.task_id == row.task_id
+        command
+        for command in ContractRepository(session=checkout.session).commands(slug)
+        if command.task_id == row.task_id
     ]
     return Evidence(
         commit=checkout.workspace.git.resolve_commit(change.commit) or change.commit,
         brief=checkout.workspace.task_brief(slug, task_number(row.task_id)) if planned else None,
         assertions=change.assertions,
         commands=commands,
-        receipts=latest_receipts(checkout, slug),
+        receipts=ContractRepository(session=checkout.session).latest_receipts(slug),
     )
 
 
@@ -431,10 +428,16 @@ def ready(checkout: Checkout, slug: Slug) -> TaskView:
     head = checkout.workspace.git.resolve_head()
     records = tuple(records_of(checkout, slug).values())
     superseded = {record.id for record in records if record.status is Status.SUPERSEDED}
-    live = [command for command in commands_of(checkout, slug) if command.task_id not in superseded]
+    live = [
+        command
+        for command in ContractRepository(session=checkout.session).commands(slug)
+        if command.task_id not in superseded
+    ]
     problems = [
         *readiness_problems(records),
-        *receipt_problems(live, latest_receipts(checkout, slug), head),
+        *receipt_problems(
+            live, ContractRepository(session=checkout.session).latest_receipts(slug), head
+        ),
     ]
     if not problems:
         text = f'ready at {(head or "unknown")[:SHORT_SHA]}\n'

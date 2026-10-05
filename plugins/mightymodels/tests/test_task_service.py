@@ -10,8 +10,6 @@ from mightymodels_plugin.clock import now
 from mightymodels_plugin.db.checkout import Checkout, Checkouts
 from mightymodels_plugin.db.tables import TransitionRow
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.contract import ContractCommand, Phase
-from mightymodels_plugin.models.contract import Outcome as ReceiptOutcome
 from mightymodels_plugin.models.task import (
     TaskMark,
     TaskRecord,
@@ -19,8 +17,12 @@ from mightymodels_plugin.models.task import (
     TaskVerification,
     TaskView,
 )
-from mightymodels_plugin.services import contract, task
+from mightymodels_plugin.services import task
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.repository import contract_transaction
+from mightymodels_plugin.tools.contract.schema import ContractCommand, Phase, Receipt
+from mightymodels_plugin.tools.contract.schema import Outcome as ReceiptOutcome
+from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tables import TicketRow
@@ -75,6 +77,7 @@ def act(
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Repo:
     checkouts: Checkouts
+    contracts: ContractService
     runner: GitRunner
 
     @property
@@ -118,11 +121,10 @@ class Repo:
             ContractCommand(id=command_id, argv=('true',), approved_by='user')
             for command_id in command_ids
         ]
-        with self.checkouts.begin() as checkout:
-            contract.approve(checkout, TICKET, commands)
+        self.contracts.approve(TICKET, commands)
 
     def receipt(self, command_id: str, outcome: str, head: str) -> None:
-        entry = contract.Receipt(
+        entry = Receipt(
             id=command_id,
             argv=('true',),
             outcome=ReceiptOutcome(outcome),
@@ -135,8 +137,8 @@ class Repo:
             phase=Phase.TASK,
             at=now(),
         )
-        with self.checkouts.begin() as checkout:
-            contract.record(checkout, TICKET, [entry])
+        with contract_transaction(self.contracts.database) as repository:
+            repository.record(TICKET, [entry])
         if command_id.startswith('T'):
             task_id = command_id.split('.', 1)[0]
             self.done(task_id, head)
@@ -149,8 +151,13 @@ class Repo:
 
 
 @pytest.fixture
-def repo(checkouts: Checkouts, ticket_service: TicketService, git: GitRunner) -> Repo:
-    space = Repo(checkouts=checkouts, runner=git)
+def repo(
+    checkouts: Checkouts,
+    ticket_service: TicketService,
+    contract_service: ContractService,
+    git: GitRunner,
+) -> Repo:
+    space = Repo(checkouts=checkouts, contracts=contract_service, runner=git)
     space.commit('src/queue.py', 'base\n')
     ticket_service.write(TICKET, ANSWERS)
     ticket_service.validate(TICKET)
@@ -525,10 +532,16 @@ class TestEscalationLadder:
 
 class TestVerify:
     @pytest.fixture
-    def unborn(self, checkouts: Checkouts, ticket_service: TicketService, git: GitRunner) -> Repo:
+    def unborn(
+        self,
+        checkouts: Checkouts,
+        ticket_service: TicketService,
+        contract_service: ContractService,
+        git: GitRunner,
+    ) -> Repo:
         ticket_service.write(TICKET, ANSWERS)
         ticket_service.validate(TICKET)
-        return Repo(checkouts=checkouts, runner=git)
+        return Repo(checkouts=checkouts, contracts=contract_service, runner=git)
 
     def test_a_task_that_never_started_cannot_be_verified(self, repo: Repo) -> None:
         outcome = repo.run('verify', 'T1', commit=repo.git('rev-parse', 'HEAD'))

@@ -18,6 +18,7 @@ from pathlib import Path
 from mcp.server import MCPServer
 
 from mightymodels_plugin.database import Database, open_database
+from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.contract.tool import contract_tool
 from mightymodels_plugin.tools.review.tool import review_tool
 from mightymodels_plugin.tools.task.tool import task_tool
@@ -34,6 +35,7 @@ class AppState:
     workspace: Workspace
     database: Database
     tickets: TicketService
+    contracts: ContractService
 
 
 def build_server(root: Path) -> MCPServer[AppState]:
@@ -46,6 +48,7 @@ def build_server(root: Path) -> MCPServer[AppState]:
                 workspace=workspace,
                 database=database,
                 tickets=TicketService(workspace=workspace, database=database),
+                contracts=ContractService(workspace=workspace, database=database),
             )
 
     server = MCPServer(SERVER_NAME, lifespan=lifespan)

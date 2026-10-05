@@ -1,4 +1,7 @@
+import inspect
 import json
+from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
@@ -6,6 +9,7 @@ from mcp.types import CallToolResult
 from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.db.tests.support import ActivityKind, DatabaseActivity
 from mightymodels_plugin.server import SERVER_NAME, TOOLS, AppState
+from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
 from mightymodels_plugin.tools.ticket.service import TicketService
@@ -24,6 +28,10 @@ START = {'by': 'engineer', 'owned': ['src/queue.py']}
 
 def ticket_results(server: StateServer, *calls: ToolCall) -> list[CallToolResult]:
     return server.call(*((name, {'slug': SLUG, **arguments}) for name, arguments in calls))
+
+
+def served_actions(registered: Callable[..., object]) -> type[StrEnum]:
+    return inspect.signature(registered).parameters['action'].annotation
 
 
 class TestStateServer:
@@ -97,9 +105,17 @@ class TestToolSchemas:
 
 class TestToolProtocol:
     @pytest.fixture
-    def app_state(self, checkouts: Checkouts, ticket_service: TicketService) -> AppState:
+    def app_state(
+        self,
+        checkouts: Checkouts,
+        ticket_service: TicketService,
+        contract_service: ContractService,
+    ) -> AppState:
         return AppState(
-            workspace=checkouts.workspace, database=checkouts.database, tickets=ticket_service
+            workspace=checkouts.workspace,
+            database=checkouts.database,
+            tickets=ticket_service,
+            contracts=contract_service,
         )
 
     @pytest.mark.parametrize(
@@ -107,6 +123,15 @@ class TestToolProtocol:
     )
     def test_each_registered_tool_satisfies_the_action_tool_protocol(self, tool: object) -> None:
         assert isinstance(tool, ActionTool)
+
+    @pytest.mark.parametrize(
+        ('tool', 'actions'),
+        [pytest.param(tool.__self__, served_actions(tool), id=tool.__name__) for tool in TOOLS],
+    )
+    def test_each_tool_handlers_cover_its_whole_action_enum(
+        self, tool: ActionTool[StrEnum, object, object, object], actions: type[StrEnum]
+    ) -> None:
+        assert set(tool.handlers) == set(actions)
 
     def test_the_lifespan_state_satisfies_what_the_tools_resolve(self, app_state: AppState) -> None:
         assert isinstance(app_state, LifespanState)

@@ -19,8 +19,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from mightymodels_plugin.db.tables import (
     AttemptRow,
-    CommandRow,
-    ReceiptRow,
     ReviewDispositionRow,
     ReviewFindingRow,
     ReviewOutcomeRow,
@@ -29,6 +27,7 @@ from mightymodels_plugin.db.tables import (
     TransitionRow,
 )
 from mightymodels_plugin.declarative import Base
+from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 
 ROW_TYPES: tuple[type[Base], ...] = (

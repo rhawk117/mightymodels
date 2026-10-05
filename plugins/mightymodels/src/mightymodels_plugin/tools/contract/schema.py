@@ -1,5 +1,10 @@
-"""Arguments and results of the `contract` tool, and the receipt `verify run` records."""
+"""Arguments and results of the `contract` tool, and what `verify run` executes and records.
 
+`ApprovedCommand` is a command as the contract holds it, the only thing `verify run` executes, and
+`Receipt` is the record of one run of it.
+"""
+
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated
 
@@ -70,3 +75,26 @@ class ContractView(BaseModel):
     text: str
     passing: bool
     commands: tuple[CommandState, ...] = ()
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ApprovedCommand:
+    id: str
+    argv: tuple[str, ...]
+    expect_exit: int
+    timeout: int
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Receipt:
+    id: str
+    argv: tuple[str, ...]
+    outcome: Outcome
+    exit: int | None
+    duration_ms: int
+    stdout_tail: str
+    stderr_tail: str
+    digest: str
+    head: str | None
+    phase: Phase
+    at: str

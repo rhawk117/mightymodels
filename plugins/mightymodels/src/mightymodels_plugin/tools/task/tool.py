@@ -18,6 +18,7 @@ from mightymodels_plugin.services import task as service
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.protocol import (
     ActionHandler,
+    ActionTool,
     MissingArgumentsError,
     ResolvedCheckouts,
     dispatch_action,
@@ -86,3 +87,4 @@ task_tool = TaskTool(
         }
     )
 )
+task_action_tool: ActionTool[TaskAction, Checkout, TaskCall, TaskView] = task_tool

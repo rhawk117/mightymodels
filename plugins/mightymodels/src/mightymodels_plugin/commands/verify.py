@@ -2,7 +2,8 @@
 
 The command is its own edge: it builds its workspace, refuses before it opens anything when git
 or the repository is missing, because every receipt records the HEAD it ran at, opens the
-database once for the run and disposes its engine before it returns. It loads no MCP module.
+database once for the run, builds the contract service over the two as the server's lifespan
+does, and disposes the engine before it returns. It loads no MCP module.
 """
 
 import argparse
@@ -11,11 +12,10 @@ import sys
 from pathlib import Path
 
 from mightymodels_plugin.database import open_database
-from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.models.contract import Phase
-from mightymodels_plugin.services.verify import RunRequest, run_approved
 from mightymodels_plugin.slug import InvalidSlugError, parsed_slug
+from mightymodels_plugin.tools.contract.schema import Phase
+from mightymodels_plugin.tools.contract.service import ContractService, RunRequest
 from mightymodels_plugin.workspace import find_root, workspace_at
 
 EXIT_FAILED = 1
@@ -40,7 +40,8 @@ def verify_run(arguments: argparse.Namespace) -> int:
     workspace.exclude_state_from_git()
     try:
         with open_database(workspace.database_file()) as database:
-            result = run_approved(Checkouts(workspace=workspace, database=database), slug, request)
+            contracts = ContractService(workspace=workspace, database=database)
+            result = contracts.run_approved(slug, request)
     except StateError as error:
         return rejected(error)
     sys.stdout.write(result.text)
