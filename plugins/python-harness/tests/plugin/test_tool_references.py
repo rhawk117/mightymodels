@@ -24,6 +24,13 @@ SKILL_TOOLS = [
     'map_python_calls',
     'plan_review_surface',
 ]
+SKILL_BASH = [
+    'Bash(python-harness *)',
+    'Bash(git rev-parse HEAD)',
+    'Bash(git symbolic-ref --short refs/remotes/origin/HEAD)',
+    'Bash(git fetch origin *)',
+    'Bash(gh pr view *)',
+]
 
 
 def referenced_tools() -> set[str]:
@@ -66,7 +73,4 @@ class TestFrontmatter:
         )
         bash = [entry for entry in entries if entry.startswith('Bash(')]
 
-        assert (allowed, bash[:2]) == (
-            SKILL_TOOLS,
-            ['Bash(python-harness *)', 'Bash(*/bin/python-harness *)'],
-        )
+        assert (allowed, bash) == (SKILL_TOOLS, SKILL_BASH)

@@ -12,10 +12,9 @@ allowed-tools:
   - mcp__plugin_python-harness_python-harness__collect_python_facts
   - mcp__plugin_python-harness_python-harness__map_python_calls
   - Bash(python-harness *)
-  - Bash(*/bin/python-harness *)
-  - Bash(git rev-parse *)
-  - Bash(git symbolic-ref *)
-  - Bash(git fetch *)
+  - Bash(git rev-parse HEAD)
+  - Bash(git symbolic-ref --short refs/remotes/origin/HEAD)
+  - Bash(git fetch origin *)
   - Bash(gh pr view *)
 ---
 
@@ -25,7 +24,7 @@ You review Python code against Ryan's engineering guide and his design philosoph
 
 ## Before starting
 
-- Run the CLI as `python-harness`: this plugin's `bin/` is on the Bash tool's `PATH`. Plugin directories come after the user's own `PATH` entries, so if `command -v python-harness` is not `${CLAUDE_PLUGIN_ROOT}/bin/python-harness`, call that absolute path instead. It is a launcher that runs the plugin's CLI through `uv tool run` with pinned dependencies, without touching the reviewed project's environment. If `uv` is not on `PATH`, or the platform is native Windows (the launcher needs a POSIX system), stop and say so; there is no fallback.
+- Run the CLI as `python-harness`: this plugin's `bin/` is on the Bash tool's `PATH`. Plugin directories come after the user's own `PATH` entries, so if `command -v python-harness` is not `${CLAUDE_PLUGIN_ROOT}/bin/python-harness`, call that absolute path instead. The absolute-path call is not pre-approved, so Claude Code asks the user before running it. `python-harness` is a launcher that runs the plugin's CLI through `uv tool run` with pinned dependencies, without touching the reviewed project's environment. If `uv` is not on `PATH`, or the platform is native Windows (the launcher needs a POSIX system), stop and say so; there is no fallback.
 - The CLI has two commands, `inspect survey` and `inspect gate`. The other four tools are on this plugin's MCP server, `python-harness`: `plan_review_surface`, `check_citations`, `collect_python_facts` and `map_python_calls`. Claude Code names each one `mcp__plugin_python-harness_python-harness__<tool>`; the steps below use the short names. Each returns one JSON document as its result. If these tools are not available, stop: the server did not start, and there is no CLI fallback. Tell the user to check the plugin in `/plugin` (its Errors tab) and the server in `/mcp`.
 - Paths below that start with `references/` or `assets/` are inside this skill's directory, `${CLAUDE_SKILL_DIR}`.
 - The reviewed project's root is the directory holding its `pyproject.toml`, and it has to be the session's project directory (`CLAUDE_PROJECT_DIR`, where Claude Code was started): the MCP tools read that directory, take paths relative to it, refuse paths outside it and accept no other root. Run `survey` and `gate` from it too. When the user points at a sub-project, stop and ask them to start Claude Code inside it; from the parent directory the tools would resolve the sub-project's imports against the wrong root.
