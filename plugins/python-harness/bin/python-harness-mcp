@@ -1,0 +1,23 @@
+"""Run the python-harness MCP server from the plugin directory this file lives in.
+
+`.mcp.json` starts this file with `uv tool run`, not `uv run`, and carries the pins there because
+they do not fit the 127 bytes of a shebang line. `uv tool run` builds an isolated environment from
+those pins alone, where `uv run` would adopt the `.venv`, `pyproject.toml` and `uv.toml` of the
+caller's working directory. The launch names this file by path, so Python puts `bin/` first on
+`sys.path`; `python -m` and `python -c` would put the working directory there, and a hostile
+project could then shadow `python_harness` or `mcp`.
+"""
+
+import importlib
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    plugin_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(plugin_root.joinpath('src')))
+    return importlib.import_module('python_harness.server').main()
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

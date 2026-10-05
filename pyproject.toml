@@ -18,6 +18,7 @@ check = [
     "pre-commit>=4.6.2",
     "ruff>=0.16.9",
     "ty>=0.0.84",
+    "types-cachetools>=7.0.0.20260713",
 ]
 test = [
     "hypothesis>=6.168.3",
@@ -26,6 +27,7 @@ test = [
     "pytest-mock>=3.16.0",
     "pytest-randomly>=5.0.0",
     "pytest-xdist>=3.8.0",
+    "python-harness-plugin[mcp]",
 ]
 dev = [{ include-group = "check" }, { include-group = "test" }]
 
@@ -38,3 +40,6 @@ members = [
     "plugins/vibe-code",
     "plugins/python-harness",
 ]
+
+[tool.uv.sources]
+python-harness-plugin = { workspace = true }

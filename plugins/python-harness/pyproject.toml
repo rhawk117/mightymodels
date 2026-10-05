@@ -13,6 +13,20 @@ dependencies = [
 [project.scripts]
 python-harness = "python_harness.cli:main"
 
+[project.optional-dependencies]
+mcp = [
+    "anyio>=4.15.1",
+    "beautifulsoup4>=4.15.0",
+    "cachetools>=7.2.0",
+    "httpx>=0.28.1",
+    "markdownify>=1.2.3",
+    "mcp>=2.3.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "rapidfuzz>=3.14.6",
+    "sphobjinv>=2.4",
+]
+
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12.0"]
 build-backend = "uv_build"

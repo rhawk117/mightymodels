@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "python-harness": {
+      "command": "uv",
+      "args": [
+        "tool",
+        "run",
+        "--python",
+        ">=3.14",
+        "--exclude-newer",
+        "2026-10-04",
+        "--with",
+        "tree-sitter==0.26.0",
+        "--with",
+        "tree-sitter-bash==0.25.1",
+        "--with",
+        "anyio==4.15.1",
+        "--with",
+        "beautifulsoup4==4.15.0",
+        "--with",
+        "cachetools==7.2.0",
+        "--with",
+        "httpx==0.28.1",
+        "--with",
+        "markdownify==1.2.3",
+        "--with",
+        "mcp==2.3.0",
+        "--with",
+        "pydantic==2.13.5",
+        "--with",
+        "pydantic-settings==2.15.0",
+        "--with",
+        "rapidfuzz==3.14.6",
+        "--with",
+        "sphobjinv==2.4",
+        "python",
+        "${CLAUDE_PLUGIN_ROOT}/bin/python-harness-mcp"
+      ]
+    }
+  }
+}
