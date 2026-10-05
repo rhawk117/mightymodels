@@ -76,6 +76,26 @@ def act(
     return service(tasks, TICKET, task_id, model.model_validate(change))
 
 
+def record_receipt(
+    contracts: ContractService, command_id: str, outcome: str, head: str | None
+) -> None:
+    entry = Receipt(
+        id=command_id,
+        argv=('true',),
+        outcome=ReceiptOutcome(outcome),
+        exit=0,
+        duration_ms=0,
+        stdout_tail='',
+        stderr_tail='',
+        digest='',
+        head=head,
+        phase=Phase.TASK,
+        at=now(),
+    )
+    with contract_transaction(contracts.database) as repository:
+        repository.record(TICKET, [entry])
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Repo:
     tasks: TaskService
@@ -125,21 +145,7 @@ class Repo:
         self.contracts.approve(TICKET, commands)
 
     def receipt(self, command_id: str, outcome: str, head: str) -> None:
-        entry = Receipt(
-            id=command_id,
-            argv=('true',),
-            outcome=ReceiptOutcome(outcome),
-            exit=0,
-            duration_ms=0,
-            stdout_tail='',
-            stderr_tail='',
-            digest='',
-            head=head,
-            phase=Phase.TASK,
-            at=now(),
-        )
-        with contract_transaction(self.contracts.database) as repository:
-            repository.record(TICKET, [entry])
+        record_receipt(self.contracts, command_id, outcome, head)
         if command_id.startswith('T'):
             task_id = command_id.split('.', 1)[0]
             self.done(task_id, head)
@@ -163,6 +169,18 @@ def repo(
     ticket_service.write(TICKET, ANSWERS)
     ticket_service.validate(TICKET)
     return space
+
+
+@pytest.fixture
+def unborn(
+    task_service: TaskService,
+    ticket_service: TicketService,
+    contract_service: ContractService,
+    git: GitRunner,
+) -> Repo:
+    ticket_service.write(TICKET, ANSWERS)
+    ticket_service.validate(TICKET)
+    return Repo(tasks=task_service, contracts=contract_service, runner=git)
 
 
 def start(repo: Repo, worker: str = 'engineer') -> Outcome:
@@ -532,18 +550,6 @@ class TestEscalationLadder:
 
 
 class TestVerify:
-    @pytest.fixture
-    def unborn(
-        self,
-        task_service: TaskService,
-        ticket_service: TicketService,
-        contract_service: ContractService,
-        git: GitRunner,
-    ) -> Repo:
-        ticket_service.write(TICKET, ANSWERS)
-        ticket_service.validate(TICKET)
-        return Repo(tasks=task_service, contracts=contract_service, runner=git)
-
     def test_a_task_that_never_started_cannot_be_verified(self, repo: Repo) -> None:
         outcome = repo.run('verify', 'T1', commit=repo.git('rev-parse', 'HEAD'))
 
@@ -558,6 +564,26 @@ class TestVerify:
 
         assert outcome.code == BLOCKED
         assert outcome.out == 'T1 blocked\n  - the task has no valid base commit\n'
+
+
+class TestReadyBeforeTheFirstCommit:
+    @pytest.fixture
+    def unborn_with_a_passing_receipt(self, unborn: Repo, taken_at: str | None) -> Repo:
+        unborn.approve('T1.AC-1')
+        record_receipt(unborn.contracts, 'T1.AC-1', 'pass', taken_at)
+        return unborn
+
+    @pytest.mark.parametrize(
+        'taken_at',
+        [pytest.param(None, id='at-no-head'), pytest.param('a' * 40, id='at-a-commit')],
+    )
+    def test_no_receipt_is_at_the_current_head_while_there_is_no_head(
+        self, unborn_with_a_passing_receipt: Repo
+    ) -> None:
+        outcome = unborn_with_a_passing_receipt.run('ready')
+
+        assert outcome.code == BLOCKED
+        assert '  - T1.AC-1 has no receipt at the current HEAD' in outcome.out.splitlines()
 
 
 def ticket_status(repo: Repo) -> str:

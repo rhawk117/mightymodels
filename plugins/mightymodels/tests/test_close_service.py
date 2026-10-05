@@ -384,6 +384,56 @@ class TestTheTicketBranch:
         assert view.blockers == ('branch feature has 1 commits on no remote',)
 
 
+class TestABranchGitHasNoAnswerFor:
+    @pytest.fixture
+    def ticket_branch(self) -> str:
+        return CHECKED_OUT
+
+    @pytest.fixture
+    def repo_with_the_branch_deleted(self, repo: Repo) -> Repo:
+        repo.git('checkout', '-q', '-b', 'elsewhere')
+        repo.git('branch', '-q', '-D', CHECKED_OUT)
+        return repo
+
+    @pytest.fixture
+    def repo_with_a_lost_parent_commit(self, repo: Repo) -> Repo:
+        parent = repo.git('rev-parse', 'HEAD')
+        repo.git('commit', '-q', '--allow-empty', '-m', 'second')
+        repo.root.joinpath('.git', 'objects', parent[:2], parent[2:]).unlink()
+        return repo
+
+    @pytest.fixture
+    def repo_with_an_unreadable_index(self, repo: Repo) -> Repo:
+        repo.root.joinpath('.git', 'index').write_bytes(b'not an index')
+        return repo
+
+    def test_a_branch_that_is_no_longer_in_the_repository_does_not_block(
+        self, repo_with_the_branch_deleted: Repo
+    ) -> None:
+        view = repo_with_the_branch_deleted.closings.check(TICKET)
+
+        assert (view.blocked, view.blockers) == (False, ())
+
+    def test_a_branch_whose_unpushed_commits_git_cannot_count_blocks(
+        self, repo_with_a_lost_parent_commit: Repo
+    ) -> None:
+        view = repo_with_a_lost_parent_commit.closings.check(TICKET)
+
+        assert view.blockers == (
+            'branch feature could not be checked: git could not count its commits on no remote',
+        )
+
+    def test_a_checked_out_branch_whose_status_git_cannot_read_blocks(
+        self, repo_with_an_unreadable_index: Repo
+    ) -> None:
+        view = repo_with_an_unreadable_index.closings.check(TICKET)
+
+        assert view.blockers == (
+            'branch feature has 1 commits on no remote',
+            'branch feature could not be checked: git could not read the working-tree status',
+        )
+
+
 class TestWhenGitIsMissing:
     @pytest.fixture
     def ticket_branch(self) -> str:
@@ -422,6 +472,27 @@ class TestABranchNameGitCannotTake:
         view = repo.closings.check(TICKET)
 
         assert (view.blocked, view.text) == (False, f'{SLUG} has no live work\n')
+
+
+class TestALegalBranchNameOutsideTheRevisionPattern:
+    BRANCH = 'feat/a+b'
+    UNCHECKED = f"branch {BRANCH} could not be checked: '{BRANCH}' is not a plain revision name"
+
+    @pytest.fixture
+    def ticket_branch(self) -> str:
+        return self.BRANCH
+
+    @pytest.fixture
+    def repo_with_the_branch_unpushed(self, repo: Repo) -> Repo:
+        repo.git('branch', self.BRANCH)
+        return repo
+
+    def test_a_branch_whose_name_cannot_be_asked_about_blocks_and_is_named(
+        self, repo_with_the_branch_unpushed: Repo
+    ) -> None:
+        view = repo_with_the_branch_unpushed.closings.check(TICKET)
+
+        assert (view.blocked, view.blockers) == (True, (self.UNCHECKED,))
 
 
 class TestClose:

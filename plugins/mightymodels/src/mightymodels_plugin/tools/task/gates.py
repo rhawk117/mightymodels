@@ -4,7 +4,8 @@ A task is proven only when the reported commit is the current HEAD and descends 
 base, every contract command for it passed at that HEAD, its DONE brief names the commit, every
 other acceptance criterion carries a citation, and the commit touched only the files the task
 owns. A ticket is ready only when a plan task has been started, every plan task is closed, no
-fix is stuck and every live contract command passed at HEAD.
+fix is stuck and every live contract command passed at HEAD. With no HEAD to compare against, no
+receipt counts as taken at it.
 
 Each function returns its problems as the lines the caller shows, and an empty list is a pass.
 They read git, the brief file and rows the caller already holds, and never the database.
@@ -61,7 +62,7 @@ def brief_problems(git: Git, evidence: Evidence) -> list[str]:
 
 
 def receipt_problem(command_id: str, receipt: ReceiptRow | None, head: str | None) -> str | None:
-    if receipt is None or receipt.head != head:
+    if receipt is None or head is None or receipt.head != head:
         return f'{command_id} has no receipt at the current HEAD'
     if receipt.outcome != Outcome.PASSED:
         return f'{command_id} {receipt.outcome} at HEAD'

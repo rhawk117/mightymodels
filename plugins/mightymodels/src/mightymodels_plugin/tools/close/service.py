@@ -11,7 +11,9 @@ one transaction, and the archive goes back as text with its paths: the service w
 and the agent writes both.
 
 Git is optional. With no git binary, or outside a repository, the branch is not asked about and
-the text says git was not consulted.
+the text says git was not consulted. Inside a repository a branch that is not there has nothing to
+strand, and one git cannot be asked about, for its name or for a read that failed, is a blocker
+that says so.
 
 Everything above the class reads no service state.
 """
@@ -123,24 +125,32 @@ def review_blockers(review: LatestReview | None) -> list[str]:
     ]
 
 
-def has_uncommitted_changes(git: Git, branch: str) -> bool:
+def unchecked(branch: str, reason: str) -> str:
+    return f'branch {branch} could not be checked: {reason}'
+
+
+def unpushed_blockers(git: Git, branch: str) -> list[str]:
+    unpushed = git.commits_on_no_remote(branch)
+    if unpushed is None:
+        return [unchecked(branch, 'git could not count its commits on no remote')]
+    return [f'branch {branch} has {unpushed} commits on no remote'] if unpushed > 0 else []
+
+
+def uncommitted_blockers(git: Git, branch: str) -> list[str]:
     if git.current_branch() != branch:
-        return False
+        return []
     dirty = git.dirty_paths(untracked=UntrackedFiles.NO)
-    return dirty is not None and len(dirty) > 0
+    if dirty is None:
+        return [unchecked(branch, 'git could not read the working-tree status')]
+    return [f'branch {branch} is checked out with uncommitted changes'] if len(dirty) > 0 else []
 
 
 def branch_blockers(git: Git, branch: str) -> list[str]:
-    if revision_error(branch) is not None:
+    if (error := revision_error(branch)) is not None:
+        return [unchecked(branch, str(error))]
+    if git.resolve_commit(f'refs/heads/{branch}') is None:
         return []
-    unpushed = git.commits_on_no_remote(branch)
-    if unpushed is None:
-        return []
-    uncommitted = has_uncommitted_changes(git, branch)
-    return [
-        *([f'branch {branch} has {unpushed} commits on no remote'] if unpushed > 0 else []),
-        *([f'branch {branch} is checked out with uncommitted changes'] if uncommitted else []),
-    ]
+    return [*unpushed_blockers(git, branch), *uncommitted_blockers(git, branch)]
 
 
 def git_note(refusal: GitRefusal | None) -> str:
