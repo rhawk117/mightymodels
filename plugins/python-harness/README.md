@@ -32,7 +32,7 @@ claude --plugin-dir plugins/python-harness
 
 Start Claude Code in the root of the Python project you want to work on: the server's four project tools read that directory and no other. Hooks and agents are read when a session starts, so start a new session after changing them.
 
-- Claude Code puts the plugin's `bin/` on the Bash tool's `PATH`, after your own entries, so the model can run `python-harness` as a bare command. claude.ai and Cowork refuse to install a plugin that has a top-level `bin/` directory, so this plugin is for Claude Code only.
+- Claude Code puts the plugin's `bin/` on the Bash tool's `PATH`, after your own entries, so the model can run `python-harness` as a bare command. This plugin is built and tested for Claude Code only.
 - Plugin agents cannot be hidden, so `python-harness:pylens` appears in `@` completion. Its description tells Claude not to delegate other work to it.
 - pylens runs on Haiku. If many of its citations fail `check_citations`, set `model: sonnet` in `agents/pylens.md`.
 
