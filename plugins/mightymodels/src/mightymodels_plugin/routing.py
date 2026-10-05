@@ -18,6 +18,12 @@ class Scope(StrEnum):
     LARGE = auto()
 
 
+class Depth(StrEnum):
+    QUICK = auto()
+    STANDARD = auto()
+    DEEP = auto()
+
+
 class Worker(StrEnum):
     CODE_SCOUT = 'code-scout'
     WEB_SCOUT = 'web-scout'
@@ -56,3 +62,16 @@ ROUTING: Mapping[Worker, ScopeRouting] = MappingProxyType(
 
 def models_at(scope: Scope) -> dict[Worker, Model]:
     return {worker: by_scope[scope] for worker, by_scope in ROUTING.items()}
+
+
+DEPTH_MODELS: Mapping[Depth, Model] = MappingProxyType(
+    {Depth.QUICK: Model.HAIKU, Depth.STANDARD: Model.SONNET}
+)
+DEFAULT_SCOPE = Scope.MED
+
+
+def reviewer_model(worker: Worker, depth: Depth, ticket_models: Mapping[str, str | None]) -> str:
+    fixed = DEPTH_MODELS.get(depth)
+    if fixed is not None:
+        return fixed.value
+    return ticket_models.get(worker.value) or ROUTING[worker][DEFAULT_SCOPE].value

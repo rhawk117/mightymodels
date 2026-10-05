@@ -1,5 +1,16 @@
+from collections.abc import Mapping
+from types import MappingProxyType
+
 import pytest
-from mightymodels_plugin.routing import ROUTING, Model, Scope, Worker, models_at
+from mightymodels_plugin.routing import (
+    ROUTING,
+    Depth,
+    Model,
+    Scope,
+    Worker,
+    models_at,
+    reviewer_model,
+)
 
 
 class TestRoutingTable:
@@ -42,3 +53,41 @@ class TestRoutingTable:
         assert models_at(Scope.LARGE) == {
             worker: by_scope[Scope.LARGE] for worker, by_scope in ROUTING.items()
         }
+
+
+PINNED: Mapping[str, str | None] = MappingProxyType(
+    {'merge-vader-reviewer': 'sonnet', 'uncle-bob-reviewer': None}
+)
+
+
+class TestReviewerModels:
+    @pytest.mark.parametrize('worker', [Worker.MERGE_VADER_REVIEWER, Worker.UNCLE_BOB_REVIEWER])
+    @pytest.mark.parametrize(
+        ('depth', 'model'),
+        [
+            pytest.param(Depth.QUICK, 'haiku', id='quick'),
+            pytest.param(Depth.STANDARD, 'sonnet', id='standard'),
+        ],
+    )
+    def test_reviewer_models_quick_and_standard_ignore_the_ticket(
+        self, worker: Worker, depth: Depth, model: str
+    ) -> None:
+        assert reviewer_model(worker, depth, PINNED) == model
+
+    def test_reviewer_models_deep_take_the_ticket_rows_choice(self) -> None:
+        assert reviewer_model(Worker.MERGE_VADER_REVIEWER, Depth.DEEP, PINNED) == 'sonnet'
+
+    @pytest.mark.parametrize(
+        ('worker', 'model'),
+        [
+            pytest.param(Worker.MERGE_VADER_REVIEWER, 'opus', id='merge-vader'),
+            pytest.param(Worker.UNCLE_BOB_REVIEWER, 'sonnet', id='uncle-bob'),
+        ],
+    )
+    def test_reviewer_models_deep_fall_back_to_the_routing_table(
+        self, worker: Worker, model: str
+    ) -> None:
+        assert reviewer_model(worker, Depth.DEEP, {}) == model
+
+    def test_reviewer_models_deep_fall_back_when_the_ticket_leaves_a_reviewer_unset(self) -> None:
+        assert reviewer_model(Worker.UNCLE_BOB_REVIEWER, Depth.DEEP, PINNED) == 'sonnet'

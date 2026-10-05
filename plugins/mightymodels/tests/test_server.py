@@ -45,23 +45,41 @@ class TestStateServer:
         assert asyncio.run(read_server_name()) == SERVER_NAME == 'state'
 
     def test_lists_its_tools_through_the_in_memory_client(self) -> None:
-        assert sorted(asyncio.run(list_tools())) == ['contract', 'task', 'ticket']
+        assert sorted(asyncio.run(list_tools())) == ['contract', 'review', 'task', 'ticket']
 
     @pytest.mark.parametrize(
-        ('name', 'arguments'),
+        ('name', 'arguments', 'required'),
         [
-            pytest.param('ticket', ['action', 'slug', 'fields'], id='ticket'),
-            pytest.param('task', ['action', 'slug', 'task_id', 'change'], id='task'),
-            pytest.param('contract', ['action', 'slug', 'commands'], id='contract'),
+            pytest.param('ticket', ['action', 'slug', 'fields'], ['action', 'slug'], id='ticket'),
+            pytest.param(
+                'task', ['action', 'slug', 'task_id', 'change'], ['action', 'slug'], id='task'
+            ),
+            pytest.param(
+                'contract', ['action', 'slug', 'commands'], ['action', 'slug'], id='contract'
+            ),
+            pytest.param('review', ['action', 'run_id', 'payload'], ['action'], id='review'),
         ],
     )
     def test_each_tool_takes_the_arguments_the_surface_gives_it(
-        self, name: str, arguments: list[str]
+        self, name: str, arguments: list[str], required: list[str]
     ) -> None:
         schema = asyncio.run(list_tools())[name].input_schema
 
         assert list(schema['properties']) == arguments
-        assert schema['required'] == ['action', 'slug']
+        assert schema['required'] == required
+
+    def test_review_offers_the_seven_actions(self) -> None:
+        schema = asyncio.run(list_tools())['review'].input_schema
+
+        assert schema['$defs']['ReviewAction']['enum'] == [
+            'start',
+            'add',
+            'gate',
+            'dispose',
+            'resolve',
+            'report',
+            'list',
+        ]
 
     def test_each_tool_is_described_by_its_docstring(self) -> None:
         listed = asyncio.run(list_tools())

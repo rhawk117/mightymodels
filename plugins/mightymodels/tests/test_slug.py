@@ -11,6 +11,8 @@ from mcp import Client
 from mcp.types import CallToolResult
 from mightymodels_plugin.cli import main
 from mightymodels_plugin.db.checkout import open_checkout
+from mightymodels_plugin.db.tables import ReviewFindingRow
+from mightymodels_plugin.models.review import StartPayload
 from mightymodels_plugin.models.slug import (
     SLUG_LIMIT,
     SLUG_PATTERN,
@@ -24,6 +26,7 @@ from mightymodels_plugin.services import ticket
 from mightymodels_plugin.services.layout import investigation_ledger, task_brief, ticket_file
 from pydantic import ValidationError
 from pytest_mock import MockerFixture
+from sqlalchemy import select
 
 type GitRunner = Callable[..., str]
 
@@ -54,6 +57,28 @@ HOSTILE = [
     pytest.param('retry queue', id='space'),
     pytest.param('x' * (SLUG_LIMIT + 1), id='too-long'),
 ]
+HOSTILE_RUN_IDS = [
+    pytest.param('../../etc', id='parents'),
+    pytest.param('..', id='dot-dot'),
+    pytest.param('20260101-000000/../x', id='trailing-parent'),
+    pytest.param('20260101-000000\n', id='trailing-newline'),
+    pytest.param('/etc', id='absolute'),
+    pytest.param('', id='empty'),
+]
+RUN_CALLS = [
+    pytest.param({'action': 'add', 'payload': {'persona': 'merge-vader'}}, id='add'),
+    pytest.param({'action': 'gate'}, id='gate'),
+    pytest.param(
+        {'action': 'dispose', 'payload': {'by': 'user', 'decisions': {'F1': {'decision': 'fix'}}}},
+        id='dispose',
+    ),
+    pytest.param(
+        {'action': 'resolve', 'payload': {'finding': 'F1', 'result': 'failed', 'reason': 'r'}},
+        id='resolve',
+    ),
+    pytest.param({'action': 'report'}, id='report'),
+]
+START_PAYLOAD = {'scope': 'codebase', 'depth': 'deep', 'emphasis': 'balanced'}
 TOOL_CALLS = (
     ('ticket-write', 'ticket', {'action': 'write', 'fields': ANSWERS}),
     ('ticket-validate', 'ticket', {'action': 'validate'}),
@@ -75,6 +100,18 @@ TOOL_CALLS = (
     ('contract-status', 'contract', {'action': 'status'}),
 )
 CALLS = [pytest.param(name, arguments, id=label) for label, name, arguments in TOOL_CALLS]
+
+
+LEAKING_REPORT = """## Findings
+
+### High
+
+#### UB-1 | [G5] Hardcoded password=hunter22 in the store \u2014 `src/store.py:4`
+
+- Evidence (convention): ruff.toml S105; src/a.py:1, src/b.py:2
+- Fix: Read the secret from the environment instead of ghp_abcdefghijklmnopqrstuvwxyzABCDEF123456.
+- Verify: `rg -n 'password' src/store.py`
+"""
 
 
 def tree(top: Path) -> dict[str, bytes]:
@@ -121,12 +158,23 @@ class TestSlugType:
         )
 
     def test_slug_confinement_every_slug_taking_tool_uses_the_one_slug_type(self) -> None:
-        annotations = [inspect.signature(tool).parameters['slug'].annotation for tool in TOOLS]
+        taking_a_slug = [tool for tool in TOOLS if 'slug' in inspect.signature(tool).parameters]
+        annotations = [
+            inspect.signature(tool).parameters['slug'].annotation for tool in taking_a_slug
+        ]
 
+        assert [tool.__name__ for tool in taking_a_slug] == ['ticket', 'task', 'contract']
         assert annotations == [Slug, Slug, Slug]
 
+    def test_slug_confinement_the_one_slug_type_is_the_review_start_payloads_slug(self) -> None:
+        assert StartPayload.model_fields['slug'].annotation == Slug | None
+
     def test_slug_confinement_every_tool_schema_carries_the_slug_pattern(self) -> None:
-        schemas = asyncio.run(tool_schemas())
+        schemas = {
+            name: schema
+            for name, schema in asyncio.run(tool_schemas()).items()
+            if 'slug' in schema['properties']
+        }
 
         assert sorted(schemas) == ['contract', 'task', 'ticket']
         assert all(
@@ -227,3 +275,81 @@ class TestInsideTheStateDirectory:
         assert not any(result.is_error for result in results)
         assert written == {'.mightymodels'}
         assert git(project, 'status', '--porcelain') == '?? outside.jsonl\n'
+
+
+@pytest.mark.usefixtures('project')
+class TestReviewConfinement:
+    @pytest.mark.parametrize('raw', HOSTILE)
+    def test_slug_confinement_review_start_reads_and_writes_nothing_for_a_hostile_slug(
+        self, tmp_path: Path, mocker: MockerFixture, raw: str
+    ) -> None:
+        opened = mocker.patch('mightymodels_plugin.db.checkout.open_repository')
+        before = tree(tmp_path)
+
+        payload = {**START_PAYLOAD, 'scope': 'ticket', 'base': 'main', 'slug': raw}
+        result = asyncio.run(call_tool('review', {'action': 'start', 'payload': payload}))
+
+        assert result.is_error
+        opened.assert_not_called()
+        assert tree(tmp_path) == before
+
+    @pytest.mark.parametrize('raw', HOSTILE_RUN_IDS)
+    @pytest.mark.parametrize('arguments', RUN_CALLS)
+    def test_slug_confinement_a_path_shaped_run_id_reads_and_writes_nothing(
+        self, tmp_path: Path, mocker: MockerFixture, arguments: dict[str, object], raw: str
+    ) -> None:
+        opened = mocker.patch('mightymodels_plugin.db.checkout.open_repository')
+        before = tree(tmp_path)
+
+        result = asyncio.run(call_tool('review', {**arguments, 'run_id': raw}))
+
+        assert result.is_error
+        opened.assert_not_called()
+        assert tree(tmp_path) == before
+
+    def test_slug_confinement_a_run_without_a_ticket_keeps_its_directory_under_runtime(
+        self, project: Path
+    ) -> None:
+        result = asyncio.run(call_tool('review', {'action': 'start', 'payload': START_PAYLOAD}))
+
+        run = result.structured_content['run_id']
+        state = project.joinpath('.mightymodels')
+        assert not result.is_error
+        assert state.joinpath('.runtime', 'reviews', run).is_dir()
+        assert {path.name for path in state.iterdir()} == {'.runtime', 'mightymodels.db'}
+
+    def test_slug_confinement_a_run_with_a_ticket_keeps_its_directory_under_the_ticket(
+        self, project: Path
+    ) -> None:
+        payload = {**START_PAYLOAD, 'scope': 'ticket', 'base': 'main', 'slug': 'retry-queue'}
+        result = asyncio.run(call_tool('review', {'action': 'start', 'payload': payload}))
+
+        run = result.structured_content['run_id']
+        state = project.joinpath('.mightymodels')
+        assert not result.is_error
+        assert state.joinpath('retry-queue', 'review', run).is_dir()
+        assert {path.name for path in state.iterdir()} == {'retry-queue', 'mightymodels.db'}
+
+    def test_slug_confinement_a_report_with_secrets_is_redacted_in_the_stored_rows(
+        self, project: Path
+    ) -> None:
+        started = asyncio.run(call_tool('review', {'action': 'start', 'payload': START_PAYLOAD}))
+        run = started.structured_content['run_id']
+        report = project.joinpath('.mightymodels', '.runtime', 'reviews', run)
+        report.joinpath('UNCLE-BOB-REPORT.md').write_text(LEAKING_REPORT, encoding='utf-8')
+
+        added = asyncio.run(
+            call_tool(
+                'review', {'action': 'add', 'run_id': run, 'payload': {'persona': 'uncle-bob'}}
+            )
+        )
+
+        with open_checkout(project) as checkout:
+            rows = checkout.session.scalars(select(ReviewFindingRow)).all()
+            stored = ' '.join(
+                str(getattr(row, column.name)) for row in rows for column in row.__table__.columns
+            )
+        assert not added.is_error
+        assert 'hunter22' not in stored
+        assert 'ghp_' not in stored
+        assert 'Hardcoded [REDACTED:assignment] in the store' in stored
