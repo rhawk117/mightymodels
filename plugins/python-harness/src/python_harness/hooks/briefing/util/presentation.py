@@ -5,6 +5,7 @@ from datetime import date, datetime, time
 from functools import singledispatch
 from types import MappingProxyType
 
+from python_harness.core.text import collapse_whitespace
 from python_harness.hooks.briefing.domain import (
     BriefingOptions,
     ConflictingPytestTables,
@@ -57,12 +58,8 @@ def cap(text: str, limit: int) -> str:
     return text[:limit] + ELLIPSIS
 
 
-def collapse(text: str) -> str:
-    return ' '.join(text.split())
-
-
 def quoted(text: str, limit: int) -> str:
-    return code_span(cap(collapse(text), limit))
+    return code_span(cap(collapse_whitespace(text), limit))
 
 
 def join_items(items: Sequence[str], limit: int, separator: str) -> str:
@@ -78,7 +75,7 @@ def join_items(items: Sequence[str], limit: int, separator: str) -> str:
 def describe_scalar(value: str | float | date | time) -> str:
     if isinstance(value, bool):
         return str(value).lower()
-    return collapse(str(value))
+    return collapse_whitespace(str(value))
 
 
 def describe_value(value: object, limit: int, separator: str = LIST_SEPARATOR) -> str:
@@ -89,7 +86,8 @@ def describe_value(value: object, limit: int, separator: str = LIST_SEPARATOR) -
         return join_items(items, limit, separator)
     if isinstance(value, Mapping):
         entries = [
-            f'{collapse(str(key))} {describe_value(item, limit)}' for key, item in value.items()
+            f'{collapse_whitespace(str(key))} {describe_value(item, limit)}'
+            for key, item in value.items()
         ]
         return join_items(entries, limit, LIST_SEPARATOR)
     return type(value).__name__
@@ -108,7 +106,7 @@ def describe_problem(problem: object, _limit: int) -> str:
 
 @describe_problem.register
 def describe_unreadable(problem: UnreadableFile, limit: int) -> str:
-    return f'{quoted(problem.label, limit)} {cap(collapse(problem.reason), limit)}'
+    return f'{quoted(problem.label, limit)} {cap(collapse_whitespace(problem.reason), limit)}'
 
 
 @describe_problem.register
@@ -212,7 +210,7 @@ def project_line(scan: ProjectScan, limit: int) -> str:
     files = LIST_SEPARATOR.join(scan.dependency_files) or 'none'
     directory = scan.dependency_directory
     located = '' if directory is None else f' in {quoted(directory, limit)}'
-    root = collapse(scan.root)
+    root = collapse_whitespace(scan.root)
     return f'- Root: {root} ({manifest}; dependency files{located}: {files})'
 
 
@@ -251,7 +249,7 @@ def project_lines(
 
 
 def no_project_lines(scan: ProjectScan, runner: RunnerBrief) -> Iterator[str]:
-    yield f'- No Python project files at or above {collapse(scan.root)}.'
+    yield f'- No Python project files at or above {collapse_whitespace(scan.root)}.'
     yield runner.rule
 
 

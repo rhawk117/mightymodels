@@ -2,10 +2,7 @@
 
 from python_harness.citations.domain import Citation, CitationOptions, CitationProblem
 from python_harness.core.sources import SourceFile
-
-
-def collapse_whitespace(text: str) -> str:
-    return ' '.join(text.split())
+from python_harness.core.text import collapse_whitespace
 
 
 def quote_matches(quote: str, lines: tuple[str, ...]) -> bool:
