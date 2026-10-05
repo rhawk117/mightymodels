@@ -214,6 +214,7 @@ class TestSymlinkBelowTheStateDirectory:
         pytest.param(
             (SLUG, 'review'), methodcaller('review_directory', TICKET, RUN), id='ticket-reviews'
         ),
+        pytest.param(('.runtime',), methodcaller('review_directory', None, RUN), id='runtime'),
         pytest.param(
             ('.runtime', 'reviews', RUN.root),
             methodcaller('persona_report', None, RUN, persona=Persona.UNCLE_BOB),
