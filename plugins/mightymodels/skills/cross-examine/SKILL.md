@@ -3,8 +3,8 @@ name: cross-examine
 description: >-
   Interview the user about a plan, design, or decision until a shared understanding exists,
   at a depth the user picks first (Skim, Standard, or Relentless). Works the design tree in
-  rounds: each round asks every decision whose prerequisites are settled, via the ask-user
-  dialog only, two to four concrete options each, one recommended, pitched at a senior
+  rounds: each round asks every decision whose prerequisites are settled, via AskUserQuestion
+  only, two to four concrete options each, one recommended, pitched at a senior
   engineer with no rationale for asking. Facts go to scouts, decisions to the user, nothing
   assumed silently. Restates a decisions record after every round that game-plan lifts into
   approach, invariants, non-goals, acceptance, and risks. Runs inside game-plan between claim
@@ -27,9 +27,10 @@ depth first and steers throughout.
 ## Round zero: target and depth
 
 State the target in one line: the plan, design, or decision under examination. Inside
-game-plan it is the ticket's base-intent; standalone it is whatever the user brought.
+game-plan it is the ticket's `summary`, which game-plan records as the plan's `base-intent`;
+standalone it is whatever the user brought.
 
-Then one ask-user dialog with two questions:
+Then one `AskUserQuestion` dialog with two questions:
 
 **Depth.** How far the interview goes before it stops.
 
@@ -63,7 +64,7 @@ Three kinds of question arrive at the frontier, and only one goes to the user:
   unsettled prerequisite: only the questions downstream of it wait; ask the rest of the
   frontier now.
 - **Decisions** (which behavior, which boundary, which trade-off, what done looks like) go to
-  the user through the dialog.
+  the user through `AskUserQuestion`.
 - **Feel** questions (how should the interaction feel, is this abstraction pleasant) do not
   grill well and get a prototype instead. Record them as Open with "needs a prototype" and
   move on rather than asking the user to imagine the answer.
@@ -84,13 +85,13 @@ Retry bound for outbound webhooks?
   Attempt count, fixed at 5 (recommended: matches the client's own limit; simplest to test)
   Wall-clock deadline of 60s (survives slow endpoints; needs a clock in tests)
   Both, whichever trips first (safest; two knobs to document)
-  Other / I don't know
+  I don't know
 ```
 
-Two to four options, written as the actual choices rather than yes/no on your framing.
+Two to four options in all, written as the actual choices rather than yes/no on your framing.
 Exactly one is marked `(recommended)` with its reason in the parenthetical; the other
 parentheticals carry that choice's trade-off, not a reason to reject it. The last option is
-always `Other / I don't know`, followed by a sentence in chat. "I don't know" is a real
+always `I don't know`, and the user can also type an answer of their own. "I don't know" is a real
 answer; it means the question is either a fact (send a scout) or a prototype, and it is
 recorded as Open, not guessed. When it is a decision that blocks the rest of the frontier
 and the user cannot choose, offer ask-an-adult: wingman's questions go back to the user, and
@@ -137,9 +138,10 @@ Open items are handed forward, never resolved by the primary's best guess.
 ## Ending
 
 The interview ends when the frontier is empty, when the depth's round cap is reached, or when
-the user says stop. Close with one dialog: shared understanding reached, one more round, or
-stop here. Only the first hands the record onward; inside game-plan that is a return to the
-drafting step, standalone it is an offer of game-plan or open-ticket, never an invocation.
+the user says stop. Close with one `AskUserQuestion` dialog: shared understanding reached,
+one more round, or stop here. Only the first hands the record onward; inside game-plan that
+is a return to the drafting step, standalone it is an offer of game-plan or open-ticket,
+never an invocation.
 
 If the session has run long enough that questions are getting worse, say so and recommend
 stopping with the record as it stands. A large scope is grilled as several smaller targets,

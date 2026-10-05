@@ -3,7 +3,7 @@ name: game-plan
 description: >-
   Large-scope ramp for a mightymodels ticket: read ticket.yml and the issue, verify the
   ticket's claims with scouts, run cross-examine so the user
-  decides the design before drafting, interview the user on how each risk is handled, then
+  decides the design before drafting, interview the user (AskUserQuestion) on how each risk is handled, then
   write the ticket's plan.md as a compaction-safe ledger: intent, approach, invariants that
   must hold throughout, dependency-ordered tasks each with deterministic acceptance criteria
   and the commands that verify them, non-goals, and risks with the user's chosen handling. No
@@ -53,8 +53,9 @@ plan on top of them. Also ask code-scout where the repository's own test, lint, 
 commands are declared (CI workflow, task runner, package scripts), so the commands in step 4
 are the repository's, not guesses.
 
-**3. Cross-examine the user.** Invoke `cross-examine` with the ticket's base-intent as the
-target; the user picks the depth. Its decisions record is the input to the draft, and the
+**3. Cross-examine the user.** Invoke `cross-examine` with the ticket's `summary` as the
+target; the user picks the depth. `base-intent` is a plan field, written into plan.md in step
+4, not a ticket key. Its decisions record is the input to the draft, and the
 draft is not started until the record's closing dialog says shared understanding was reached.
 This is the step that stops the plan being one the agent wrote and the user nodded at: the
 approach, the boundaries, and what done looks like are the user's calls, and this is where
@@ -78,30 +79,34 @@ sees it; the user's time is for direction, not for catching a task with no accep
 
 **4b. Approve and run the verification commands.** Every invariant's proving command and
 every command-shaped acceptance criterion gets a contract id (`I1`, `T1.AC-1`) and an argv
-list. Put the full list, id and argv per line, to the user in one ask-user dialog: approve
-all, remove some, or edit. Only approved commands are recorded:
+list. Put the full list, id and argv per line, to the user in one `AskUserQuestion` dialog:
+approve all, remove some, or edit. Only approved commands are recorded, all in one call to
+`mcp__plugin_mightymodels_state__contract` with action `approve`:
 
-```bash
-python3 BASE/scripts/verification.py contract --slug SLUG <<'JSON'
-{"approved_by": "user", "commands": [
-  {"id": "I1", "argv": ["uv", "run", "pytest", "-q"]},
-  {"id": "T1.AC-1", "argv": ["uv", "run", "pytest", "-q", "tests/test_queue.py"], "timeout": 120}
+```json
+{"action": "approve", "slug": "SLUG", "commands": [
+  {"id": "I1", "argv": ["uv", "run", "pytest", "-q"], "approved_by": "user"},
+  {"id": "T1.AC-1", "argv": ["uv", "run", "pytest", "-q", "tests/test_queue.py"], "timeout": 120, "approved_by": "user"}
 ]}
-JSON
-python3 BASE/scripts/verification.py run --slug SLUG --phase planning --id I1 --id T1.AC-1
 ```
 
-`BASE` is the `Base directory for this skill` line. The runner takes ids only, never an
-argv, so nothing unapproved runs through it; commands are argv lists with no shell, so a
-check that needs a pipeline belongs in a script the repository owns. Record each command's
-planning outcome in the plan: an invariant that fails at HEAD is a finding for the user
-before anything is built; an acceptance command that fails because the thing it tests does
-not exist yet is the expected baseline. Read `references/verification-contract.md` when a
-record or run is refused.
+Then run them at HEAD with a bare Bash command (the plugin's `bin/` is on the Bash PATH):
+
+```bash
+mightymodels verify run --slug SLUG --phase planning --id I1 --id T1.AC-1
+```
+
+The runner takes ids only, never an argv, so nothing unapproved runs through it; commands
+are argv lists with no shell, so a check that needs a pipeline belongs in a script the
+repository owns. An approved id never changes its argv; a different command gets a new id.
+Record each command's planning outcome in the plan: an invariant that fails at HEAD is a
+finding for the user before anything is built; an acceptance command that fails because the
+thing it tests does not exist yet is the expected baseline. Read
+`references/verification-contract.md` when a record or run is refused.
 
 **5. Interview the user on risks.** Every risk in the draft gets a handling chosen by the user,
-not by you. One ask-user dialog, risks batched where the tool allows, each offering the same
-four handlings:
+not by you. One `AskUserQuestion` dialog, risks batched up to four a call, each offering the same
+four handlings (the user can always type a handling of their own):
 
 - **Accept**: proceed; the signal is noted, nothing changes.
 - **Mitigate**: add a task, or a criterion to an existing task, that reduces the risk; you
@@ -115,7 +120,7 @@ risk the post-compaction primary will handle by improvising. When no dialog is a
 in chat with the four handlings spelled out, and wait.
 
 **6. Get approval.** Write `plan.md` with the handlings folded in, present it, and ask through
-the dialog: approve, revise, or abandon. This gate is the user's, and it is the last cheap
+`AskUserQuestion`: approve, revise, or abandon. This gate is the user's, and it is the last cheap
 moment to change direction. On approve, invoke agents-assemble. On revise, regenerate the whole
 plan (never append to it) and state in one paragraph what changed and why, so the user reviews
 a delta rather than re-reading two hundred lines. A revision that contradicts a Decided line
@@ -168,7 +173,7 @@ What each section is for, since the reader will not have this file:
   rest of the code" are refused at write time. Two to four criteria per task; a task needing
   more is two tasks.
 - **verify** is the sequence of contract ids the engineer runs before appending DONE and the
-  loop re-runs through `verification.py` afterwards. It is the same sequence in both places,
+  loop re-runs with `mightymodels verify run` afterwards. It is the same sequence in both places,
   which is what makes verification comparable across tasks.
 - **Non-goals** are load-bearing: they are what keeps a long sprint from growing sideways while
   nobody is watching. Each carries its one-line why so a later session does not relitigate it.

@@ -7,7 +7,7 @@ description: >-
   proposed change), closing with a readiness read for the next stage. Reads the persisted
   lets-investigate ledger, treats entries from an older HEAD as leads to re-verify, and writes
   current verdicts back; assembles from cited facts or one scout wave otherwise. Interactive mode resolves
-  uncertainties via the ask-user dialog; sprint mode (inside agents-assemble) compiles per-task
+  uncertainties via AskUserQuestion; sprint mode (inside agents-assemble) compiles per-task
   citations and files-in-scope and never asks. Use for "what do we know", "summarize what
   we've learned", "where are the unknowns", "consolidate the findings", "before we ticket
   / plan / decide, what is verified", "do the swot pass", and as the facts packet before
@@ -29,18 +29,19 @@ right; the same pause inside a running sprint stalls the loop on questions nobod
 **Mode detection:** sprint mode when invoked from agents-assemble, when a `briefs/` directory
 exists in the active ticket, or when the dispatch says so. Interactive otherwise.
 
-The ledger belongs to lets-investigate, and this skill reads and writes it only through that
-skill's script, so the file has one reader and one writer: run
-`python3 BASE/../lets-investigate/scripts/ledger.py`, where `BASE` is the `Base directory for this skill` line, from the repository's working directory. Its ledger-schema
-reference, next to the script, describes the fields.
+The ledger belongs to lets-investigate, and this skill reads and writes it only through the
+`investigation` tool, so the rows have one writer: call
+`mcp__plugin_mightymodels_state__investigation`. The ledger-schema reference of lets-investigate,
+`${CLAUDE_PLUGIN_ROOT}/skills/lets-investigate/references/ledger-schema.md`, describes the
+fields.
 
 ## Where the evidence comes from
 
 Consolidation starts from whatever evidence exists, and re-deriving evidence that already
 carries a citation is waste.
 
-- **An investigation exists.** `ledger.py list` shows the ids; lets-investigate usually hands
-  you one. `ledger.py knowns --id ID` prints every live entry marked `current` (written at
+- **An investigation exists.** Action `list` shows the ids; lets-investigate usually hands
+  you one. Action `knowns` with the id prints every live entry marked `current` (written at
   this HEAD) or `lead` (written at an older one). Current Knowns lift straight into the knowns
   table, Open items into uncertainties, Decisions into the table with source `user`, and
   Resources carry forward. A lead is history, not evidence: the code may have moved since it
@@ -51,8 +52,14 @@ carries a citation is waste.
   claim with a citation is a known; a claim someone made without one is an uncertainty, even
   when it came from the user, until the user confirms it at the dialog.
 - **Nothing is established yet** and the user is asking cold. Open an investigation first
-  (`ledger.py start --target ... --kind ...`) so the verdicts have somewhere to persist, then
-  bootstrap with one scout wave of
+  (action `start`, `kind` one of `behavior`, `claim`, `research` or `change`, the proposed
+  change being the SWOT target) so the verdicts have somewhere to persist:
+
+  ```json
+  {"action": "start", "request": {"target": "<target line>", "kind": "change"}}
+  ```
+
+  Then bootstrap with one scout wave of
   two or three narrow retrieval questions aimed at the target, then consolidate what came
   back. If one wave is plainly not enough, that is an investigation, not a consolidation: say
   so and offer lets-investigate rather than running rounds under this skill's name.
@@ -75,20 +82,28 @@ attempt. Each carries either what an inference rests on or where the answer live
 exceed about six, group them and ask the user which matter; twenty questions is a failed
 triage wearing thoroughness as a costume.
 
-**4. Resolve through the ask-user dialog.** One dialog, questions batched where the tool
-allows, only for uncertainties the user can actually answer (intent, production observations,
-history, priorities). Uncertainties a scout could answer get one more narrow dispatch instead
+**4. Resolve through `AskUserQuestion`.** One dialog, up to four questions a call with two to
+four options each (the user can always type an answer of their own), only for uncertainties
+the user can actually answer (intent, production observations, history, priorities). Uncertainties a scout could answer get one more narrow dispatch instead
 of a question; uncertainties nobody can answer yet are recorded as such. Record each answer as
 a known with source `user`. When no dialog is available, list the questions you
 would ask, state a working assumption for each, and proceed on the assumptions labelled as
 assumptions.
 
-**Persist before analysing.** Write the session's verdicts in one batch through
-`ledger.py add --id ID --round N` (the next round after the ledger's latest): re-verified
-leads as new `known` entries that supersede the lead, scout findings that contradict a lead as
-`open` entries superseding it, user answers as `known` with source `user`, and each
-unresolved uncertainty as `open` with where its answer lives. The analysis below is judgment
-and stays in chat; only cited facts and open questions go in the file. When the write is
+**Persist before analysing.** Write the session's verdicts in one batch with
+`mcp__plugin_mightymodels_state__investigation`, action `add`, `request` `{"round": N}` (the
+next round after the ledger's latest):
+
+```json
+{"action": "add", "investigation_id": "ID", "request": {"round": 2},
+ "entries": [{"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout", "supersedes": [4]}]}
+```
+
+The batch
+carries re-verified leads as new `known` entries that supersede the lead, scout findings that
+contradict a lead as `open` entries superseding it, user answers as `known` with source `user`,
+and each unresolved uncertainty as `open` with where its answer lives. The analysis below is
+judgment and stays in chat; only cited facts and open questions go in the ledger. When the write is
 rejected, fix the entry the error names; when it cannot be written at all, say so before
 continuing, because a consolidation that is not persisted is lost at the next compaction.
 
@@ -111,10 +126,10 @@ judgment call between defensible options; whats-broken when a reproduction is in
 work at all, when the claim did not hold or the behavior is intended. Offer the stage; do not
 invoke it.
 
-Output is chat plus the investigation file; nothing else is written. open-ticket lifts
+Output is chat plus the investigation's rows; nothing else is written. open-ticket lifts
 what matters into ticket.yml and the issue, and a separate triage file here would be a second
 source of truth waiting to drift. End the output with the Resources list and the
-investigation id so open-ticket can name the sources and link the file.
+investigation id so open-ticket can name the sources and link the ledger.
 
 ## Sprint mode (per task, inside agents-assemble)
 
@@ -122,7 +137,7 @@ Compile fresh citations for the current task against the current HEAD: where the
 what touches it, and what the ASKED stanza's `files-in-scope` should contain. Fresh every time,
 because the plan is deliberately citation-free; citations rot during iteration and this step
 is where they get compiled at dispatch time. When the ticket links an investigation, its
-`ledger.py knowns` rows are leads for where to look, never citations to copy: re-verify before
+`investigation` `knowns` rows are leads for where to look, never citations to copy: re-verify before
 any of them reaches the report. Sprint mode writes nothing; the brief's ASKED stanza is the
 durable record of the task's citations, and a second copy in the ledger would drift.
 

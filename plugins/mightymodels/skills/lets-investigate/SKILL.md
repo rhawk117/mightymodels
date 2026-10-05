@@ -3,13 +3,13 @@ name: lets-investigate
 description: >-
   Run a chat-first investigation as a gated loop: frame one target, dispatch scouts for
   repository facts and documentation facts, fold every report into a restated in-chat ledger
-  (knowns, open questions, decisions, resources), then stop at an ask-user gate where the user
+  (knowns, open questions, decisions, resources), then stop at an AskUserQuestion gate where the user
   chooses to dig further, redirect, or consolidate. Use at the START of work, before any ticket
   exists, whenever the user wants to understand something before acting: "let's investigate X",
   "look into this claim", "triage this bug report", "why would Y be happening", "dig into this
   error", "how does library Z actually handle this, check the docs and our usage". Also for
-  research questions about a dependency, API, protocol, or tool the repository relies on. Persists its ledger under
-  .mightymodels/.runtime/investigations/ and changes nothing else. Not for reviewing a branch or grading a codebase (review-circus), debugging
+  research questions about a dependency, API, protocol, or tool the repository relies on. Persists its ledger as rows
+  in .mightymodels/mightymodels.db and changes nothing else. Not for reviewing a branch or grading a codebase (review-circus), debugging
   with a known reproduction (whats-broken), or non-engineering research such as market or
   vendor comparisons.
 ---
@@ -18,12 +18,13 @@ description: >-
 
 The opening move: understand before anything gets named, ticketed, or built. The session's
 product is a ledger, restated in chat at the end of every round, that the user has agreed is
-sufficient. The ledger is persisted before every gate by `scripts/ledger.py`, so a compaction
-or a new conversation resumes from the file instead of from memory; the chat restatement is
-the script's own rendering, so the two cannot disagree.
+sufficient. The ledger is persisted before every gate by the `investigation` tool, so a compaction
+or a new conversation resumes from the database instead of from memory; the chat restatement is
+the tool's own rendering, so the two cannot disagree.
 
-Run the script as `python3 BASE/scripts/ledger.py`, where `BASE` is the `Base directory for this skill` line, from the repository's working directory: it finds the repository by walking
-up to `.git`. Read `references/ledger-schema.md` when an entry is rejected.
+State goes through the plugin's MCP tool, called by full name:
+`mcp__plugin_mightymodels_state__investigation`. Read `references/ledger-schema.md` when an
+entry is rejected.
 
 <important>Invoke `prompting-subagents` before the first dispatch.</important>
 
@@ -46,22 +47,30 @@ the runtime configuration; a claim needs the exact lines that would make it true
 research question needs the documentation for the version in the lockfile and the call sites
 that depend on it.
 
-Put the framing to the user through the ask-user dialog before dispatching anything: the
+Put the framing to the user through one `AskUserQuestion` dialog before dispatching anything: the
 target line, the classification, and one question asking what they already know or have ruled
-out. Scouts pointed at a vague target return precise answers to the wrong question, and facts
+out (the user can always type an answer of their own). Scouts pointed at a vague target return precise answers to the wrong question, and facts
 the user already holds cost nothing to record and a round to rediscover.
 
 Once the user confirms the framing, open the ledger and record their answers as round 0:
 
-```bash
-python3 BASE/scripts/ledger.py start --target "<target line>" --kind <behavior|claim|research>
-python3 BASE/scripts/ledger.py add --id <id> --round 0 <<'JSON'
-[{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]
-JSON
+Call `mcp__plugin_mightymodels_state__investigation` with action `start`; `kind` is `behavior`,
+`claim`, `research` or `change` (a proposed change to weigh, which what-we-know opens):
+
+```json
+{"action": "start", "request": {"target": "<target line>", "kind": "behavior"}}
 ```
 
-`start` prints the investigation id; every later call names it. When the user is resuming an
-earlier investigation, `ledger.py list` shows the ids and `render` restores the ledger.
+`start` returns the investigation id; every later call names it. Then the same tool with action
+`add` records the user's answers:
+
+```json
+{"action": "add", "investigation_id": "ID", "request": {"round": 0},
+ "entries": [{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]}
+```
+
+When the user is resuming an earlier investigation, action `list` shows the ids and action
+`render` restores the ledger.
 
 ## Each round
 
@@ -97,28 +106,32 @@ is an entry `kind`:
 - Two scouts disagreeing is a finding. Record the contradiction as its own Open question with
   both citations; never reconcile it silently.
 
-**4. Persist, then restate the whole ledger.** Write the round's entries in one batch:
+**4. Persist, then restate the whole ledger.** Write the round's entries in one `add` call:
 
-```bash
-python3 BASE/scripts/ledger.py add --id <id> --round <n> <<'JSON'
-[
+```json
+{"action": "add", "investigation_id": "ID", "request": {"round": 1}, "entries": [
   {"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout"},
   {"kind": "open", "text": "... rests on ...", "cite": "CHANGELOG 3.x", "source": "web-scout"},
   {"kind": "known", "text": "...", "cite": "https://...#backoff", "source": "web-scout", "supersedes": [4]},
   {"kind": "next", "text": "<exact question>", "source": "code-scout"}
-]
-JSON
-python3 BASE/scripts/ledger.py render --id <id>
+]}
 ```
 
-An answered Open question is retired by the entry that answers it (`supersedes`), never
-edited. Paste the `render` output into chat as the restatement: not a delta, the whole ledger.
+Then call `mcp__plugin_mightymodels_state__investigation` with action `render`:
+
+```json
+{"action": "render", "investigation_id": "ID"}
+```
+
+An answered Open question is retired by the entry that answers it (`supersedes`, naming an
+entry from an earlier call), never edited. Paste the `render` output into chat as the
+restatement: not a delta, the whole ledger.
 If `add` is rejected, fix the entry the error names and retry; if it cannot be written at all,
 stop at the gate and say so. A gate on an unpersisted round is the loss this skill exists to
 prevent.
 
-**5. Stop at the gate.** Open the ask-user dialog with the round's decision and any questions
-held for the user, batched into one dialog where the tool allows. The decision offers exactly
+**5. Stop at the gate.** Open an `AskUserQuestion` dialog with the round's decision and any questions
+held for the user, batched into one call (up to four questions). The decision offers exactly
 these choices:
 
 - **Sufficient**: consolidate through what-we-know.
@@ -137,12 +150,12 @@ out, and wait for the answer.
 
 ## The ledger
 
-`ledger.py render` prints it in this shape. The sections are ordered so what-we-know can lift
+`render` prints it in this shape. The sections are ordered so what-we-know can lift
 Knowns and Open straight into its knowns table and uncertainties list.
 
 ```markdown
 ## Ledger, round N
-Target: <one line> (<behavior | claim | research>)
+Target: <one line> (<behavior | claim | research | change>)
 
 ### Knowns
 - e<seq>: <claim> [<file:line> | <URL#heading> | user] (<source>, round N)
@@ -191,12 +204,12 @@ primary source is, not a citation.
 
 The loop ends only at a gate. On Sufficient, offer what-we-know and hand it the investigation
 id; never invoke it unasked. On Stop here, leave the final rendered ledger as the last message;
-the file keeps it for a later session.
+the database keeps it for a later session.
 
 ## Boundaries
 
-Read-only apart from the ledger file: no other writes, no edits, no commands beyond
-`ledger.py` and the single read-only command a scout runs. If the investigation surfaces something needing immediate
+Read-only apart from the ledger rows: no other writes, no edits, no commands beyond
+the `investigation` tool and the single read-only command a scout runs. If the investigation surfaces something needing immediate
 action (a live secret, a data-loss path in production), say so plainly and let the user act;
 the pipeline is for work, not for emergencies.
 
