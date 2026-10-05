@@ -6,12 +6,13 @@ from enum import StrEnum, auto
 from types import MappingProxyType
 from typing import Literal, Self
 
+from python_harness.core.toml import EMPTY_TABLE
+
 MEBIBYTE = 1024 * 1024
 
 type IniSections = Mapping[str, Mapping[str, str]]
 type ConfigTable = Mapping[str, object]
 
-EMPTY_TABLE: ConfigTable = MappingProxyType({})
 EMPTY_SECTIONS: IniSections = MappingProxyType[str, Mapping[str, str]]({})
 
 

@@ -3,6 +3,7 @@
 from pathlib import PurePosixPath
 from types import MappingProxyType
 
+from python_harness.core.toml import EMPTY_TABLE, read_nested_table, read_strings, read_table
 from python_harness.hooks.briefing.domain import (
     ConfigSource,
     ConfigTable,
@@ -15,10 +16,8 @@ from python_harness.hooks.briefing.domain import (
     TomlRead,
 )
 from python_harness.survey.domain import PYPROJECT, ProjectManifest
-from python_harness.survey.util import read_nested_table, read_strings, read_table
 
 INI_OPTIONS = 'ini_options'
-EMPTY_TABLE: ConfigTable = MappingProxyType({})
 PYTEST_CANDIDATES = (
     PytestCandidate('pytest.toml', 'pytest', 'toml', matches_when_empty=True),
     PytestCandidate('.pytest.toml', 'pytest', 'toml', matches_when_empty=True),

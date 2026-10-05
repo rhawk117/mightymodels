@@ -4,6 +4,7 @@ from types import MappingProxyType
 
 import pytest
 from python_harness.core.tests.fixtures import ProjectBuilder
+from python_harness.core.toml import TomlTable
 from python_harness.core.workspace import DiscoveryOptions, Workspace, open_workspace
 from python_harness.survey.domain import Domain, LayoutFacts, Mode, ModeInference
 from python_harness.survey.errors import ManifestUnreadableError
@@ -13,7 +14,6 @@ from python_harness.survey.services import (
     read_layout,
     survey_project,
 )
-from python_harness.survey.util import TomlTable
 
 
 class TestLoadPyproject:

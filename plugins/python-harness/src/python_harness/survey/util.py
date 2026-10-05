@@ -2,70 +2,34 @@
 
 import re
 from collections.abc import Iterable, Iterator, Mapping
-from functools import reduce
 from itertools import chain
 from types import MappingProxyType
-from typing import TypeIs
 
+from python_harness.core.toml import (
+    TomlTable,
+    normalize_name,
+    read_items,
+    read_nested_table,
+    read_string,
+    read_strings,
+    read_table,
+    select_strings,
+)
 from python_harness.survey.domain import ProjectManifest
 
-type TomlTable = Mapping[str, object]
 type DependencyGroups = Mapping[str, tuple[object, ...]]
 
 SCRIPT_TABLES = ('scripts', 'gui-scripts')
 LEGACY_BUILD_BACKEND = 'setuptools.build_meta:__legacy__'
-EMPTY_TABLE: TomlTable = MappingProxyType({})
 REQUIREMENT_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
-NAME_SEPARATORS = re.compile(r'[-_.]+')
 DEV_GROUP = 'dev'
 ALL_GROUPS = 'all'
 DEFAULT_GROUPS_KEY = 'default-groups'
 POETRY_PYTHON = 'python'
 
 
-def is_table(value: object) -> TypeIs[TomlTable]:
-    return isinstance(value, Mapping)
-
-
-def read_table(table: TomlTable, key: str) -> TomlTable:
-    value = table.get(key)
-    if is_table(value):
-        return value
-    return EMPTY_TABLE
-
-
-def read_nested_table(table: TomlTable, *keys: str) -> TomlTable:
-    return reduce(read_table, keys, table)
-
-
-def read_string(table: TomlTable, key: str) -> str | None:
-    value = table.get(key)
-    if isinstance(value, str):
-        return value
-    return None
-
-
-def read_items(table: TomlTable, key: str) -> tuple[object, ...]:
-    value = table.get(key)
-    if not isinstance(value, list):
-        return ()
-    return tuple(value)
-
-
-def select_strings(items: Iterable[object]) -> Iterator[str]:
-    return (item for item in items if isinstance(item, str))
-
-
-def read_strings(table: TomlTable, key: str) -> tuple[str, ...]:
-    return tuple(select_strings(read_items(table, key)))
-
-
 def read_strings_of_every_key(table: TomlTable) -> Iterator[str]:
     return chain.from_iterable(read_strings(table, key) for key in table)
-
-
-def normalize_name(name: str) -> str:
-    return NAME_SEPARATORS.sub('-', name).lower()
 
 
 def distribution_name_of(requirement: str) -> str | None:

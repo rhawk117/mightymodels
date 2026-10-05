@@ -8,6 +8,7 @@ from pathlib import Path, PurePath, PurePosixPath
 from types import MappingProxyType
 
 from python_harness.core.files import describe_os_error
+from python_harness.core.toml import read_nested_table
 from python_harness.core.workspace import find_search_boundary, list_ancestors_to
 from python_harness.hooks.briefing.domain import (
     ConfigTable,
@@ -32,7 +33,7 @@ from python_harness.hooks.briefing.util.parsing import (
 )
 from python_harness.hooks.domain import SEARCH_BOUNDARY_MARKERS
 from python_harness.survey.domain import NO_MANIFEST, PYPROJECT, UV_LOCK, ProjectManifest
-from python_harness.survey.util import manifest_from_document, read_nested_table
+from python_harness.survey.util import manifest_from_document
 
 UV_WORKSPACE_TABLE = ('tool', 'uv', 'workspace')
 

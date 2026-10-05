@@ -11,10 +11,15 @@ from dataclasses import dataclass
 from functools import partial, reduce
 from types import MappingProxyType
 
+from python_harness.core.toml import (
+    EMPTY_TABLE,
+    is_table,
+    normalize_name,
+    read_items,
+    read_nested_table,
+)
 from python_harness.hooks.briefing.domain import ConfigTable, Setting
-from python_harness.survey.util import is_table, normalize_name, read_items, read_nested_table
 
-EMPTY_TABLE: ConfigTable = MappingProxyType({})
 ALL_RULES = 'ALL'
 VARIABLE = re.compile(r'\$\{(\w+)\}|\$(\w+)')
 VERSION_TEXT = re.compile(r'[0-9A-Za-z.+!_-]{1,64}')

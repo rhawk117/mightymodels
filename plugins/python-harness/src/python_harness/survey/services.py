@@ -6,6 +6,7 @@ from pathlib import Path
 
 import tomllib
 
+from python_harness.core.toml import TomlTable
 from python_harness.core.workspace import Workspace
 from python_harness.imports.services import load_project_index
 from python_harness.survey.domain import (
@@ -19,7 +20,7 @@ from python_harness.survey.domain import (
 )
 from python_harness.survey.errors import ManifestUnreadableError
 from python_harness.survey.policy import detect_domains, infer_mode
-from python_harness.survey.util import TomlTable, declares_ruff_config, manifest_from_document
+from python_harness.survey.util import declares_ruff_config, manifest_from_document
 
 
 def load_pyproject(workspace: Workspace) -> TomlTable | None:

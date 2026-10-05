@@ -11,6 +11,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from python_harness.core.files import parse_version_pin
+from python_harness.core.toml import read_nested_table, read_string
 from python_harness.core.workspace import (
     DiscoveryOptions,
 )
@@ -71,10 +72,6 @@ from python_harness.hooks.guard.domain import GuardOptions
 from python_harness.hooks.guard.util.presentation import describe_guard_rule
 from python_harness.survey.domain import PYPROJECT, ProjectManifest
 from python_harness.survey.services import ruff_config_name
-from python_harness.survey.util import (
-    read_nested_table,
-    read_string,
-)
 
 PYVENV_CONFIG = 'pyvenv.cfg'
 TY_CONFIG = 'ty.toml'
