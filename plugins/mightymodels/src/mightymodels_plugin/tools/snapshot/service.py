@@ -3,9 +3,10 @@
 A snapshot is what a handoff needs and nothing a model wrote from memory: the ticket, the
 repository, every task with its attempts, each contract command judged at HEAD from its latest
 receipt, the passing commands, the failed and blocked attempts not to repeat, and where the
-latest review run stands. Each list is cut to the caller's limit. The ledger sections and the
-answer and subagent sections are in the record and read empty: the database holds no row for them
-yet.
+latest review run stands. Each list is cut to the caller's limit. The decisions and the open
+questions are the live entries of the investigations the ticket links, the latest of each kept,
+and a linked investigation with no ledger is a warning. The answer and subagent sections are in
+the record and read empty: the database holds no row for them yet.
 
 Git is optional. With no git binary, or outside a repository, the repository section is empty and
 a warning says why.
@@ -24,6 +25,8 @@ from mightymodels_plugin.database import Database
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.schema import Outcome
 from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
+from mightymodels_plugin.tools.investigation.ledger import Ledger, LinkedLedgers, linked_ledgers
+from mightymodels_plugin.tools.investigation.schema import EntryKind
 from mightymodels_plugin.tools.review.schema import Decision
 from mightymodels_plugin.tools.snapshot.latest_review import LatestReview, latest_review_of
 from mightymodels_plugin.tools.snapshot.rendering import snapshot_markdown
@@ -31,6 +34,7 @@ from mightymodels_plugin.tools.snapshot.repository import snapshot_transaction
 from mightymodels_plugin.tools.snapshot.schema import (
     CheckState,
     FailedAttempt,
+    LedgerLine,
     PassingCommand,
     RepositoryState,
     ReviewDecision,
@@ -132,6 +136,21 @@ def failed_attempts(transitions: Sequence[TransitionRow], limit: int) -> tuple[F
     return tuple(stuck[-limit:])
 
 
+def ledger_lines(ledgers: Sequence[Ledger], kind: EntryKind, limit: int) -> tuple[LedgerLine, ...]:
+    lines = [
+        LedgerLine(
+            kind=record.kind, text=record.text, cite=record.cite, origin=ledger.origin_of(record)
+        )
+        for ledger in ledgers
+        for record in ledger.live_of_kind(kind)
+    ]
+    return tuple(lines[-limit:])
+
+
+def ledger_warnings(linked: LinkedLedgers) -> tuple[str, ...]:
+    return tuple(f'investigation {investigation} is missing' for investigation in linked.missing)
+
+
 def review_state(review: LatestReview | None, limit: int) -> ReviewState | None:
     if review is None:
         return None
@@ -164,6 +183,7 @@ class SnapshotService:
             unit = unit_of(repository.tickets.staged_row(slug))
             commands = repository.contracts.commands(slug)
             receipts = repository.contracts.latest_receipts(slug)
+            linked = linked_ledgers(repository.investigations, unit.investigations)
             record = SnapshotRecord(
                 slug=slug,
                 generated_at=now(),
@@ -172,9 +192,11 @@ class SnapshotService:
                 tasks=tuple(map(task_state, records_of(repository.tasks, slug).values())),
                 checks=check_states(commands, receipts, repository_now.head),
                 works=passing_commands(commands, receipts, limit),
+                decisions=ledger_lines(linked.ledgers, EntryKind.DECISION, limit),
+                open_questions=ledger_lines(linked.ledgers, EntryKind.OPEN, limit),
                 do_not_retry=failed_attempts(repository.tasks.transition_rows(slug), limit),
                 review=review_state(latest_review_of(repository.reviews, slug), limit),
-                warnings=git_warnings(git.refusal()),
+                warnings=(*git_warnings(git.refusal()), *ledger_warnings(linked)),
             )
         files = self.workspace.handoffs.snapshot(slug)
         return SnapshotView(

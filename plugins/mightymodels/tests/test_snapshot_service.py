@@ -14,6 +14,14 @@ from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.repository import contract_transaction
 from mightymodels_plugin.tools.contract.schema import ContractCommand, Outcome, Phase, Receipt
 from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.investigation.schema import (
+    EntryKind,
+    InvestigationStart,
+    LedgerEntry,
+    Source,
+    TargetKind,
+)
+from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.review.schema import (
     Decision,
     DisposePayload,
@@ -31,9 +39,9 @@ from mightymodels_plugin.tools.task.repository import Attempt, Transition, task_
 from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskMark, TaskStart
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.tests.support import StateServer, text_of, tree
-from mightymodels_plugin.tools.ticket.repository import NotStagedError
+from mightymodels_plugin.tools.ticket.repository import NotStagedError, ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
-from mightymodels_plugin.tools.ticket.service import TicketService
+from mightymodels_plugin.tools.ticket.service import TicketService, unit_of
 
 type GitRunner = Callable[..., str]
 
@@ -41,6 +49,7 @@ SLUG = 'retry-queue'
 TICKET = Slug(SLUG)
 OLD = 'a' * 40
 BRANCH = 'fix/retry'
+LEDGER = '20260928-queue'
 IDENTITY = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
 NEEDS_GIT = 'git was not consulted: this needs git and no git executable is on PATH'
 ANSWERS = TicketAnswers.model_validate(
@@ -174,6 +183,14 @@ def repo(handoff: Handoff) -> Handoff:
     return handoff
 
 
+@pytest.fixture
+def repo_linking_an_investigation(repo: Handoff) -> Handoff:
+    with ticket_transaction(repo.snapshots.database) as repository:
+        section = unit_of(repository.staged_row(TICKET)).ticket
+        repository.stage(TICKET, section, [LEDGER])
+    return repo
+
+
 class TestAnUnstagedTicket:
     def test_an_unstaged_ticket_writes_nothing(
         self, snapshot_service: SnapshotService, repository: Path
@@ -195,12 +212,13 @@ class TestAnUnstagedTicket:
 
 
 class TestAStagedTicket:
-    def test_missing_sources_read_as_empty(self, repo: Handoff) -> None:
-        view = repo.take()
+    def test_missing_sources_read_as_empty(self, repo_linking_an_investigation: Handoff) -> None:
+        view = repo_linking_an_investigation.take()
         record = view.record.model_dump(mode='json')
 
         assert record['repository']['branch'] == 'fix/retry'
         assert (record['checks'], record['subagents'], record['review']) == ([], [], None)
+        assert record['warnings'] == ['investigation 20260928-queue is missing']
         assert '- no receipts yet' in view.markdown
 
     def test_the_sections_no_row_fills_yet_read_empty(self, repo: Handoff) -> None:
@@ -229,6 +247,87 @@ class TestAStagedTicket:
         assert lines[3:5] == [
             'Ticket: Retry queue drains slowly (status staged).',
             f'Repository: fix/retry at {head[:12]}; tree clean.',
+        ]
+
+
+class TestLinkedLedgers:
+    TARGET = InvestigationStart(target='queue', kind=TargetKind.BEHAVIOR)
+    STARTED = datetime(2026, 9, 28, tzinfo=UTC)
+    QUESTION = LedgerEntry(kind=EntryKind.OPEN, text='is backoff capped?', source=Source.PRIMARY)
+    DECISION = LedgerEntry(kind=EntryKind.DECISION, text='keep the 10s floor', source=Source.USER)
+    ANSWER = LedgerEntry(
+        kind=EntryKind.KNOWN,
+        text='cap is 60s',
+        source=Source.CODE_SCOUT,
+        cite='queue.py:9',
+        supersedes=(2,),
+    )
+    LATER_QUESTION = LedgerEntry(
+        kind=EntryKind.OPEN,
+        text='does the cap hold under load?',
+        source=Source.USER,
+        cite='queue.py:9',
+    )
+    LATER_DECISION = LedgerEntry(kind=EntryKind.DECISION, text='ship the cap', source=Source.USER)
+
+    @pytest.fixture
+    def repo_with_a_superseded_question(
+        self, repo_linking_an_investigation: Handoff, investigation_service: InvestigationService
+    ) -> Handoff:
+        investigation_service.start(self.TARGET, started=self.STARTED)
+        investigation_service.add(Slug(LEDGER), 1, [self.QUESTION, self.DECISION])
+        investigation_service.add(Slug(LEDGER), 2, [self.ANSWER])
+        return repo_linking_an_investigation
+
+    @pytest.fixture
+    def repo_with_two_decisions_and_a_cited_question(
+        self, repo_with_a_superseded_question: Handoff, investigation_service: InvestigationService
+    ) -> Handoff:
+        investigation_service.add(Slug(LEDGER), 3, [self.LATER_QUESTION, self.LATER_DECISION])
+        return repo_with_a_superseded_question
+
+    def test_ledger_decisions_and_questions_skip_superseded_entries(
+        self, repo_with_a_superseded_question: Handoff
+    ) -> None:
+        record = repo_with_a_superseded_question.take().record.model_dump(mode='json')
+
+        assert record['open_questions'] == []
+        assert record['decisions'] == [
+            {
+                'kind': 'decision',
+                'text': 'keep the 10s floor',
+                'cite': None,
+                'from': '20260928-queue e3',
+            },
+        ]
+
+    def test_a_linked_ledger_with_entries_is_not_a_warning(
+        self, repo_with_a_superseded_question: Handoff
+    ) -> None:
+        assert repo_with_a_superseded_question.take().record.warnings == ()
+
+    def test_ledger_lines_name_their_cite_and_the_entry_they_came_from(
+        self, repo_with_two_decisions_and_a_cited_question: Handoff
+    ) -> None:
+        markdown = repo_with_two_decisions_and_a_cited_question.take().markdown
+
+        assert (
+            '## Decisions\n\n'
+            '- keep the 10s floor (20260928-queue e3)\n'
+            '- ship the cap (20260928-queue e6)\n'
+        ) in markdown
+        assert (
+            '## Open questions\n\n'
+            '- does the cap hold under load? [queue.py:9] (20260928-queue e5)\n'
+        ) in markdown
+
+    def test_the_limit_keeps_the_latest_ledger_decisions(
+        self, repo_with_two_decisions_and_a_cited_question: Handoff
+    ) -> None:
+        record = repo_with_two_decisions_and_a_cited_question.take(limit=1).record
+
+        assert [(line.text, line.origin) for line in record.decisions] == [
+            ('ship the cap', '20260928-queue e6')
         ]
 
 

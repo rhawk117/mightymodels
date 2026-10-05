@@ -31,7 +31,16 @@ SLUG = 'retry-queue'
 TICKET = Slug(SLUG)
 RUN = RunId('20260101-000000')
 PASSED, REJECTED = 0, 2
-TOOL_NAMES = ['close', 'contract', 'review', 'snapshot', 'task', 'ticket']
+TOOL_NAMES = [
+    'close',
+    'contract',
+    'crashout',
+    'investigation',
+    'review',
+    'snapshot',
+    'task',
+    'ticket',
+]
 ESCAPES = 'resolves outside .mightymodels/'
 NEEDS_GIT = 'this needs git and no git executable is on PATH'
 NOT_A_REPOSITORY = 'is not inside a git repository'
@@ -205,7 +214,6 @@ class TestSymlinkBelowTheStateDirectory:
         pytest.param(
             (SLUG, 'review'), methodcaller('review_directory', TICKET, RUN), id='ticket-reviews'
         ),
-        pytest.param(('.runtime',), methodcaller('investigation_ledger', TICKET), id='runtime'),
         pytest.param(
             ('.runtime', 'reviews', RUN.root),
             methodcaller('persona_report', None, RUN, persona=Persona.UNCLE_BOB),

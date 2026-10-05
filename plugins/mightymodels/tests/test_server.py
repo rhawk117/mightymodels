@@ -6,8 +6,11 @@ from typing import get_args, get_type_hints
 import pytest
 from mcp.types import CallToolResult
 from mightymodels_plugin.server import SERVER_NAME, TOOLS, AppState
+from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.close.service import CloseService
 from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.crashout.service import CrashoutService
+from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.snapshot.service import SnapshotService
@@ -20,6 +23,7 @@ from mightymodels_plugin.tools.tests.support import (
     text_of,
     tree,
 )
+from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
 
 SLUG = 'retry-queue'
@@ -32,7 +36,16 @@ ANSWERS = {
 }
 COMMAND = {'id': 'T1.AC-1', 'argv': ['true'], 'approved_by': 'user'}
 START = {'by': 'engineer', 'owned': ['src/queue.py']}
-TOOL_NAMES = ['close', 'contract', 'review', 'snapshot', 'task', 'ticket']
+TOOL_NAMES = [
+    'close',
+    'contract',
+    'crashout',
+    'investigation',
+    'review',
+    'snapshot',
+    'task',
+    'ticket',
+]
 
 
 def ticket_results(server: StateServer, *calls: ToolCall) -> list[CallToolResult]:
@@ -63,6 +76,13 @@ class TestStateServer:
             pytest.param('review', ['action', 'run_id', 'payload'], ['action'], id='review'),
             pytest.param('snapshot', ['slug', 'limit'], ['slug'], id='snapshot'),
             pytest.param('close', ['action', 'slug', 'closing'], ['action', 'slug'], id='close'),
+            pytest.param(
+                'investigation',
+                ['action', 'investigation_id', 'entries', 'request'],
+                ['action'],
+                id='investigation',
+            ),
+            pytest.param('crashout', ['action', 'entry'], ['action'], id='crashout'),
         ],
     )
     def test_each_tool_takes_the_arguments_the_surface_gives_it(
@@ -124,6 +144,8 @@ class TestToolProtocol:
         review_service: ReviewService,
         snapshot_service: SnapshotService,
         close_service: CloseService,
+        investigation_service: InvestigationService,
+        crashout_service: CrashoutService,
     ) -> AppState:
         return AppState(
             tickets=ticket_service,
@@ -132,6 +154,8 @@ class TestToolProtocol:
             reviews=review_service,
             snapshots=snapshot_service,
             closings=close_service,
+            investigations=investigation_service,
+            crashouts=crashout_service,
         )
 
     @pytest.mark.parametrize(
@@ -205,6 +229,34 @@ class TestOutsideARepository:
 
 
 class TestToolCalls:
+    ONE_CALL_OF_EACH_TOOL: tuple[ToolCall, ...] = (
+        ('ticket', {'action': 'show', 'slug': SLUG}),
+        ('task', {'action': 'show', 'slug': SLUG}),
+        ('contract', {'action': 'status', 'slug': SLUG}),
+        ('review', {'action': 'list'}),
+        ('snapshot', {'slug': SLUG}),
+        ('close', {'action': 'check', 'slug': SLUG}),
+        ('investigation', {'action': 'list'}),
+        ('crashout', {'action': 'stats'}),
+    )
+
+    @pytest.fixture
+    def server_with_a_staged_ticket(
+        self, state_server: StateServer, ticket_service: TicketService
+    ) -> StateServer:
+        ticket_service.write(Slug(SLUG), TicketAnswers.model_validate(ANSWERS))
+        ticket_service.validate(Slug(SLUG))
+        return state_server
+
+    def test_each_of_the_eight_tools_answers_one_call(
+        self, server_with_a_staged_ticket: StateServer
+    ) -> None:
+        results = server_with_a_staged_ticket.call(*self.ONE_CALL_OF_EACH_TOOL)
+
+        assert [name for name, _ in self.ONE_CALL_OF_EACH_TOOL] == [tool.__name__ for tool in TOOLS]
+        assert [result.is_error for result in results] == [False] * len(TOOLS)
+        assert all(result.structured_content for result in results)
+
     def test_a_ticket_is_written_validated_and_read_back(self, state_server: StateServer) -> None:
         written, validated, shown = ticket_results(
             state_server,

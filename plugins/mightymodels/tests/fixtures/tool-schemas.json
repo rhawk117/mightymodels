@@ -1237,6 +1237,18 @@
           "title": "Depth",
           "type": "string"
         },
+        "EntryKind": {
+          "enum": [
+            "target",
+            "known",
+            "open",
+            "decision",
+            "resource",
+            "next"
+          ],
+          "title": "EntryKind",
+          "type": "string"
+        },
         "FailedAttempt": {
           "properties": {
             "task": {
@@ -1268,6 +1280,40 @@
             "at"
           ],
           "title": "FailedAttempt",
+          "type": "object"
+        },
+        "LedgerLine": {
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/EntryKind"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            },
+            "cite": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cite"
+            },
+            "from": {
+              "title": "From",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "cite",
+            "from"
+          ],
+          "title": "LedgerLine",
           "type": "object"
         },
         "NotYetRecorded": {
@@ -1476,12 +1522,18 @@
               "type": "array"
             },
             "decisions": {
-              "$ref": "#/$defs/NotYetRecorded",
-              "default": []
+              "items": {
+                "$ref": "#/$defs/LedgerLine"
+              },
+              "title": "Decisions",
+              "type": "array"
             },
             "open_questions": {
-              "$ref": "#/$defs/NotYetRecorded",
-              "default": []
+              "items": {
+                "$ref": "#/$defs/LedgerLine"
+              },
+              "title": "Open Questions",
+              "type": "array"
             },
             "do_not_retry": {
               "items": {
@@ -1524,6 +1576,8 @@
             "tasks",
             "checks",
             "works",
+            "decisions",
+            "open_questions",
             "do_not_retry",
             "review",
             "warnings"
@@ -1805,8 +1859,11 @@
               "type": "array"
             },
             "decisions": {
-              "$ref": "#/$defs/NotYetRecorded",
-              "default": []
+              "items": {
+                "$ref": "#/$defs/ArchivedDecision"
+              },
+              "title": "Decisions",
+              "type": "array"
             },
             "review": {
               "anyOf": [
@@ -1852,6 +1909,7 @@
             "investigations",
             "tasks",
             "verification",
+            "decisions",
             "review",
             "gotchas"
           ],
@@ -1911,6 +1969,24 @@
             "digest"
           ],
           "title": "ArchivedCommand",
+          "type": "object"
+        },
+        "ArchivedDecision": {
+          "properties": {
+            "text": {
+              "title": "Text",
+              "type": "string"
+            },
+            "from": {
+              "title": "From",
+              "type": "string"
+            }
+          },
+          "required": [
+            "text",
+            "from"
+          ],
+          "title": "ArchivedDecision",
           "type": "object"
         },
         "ArchivedReview": {
@@ -2140,6 +2216,526 @@
         "blocked"
       ],
       "title": "CloseView",
+      "type": "object"
+    }
+  },
+  "investigation": {
+    "description": "Open an investigation, append ledger entries, or render the ledger or its knowns.",
+    "input_schema": {
+      "type": "object",
+      "$defs": {
+        "Cite": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "EntryKind": {
+          "enum": [
+            "target",
+            "known",
+            "open",
+            "decision",
+            "resource",
+            "next"
+          ],
+          "title": "EntryKind",
+          "type": "string"
+        },
+        "InvestigationAction": {
+          "enum": [
+            "start",
+            "add",
+            "render",
+            "knowns",
+            "list"
+          ],
+          "title": "InvestigationAction",
+          "type": "string"
+        },
+        "InvestigationRequest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InvestigationStart"
+            },
+            {
+              "$ref": "#/$defs/LedgerRound"
+            },
+            {
+              "$ref": "#/$defs/KnownsFilter"
+            }
+          ]
+        },
+        "InvestigationStart": {
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "title": "Target",
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/$defs/TargetKind"
+            }
+          },
+          "required": [
+            "target",
+            "kind"
+          ],
+          "title": "InvestigationStart",
+          "type": "object"
+        },
+        "KnownsFilter": {
+          "additionalProperties": false,
+          "properties": {
+            "kinds": {
+              "$ref": "#/$defs/TableKinds",
+              "default": [
+                "known",
+                "open",
+                "decision",
+                "resource"
+              ]
+            },
+            "limit": {
+              "$ref": "#/$defs/KnownsLimit",
+              "default": 40
+            }
+          },
+          "title": "KnownsFilter",
+          "type": "object"
+        },
+        "KnownsLimit": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "LedgerEntry": {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/EntryKind"
+            },
+            "text": {
+              "title": "Text",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/Source"
+            },
+            "cite": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Cite"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "supersedes": {
+              "default": [],
+              "items": {
+                "type": "integer"
+              },
+              "title": "Supersedes",
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "source"
+          ],
+          "title": "LedgerEntry",
+          "type": "object"
+        },
+        "LedgerRound": {
+          "additionalProperties": false,
+          "properties": {
+            "round": {
+              "title": "Round",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "round"
+          ],
+          "title": "LedgerRound",
+          "type": "object"
+        },
+        "Slug": {
+          "$ref": "#/$defs/SlugText",
+          "title": "Slug"
+        },
+        "SlugText": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        },
+        "Source": {
+          "enum": [
+            "code-scout",
+            "web-scout",
+            "user",
+            "primary"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "TableKind": {
+          "enum": [
+            "known",
+            "open",
+            "decision",
+            "resource"
+          ],
+          "type": "string"
+        },
+        "TableKinds": {
+          "items": {
+            "$ref": "#/$defs/TableKind"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "TargetKind": {
+          "enum": [
+            "behavior",
+            "claim",
+            "research",
+            "change"
+          ],
+          "title": "TargetKind",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/InvestigationAction"
+        },
+        "investigation_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Slug"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "entries": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/LedgerEntry"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entries"
+        },
+        "request": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InvestigationRequest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "investigationArguments"
+    },
+    "output_schema": {
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "investigation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Investigation Id"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "InvestigationView",
+      "type": "object"
+    }
+  },
+  "crashout": {
+    "description": "Journal a crashout, or report recurring patterns.",
+    "input_schema": {
+      "type": "object",
+      "$defs": {
+        "CrashoutAction": {
+          "enum": [
+            "add",
+            "stats",
+            "last"
+          ],
+          "title": "CrashoutAction",
+          "type": "string"
+        },
+        "CrashoutEntry": {
+          "additionalProperties": false,
+          "properties": {
+            "ticket": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Slug"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "branch": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Branch"
+            },
+            "severity": {
+              "$ref": "#/$defs/Severity"
+            },
+            "verdict": {
+              "$ref": "#/$defs/Verdict"
+            },
+            "rant": {
+              "$ref": "#/$defs/NotBlank"
+            },
+            "failures": {
+              "$ref": "#/$defs/Failures"
+            },
+            "root_cause": {
+              "$ref": "#/$defs/Stripped"
+            },
+            "corrective_action": {
+              "$ref": "#/$defs/Stripped"
+            },
+            "barked_back": {
+              "title": "Barked Back",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "severity",
+            "verdict",
+            "rant",
+            "failures",
+            "root_cause",
+            "corrective_action",
+            "barked_back"
+          ],
+          "title": "CrashoutEntry",
+          "type": "object"
+        },
+        "Failures": {
+          "items": {
+            "$ref": "#/$defs/NotBlank"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "NotBlank": {
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "Severity": {
+          "enum": [
+            "mild-tilt",
+            "heated",
+            "crashout",
+            "full-meltdown"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "Slug": {
+          "$ref": "#/$defs/SlugText",
+          "title": "Slug"
+        },
+        "SlugText": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        },
+        "Stripped": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "Verdict": {
+          "enum": [
+            "deserved",
+            "split",
+            "unreasonable"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/CrashoutAction"
+        },
+        "entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CrashoutEntry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "crashoutArguments"
+    },
+    "output_schema": {
+      "$defs": {
+        "JournaledCrashout": {
+          "properties": {
+            "at": {
+              "title": "At",
+              "type": "string"
+            },
+            "ticket": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket"
+            },
+            "branch": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch"
+            },
+            "severity": {
+              "$ref": "#/$defs/Severity"
+            },
+            "verdict": {
+              "$ref": "#/$defs/Verdict"
+            },
+            "rant": {
+              "title": "Rant",
+              "type": "string"
+            },
+            "failures": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Failures",
+              "type": "array"
+            },
+            "root_cause": {
+              "title": "Root Cause",
+              "type": "string"
+            },
+            "corrective_action": {
+              "title": "Corrective Action",
+              "type": "string"
+            },
+            "barked_back": {
+              "title": "Barked Back",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "at",
+            "ticket",
+            "branch",
+            "severity",
+            "verdict",
+            "rant",
+            "failures",
+            "root_cause",
+            "corrective_action",
+            "barked_back"
+          ],
+          "title": "JournaledCrashout",
+          "type": "object"
+        },
+        "Severity": {
+          "enum": [
+            "mild-tilt",
+            "heated",
+            "crashout",
+            "full-meltdown"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "Verdict": {
+          "enum": [
+            "deserved",
+            "split",
+            "unreasonable"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JournaledCrashout"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "CrashoutView",
       "type": "object"
     }
   }

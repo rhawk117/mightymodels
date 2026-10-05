@@ -2,8 +2,9 @@
 
 `Closing` is what the user says about the ticket as it closes. `ArchiveRecord` is the JSON
 prune-ticket writes beside the archive Markdown, and `ClosedArchive` carries both texts with
-their paths. The record's ledger decisions, worker runs and recorded answers read empty: the
-database holds no row for them yet.
+their paths. `ArchivedDecision` is one live decision of an investigation the ticket links, held
+to one line, with the investigation and the entry it came from under `from`. The record's worker
+runs and recorded answers read empty: the database holds no row for them yet.
 """
 
 from enum import StrEnum, auto
@@ -58,6 +59,13 @@ class ArchivedReview(BaseModel):
     reasons: dict[str, str]
 
 
+class ArchivedDecision(BaseModel):
+    model_config = ConfigDict(frozen=True, validate_by_name=True, serialize_by_alias=True)
+
+    text: str
+    origin: str = Field(alias='from')
+
+
 class WorkerRuns(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -86,7 +94,7 @@ class ArchiveRecord(BaseModel):
     investigations: tuple[str, ...]
     tasks: dict[str, ArchivedTask]
     verification: tuple[ArchivedCommand, ...]
-    decisions: NotYetRecorded = ()
+    decisions: tuple[ArchivedDecision, ...]
     review: ArchivedReview | None
     agents: WorkerRuns = WorkerRuns()
     answers: RecordedAnswers = RecordedAnswers()

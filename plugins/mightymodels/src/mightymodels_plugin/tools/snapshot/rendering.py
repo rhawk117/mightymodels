@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from mightymodels_plugin.tools.snapshot.schema import (
     CheckState,
     FailedAttempt,
+    LedgerLine,
     PassingCommand,
     ReviewDecision,
     ReviewState,
@@ -63,6 +64,11 @@ def passing_command_line(command: PassingCommand) -> str:
     return f'{command.id}: `{" ".join(command.argv)}`'
 
 
+def ledger_line(line: LedgerLine) -> str:
+    cite = '' if line.cite is None else f' [{line.cite}]'
+    return f'{line.text}{cite} ({line.origin})'
+
+
 def failed_attempt_line(attempt: FailedAttempt) -> str:
     return f'{attempt.task} {attempt.to} at {attempt.head}: {attempt.reason}'
 
@@ -95,8 +101,10 @@ def snapshot_markdown(record: SnapshotRecord) -> str:
         *section_lines(
             'Works', map(passing_command_line, record.works), empty='no passing command yet'
         ),
-        *section_lines('Decisions', record.decisions, empty='none recorded'),
-        *section_lines('Open questions', record.open_questions, empty='none recorded'),
+        *section_lines('Decisions', map(ledger_line, record.decisions), empty='none recorded'),
+        *section_lines(
+            'Open questions', map(ledger_line, record.open_questions), empty='none recorded'
+        ),
         *section_lines(
             'Do not retry',
             map(failed_attempt_line, record.do_not_retry),

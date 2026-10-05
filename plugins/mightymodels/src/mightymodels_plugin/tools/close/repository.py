@@ -3,7 +3,8 @@
 `close_transaction` opens the snapshot's transaction and hands out the close repository built on
 that transaction's session, so the close service never sees a session. The repository carries the
 snapshot repository as `recorded`: a closing is blocked by, and archives, what the ticket, task,
-contract and review domains recorded, and it reads those rows in the transaction it writes in.
+contract, review and investigation domains recorded, and it reads those rows in the transaction it
+writes in.
 
 `record_closing` is the only write. It marks the ticket closed and stores the closing's row
 together, so no ticket reads closed without its closing.

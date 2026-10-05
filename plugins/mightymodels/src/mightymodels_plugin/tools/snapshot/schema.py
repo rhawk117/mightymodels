@@ -4,6 +4,9 @@
 tool takes no action from the model: `SnapshotAction` has the one member its handler is filed
 under, and the schema does not show it.
 
+`LedgerLine` is one live entry of an investigation the ticket links, with the investigation and
+the entry it came from under `from`.
+
 `NotYetRecorded` is the type of a section the database holds nothing for yet. It reads empty and
 admits no entry.
 """
@@ -15,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from mightymodels_plugin.routing import Depth, Scope
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.investigation.schema import EntryKind
 from mightymodels_plugin.tools.review.schema import Decision
 from mightymodels_plugin.tools.ticket.schema import TicketStatus, Tracker
 
@@ -80,6 +84,15 @@ class FailedAttempt(BaseModel):
     at: str
 
 
+class LedgerLine(BaseModel):
+    model_config = ConfigDict(frozen=True, validate_by_name=True, serialize_by_alias=True)
+
+    kind: EntryKind
+    text: str
+    cite: str | None
+    origin: str = Field(alias='from')
+
+
 class ReviewDecision(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -110,8 +123,8 @@ class SnapshotRecord(BaseModel):
     tasks: tuple[TaskState, ...]
     checks: tuple[CheckState, ...]
     works: tuple[PassingCommand, ...]
-    decisions: NotYetRecorded = ()
-    open_questions: NotYetRecorded = ()
+    decisions: tuple[LedgerLine, ...]
+    open_questions: tuple[LedgerLine, ...]
     do_not_retry: tuple[FailedAttempt, ...]
     review: ReviewState | None
     answers: NotYetRecorded = ()

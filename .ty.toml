@@ -10,7 +10,6 @@ exclude-scripts = true
 exclude = [
     "plugins/**/assets/*.template.py",
     "plugins/**/assets/template/**",
-    "plugins/mightymodels/skills/lets-investigate/scripts/ledger.py",  # T6
 ]
 
 [analysis]

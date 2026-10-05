@@ -3,9 +3,12 @@
 `ticket_transaction` opens a transaction on the database and hands out the repository, so the
 ticket service never sees a session. A domain that reads ticket rows inside its own transaction
 builds a `TicketRepository` on that transaction's session.
+
+A ticket links investigations by id, and `unrecorded_investigations` says which of them have no
+ledger, read through the investigation repository on the same session.
 """
 
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Iterable, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -14,6 +17,7 @@ from sqlalchemy.orm import Session
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.investigation.repository import InvestigationRepository
 from mightymodels_plugin.tools.ticket.schema import TicketSection, TicketStatus
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 
@@ -57,6 +61,10 @@ class TicketRepository:
             validated_at=section.validated_at,
         )
         return self.session.merge(row)
+
+    def unrecorded_investigations(self, linked: Iterable[Slug]) -> list[Slug]:
+        investigations = InvestigationRepository(session=self.session)
+        return [slug for slug in linked if not investigations.has_entries(slug)]
 
     def mark_in_progress(self, slug: Slug) -> None:
         self.staged_row(slug).status = TicketStatus.IN_PROGRESS

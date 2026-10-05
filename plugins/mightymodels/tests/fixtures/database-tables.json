@@ -12,6 +12,12 @@
     "sql": "CREATE TABLE contract_commands (\n\tslug VARCHAR NOT NULL, \n\tcommand_id VARCHAR NOT NULL, \n\ttask_id VARCHAR, \n\targv JSON NOT NULL, \n\texpect_exit INTEGER NOT NULL, \n\ttimeout INTEGER NOT NULL, \n\tapproved_by VARCHAR NOT NULL, \n\tapproved_at VARCHAR NOT NULL, \n\thead VARCHAR, \n\tPRIMARY KEY (slug, command_id)\n)"
   },
   {
+    "type": "table",
+    "name": "crashouts",
+    "tbl_name": "crashouts",
+    "sql": "CREATE TABLE crashouts (\n\tid INTEGER NOT NULL, \n\tat VARCHAR NOT NULL, \n\tticket VARCHAR, \n\tbranch VARCHAR, \n\tseverity VARCHAR NOT NULL, \n\tverdict VARCHAR NOT NULL, \n\trant VARCHAR NOT NULL, \n\tfailures JSON NOT NULL, \n\troot_cause VARCHAR NOT NULL, \n\tcorrective_action VARCHAR NOT NULL, \n\tbarked_back BOOLEAN NOT NULL, \n\tPRIMARY KEY (id)\n)"
+  },
+  {
     "type": "index",
     "name": "ix_receipts_slug",
     "tbl_name": "receipts",
@@ -28,6 +34,12 @@
     "name": "ix_task_transitions_slug",
     "tbl_name": "task_transitions",
     "sql": "CREATE INDEX ix_task_transitions_slug ON task_transitions (slug)"
+  },
+  {
+    "type": "table",
+    "name": "ledger_entries",
+    "tbl_name": "ledger_entries",
+    "sql": "CREATE TABLE ledger_entries (\n\tinvestigation_id VARCHAR NOT NULL, \n\tseq INTEGER NOT NULL, \n\tround INTEGER NOT NULL, \n\tkind VARCHAR NOT NULL, \n\ttext VARCHAR NOT NULL, \n\tsource VARCHAR NOT NULL, \n\tcite VARCHAR, \n\tsupersedes JSON NOT NULL, \n\tat VARCHAR NOT NULL, \n\thead VARCHAR, \n\tPRIMARY KEY (investigation_id, seq)\n)"
   },
   {
     "type": "table",
@@ -69,6 +81,12 @@
     "type": "index",
     "name": "sqlite_autoindex_contract_commands_1",
     "tbl_name": "contract_commands",
+    "sql": null
+  },
+  {
+    "type": "index",
+    "name": "sqlite_autoindex_ledger_entries_1",
+    "tbl_name": "ledger_entries",
     "sql": null
   },
   {

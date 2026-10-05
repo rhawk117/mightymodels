@@ -25,10 +25,11 @@ from mightymodels_plugin.database import Database
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.redaction import redact
 from mightymodels_plugin.slug import Slug
-from mightymodels_plugin.tools.close.rendering import archive_markdown
+from mightymodels_plugin.tools.close.rendering import DECISION_LIMIT, archive_markdown
 from mightymodels_plugin.tools.close.repository import CloseRepository, close_transaction
 from mightymodels_plugin.tools.close.schema import (
     ArchivedCommand,
+    ArchivedDecision,
     ArchivedReview,
     ArchivedTask,
     ArchiveRecord,
@@ -37,6 +38,8 @@ from mightymodels_plugin.tools.close.schema import (
     Closing,
 )
 from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
+from mightymodels_plugin.tools.investigation.ledger import Ledger, linked_ledgers
+from mightymodels_plugin.tools.investigation.schema import EntryKind
 from mightymodels_plugin.tools.review.schema import Result
 from mightymodels_plugin.tools.snapshot.latest_review import LatestReview, latest_review_of
 from mightymodels_plugin.tools.snapshot.repository import SnapshotRepository
@@ -182,6 +185,15 @@ def archived_review(review: LatestReview | None) -> ArchivedReview | None:
     )
 
 
+def archived_decisions(ledgers: Sequence[Ledger]) -> tuple[ArchivedDecision, ...]:
+    decisions = [
+        ArchivedDecision(text=one_line(record.text), origin=ledger.origin_of(record))
+        for ledger in ledgers
+        for record in ledger.live_of_kind(EntryKind.DECISION)
+    ]
+    return tuple(decisions[-DECISION_LIMIT:])
+
+
 def archive_record(
     recorded: SnapshotRepository, unit: WorkUnit, closing: Closing, *, head: str | None
 ) -> ArchiveRecord:
@@ -203,6 +215,9 @@ def archive_record(
         verification=tuple(
             archived_command(command, receipts.get(command.command_id))
             for command in recorded.contracts.commands(slug)
+        ),
+        decisions=archived_decisions(
+            linked_ledgers(recorded.investigations, unit.investigations).ledgers
         ),
         review=archived_review(latest_review_of(recorded.reviews, slug)),
         gotchas=closing.gotchas,

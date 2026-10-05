@@ -2,12 +2,15 @@
 
 from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
 
 import pytest
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.investigation.schema import InvestigationStart, TargetKind
+from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskStart
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.task.tables import TaskRow
@@ -40,6 +43,9 @@ ANSWERS = {
     'context': CONTEXT,
     'issue': 42,
 }
+INVESTIGATION_TARGET = InvestigationStart(target='inv a', kind=TargetKind.BEHAVIOR)
+INVESTIGATION_STARTED = datetime(2026, 9, 28, tzinfo=UTC)
+STARTED_INVESTIGATION = '20260928-inv-a'
 
 
 def write(tickets: TicketService, answers: object) -> TicketView:
@@ -114,6 +120,11 @@ class Workspace:
 @pytest.fixture
 def workspace(ticket_service: TicketService) -> Workspace:
     return Workspace(tickets=ticket_service)
+
+
+@pytest.fixture
+def started_investigation(investigation_service: InvestigationService) -> None:
+    investigation_service.start(INVESTIGATION_TARGET, started=INVESTIGATION_STARTED)
 
 
 @pytest.fixture
@@ -220,20 +231,19 @@ def test_retired_worker_keys_are_refused(workspace: Workspace) -> None:
 def test_linked_investigations_must_exist(workspace: Workspace) -> None:
     outcome = workspace.run('write', {**ANSWERS, 'investigations': ['20260928-missing']})
     assert outcome.code == REJECTED
-    assert 'investigation 20260928-missing has no ledger file' in outcome.err
+    assert 'investigation 20260928-missing has no ledger' in outcome.err
+    assert 'ledger file' not in outcome.err
 
 
+@pytest.mark.usefixtures('started_investigation')
 def test_revalidation_keeps_progress_and_only_adds_links(workspace: Workspace) -> None:
-    runtime = workspace.root.joinpath('.mightymodels', '.runtime', 'investigations')
-    runtime.mkdir(parents=True)
-    runtime.joinpath('inv-a.jsonl').write_text('', encoding='utf-8')
-    workspace.run('write', {**ANSWERS, 'investigations': ['inv-a']})
+    workspace.run('write', {**ANSWERS, 'investigations': [STARTED_INVESTIGATION]})
     workspace.run('validate')
     workspace.verify_first_task()
     workspace.run('validate')
     refreshed = workspace.unit()
     assert (refreshed.status, workspace.tasks()) == ('in-progress', {'T1': 'verified'})
-    assert list(refreshed.investigations) == ['inv-a']
+    assert list(refreshed.investigations) == [STARTED_INVESTIGATION]
 
 
 def test_exclude_goes_to_the_common_dir_from_a_worktree(

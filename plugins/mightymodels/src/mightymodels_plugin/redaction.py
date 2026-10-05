@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from types import MappingProxyType
 
 SECRET_PATTERNS: Mapping[str, re.Pattern[str]] = MappingProxyType(
@@ -26,7 +27,19 @@ SECRET_PATTERNS: Mapping[str, re.Pattern[str]] = MappingProxyType(
 )
 
 
-def redact(text: str) -> str:
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Redaction:
+    text: str
+    hits: int
+
+
+def redaction_of(text: str) -> Redaction:
+    hits = 0
     for name, pattern in SECRET_PATTERNS.items():
-        text = pattern.sub(f'[REDACTED:{name}]', text)
-    return text
+        text, replaced = pattern.subn(f'[REDACTED:{name}]', text)
+        hits += replaced
+    return Redaction(text=text, hits=hits)
+
+
+def redact(text: str) -> str:
+    return redaction_of(text).text

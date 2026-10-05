@@ -22,6 +22,14 @@ from mightymodels_plugin.tools.close.tables import ClosingRow
 from mightymodels_plugin.tools.contract.repository import contract_transaction
 from mightymodels_plugin.tools.contract.schema import ContractCommand, Outcome, Phase, Receipt
 from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.investigation.schema import (
+    EntryKind,
+    InvestigationStart,
+    LedgerEntry,
+    Source,
+    TargetKind,
+)
+from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.review.schema import (
     Decision,
     DisposePayload,
@@ -40,7 +48,7 @@ from mightymodels_plugin.tools.task.schema import Implementer, Status
 from mightymodels_plugin.tools.tests.support import StateServer, tree
 from mightymodels_plugin.tools.ticket.repository import ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
-from mightymodels_plugin.tools.ticket.service import TicketService
+from mightymodels_plugin.tools.ticket.service import TicketService, unit_of
 
 type GitRunner = Callable[..., str]
 
@@ -52,6 +60,12 @@ IDENTITY = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
 NEEDS_GIT = 'git was not consulted: this needs git and no git executable is on PATH\n'
 REVIEWED = datetime(2026, 9, 28, 12, tzinfo=UTC)
 ARCHIVE = f'.mightymodels/archives/{SLUG}.md'
+LEDGER = '20260928-queue'
+LEDGER_TARGET = InvestigationStart(target='queue', kind=TargetKind.BEHAVIOR)
+LEDGER_STARTED = datetime(2026, 9, 28, tzinfo=UTC)
+LEDGER_DECISION = LedgerEntry(
+    kind=EntryKind.DECISION, text='keep the\n10s floor', source=Source.USER
+)
 ANSWERS: Mapping[str, object] = MappingProxyType(
     {
         'summary': 'Retry queue drains slowly',
@@ -197,6 +211,16 @@ def committed(staged: Repo) -> Repo:
 def repo(committed: Repo) -> Repo:
     committed.record_verified_work()
     return committed
+
+
+@pytest.fixture
+def repo_with_a_ledger_decision(repo: Repo, investigation_service: InvestigationService) -> Repo:
+    investigation_service.start(LEDGER_TARGET, started=LEDGER_STARTED)
+    investigation_service.add(Slug(LEDGER), 1, [LEDGER_DECISION])
+    with ticket_transaction(repo.closings.database) as repository:
+        section = unit_of(repository.staged_row(TICKET)).ticket
+        repository.stage(TICKET, section, [LEDGER])
+    return repo
 
 
 class TestCheck:
@@ -417,16 +441,22 @@ class TestClose:
     def closed(self, repo: Repo) -> CloseView:
         return repo.closings.close(TICKET, CLOSING)
 
-    def test_close_writes_a_bounded_archive_and_marks_the_unit_closed(self, repo: Repo) -> None:
-        view = repo.closings.close(TICKET, CLOSING)
+    def test_close_writes_a_bounded_archive_and_marks_the_unit_closed(
+        self, repo_with_a_ledger_decision: Repo
+    ) -> None:
+        view = repo_with_a_ledger_decision.closings.close(TICKET, CLOSING)
 
         assert view.archive is not None
         record = view.archive.record.model_dump(mode='json')
         assert not view.blocked
         assert len(view.archive.markdown.splitlines()) <= ARCHIVE_LINES
         assert 'PR: https://x/pull/7 · tracker: #42' in view.archive.markdown
+        assert '- keep the 10s floor (20260928-queue e2)' in view.archive.markdown
         assert record['verification'][0]['argv'] == ['uv', 'run', 'pytest']
-        assert (repo.ticket_status(), repo.recorded_archive()) == ('closed', ARCHIVE)
+        assert (
+            repo_with_a_ledger_decision.ticket_status(),
+            repo_with_a_ledger_decision.recorded_archive(),
+        ) == ('closed', ARCHIVE)
 
     def test_close_returns_the_archive_for_the_agent_to_write(self, repo: Repo) -> None:
         head = repo.git('rev-parse', 'HEAD')
@@ -508,6 +538,18 @@ class TestClose:
         assert tree(connected_server.root) == tree_after_the_connect
 
 
+class TestLedgerDecisions:
+    def test_the_archive_record_holds_each_ledger_decision_on_one_line(
+        self, repo_with_a_ledger_decision: Repo
+    ) -> None:
+        view = repo_with_a_ledger_decision.closings.close(TICKET, CLOSING)
+
+        assert view.archive is not None
+        assert view.archive.record.model_dump(mode='json')['decisions'] == [
+            {'text': 'keep the 10s floor', 'from': '20260928-queue e2'}
+        ]
+
+
 class TestTheLongestArchive:
     FOUR_LINES_ONE_BLANK = CLOSING.model_copy(
         update={'gotchas': ('first', '   ', 'second\nline', 'third')}
@@ -525,6 +567,21 @@ class TestTheLongestArchive:
         }
         repo.reviews.dispose(run, DisposePayload(by='user', decisions=decisions))
         return repo
+
+    @pytest.mark.usefixtures('repo_with_a_ledger_decision')
+    def test_ledger_decisions_come_first_and_review_reasons_fill_what_is_left_of_four(
+        self, repo_with_six_accepted_findings: Repo
+    ) -> None:
+        view = repo_with_six_accepted_findings.closings.close(TICKET, self.FOUR_LINES_ONE_BLANK)
+
+        assert view.archive is not None
+        assert view.archive.markdown.splitlines()[7:12] == [
+            'decisions:',
+            '- keep the 10s floor (20260928-queue e2)',
+            '- review F1: reason 1',
+            '- review F2: reason 2',
+            '- review F3: reason 3',
+        ]
 
     def test_the_longest_archive_keeps_three_gotchas_and_four_decisions(
         self, repo_with_six_accepted_findings: Repo

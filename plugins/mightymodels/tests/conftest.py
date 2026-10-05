@@ -12,6 +12,8 @@ CONCEPTS = (
     'tools.review',
     'tools.snapshot',
     'tools.close',
+    'tools.investigation',
+    'tools.crashout',
 )
 
 

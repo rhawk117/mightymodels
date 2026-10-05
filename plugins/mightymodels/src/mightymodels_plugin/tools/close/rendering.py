@@ -1,8 +1,9 @@
 """The Markdown of an archive: what a closed ticket shipped, in a fixed and bounded set of lines.
 
 Each part of the record is one line, the decisions and the gotchas are bulleted under their own
-line and capped, and the last line names the JSON record beside the archive. The longest archive
-is well under `ARCHIVE_LINES`.
+line and capped, and the last line names the JSON record beside the archive. The decisions are the
+linked ledgers' first and the review's reasons after, as many as the cap leaves room for. The
+longest archive is well under `ARCHIVE_LINES`.
 """
 
 from collections.abc import Mapping, Sequence
@@ -78,10 +79,12 @@ def worker_runs_line(agents: WorkerRuns) -> str:
     return f'agents: {agents.runs} runs' + (f' ({detail})' if detail else '')
 
 
-def decision_lines(review: ArchivedReview | None) -> list[str]:
-    reasons = {} if review is None else review.reasons
+def decision_lines(record: ArchiveRecord) -> list[str]:
+    decided = [f'{decision.text} ({decision.origin})' for decision in record.decisions]
+    reasons = {} if record.review is None else record.review.reasons
     reviewed = (f'review {finding_id}: {reason}' for finding_id, reason in reasons.items())
-    return bullet_lines(islice(reviewed, DECISION_LIMIT), NONE_RECORDED)
+    accepted = islice(reviewed, DECISION_LIMIT - len(decided))
+    return bullet_lines([*decided, *accepted], NONE_RECORDED)
 
 
 def archive_markdown(record: ArchiveRecord, record_name: str) -> str:
@@ -94,7 +97,7 @@ def archive_markdown(record: ArchiveRecord, record_name: str) -> str:
         worker_runs_line(record.agents),
         f'answers: {record.answers.recorded} recorded through ask_user',
         'decisions:',
-        *decision_lines(record.review),
+        *decision_lines(record),
         'gotchas:',
         *bullet_lines(record.gotchas, NONE_RECORDED),
         f'details: {ARCHIVES_DIRECTORY}/{record_name}',

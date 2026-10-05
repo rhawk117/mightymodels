@@ -2,6 +2,7 @@
 
 import inspect
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,8 @@ from mightymodels_plugin.slug import (
     Slug,
     parsed_slug,
 )
+from mightymodels_plugin.tools.investigation.schema import InvestigationStart, TargetKind
+from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.review.schema import StartPayload
 from mightymodels_plugin.tools.review.tables import ReviewFindingRow
 from mightymodels_plugin.tools.tests.support import (
@@ -163,9 +166,6 @@ class TestSlugType:
         assert workspace_at(tmp_path).task_brief(slug, 3) == state.joinpath(
             raw, 'briefs', 'task-03.md'
         )
-        assert workspace_at(tmp_path).investigation_ledger(slug) == state.joinpath(
-            '.runtime', 'investigations', f'{raw}.jsonl'
-        )
 
     def test_slug_confinement_every_slug_taking_tool_uses_the_one_slug_type(self) -> None:
         taking_a_slug = [tool for tool in TOOLS if 'slug' in inspect.signature(tool).parameters]
@@ -263,6 +263,13 @@ class TestInsideTheStateDirectory:
         (name, {**arguments, 'slug': 'retry-queue'}) for _, name, arguments in TOOL_CALLS
     )
 
+    TARGET = InvestigationStart(target='Queue drains slowly', kind=TargetKind.BEHAVIOR)
+    STARTED = datetime(2026, 9, 28, tzinfo=UTC)
+
+    @pytest.fixture
+    def started_investigation(self, investigation_service: InvestigationService) -> None:
+        investigation_service.start(self.TARGET, started=self.STARTED)
+
     def stage(self, tickets: TicketService, investigations: list[str]) -> str:
         answers = TicketAnswers.model_validate({**ANSWERS, 'investigations': investigations})
         try:
@@ -271,12 +278,14 @@ class TestInsideTheStateDirectory:
         except InvalidTicketError as error:
             return str(error)
 
+    @pytest.mark.usefixtures('started_investigation')
     def test_slug_confinement_a_written_investigation_id_cannot_name_a_file_outside(
         self, project: Path, ticket_service: TicketService
     ) -> None:
         assert f'investigation {OUTSIDE} is not a valid id' in self.stage(ticket_service, [OUTSIDE])
         assert not workspace_at(project).ticket_file(Slug('retry-queue')).exists()
 
+    @pytest.mark.usefixtures('started_investigation')
     def test_slug_confinement_a_hand_edited_investigation_id_cannot_name_a_file_outside(
         self, project: Path, ticket_service: TicketService
     ) -> None:

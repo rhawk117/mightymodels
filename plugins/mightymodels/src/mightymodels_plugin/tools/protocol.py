@@ -27,6 +27,8 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.tools.close.service import CloseService
 from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.tools.crashout.service import CrashoutService
+from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.snapshot.service import SnapshotService
 from mightymodels_plugin.tools.task.service import TaskService
@@ -67,6 +69,12 @@ class LifespanState(Protocol):
 
     @property
     def closings(self) -> CloseService: ...
+
+    @property
+    def investigations(self) -> InvestigationService: ...
+
+    @property
+    def crashouts(self) -> CrashoutService: ...
 
 
 @contextmanager

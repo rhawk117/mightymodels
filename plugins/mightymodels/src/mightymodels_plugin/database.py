@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from mightymodels_plugin.declarative import Base
 from mightymodels_plugin.tools.close.tables import ClosingRow
 from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
+from mightymodels_plugin.tools.crashout.tables import CrashoutRow
+from mightymodels_plugin.tools.investigation.tables import LedgerEntryRow
 from mightymodels_plugin.tools.review.tables import (
     ReviewDispositionRow,
     ReviewFindingRow,
@@ -41,6 +43,8 @@ ROW_TYPES: tuple[type[Base], ...] = (
     ReviewDispositionRow,
     ReviewOutcomeRow,
     ClosingRow,
+    LedgerEntryRow,
+    CrashoutRow,
 )
 
 

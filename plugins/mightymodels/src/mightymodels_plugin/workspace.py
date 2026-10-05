@@ -275,9 +275,6 @@ class Workspace:
     def task_brief(self, slug: Slug, number: int) -> Path:
         return self.contained(slug.root, 'briefs', f'task-{number:02d}.md')
 
-    def investigation_ledger(self, investigation: Slug) -> Path:
-        return self.contained(RUNTIME_DIRECTORY, 'investigations', f'{investigation.root}.jsonl')
-
     def review_directory(self, slug: Slug | None, run: RunId) -> Path:
         return self.contained(*review_parts(slug, run))
 
