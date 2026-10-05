@@ -2,7 +2,7 @@
 
 import json
 import os
-from collections.abc import AsyncGenerator, Generator, Mapping
+from collections.abc import AsyncGenerator, Callable, Generator, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 
@@ -14,6 +14,7 @@ from mcp.types import ToolAnnotations
 
 from python_harness.core.errors import PythonHarnessError
 from python_harness.core.output import COMPACT_SEPARATORS, to_json_value
+from python_harness.core.workspace import Workspace
 from python_harness.documentation.repository import documentation_http_client
 from python_harness.documentation.services import (
     DocumentationService,
@@ -137,6 +138,10 @@ class DocumentationTools:
 class ProjectTools:
     environment: Mapping[str, str]
 
+    def answer[Request](self, run: Callable[[Workspace, Request], object], request: Request) -> str:
+        with tool_errors():
+            return render_document(run(open_project(self.environment), request))
+
     def collect_python_facts(
         self, *, paths: ProjectPaths, with_function_shapes: FunctionShapes = False
     ) -> str:
@@ -147,8 +152,7 @@ class ProjectTools:
         never verdicts.
         """
         request = FactsRequest(paths=paths, with_function_shapes=with_function_shapes)
-        with tool_errors():
-            return render_document(facts_use_case.run(open_project(self.environment), request))
+        return self.answer(facts_use_case.run, request)
 
     def map_python_calls(
         self, *, paths: ProjectPaths, symbol: SymbolReference | None = None
@@ -160,8 +164,7 @@ class ProjectTools:
         path and line. Resolution is static, so dynamic use is not seen.
         """
         request = CallsRequest(paths=paths, symbol=symbol)
-        with tool_errors():
-            return render_document(calls_use_case.run(open_project(self.environment), request))
+        return self.answer(calls_use_case.run, request)
 
     def check_citations(self, *, path: DocumentPath = '', text: DocumentText = '') -> str:
         """Check every path.py:line citation and its backticked quote in Markdown, as JSON.
@@ -171,8 +174,7 @@ class ProjectTools:
         lists are empty. A failed check is a report, not an error.
         """
         request = CitationsRequest(path=path or None, text=text or None)
-        with tool_errors():
-            return render_document(citations_use_case.run(open_project(self.environment), request))
+        return self.answer(citations_use_case.run, request)
 
     def plan_review_surface(
         self,
@@ -189,8 +191,7 @@ class ProjectTools:
         other modules that depend on them.
         """
         request = SurfaceRequest(paths=paths, diff_base=diff_base, diff_head=diff_head)
-        with tool_errors():
-            return render_document(surface_use_case.run(open_project(self.environment), request))
+        return self.answer(surface_use_case.run, request)
 
 
 def build_server(
