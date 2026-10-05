@@ -1,6 +1,6 @@
 """Tunable limits for retrieval, caching, and matching; overridable per environment."""
 
-from typing import Annotated, Self
+from typing import Annotated, NamedTuple, Self
 
 from pydantic import (
     AllowInfNan,
@@ -13,6 +13,8 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from python_harness.documentation.errors import CapacityError
+
 type PositiveSeconds = Annotated[PositiveFloat, AllowInfNan(allow_inf_nan=False)]
 type NonNegativeSeconds = Annotated[NonNegativeFloat, AllowInfNan(allow_inf_nan=False)]
 type CacheTTL = Annotated[PositiveSeconds, Field(le=24 * 60 * 60)]
@@ -20,9 +22,17 @@ type MatchScore = Annotated[float, Field(ge=0, le=100)]
 type Ratio = Annotated[float, Field(ge=0, le=1)]
 
 
-class CapacityError(ValueError):
-    def __init__(self, larger: str, smaller: str) -> None:
-        super().__init__(f'{larger} must be at least {smaller}')
+class CapacityRule(NamedTuple):
+    larger: str
+    smaller: str
+
+
+CAPACITY_RULES = (
+    CapacityRule('page_cache_bytes', 'download_max_bytes'),
+    CapacityRule('section_cache_characters', 'download_max_bytes'),
+    CapacityRule('download_max_bytes', 'download_chunk_bytes'),
+    CapacityRule('http_max_connections', 'http_max_keepalive_connections'),
+)
 
 
 class Settings(BaseSettings):
@@ -59,16 +69,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode='after')
     def validate_capacity(self) -> Self:
-        if self.page_cache_bytes < self.download_max_bytes:
-            msg = 'page_cache_bytes'
-            raise CapacityError(msg, 'download_max_bytes')
-        if self.section_cache_characters < self.download_max_bytes:
-            msg = 'section_cache_characters'
-            raise CapacityError(msg, 'download_max_bytes')
-        if self.download_max_bytes < self.download_chunk_bytes:
-            msg = 'download_max_bytes'
-            raise CapacityError(msg, 'download_chunk_bytes')
-        if self.http_max_connections < self.http_max_keepalive_connections:
-            msg = 'http_max_connections'
-            raise CapacityError(msg, 'http_max_keepalive_connections')
+        if (broken := next(filter(self.breaks, CAPACITY_RULES), None)) is not None:
+            raise CapacityError(broken.larger, broken.smaller)
         return self
+
+    def breaks(self, rule: CapacityRule) -> bool:
+        return int(getattr(self, rule.larger)) < int(getattr(self, rule.smaller))
