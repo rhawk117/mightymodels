@@ -1,36 +1,30 @@
-# Snapshot schema (version 1)
+# Snapshot schema
 
-Read before changing `scripts/snapshot.py`, before another component writes one of the files it reads, and when a snapshot carries warnings. The snapshot is objective, file-backed state; BATON.md adds only what no file holds.
+Read before another component writes a table the `snapshot` tool reads, and when a snapshot carries warnings. The snapshot is objective state, read from the database and git; BATON.md adds only what no table holds.
 
 ## Output
 
-`.mightymodels/SLUG/handoffs/snapshot.json` and `snapshot.md`, regenerated whole on every run with atomic replacement. Never tracked by git. Each list holds at most `--limit` entries (default 8), the most recent kept, except `checks`, which lists every contract command.
+The tool writes no file. Its answer holds `record` (the JSON below), `markdown`, and the two paths `record_path` and `markdown_path`, which are `.mightymodels/SLUG/handoffs/snapshot.json` and `snapshot.md` relative to the repository root. The agent writes both whole on every run; never tracked by git. Each list holds at most `limit` entries (default 20, at most 100), the most recent kept, except `tasks` and `checks`, which list every task and every contract command. The changed paths in `repository` are cut to `limit` too; `dirty_count` is not.
 
-| Key                           | Source                                              | Holds                                                                                            |
-| ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `ticket`                      | `work-unit.json`                                    | summary, status, scope, tracker                                                                  |
-| `repository`                  | `.git` files, `git status --porcelain`              | branch, HEAD, count and list of changed paths                                                    |
-| `tasks`                       | `work-unit.json` progress, contract ids             | every started task with status, attempts, reasons; contract tasks never started                  |
-| `checks`                      | `verification/contract.json`, `receipts.jsonl`      | each command: `pass`/`fail`/`timeout`/`not-found` at HEAD, `stale (...)`, or `never-run`         |
-| `works`                       | the same                                            | commands whose latest receipt passed, with their argv                                            |
-| `decisions`, `open_questions` | linked ledgers (`.runtime/investigations/ID.jsonl`) | live `decision` and `open` entries, superseded ones dropped                                      |
-| `do_not_retry`                | `transitions.jsonl`                                 | attempts that ended `failed` or `blocked`, with the reason and HEAD                              |
-| `review`                      | the latest `review/RUN/`                            | run, depth, finding count, undecided ids, remediation still open, non-fix decisions with reasons |
-| `answers`                     | `.runtime/decisions/receipts.jsonl`                 | this ticket's most recent ask_user answers                                                       |
-| `subagents`                   | `.runtime/subagents/receipts.jsonl`                 | this ticket's most recent worker results                                                         |
-| `warnings`                    | the reader                                          | missing linked ledgers, unreadable lines, unsupported versions                                   |
+| Key                           | Source                                                    | Holds                                                                                                         |
+| ----------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ticket`                      | `tickets` row                                             | summary, status, scope, tracker                                                                               |
+| `repository`                  | git: branch, HEAD, `status --porcelain`                   | branch, HEAD, count and list of changed paths                                                                 |
+| `tasks`                       | `tasks`, `task_attempts` rows, plan tasks of the contract | every started task with status, attempts, reasons; plan tasks with contract commands never started as `not started` |
+| `checks`                      | `contract_commands`, `receipts` rows                      | each command: the latest receipt's outcome at HEAD, `stale (OUTCOME at OLD-HEAD)`, or `never-run`                     |
+| `works`                       | the same                                                  | commands whose latest receipt passed, at any HEAD, with their argv                                            |
+| `decisions`, `open_questions` | `ledger_entries` of the linked investigations             | live `decision` and `open` entries, superseded ones dropped, each with its investigation and entry under `from` |
+| `do_not_retry`                | `task_transitions` rows                                   | transitions into `failed` or `blocked`, with the reason and HEAD                                              |
+| `review`                      | the latest `review_runs` row and its findings            | run, depth, finding count, undecided ids, remediation still open, non-fix decisions with reasons              |
+| `answers`, `subagents`        | none yet                                                  | present and empty until the recorder hooks record rows                                                        |
+| `warnings`                    | the reader                                                | git not consulted (no git binary, or not a repository), linked investigations with no ledger                  |
 
-A source that does not exist is empty. A record whose `schema` is not 1 is skipped and named in `warnings`; nothing is guessed.
+A section with nothing to show reads as one line in the Markdown saying so. With no git, `repository` is empty and a warning says why.
 
 ## Hook receipts
 
-Written by the plugin's hooks (`src/mightymodels_plugin/hooks.py`), append-only and repository-scoped; the full shapes are `references/state/receipt.schema.json` at the plugin root, generated from the structs in `src/mightymodels_plugin/workflow_state.py`.
+The `answers` and `subagents` sections stay in the record and read empty. The database holds no row for a user's answer or a worker's stop yet; the recorder hooks will write them, and the sections fill from those rows when they do. The snapshot does not infer them.
 
-- `.mightymodels/.runtime/subagents/receipts.jsonl`, one per mightymodels worker stop (subagent-recorder): `agent`, `agent_id`, `agent_type`, `status`, `ticket`, `head`, `at`, `summary`, `stop_reason`, `evidence`, `unavailable`.
-- `.mightymodels/.runtime/decisions/receipts.jsonl`, one per ask_user answer (decision-recorder): `id`, `ticket`, `head`, `at`, `session`, `question`, `answer`, `options`, `unavailable`.
+## Writers of what it reads
 
-`ticket` is the ticket whose `work-unit.json` names the checked-out branch, or `null` when none does; snapshot.py keeps only receipts whose `ticket` matches. `status` is the worker's own vocabulary as its report states it. `unavailable` names the fields the CLI payload did not carry; they are never inferred.
-
-## Readers other than snapshot.py
-
-snapshot.py reads files that other scripts own: `ledger.py`, `verification.py`, `task_state.py`, and `review_state.py` stay their only writers. The schemas those scripts document are the contract, so a change to one of them updates this reader in the same change.
+The snapshot reads rows other tools own. `ticket` writes `tickets`, and `task` (in progress) and `close` (closed) move its status; `task` writes the task rows; `contract` writes `contract_commands`; `mightymodels verify run` writes `receipts`; `investigation` writes `ledger_entries`; `review` writes the review rows. The row shapes are the contract, so a change to one of them updates this reader in the same change.
