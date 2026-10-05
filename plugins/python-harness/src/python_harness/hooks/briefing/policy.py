@@ -8,13 +8,11 @@ from python_harness.hooks.briefing.domain import (
     ConfigTable,
     ConflictingPytestTables,
     Declaration,
-    IniDocument,
     IniRead,
-    MissingFile,
     PytestCandidate,
     PytestConfig,
+    ScanProblem,
     TomlRead,
-    UnreadableFile,
 )
 from python_harness.survey.domain import PYPROJECT, ProjectManifest
 from python_harness.survey.util import read_nested_table, read_strings, read_table
@@ -50,11 +48,11 @@ def is_workspace_member(workspace: ConfigTable, relative: PurePosixPath) -> bool
 
 
 def unreadable_pytest(
-    read: UnreadableFile, label: str, candidate: PytestCandidate
+    problems: tuple[ScanProblem, ...], label: str, candidate: PytestCandidate
 ) -> PytestConfig | None:
     if not candidate.matches_when_empty:
         return None
-    return PytestConfig(ConfigSource(label, candidate.section), EMPTY_TABLE, (read,))
+    return PytestConfig(ConfigSource(label, candidate.section), EMPTY_TABLE, problems)
 
 
 def ini_options_config(table: ConfigTable, label: str, candidate: PytestCandidate) -> PytestConfig:
@@ -75,18 +73,18 @@ def pytest_from_table(
 
 
 def pytest_from_toml(read: TomlRead, label: str, candidate: PytestCandidate) -> PytestConfig | None:
-    if isinstance(read, UnreadableFile):
-        return unreadable_pytest(read, label, candidate)
-    if isinstance(read, MissingFile):
+    if read.problems:
+        return unreadable_pytest(read.problems, label, candidate)
+    if not read.found:
         return None
     table = read_nested_table(read.table, *candidate.section.split('.'))
     return pytest_from_table(table, label, candidate)
 
 
 def pytest_from_ini(read: IniRead, label: str, candidate: PytestCandidate) -> PytestConfig | None:
-    if isinstance(read, UnreadableFile):
-        return unreadable_pytest(read, label, candidate)
-    if not isinstance(read, IniDocument):
+    if read.problems:
+        return unreadable_pytest(read.problems, label, candidate)
+    if not read.found:
         return None
     section = read.sections.get(candidate.section)
     if section is None and not candidate.matches_when_empty:

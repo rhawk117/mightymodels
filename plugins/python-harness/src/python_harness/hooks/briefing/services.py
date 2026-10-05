@@ -22,8 +22,6 @@ from python_harness.hooks.briefing.domain import (
     ExtendCycle,
     ExtendTargetMissing,
     ExtendTargetOutside,
-    IniDocument,
-    MissingFile,
     Orchestrator,
     PackageFacts,
     ProjectScan,
@@ -36,11 +34,8 @@ from python_harness.hooks.briefing.domain import (
     ScanProblem,
     Setting,
     SuiteFacts,
-    TextFile,
-    TomlDocument,
     Tool,
     ToolScan,
-    UnreadableFile,
     VirtualEnvironment,
 )
 from python_harness.hooks.briefing.policy import (
@@ -49,11 +44,12 @@ from python_harness.hooks.briefing.policy import (
     pytest_from_toml,
 )
 from python_harness.hooks.briefing.store import (
+    ConfigReader,
+    DeclaredPackages,
     ScanContext,
     has_directory,
     has_file,
     open_scan_context,
-    read_text,
     read_toml,
 )
 from python_harness.hooks.briefing.util.configs import (
@@ -84,11 +80,8 @@ PYVENV_CONFIG = 'pyvenv.cfg'
 TY_CONFIG = 'ty.toml'
 TY_TABLE = ('tool', 'ty')
 TOX_TABLE = ('tool', 'tox')
-INI_OPTIONS = 'ini_options'
 TOX_SECTION = 'tox'
 TOX_ENVIRONMENT_PREFIX = 'testenv'
-EMPTY_TABLE: ConfigTable = MappingProxyType({})
-EMPTY_CONFIG: Mapping[str, str] = MappingProxyType[str, str]({})
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,43 +105,41 @@ class RuffChain:
 
 def find_pin(context: ScanContext) -> PythonPin | None:
     name = context.options.version_file_name
-    directory = context.find_directory(partial(has_file, name=name))
+    directory = context.tree.find_directory(partial(has_file, name=name))
     if directory is None:
         return None
     path = directory.joinpath(name)
-    read = read_text(path, context.display(path), context.options.max_file_bytes)
-    version = parse_version_pin(read.text) if isinstance(read, TextFile) else None
+    version = parse_version_pin(context.reader.read_text(path).text)
     if version is None:
         return None
-    return PythonPin(version, context.display(path))
+    return PythonPin(version, context.reader.display(path))
 
 
 def find_environment(context: ScanContext) -> VirtualEnvironment | None:
     name = context.options.environment_name
-    directory = context.find_project_directory(partial(has_directory, name=name))
+    directory = context.tree.find_project_directory(partial(has_directory, name=name))
     if directory is None:
         return None
     path = directory.joinpath(name, PYVENV_CONFIG)
-    read = read_text(path, context.display(path), context.options.max_file_bytes)
-    config = parse_pyvenv_config(read.text) if isinstance(read, TextFile) else EMPTY_CONFIG
-    return environment_from_config(context.display(directory.joinpath(name)), config)
+    config = parse_pyvenv_config(context.reader.read_text(path).text)
+    return environment_from_config(context.reader.display(directory.joinpath(name)), config)
 
 
 def scan_python(context: ScanContext) -> PythonFacts:
     return PythonFacts(
         pin=find_pin(context),
-        requires_python=context.manifest.requires_python,
+        requires_python=context.packages.manifest.requires_python,
         environment=find_environment(context),
     )
 
 
 def ruff_config_in(directory: Path, context: ScanContext) -> FoundConfig | None:
-    name = ruff_config_name(directory, context.pyproject_table(directory))
+    name = ruff_config_name(directory, context.tree.pyproject_table(directory))
     if name is None:
         return None
     path = directory.joinpath(name)
     table = f'tool.{Tool.RUFF}' if name == PYPROJECT else None
-    return FoundConfig(path, ConfigSource(context.display(path), table))
+    return FoundConfig(path, ConfigSource(context.reader.display(path), table))
 
 
 def ruff_table_of(document: ConfigTable, path: Path) -> ConfigTable:
@@ -171,7 +162,7 @@ def find_chain_stop(
     target: ExtendTarget, visited: frozenset[Path], context: ScanContext
 ) -> ScanProblem | None:
     resolved = target.path.resolve()
-    if not resolved.is_relative_to(context.boundary.resolve()):
+    if not resolved.is_relative_to(context.tree.boundary.resolve()):
         return ExtendTargetOutside(target.written)
     if resolved in visited:
         return ExtendCycle(target.written)
@@ -199,10 +190,10 @@ def extend_chain(
 def load_ruff_chain(
     path: Path, label: str, context: ScanContext, *, visited: frozenset[Path]
 ) -> RuffChain:
-    read = read_toml(path, label, context.options.max_file_bytes)
-    if isinstance(read, UnreadableFile):
-        return RuffChain((), (), (read,))
-    if isinstance(read, MissingFile):
+    read = read_toml(path, label, context.reader.max_file_bytes)
+    if read.problems:
+        return RuffChain((), (), read.problems)
+    if not read.found:
         return RuffChain((), (), (ExtendTargetMissing(label),))
     table = ruff_table_of(read.table, path)
     return extend_chain(table, path, context, visited=visited)
@@ -215,8 +206,8 @@ def extends_settings(loaded: RuffChain) -> tuple[Setting, ...]:
 
 
 def scan_ruff(context: ScanContext) -> ToolScan:
-    package = context.package(Tool.RUFF)
-    configs = (ruff_config_in(directory, context) for directory in context.directories)
+    package = context.packages.package(Tool.RUFF)
+    configs = (ruff_config_in(directory, context) for directory in context.tree.directories)
     found = next((config for config in configs if config is not None), None)
     if found is None:
         return ToolScan(Tool.RUFF, package, None, (), ())
@@ -230,28 +221,27 @@ def scan_ruff(context: ScanContext) -> ToolScan:
     return ToolScan(Tool.RUFF, package, found.source, settings, loaded.problems)
 
 
-def ty_file_scan(path: Path, context: ScanContext, package: PackageFacts) -> ToolScan:
-    source = ConfigSource(context.display(path), None)
-    read = context.read_toml(path)
-    if isinstance(read, UnreadableFile):
-        return ToolScan(Tool.TY, package, source, (), (read,))
-    table = read.table if isinstance(read, TomlDocument) else EMPTY_TABLE
-    return ToolScan(Tool.TY, package, source, collect_settings(table, TY_SETTINGS), ())
+def ty_file_scan(path: Path, reader: ConfigReader, package: PackageFacts) -> ToolScan:
+    source = ConfigSource(reader.display(path), None)
+    read = reader.read_toml(path)
+    settings = collect_settings(read.table, TY_SETTINGS)
+    return ToolScan(Tool.TY, package, source, settings, read.problems)
 
 
 def ty_scan_in(directory: Path, context: ScanContext, package: PackageFacts) -> ToolScan | None:
     if has_file(directory, TY_CONFIG):
-        return ty_file_scan(directory.joinpath(TY_CONFIG), context, package)
-    table = read_nested_table(context.pyproject_table(directory), *TY_TABLE)
+        return ty_file_scan(directory.joinpath(TY_CONFIG), context.reader, package)
+    table = read_nested_table(context.tree.pyproject_table(directory), *TY_TABLE)
     if not table:
         return None
-    source = ConfigSource(context.display(directory.joinpath(PYPROJECT)), '.'.join(TY_TABLE))
+    path = directory.joinpath(PYPROJECT)
+    source = ConfigSource(context.reader.display(path), '.'.join(TY_TABLE))
     return ToolScan(Tool.TY, package, source, collect_settings(table, TY_SETTINGS), ())
 
 
 def scan_ty(context: ScanContext) -> ToolScan:
-    package = context.package(Tool.TY)
-    scans = (ty_scan_in(directory, context, package) for directory in context.directories)
+    package = context.packages.package(Tool.TY)
+    scans = (ty_scan_in(directory, context, package) for directory in context.tree.directories)
     found = next((scan for scan in scans if scan is not None), None)
     if found is None:
         return ToolScan(Tool.TY, package, None, (), ())
@@ -262,27 +252,27 @@ def read_pytest_candidate(
     context: ScanContext, directory: Path, candidate: PytestCandidate
 ) -> PytestConfig | None:
     path = directory.joinpath(candidate.file_name)
-    label = context.display(path)
+    label = context.reader.display(path)
     if candidate.file_name == PYPROJECT:
-        return pytest_from_toml(context.pyprojects[directory], label, candidate)
+        return pytest_from_toml(context.tree.pyprojects[directory], label, candidate)
     if not path.is_file():
         return None
     if candidate.syntax == 'toml':
-        return pytest_from_toml(context.read_toml(path), label, candidate)
-    return pytest_from_ini(context.read_ini(path), label, candidate)
+        return pytest_from_toml(context.reader.read_toml(path), label, candidate)
+    return pytest_from_ini(context.reader.read_ini(path), label, candidate)
 
 
 def locate_pytest_config(context: ScanContext) -> PytestConfig | None:
     configs = (
         read_pytest_candidate(context, directory, candidate)
-        for directory in context.directories
+        for directory in context.tree.directories
         for candidate in PYTEST_CANDIDATES
     )
     return next((config for config in configs if config is not None), None)
 
 
 def scan_pytest(context: ScanContext) -> ToolScan:
-    package = context.package(Tool.PYTEST)
+    package = context.packages.package(Tool.PYTEST)
     config = locate_pytest_config(context)
     if config is None:
         return ToolScan(Tool.PYTEST, package, None, (), ())
@@ -298,30 +288,27 @@ def is_test_plugin(name: str, options: ScanOptions) -> bool:
     return name.startswith(options.test_plugin_prefix) or name in options.test_plugin_names
 
 
-def list_test_plugins(context: ScanContext) -> tuple[PackageFacts, ...]:
-    names = sorted(declared_names(context.manifest))
-    plugins = (name for name in names if is_test_plugin(name, context.options))
-    return tuple(context.package(name) for name in plugins)
+def list_test_plugins(packages: DeclaredPackages, options: ScanOptions) -> tuple[PackageFacts, ...]:
+    names = sorted(declared_names(packages.manifest))
+    plugins = (name for name in names if is_test_plugin(name, options))
+    return tuple(packages.package(name) for name in plugins)
 
 
 def has_nox(context: ScanContext) -> bool:
-    return has_file(context.root, 'noxfile.py')
+    return has_file(context.tree.root, 'noxfile.py')
 
 
 def has_tox_toml(context: ScanContext) -> bool:
-    return has_file(context.root, 'tox.toml')
+    return has_file(context.tree.root, 'tox.toml')
 
 
 def has_tox_ini(context: ScanContext) -> bool:
-    read = context.read_ini(context.root.joinpath('tox.ini'))
-    if not isinstance(read, IniDocument):
-        return False
-    names = read.sections
+    names = context.reader.read_ini(context.tree.root.joinpath('tox.ini')).sections
     return any(name == TOX_SECTION or name.startswith(TOX_ENVIRONMENT_PREFIX) for name in names)
 
 
 def has_tox_table(context: ScanContext) -> bool:
-    return bool(read_nested_table(context.pyproject_table(context.root), *TOX_TABLE))
+    return bool(read_nested_table(context.tree.pyproject_table(context.tree.root), *TOX_TABLE))
 
 
 def default_orchestrator_checks() -> Mapping[Orchestrator, Callable[[ScanContext], bool]]:
@@ -340,15 +327,15 @@ def scan_tests(context: ScanContext) -> SuiteFacts:
     names = sorted(DiscoveryOptions().test_directory_names)
     return SuiteFacts(
         runner=scan_pytest(context),
-        plugins=list_test_plugins(context),
+        plugins=list_test_plugins(context.packages, context.options),
         orchestrators=tuple(item for item, check in checks.items() if check(context)),
-        directories=tuple(name for name in names if has_directory(context.root, name)),
+        directories=tuple(name for name in names if has_directory(context.tree.root, name)),
     )
 
 
 def list_problems(context: ScanContext) -> tuple[ScanProblem, ...]:
-    reads = (*context.pyprojects.values(), context.lock)
-    return tuple(read for read in reads if isinstance(read, UnreadableFile))
+    reads = (*context.tree.pyprojects.values(), context.lock)
+    return tuple(problem for read in reads for problem in read.problems)
 
 
 def list_dependency_files(context: ScanContext) -> tuple[str, ...]:
@@ -361,9 +348,9 @@ def list_dependency_files(context: ScanContext) -> tuple[str, ...]:
 
 def dependency_directory_label(context: ScanContext) -> str | None:
     directory = context.dependency_directory
-    if directory is None or directory == context.root:
+    if directory is None or directory == context.tree.root:
         return None
-    return context.display(directory)
+    return context.reader.display(directory)
 
 
 def scan_project(
@@ -374,9 +361,9 @@ def scan_project(
     chosen = ScanOptions() if options is None else options
     variables = MappingProxyType({}) if environment is None else environment
     context = open_scan_context(cwd, chosen, variables)
-    has_manifest = isinstance(context.pyprojects.get(context.root), TomlDocument | UnreadableFile)
+    has_manifest = context.tree.pyprojects[context.tree.root].found
     return ProjectScan(
-        root=context.root.as_posix(),
+        root=context.tree.root.as_posix(),
         manifest=PYPROJECT if has_manifest else None,
         dependency_files=list_dependency_files(context),
         dependency_directory=dependency_directory_label(context),

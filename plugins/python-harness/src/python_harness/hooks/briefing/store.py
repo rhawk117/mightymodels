@@ -17,7 +17,6 @@ from python_harness.hooks.briefing.domain import (
     ScanOptions,
     TextFile,
     TextRead,
-    TomlDocument,
     TomlRead,
     UnreadableFile,
 )
@@ -35,7 +34,6 @@ from python_harness.hooks.domain import SEARCH_BOUNDARY_MARKERS
 from python_harness.survey.domain import NO_MANIFEST, PYPROJECT, UV_LOCK, ProjectManifest
 from python_harness.survey.util import manifest_from_document, read_nested_table
 
-EMPTY_TABLE: ConfigTable = MappingProxyType({})
 UV_WORKSPACE_TABLE = ('tool', 'uv', 'workspace')
 
 
@@ -86,46 +84,50 @@ def holds_any_file(directory: Path, names: tuple[str, ...]) -> bool:
     return any(has_file(directory, name) for name in names)
 
 
-def manifest_of(read: TomlRead | None) -> ProjectManifest:
-    if not isinstance(read, TomlDocument):
+def manifest_of(read: TomlRead) -> ProjectManifest:
+    if read.problems or not read.found:
         return NO_MANIFEST
     return manifest_from_document(read.table)
 
 
-def table_of(read: TomlRead | None) -> ConfigTable:
-    if isinstance(read, TomlDocument):
-        return read.table
-    return EMPTY_TABLE
+@dataclass(frozen=True, slots=True)
+class ConfigReader:
+    root: Path
+    max_file_bytes: int
+
+    def display(self, path: Path) -> str:
+        return relative_label(path, self.root)
+
+    def read_text(self, path: Path) -> TextRead:
+        return read_text(path, self.display(path), self.max_file_bytes)
+
+    def read_toml(self, path: Path) -> TomlRead:
+        return read_toml(path, self.display(path), self.max_file_bytes)
+
+    def read_ini(self, path: Path) -> IniRead:
+        return read_ini(path, self.display(path), self.max_file_bytes)
 
 
 @dataclass(frozen=True, slots=True)
-class ScanContext:
-    root: Path
-    boundary: Path
-    directories: tuple[Path, ...]
-    project_directories: tuple[Path, ...]
-    pyprojects: Mapping[Path, TomlRead]
+class DeclaredPackages:
     manifest: ProjectManifest
-    lock: TomlRead
     locked_versions: Mapping[str, str]
-    options: ScanOptions
-    variables: Mapping[str, str]
-
-    def pyproject_table(self, directory: Path) -> ConfigTable:
-        return table_of(self.pyprojects.get(directory))
 
     def package(self, name: str) -> PackageFacts:
         declaration = classify_declaration(self.manifest, name)
         return PackageFacts(name, declaration, self.locked_versions.get(name))
 
-    def display(self, path: Path) -> str:
-        return relative_label(path, self.root)
 
-    def read_toml(self, path: Path) -> TomlRead:
-        return read_toml(path, self.display(path), self.options.max_file_bytes)
+@dataclass(frozen=True, slots=True)
+class ProjectTree:
+    root: Path
+    boundary: Path
+    directories: tuple[Path, ...]
+    project_directories: tuple[Path, ...]
+    pyprojects: Mapping[Path, TomlRead]
 
-    def read_ini(self, path: Path) -> IniRead:
-        return read_ini(path, self.display(path), self.options.max_file_bytes)
+    def pyproject_table(self, directory: Path) -> ConfigTable:
+        return self.pyprojects[directory].table
 
     def find_directory(self, contains: Callable[[Path], bool]) -> Path | None:
         return next((path for path in self.directories if contains(path)), None)
@@ -134,10 +136,20 @@ class ScanContext:
         found = (path for path in self.project_directories if contains(path))
         return next(found, None)
 
+
+@dataclass(frozen=True, slots=True)
+class ScanContext:
+    tree: ProjectTree
+    reader: ConfigReader
+    packages: DeclaredPackages
+    lock: TomlRead
+    options: ScanOptions
+    variables: Mapping[str, str]
+
     @property
     def dependency_directory(self) -> Path | None:
         names = self.options.dependency_file_names
-        return self.find_project_directory(partial(holds_any_file, names=names))
+        return self.tree.find_project_directory(partial(holds_any_file, names=names))
 
 
 def read_pyprojects(
@@ -158,7 +170,7 @@ def find_workspace_root(
         directory
         for directory in directories[1:]
         if is_workspace_member(
-            read_nested_table(table_of(pyprojects.get(directory)), *UV_WORKSPACE_TABLE),
+            read_nested_table(pyprojects[directory].table, *UV_WORKSPACE_TABLE),
             PurePosixPath(root.relative_to(directory).as_posix()),
         )
     )
@@ -184,14 +196,16 @@ def open_scan_context(cwd: Path, options: ScanOptions, variables: Mapping[str, s
     workspace_root = find_workspace_root(root, directories, pyprojects)
     lock = read_workspace_lock(workspace_root, root, options)
     return ScanContext(
-        root=root,
-        boundary=boundary,
-        directories=directories,
-        project_directories=list_ancestors_to(root, workspace_root),
-        pyprojects=pyprojects,
-        manifest=manifest_of(pyprojects.get(root)),
+        tree=ProjectTree(
+            root=root,
+            boundary=boundary,
+            directories=directories,
+            project_directories=list_ancestors_to(root, workspace_root),
+            pyprojects=pyprojects,
+        ),
+        reader=ConfigReader(root, options.max_file_bytes),
+        packages=DeclaredPackages(manifest_of(pyprojects[root]), parse_locked_versions(lock.table)),
         lock=lock,
-        locked_versions=parse_locked_versions(table_of(lock)),
         options=options,
         variables=variables,
     )

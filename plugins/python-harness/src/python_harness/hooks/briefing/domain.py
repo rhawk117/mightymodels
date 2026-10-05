@@ -3,12 +3,16 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
-from typing import Literal
+from types import MappingProxyType
+from typing import Literal, Self
 
 MEBIBYTE = 1024 * 1024
 
 type IniSections = Mapping[str, Mapping[str, str]]
 type ConfigTable = Mapping[str, object]
+
+EMPTY_TABLE: ConfigTable = MappingProxyType({})
+EMPTY_SECTIONS: IniSections = MappingProxyType[str, Mapping[str, str]]({})
 
 
 class Tool(StrEnum):
@@ -47,6 +51,26 @@ class Setting:
 class MissingFile:
     kind: Literal['missing'] = field(default='missing', init=False)
 
+    @property
+    def text(self) -> str:
+        return ''
+
+    @property
+    def table(self) -> ConfigTable:
+        return EMPTY_TABLE
+
+    @property
+    def sections(self) -> IniSections:
+        return EMPTY_SECTIONS
+
+    @property
+    def problems(self) -> tuple[()]:
+        return ()
+
+    @property
+    def found(self) -> bool:
+        return False
+
 
 @dataclass(frozen=True, slots=True)
 class UnreadableFile:
@@ -54,11 +78,47 @@ class UnreadableFile:
     reason: str
     kind: Literal['unreadable'] = field(default='unreadable', init=False)
 
+    @property
+    def text(self) -> str:
+        return ''
+
+    @property
+    def table(self) -> ConfigTable:
+        return EMPTY_TABLE
+
+    @property
+    def sections(self) -> IniSections:
+        return EMPTY_SECTIONS
+
+    @property
+    def problems(self) -> tuple[Self]:
+        return (self,)
+
+    @property
+    def found(self) -> bool:
+        return True
+
 
 @dataclass(frozen=True, slots=True)
 class TextFile:
     text: str
     kind: Literal['text'] = field(default='text', init=False)
+
+    @property
+    def table(self) -> ConfigTable:
+        return EMPTY_TABLE
+
+    @property
+    def sections(self) -> IniSections:
+        return EMPTY_SECTIONS
+
+    @property
+    def problems(self) -> tuple[()]:
+        return ()
+
+    @property
+    def found(self) -> bool:
+        return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,11 +126,43 @@ class TomlDocument:
     table: ConfigTable
     kind: Literal['toml'] = field(default='toml', init=False)
 
+    @property
+    def text(self) -> str:
+        return ''
+
+    @property
+    def sections(self) -> IniSections:
+        return EMPTY_SECTIONS
+
+    @property
+    def problems(self) -> tuple[()]:
+        return ()
+
+    @property
+    def found(self) -> bool:
+        return True
+
 
 @dataclass(frozen=True, slots=True)
 class IniDocument:
     sections: IniSections
     kind: Literal['ini'] = field(default='ini', init=False)
+
+    @property
+    def text(self) -> str:
+        return ''
+
+    @property
+    def table(self) -> ConfigTable:
+        return EMPTY_TABLE
+
+    @property
+    def problems(self) -> tuple[()]:
+        return ()
+
+    @property
+    def found(self) -> bool:
+        return True
 
 
 type TextRead = TextFile | MissingFile | UnreadableFile
