@@ -23,7 +23,8 @@ make setup    # scripts/setup.sh
 
 It installs the pre-commit hook (`uv run pre-commit install --install-hooks`) and runs
 `uv sync --all-packages --all-groups`. The root `pyproject.toml` is a uv workspace root named
-`rygentic-harness-plugins`; `plugins/mightymodels` and `plugins/vibe-code` are its members.
+`rygentic-harness-plugins`; `plugins/mightymodels`, `plugins/vibe-code` and
+`plugins/python-harness` are its members.
 
 ## The gate
 
@@ -45,7 +46,8 @@ problem in one pass:
 - `mdformat --check` on `docs/` and the root `*.md` files only
 - `ty` at Python 3.14, then a second `ty` pass at Python 3.12 over the skills trees and
   `plugins/vibe-code/src` and `plugins/vibe-code/tests`
-- `pytest`, which runs the vibe-code tests in `plugins/vibe-code/tests`
+- `pytest`, which runs the vibe-code tests in `plugins/vibe-code/tests` and the python-harness
+  tests in `plugins/python-harness/tests`
 - `claude plugin validate --strict` for each plugin under `plugins/`, then for the root
   marketplace
 

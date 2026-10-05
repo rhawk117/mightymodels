@@ -112,6 +112,8 @@ plugins/         one directory per plugin; each carries its own manifest and ski
   mightymodels/  the dev loop: twenty skills, seven worker agents
   vibe-code/     authoring skills and the `vibe-code` CLI: ten skills, no agents,
                  with its own tests and eval cases
+  python-harness/ Python review: one skill, one agent, hooks, the `python-harness` CLI
+                 and an MCP server, with its own tests
 docs/            human documentation for the harness and the mightymodels plugin
 scripts/         the quality gate (`quality.sh`), checkout setup, and a log helper
 .claude-plugin/  the rygentic-harness marketplace manifest
@@ -135,6 +137,7 @@ frontmatter. [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
 | [docs/state.md](docs/state.md) | The `.mightymodels/` directory and `ticket.yml` |
 | [docs/claude-code.md](docs/claude-code.md) | Running under Claude Code |
 | [plugins/vibe-code/README.md](plugins/vibe-code/README.md) | The vibe-code plugin: install, skills, CLI, launcher |
+| [plugins/python-harness/README.md](plugins/python-harness/README.md) | The python-harness plugin: install, hooks, server, launcher, limitations |
 
 ## Evals
 
@@ -146,9 +149,10 @@ a change has to pass: `make check`, which syncs the locked environment, runs pre
 
 ## Status
 
-vibe-code is at 0.3.0. mightymodels is at 0.8.0 and is the marketplace's first plugin. Its hook
-layer (session covenant injection, verification gates at Stop, PreCompact ticket snapshots) and
-the team/personal overlay split are designed but not yet shipped. CHANGELOG.md has the full trail.
+vibe-code is at 0.3.0. python-harness is at 0.1.0. mightymodels is at 0.8.0 and is the
+marketplace's first plugin. Its hook layer (session covenant injection, verification gates at
+Stop, PreCompact ticket snapshots) and the team/personal overlay split are designed but not yet
+shipped. CHANGELOG.md has the full trail.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR, and
 [SECURITY.md](SECURITY.md) for reporting anything sensitive.
