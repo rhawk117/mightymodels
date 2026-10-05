@@ -18,6 +18,7 @@ class TicketAction(StrEnum):
 class TicketStatus(StrEnum):
     STAGED = 'staged'
     IN_PROGRESS = 'in-progress'
+    CLOSED = 'closed'
 
 
 class TicketAnswers(BaseModel):

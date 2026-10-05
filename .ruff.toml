@@ -5,7 +5,6 @@ extend-include = ["plugins/vibe-code/bin/vibe-code"]
 extend-exclude = [
     "plugins/**/assets/*.template.py",
     "plugins/**/assets/template/**",
-    "plugins/mightymodels/skills/prune-ticket/scripts/archive_ticket.py",  # T5
 ]
 per-file-target-version = { "plugins/*/skills/**" = "py312", "plugins/vibe-code/bin/vibe-code" = "py312", "plugins/vibe-code/src/**" = "py312", "plugins/vibe-code/tests/**" = "py312" }
 force-exclude = true

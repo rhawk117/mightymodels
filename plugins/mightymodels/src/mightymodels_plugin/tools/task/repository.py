@@ -83,6 +83,12 @@ class TaskRepository:
         )
         return len(self.session.scalars(query).all())
 
+    def transition_rows(self, slug: Slug) -> list[TransitionRow]:
+        query = (
+            select(TransitionRow).where(TransitionRow.slug == slug.root).order_by(TransitionRow.id)
+        )
+        return list(self.session.scalars(query))
+
     def record_start(self, slug: Slug, transition: Transition, attempt: Attempt) -> None:
         self.session.merge(
             TaskRow(

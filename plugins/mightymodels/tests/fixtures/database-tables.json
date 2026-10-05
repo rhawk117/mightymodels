@@ -1,6 +1,12 @@
 [
   {
     "type": "table",
+    "name": "closings",
+    "tbl_name": "closings",
+    "sql": "CREATE TABLE closings (\n\tslug VARCHAR NOT NULL, \n\tclosed_at VARCHAR NOT NULL, \n\thead VARCHAR, \n\tshipped VARCHAR NOT NULL, \n\tpr VARCHAR, \n\tgotchas JSON NOT NULL, \n\tarchive VARCHAR NOT NULL, \n\tPRIMARY KEY (slug)\n)"
+  },
+  {
+    "type": "table",
     "name": "contract_commands",
     "tbl_name": "contract_commands",
     "sql": "CREATE TABLE contract_commands (\n\tslug VARCHAR NOT NULL, \n\tcommand_id VARCHAR NOT NULL, \n\ttask_id VARCHAR, \n\targv JSON NOT NULL, \n\texpect_exit INTEGER NOT NULL, \n\ttimeout INTEGER NOT NULL, \n\tapproved_by VARCHAR NOT NULL, \n\tapproved_at VARCHAR NOT NULL, \n\thead VARCHAR, \n\tPRIMARY KEY (slug, command_id)\n)"
@@ -52,6 +58,12 @@
     "name": "review_runs",
     "tbl_name": "review_runs",
     "sql": "CREATE TABLE review_runs (\n\trun_id VARCHAR NOT NULL, \n\tslug VARCHAR, \n\tscope VARCHAR NOT NULL, \n\tbase VARCHAR, \n\thead VARCHAR, \n\tdepth VARCHAR NOT NULL, \n\temphasis VARCHAR NOT NULL, \n\tweights JSON NOT NULL, \n\tpersonas JSON NOT NULL, \n\tmodels JSON NOT NULL, \n\tcreated_at VARCHAR NOT NULL, \n\tPRIMARY KEY (run_id)\n)"
+  },
+  {
+    "type": "index",
+    "name": "sqlite_autoindex_closings_1",
+    "tbl_name": "closings",
+    "sql": null
   },
   {
     "type": "index",

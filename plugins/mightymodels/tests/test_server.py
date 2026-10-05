@@ -1,15 +1,16 @@
-import inspect
 import json
-from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
+from typing import get_args, get_type_hints
 
 import pytest
 from mcp.types import CallToolResult
 from mightymodels_plugin.server import SERVER_NAME, TOOLS, AppState
+from mightymodels_plugin.tools.close.service import CloseService
 from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
 from mightymodels_plugin.tools.review.service import ReviewService
+from mightymodels_plugin.tools.snapshot.service import SnapshotService
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.tests.support import (
     ActivityKind,
@@ -31,14 +32,15 @@ ANSWERS = {
 }
 COMMAND = {'id': 'T1.AC-1', 'argv': ['true'], 'approved_by': 'user'}
 START = {'by': 'engineer', 'owned': ['src/queue.py']}
+TOOL_NAMES = ['close', 'contract', 'review', 'snapshot', 'task', 'ticket']
 
 
 def ticket_results(server: StateServer, *calls: ToolCall) -> list[CallToolResult]:
     return server.call(*((name, {'slug': SLUG, **arguments}) for name, arguments in calls))
 
 
-def served_actions(registered: Callable[..., object]) -> type[StrEnum]:
-    return inspect.signature(registered).parameters['action'].annotation
+def served_actions(tool: object) -> type[StrEnum]:
+    return get_args(get_type_hints(type(tool))['handlers'])[0]
 
 
 class TestStateServer:
@@ -46,7 +48,7 @@ class TestStateServer:
         assert state_server.name() == SERVER_NAME == 'state'
 
     def test_lists_its_tools_through_the_in_memory_client(self, state_server: StateServer) -> None:
-        assert sorted(state_server.tools()) == ['contract', 'review', 'task', 'ticket']
+        assert sorted(state_server.tools()) == TOOL_NAMES
 
     @pytest.mark.parametrize(
         ('name', 'arguments', 'required'),
@@ -59,6 +61,8 @@ class TestStateServer:
                 'contract', ['action', 'slug', 'commands'], ['action', 'slug'], id='contract'
             ),
             pytest.param('review', ['action', 'run_id', 'payload'], ['action'], id='review'),
+            pytest.param('snapshot', ['slug', 'limit'], ['slug'], id='snapshot'),
+            pytest.param('close', ['action', 'slug', 'closing'], ['action', 'slug'], id='close'),
         ],
     )
     def test_each_tool_takes_the_arguments_the_surface_gives_it(
@@ -118,12 +122,16 @@ class TestToolProtocol:
         task_service: TaskService,
         contract_service: ContractService,
         review_service: ReviewService,
+        snapshot_service: SnapshotService,
+        close_service: CloseService,
     ) -> AppState:
         return AppState(
             tickets=ticket_service,
             tasks=task_service,
             contracts=contract_service,
             reviews=review_service,
+            snapshots=snapshot_service,
+            closings=close_service,
         )
 
     @pytest.mark.parametrize(
@@ -134,7 +142,10 @@ class TestToolProtocol:
 
     @pytest.mark.parametrize(
         ('tool', 'actions'),
-        [pytest.param(tool.__self__, served_actions(tool), id=tool.__name__) for tool in TOOLS],
+        [
+            pytest.param(tool.__self__, served_actions(tool.__self__), id=tool.__name__)
+            for tool in TOOLS
+        ],
     )
     def test_each_tool_handlers_cover_its_whole_action_enum(
         self, tool: ActionTool[StrEnum, object, object, object], actions: type[StrEnum]
@@ -187,7 +198,7 @@ class TestOutsideARepository:
             ('ticket', {'action': 'show'}),
         )
 
-        assert sorted(listed) == ['contract', 'review', 'task', 'ticket']
+        assert sorted(listed) == TOOL_NAMES
         assert (written.is_error, shown.is_error) == (False, False)
         assert shown.structured_content['unit']['slug'] == SLUG
         assert not state_server.root.joinpath('.git').exists()
@@ -228,6 +239,45 @@ class TestToolCalls:
             {'id': 'T1.AC-1', 'argv': ['true'], 'state': 'never-run'}
         ]
 
+    def test_a_staged_ticket_gives_its_snapshot_and_its_live_work(
+        self, state_server: StateServer
+    ) -> None:
+        *_, snapshot, checked, closed = ticket_results(
+            state_server,
+            ('ticket', {'action': 'write', 'fields': ANSWERS}),
+            ('ticket', {'action': 'validate'}),
+            ('snapshot', {'limit': 5}),
+            ('close', {'action': 'check'}),
+            ('close', {'action': 'close', 'closing': {'shipped': 'the queue drains'}}),
+        )
+
+        assert snapshot.structured_content['record']['ticket']['status'] == 'staged'
+        assert snapshot.structured_content['record_path'] == (
+            f'.mightymodels/{SLUG}/handoffs/snapshot.json'
+        )
+        assert checked.structured_content == {
+            'text': 'live work remains\n  - no verified task work is recorded\n',
+            'blocked': True,
+            'blockers': ['no verified task work is recorded'],
+            'archive': None,
+        }
+        assert (closed.is_error, closed.structured_content['blocked']) == (False, True)
+
+    @pytest.mark.parametrize(
+        ('name', 'arguments'),
+        [
+            pytest.param('snapshot', {}, id='snapshot'),
+            pytest.param('close', {'action': 'check'}, id='close-check'),
+        ],
+    )
+    def test_an_unstaged_ticket_is_refused_by_the_tools_that_read_it(
+        self, name: str, arguments: dict[str, object], state_server: StateServer
+    ) -> None:
+        (result,) = ticket_results(state_server, (name, arguments))
+
+        assert result.is_error
+        assert f'{SLUG} is not staged; stage the ticket with open-ticket first' in text_of(result)
+
     def test_an_anticipated_failure_reaches_the_model_as_its_own_text(
         self, state_server: StateServer
     ) -> None:
@@ -252,6 +302,12 @@ class TestToolCalls:
             ),
             pytest.param('task', {'action': 'mark', 'task_id': 'T1'}, 'mark needs', id='mark'),
             pytest.param('contract', {'action': 'approve'}, 'approve needs', id='approve'),
+            pytest.param(
+                'close',
+                {'action': 'close'},
+                'close needs a closing holding shipped, pr and gotchas',
+                id='close',
+            ),
         ],
     )
     def test_an_action_missing_its_arguments_says_what_it_needs(
@@ -274,6 +330,14 @@ class TestToolCalls:
                 id='mark-verified',
             ),
             pytest.param('ticket', {'action': 'delete'}, id='unknown-action'),
+            pytest.param('snapshot', {'limit': 0}, id='snapshot-limit-zero'),
+            pytest.param('snapshot', {'limit': 101}, id='snapshot-limit-over'),
+            pytest.param('close', {'action': 'prune'}, id='close-unknown-action'),
+            pytest.param(
+                'close',
+                {'action': 'close', 'closing': {'shipped': 's', 'confirm': True}},
+                id='closing-unknown-field',
+            ),
         ],
     )
     def test_arguments_outside_the_schema_are_refused(

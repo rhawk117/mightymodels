@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.run_id import RunId
+from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.review.errors import RunNotFoundError
 from mightymodels_plugin.tools.review.schema import Decision, Finding, Result, ReviewRun
 from mightymodels_plugin.tools.review.tables import (
@@ -150,6 +151,14 @@ class ReviewRepository:
 
     def run_rows(self) -> list[ReviewRunRow]:
         return list(self.session.scalars(select(ReviewRunRow).order_by(ReviewRunRow.run_id)))
+
+    def latest_run_row(self, slug: Slug) -> ReviewRunRow | None:
+        query = (
+            select(ReviewRunRow)
+            .where(ReviewRunRow.slug == slug.root)
+            .order_by(ReviewRunRow.run_id.desc())
+        )
+        return self.session.scalars(query).first()
 
     def finding_rows(self, run: RunId) -> list[ReviewFindingRow]:
         query = select(ReviewFindingRow).where(ReviewFindingRow.run_id == run.root)

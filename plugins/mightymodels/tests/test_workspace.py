@@ -17,6 +17,7 @@ from mightymodels_plugin.tools.task.tables import TransitionRow
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
 from mightymodels_plugin.workspace import (
     OutsideStateDirectoryError,
+    RecordFiles,
     UnsafeRevisionError,
     Workspace,
     revision_error,
@@ -24,13 +25,13 @@ from mightymodels_plugin.workspace import (
 )
 from sqlalchemy import select
 
-type PathRequest = Callable[[Workspace], Path]
+type PathRequest = Callable[[Workspace], object]
 
 SLUG = 'retry-queue'
 TICKET = Slug(SLUG)
 RUN = RunId('20260101-000000')
 PASSED, REJECTED = 0, 2
-TOOL_NAMES = ['contract', 'review', 'task', 'ticket']
+TOOL_NAMES = ['close', 'contract', 'review', 'snapshot', 'task', 'ticket']
 ESCAPES = 'resolves outside .mightymodels/'
 NEEDS_GIT = 'this needs git and no git executable is on PATH'
 NOT_A_REPOSITORY = 'is not inside a git repository'
@@ -70,6 +71,18 @@ APPROVE: ToolCall = ('contract', {'action': 'approve', 'commands': [MARKER_COMMA
 STATUS: ToolCall = ('contract', {'action': 'status'})
 START_REVIEW: ToolCall = ('review', {'action': 'start', 'payload': REVIEW})
 LIST_REVIEWS: ToolCall = ('review', {'action': 'list'})
+
+
+def snapshot_files(workspace: Workspace) -> RecordFiles:
+    return workspace.handoffs.snapshot(TICKET)
+
+
+def first_archive_files(workspace: Workspace) -> RecordFiles:
+    return workspace.handoffs.archive(TICKET, 1)
+
+
+def live_debug_note(workspace: Workspace) -> Path:
+    return workspace.handoffs.live_debug(TICKET)
 
 
 def slug_results(server: StateServer, *calls: ToolCall) -> list[CallToolResult]:
@@ -163,6 +176,14 @@ class TestSafeRevision:
         assert isinstance(refusal, UnsafeRevisionError)
         assert refusal.revision == 'HEAD\n'
 
+    def test_safe_revision_keeps_an_option_out_of_the_unpushed_commit_count(
+        self, repository_workspace: Workspace
+    ) -> None:
+        with pytest.raises(UnsafeRevisionError) as refusal:
+            repository_workspace.git.commits_on_no_remote('--all')
+
+        assert refusal.value.revision == '--all'
+
     def test_safe_revision_keeps_a_trailing_newline_out_of_a_review_base(
         self, state_server: StateServer
     ) -> None:
@@ -191,6 +212,9 @@ class TestSymlinkBelowTheStateDirectory:
             id='run-directory',
         ),
         pytest.param(('mightymodels.db',), methodcaller('database_file'), id='database'),
+        pytest.param((SLUG, 'handoffs'), snapshot_files, id='handoffs'),
+        pytest.param(('archives',), first_archive_files, id='archives'),
+        pytest.param((SLUG, 'whats-broken.md'), live_debug_note, id='debug-note'),
     )
 
     @pytest.fixture
@@ -285,6 +309,44 @@ class TestStateDirectoryBoundary:
     ) -> None:
         with pytest.raises(OutsideStateDirectoryError):
             workspace.contained(*parts)
+
+
+class TestHandoffFiles:
+    @pytest.fixture
+    def workspace(self, tmp_path: Path) -> Workspace:
+        return workspace_at(tmp_path)
+
+    @pytest.mark.parametrize(
+        ('repeat', 'name'),
+        [
+            pytest.param(1, SLUG, id='first'),
+            pytest.param(2, f'{SLUG}-2', id='second'),
+            pytest.param(11, f'{SLUG}-11', id='eleventh'),
+        ],
+    )
+    def test_an_archive_is_named_for_the_ticket_and_numbered_from_its_second(
+        self, workspace: Workspace, repeat: int, name: str
+    ) -> None:
+        files = workspace.handoffs.archive(TICKET, repeat)
+
+        assert [workspace.relative_to_root(files.markdown), files.record.name] == [
+            f'.mightymodels/archives/{name}.md',
+            f'{name}.json',
+        ]
+
+    def test_the_snapshot_and_the_debug_note_sit_in_the_ticket_directory(
+        self, workspace: Workspace
+    ) -> None:
+        snapshot = workspace.handoffs.snapshot(TICKET)
+        note = workspace.handoffs.live_debug(TICKET)
+
+        assert [
+            workspace.relative_to_root(path) for path in (snapshot.markdown, snapshot.record, note)
+        ] == [
+            f'.mightymodels/{SLUG}/handoffs/snapshot.md',
+            f'.mightymodels/{SLUG}/handoffs/snapshot.json',
+            f'.mightymodels/{SLUG}/whats-broken.md',
+        ]
 
 
 class TestSymlinkedTicket:

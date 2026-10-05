@@ -13,8 +13,8 @@ itself would hide its registered method from the server.
 A handler takes its domain's service and the call. Each tool resolves the service the lifespan
 built and dispatches through `dispatch_to_service`, and the service opens its own transactions.
 
-`LifespanState` is what the tools need from the server's lifespan state: the four services and
-nothing else. The server's `AppState` satisfies it, and it is declared here because the server
+`LifespanState` is what the tools need from the server's lifespan state: one service per tool
+and nothing else. The server's `AppState` satisfies it, and it is declared here because the server
 imports the tools.
 """
 
@@ -25,8 +25,10 @@ from typing import Protocol, runtime_checkable
 from mcp.server.mcpserver.exceptions import ToolError
 
 from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.tools.close.service import CloseService
 from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.review.service import ReviewService
+from mightymodels_plugin.tools.snapshot.service import SnapshotService
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.ticket.service import TicketService
 
@@ -59,6 +61,12 @@ class LifespanState(Protocol):
 
     @property
     def reviews(self) -> ReviewService: ...
+
+    @property
+    def snapshots(self) -> SnapshotService: ...
+
+    @property
+    def closings(self) -> CloseService: ...
 
 
 @contextmanager

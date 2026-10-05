@@ -2,10 +2,15 @@
 
 Each edge builds one workspace, the server in its lifespan and `verify run` for its one command.
 
-Every path under the state directory comes whole from `Workspace.contained`, which resolves it
-and refuses one that leaves the resolved state directory, so a symlink planted below it carries no
+Every path under the state directory comes whole from `contained_in`, which resolves it and
+refuses one that leaves the resolved state directory, so a symlink planted below it carries no
 read and no write outside. The state directory is held privately, so nothing outside this module
-joins a part onto it and every path passes through `contained`.
+joins a part onto it and every path passes through `contained_in`.
+
+The files a ticket leaves for whoever picks it up are named by `HandoffFiles`, which the
+workspace carries as `handoffs`: the snapshot, a closing's archive, and the debug note whose
+presence says a debug is still live. It holds the same resolved state directory and hands out
+contained paths only.
 
 A persona report is the one path a symlink may not stand in for, wherever the symlink points.
 Resolving the report would hide that its last part is one, so `Workspace.persona_report` looks at
@@ -15,13 +20,14 @@ that name is no symlink.
 Git runs in `Git._answer` and nowhere else. A missing git binary is an answer without an exit
 code, never an exception, so HEAD is absent there as it is outside a repository or before the
 first commit. An operation that cannot work without git asks `Git.refusal` first and raises what
-it returns.
+it returns, and one that can says in its result that git was not consulted.
 """
 
 import re
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum, auto
 from pathlib import Path
 from types import MappingProxyType
 
@@ -37,6 +43,10 @@ DATABASE_NAME = 'mightymodels.db'
 TICKET_FILE = 'ticket.yml'
 TICKET_DRAFT = f'{TICKET_FILE}.tmp'
 EXCLUDE_LINE = f'{STATE_DIRECTORY}/'
+HANDOFFS_DIRECTORY = 'handoffs'
+ARCHIVES_DIRECTORY = 'archives'
+SNAPSHOT_NAME = 'snapshot'
+LIVE_DEBUG_FILE = 'whats-broken.md'
 SAFE_REVISION = re.compile(r'[0-9A-Za-z][0-9A-Za-z._/-]*')
 REPORT_FILES: Mapping[Persona, str] = MappingProxyType(
     {
@@ -82,6 +92,11 @@ class GitUnavailableError(StateError):
 type GitRefusal = GitMissingError | NotARepositoryError
 
 
+class UntrackedFiles(StrEnum):
+    NORMAL = auto()
+    NO = auto()
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class GitAnswer:
     exit: int | None
@@ -95,6 +110,12 @@ class PersonaReport:
     file: Path | None
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RecordFiles:
+    markdown: Path
+    record: Path
+
+
 def find_root(environ: Mapping[str, str], cwd: Path) -> Path:
     project_dir = environ.get(PROJECT_DIR_VARIABLE, '')
     return Path(project_dir) if project_dir else cwd
@@ -105,6 +126,13 @@ def revision_error(*revisions: str) -> UnsafeRevisionError | None:
         (revision for revision in revisions if not SAFE_REVISION.fullmatch(revision)), None
     )
     return None if unsafe is None else UnsafeRevisionError(unsafe)
+
+
+def contained_in(state_directory: Path, *parts: str) -> Path:
+    resolved = state_directory.joinpath(*parts).resolve()
+    if not resolved.is_relative_to(state_directory):
+        raise OutsideStateDirectoryError(str(Path(STATE_DIRECTORY, *parts)))
+    return resolved
 
 
 def review_parts(slug: Slug | None, run: RunId) -> tuple[str, ...]:
@@ -182,18 +210,55 @@ class Git:
             raise GitUnavailableError(answer.stderr.strip())
         return {line for line in answer.stdout.splitlines() if line}
 
+    def current_branch(self) -> str | None:
+        answer = self._answer('symbolic-ref', '--quiet', '--short', 'HEAD')
+        return answer.stdout.strip() if answer.exit == 0 else None
+
+    def dirty_paths(self, *, untracked: UntrackedFiles) -> list[str] | None:
+        answer = self._answer('status', '--porcelain', f'--untracked-files={untracked}')
+        if answer.exit != 0:
+            return None
+        return [line[3:] for line in answer.stdout.splitlines() if line.strip()]
+
+    def commits_on_no_remote(self, branch: str) -> int | None:
+        error = revision_error(branch)
+        if error is not None:
+            raise error
+        answer = self._answer('rev-list', '--count', f'refs/heads/{branch}', '--not', '--remotes')
+        return int(answer.stdout) if answer.exit == 0 else None
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class HandoffFiles:
+    _state_directory: Path
+
+    def snapshot(self, slug: Slug) -> RecordFiles:
+        parts = (slug.root, HANDOFFS_DIRECTORY)
+        return RecordFiles(
+            markdown=contained_in(self._state_directory, *parts, f'{SNAPSHOT_NAME}.md'),
+            record=contained_in(self._state_directory, *parts, f'{SNAPSHOT_NAME}.json'),
+        )
+
+    def archive(self, slug: Slug, repeat: int) -> RecordFiles:
+        name = slug.root if repeat == 1 else f'{slug.root}-{repeat}'
+        return RecordFiles(
+            markdown=contained_in(self._state_directory, ARCHIVES_DIRECTORY, f'{name}.md'),
+            record=contained_in(self._state_directory, ARCHIVES_DIRECTORY, f'{name}.json'),
+        )
+
+    def live_debug(self, slug: Slug) -> Path:
+        return contained_in(self._state_directory, slug.root, LIVE_DEBUG_FILE)
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Workspace:
     root: Path
     _state_directory: Path
     git: Git
+    handoffs: HandoffFiles
 
     def contained(self, *parts: str) -> Path:
-        resolved = self._state_directory.joinpath(*parts).resolve()
-        if not resolved.is_relative_to(self._state_directory):
-            raise OutsideStateDirectoryError(str(Path(STATE_DIRECTORY, *parts)))
-        return resolved
+        return contained_in(self._state_directory, *parts)
 
     def relative_to_root(self, contained: Path) -> str:
         return str(Path(STATE_DIRECTORY).joinpath(contained.relative_to(self._state_directory)))
@@ -235,8 +300,10 @@ class Workspace:
 
 def workspace_at(root: Path) -> Workspace:
     resolved = root.resolve()
+    state_directory = resolved.joinpath(STATE_DIRECTORY).resolve()
     return Workspace(
         root=resolved,
-        _state_directory=resolved.joinpath(STATE_DIRECTORY).resolve(),
+        _state_directory=state_directory,
         git=Git(root=resolved),
+        handoffs=HandoffFiles(_state_directory=state_directory),
     )

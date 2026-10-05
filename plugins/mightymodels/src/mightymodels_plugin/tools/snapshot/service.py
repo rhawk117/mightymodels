@@ -1,0 +1,185 @@
+"""The snapshot service: a ticket's objective state, read from the database and from git.
+
+A snapshot is what a handoff needs and nothing a model wrote from memory: the ticket, the
+repository, every task with its attempts, each contract command judged at HEAD from its latest
+receipt, the passing commands, the failed and blocked attempts not to repeat, and where the
+latest review run stands. Each list is cut to the caller's limit. The ledger sections and the
+answer and subagent sections are in the record and read empty: the database holds no row for them
+yet.
+
+Git is optional. With no git binary, or outside a repository, the repository section is empty and
+a warning says why.
+
+The service writes no file. It returns the record, its Markdown and the two paths under the
+ticket's handoffs directory, and the agent writes them. Everything above the class reads no
+service state.
+"""
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from itertools import islice
+
+from mightymodels_plugin.clock import now
+from mightymodels_plugin.database import Database
+from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.schema import Outcome
+from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
+from mightymodels_plugin.tools.review.schema import Decision
+from mightymodels_plugin.tools.snapshot.latest_review import LatestReview, latest_review_of
+from mightymodels_plugin.tools.snapshot.rendering import snapshot_markdown
+from mightymodels_plugin.tools.snapshot.repository import snapshot_transaction
+from mightymodels_plugin.tools.snapshot.schema import (
+    CheckState,
+    FailedAttempt,
+    PassingCommand,
+    RepositoryState,
+    ReviewDecision,
+    ReviewState,
+    SnapshotRecord,
+    SnapshotView,
+    TaskState,
+    TicketSummary,
+)
+from mightymodels_plugin.tools.task.gates import STUCK
+from mightymodels_plugin.tools.task.schema import Status, TaskRecord
+from mightymodels_plugin.tools.task.service import records_of, short_head
+from mightymodels_plugin.tools.task.tables import TransitionRow
+from mightymodels_plugin.tools.ticket.schema import WorkUnit
+from mightymodels_plugin.tools.ticket.service import unit_of
+from mightymodels_plugin.workspace import Git, GitRefusal, UntrackedFiles, Workspace
+
+NEVER_RUN = 'never-run'
+NOT_STARTED = 'not started'
+
+
+def git_warnings(refusal: GitRefusal | None) -> tuple[str, ...]:
+    return () if refusal is None else (f'git was not consulted: {refusal}',)
+
+
+def repository_state(git: Git, limit: int) -> RepositoryState:
+    dirty = git.dirty_paths(untracked=UntrackedFiles.NORMAL)
+    return RepositoryState(
+        branch=git.current_branch(),
+        head=git.resolve_head(),
+        dirty_count=None if dirty is None else len(dirty),
+        dirty=() if dirty is None else tuple(dirty[:limit]),
+    )
+
+
+def ticket_summary(unit: WorkUnit) -> TicketSummary:
+    return TicketSummary(
+        summary=unit.ticket.summary,
+        status=unit.status,
+        scope=unit.ticket.scope,
+        tracker=unit.ticket.tracker,
+    )
+
+
+def task_state(record: TaskRecord) -> TaskState:
+    return TaskState(
+        task=record.id,
+        status=NOT_STARTED if record.status is Status.PENDING else record.status,
+        attempts=record.attempts,
+        reasons=record.reasons,
+    )
+
+
+def check_state(receipt: ReceiptRow | None, head: str | None) -> str:
+    if receipt is None:
+        return NEVER_RUN
+    if receipt.head != head:
+        return f'stale ({receipt.outcome} at {short_head(receipt.head)})'
+    return receipt.outcome
+
+
+def check_states(
+    commands: Sequence[CommandRow], receipts: Mapping[str, ReceiptRow], head: str | None
+) -> tuple[CheckState, ...]:
+    return tuple(
+        CheckState(id=command.command_id, state=check_state(receipts.get(command.command_id), head))
+        for command in commands
+    )
+
+
+def last_passed(command: CommandRow, receipts: Mapping[str, ReceiptRow]) -> bool:
+    receipt = receipts.get(command.command_id)
+    return receipt is not None and receipt.outcome == Outcome.PASSED
+
+
+def passing_commands(
+    commands: Sequence[CommandRow], receipts: Mapping[str, ReceiptRow], limit: int
+) -> tuple[PassingCommand, ...]:
+    passing = (
+        PassingCommand(id=command.command_id, argv=tuple(command.argv))
+        for command in commands
+        if last_passed(command, receipts)
+    )
+    return tuple(islice(passing, limit))
+
+
+def failed_attempts(transitions: Sequence[TransitionRow], limit: int) -> tuple[FailedAttempt, ...]:
+    stuck = [
+        FailedAttempt(
+            task=transition.task_id,
+            to=transition.after,
+            reason='; '.join(transition.reasons),
+            head=short_head(transition.head),
+            at=transition.at,
+        )
+        for transition in transitions
+        if transition.after in STUCK
+    ]
+    return tuple(stuck[-limit:])
+
+
+def review_state(review: LatestReview | None, limit: int) -> ReviewState | None:
+    if review is None:
+        return None
+    run = review.standing.run
+    decisions = (
+        ReviewDecision(finding=finding_id, decision=decided.decision, reason=decided.reason)
+        for finding_id, decided in review.decided().items()
+        if decided.decision is not Decision.FIX
+    )
+    return ReviewState(
+        run=run.run_id.root,
+        depth=run.depth,
+        head=short_head(run.head),
+        findings=len(review.findings),
+        undecided=tuple(review.undecided()),
+        remediation_open=tuple(review.open_remediation()),
+        decisions=tuple(islice(decisions, limit)),
+    )
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class SnapshotService:
+    workspace: Workspace
+    database: Database
+
+    def take(self, slug: Slug, limit: int) -> SnapshotView:
+        git = self.workspace.git
+        repository_now = repository_state(git, limit)
+        with snapshot_transaction(self.database) as repository:
+            unit = unit_of(repository.tickets.staged_row(slug))
+            commands = repository.contracts.commands(slug)
+            receipts = repository.contracts.latest_receipts(slug)
+            record = SnapshotRecord(
+                slug=slug,
+                generated_at=now(),
+                ticket=ticket_summary(unit),
+                repository=repository_now,
+                tasks=tuple(map(task_state, records_of(repository.tasks, slug).values())),
+                checks=check_states(commands, receipts, repository_now.head),
+                works=passing_commands(commands, receipts, limit),
+                do_not_retry=failed_attempts(repository.tasks.transition_rows(slug), limit),
+                review=review_state(latest_review_of(repository.reviews, slug), limit),
+                warnings=git_warnings(git.refusal()),
+            )
+        files = self.workspace.handoffs.snapshot(slug)
+        return SnapshotView(
+            markdown=snapshot_markdown(record),
+            record=record,
+            markdown_path=self.workspace.relative_to_root(files.markdown),
+            record_path=self.workspace.relative_to_root(files.record),
+        )

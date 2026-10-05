@@ -173,8 +173,14 @@ class TestSlugType:
             inspect.signature(tool).parameters['slug'].annotation for tool in taking_a_slug
         ]
 
-        assert [tool.__name__ for tool in taking_a_slug] == ['ticket', 'task', 'contract']
-        assert annotations == [Slug, Slug, Slug]
+        assert [tool.__name__ for tool in taking_a_slug] == [
+            'ticket',
+            'task',
+            'contract',
+            'snapshot',
+            'close',
+        ]
+        assert annotations == [Slug, Slug, Slug, Slug, Slug]
 
     def test_slug_confinement_the_one_slug_type_is_the_review_start_payloads_slug(self) -> None:
         assert StartPayload.model_fields['slug'].annotation == Slug | None
@@ -188,7 +194,7 @@ class TestSlugType:
             if 'slug' in tool.input_schema['properties']
         }
 
-        assert sorted(schemas) == ['contract', 'task', 'ticket']
+        assert sorted(schemas) == ['close', 'contract', 'snapshot', 'task', 'ticket']
         assert all(
             (
                 schema['properties']['slug'],

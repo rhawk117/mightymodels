@@ -61,6 +61,9 @@ class TicketRepository:
     def mark_in_progress(self, slug: Slug) -> None:
         self.staged_row(slug).status = TicketStatus.IN_PROGRESS
 
+    def mark_closed(self, slug: Slug) -> None:
+        self.staged_row(slug).status = TicketStatus.CLOSED
+
 
 @contextmanager
 def ticket_transaction(database: Database) -> Generator[TicketRepository]:

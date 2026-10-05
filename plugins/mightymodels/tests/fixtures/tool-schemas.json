@@ -1073,7 +1073,8 @@
         "TicketStatus": {
           "enum": [
             "staged",
-            "in-progress"
+            "in-progress",
+            "closed"
           ],
           "title": "TicketStatus",
           "type": "string"
@@ -1160,6 +1161,985 @@
         "text"
       ],
       "title": "TicketView",
+      "type": "object"
+    }
+  },
+  "snapshot": {
+    "description": "Return the ticket's objective state as JSON and Markdown text for baton-pass to write.",
+    "input_schema": {
+      "type": "object",
+      "$defs": {
+        "Limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "Slug": {
+          "$ref": "#/$defs/SlugText",
+          "title": "Slug"
+        },
+        "SlugText": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "slug": {
+          "$ref": "#/$defs/Slug"
+        },
+        "limit": {
+          "$ref": "#/$defs/Limit",
+          "default": 20
+        }
+      },
+      "required": [
+        "slug"
+      ],
+      "title": "snapshotArguments"
+    },
+    "output_schema": {
+      "$defs": {
+        "CheckState": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "state": {
+              "title": "State",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "state"
+          ],
+          "title": "CheckState",
+          "type": "object"
+        },
+        "Decision": {
+          "enum": [
+            "fix",
+            "defer",
+            "accept-risk",
+            "dismiss"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "Depth": {
+          "enum": [
+            "quick",
+            "standard",
+            "deep"
+          ],
+          "title": "Depth",
+          "type": "string"
+        },
+        "FailedAttempt": {
+          "properties": {
+            "task": {
+              "title": "Task",
+              "type": "string"
+            },
+            "to": {
+              "title": "To",
+              "type": "string"
+            },
+            "reason": {
+              "title": "Reason",
+              "type": "string"
+            },
+            "head": {
+              "title": "Head",
+              "type": "string"
+            },
+            "at": {
+              "title": "At",
+              "type": "string"
+            }
+          },
+          "required": [
+            "task",
+            "to",
+            "reason",
+            "head",
+            "at"
+          ],
+          "title": "FailedAttempt",
+          "type": "object"
+        },
+        "NotYetRecorded": {
+          "maxItems": 0,
+          "minItems": 0,
+          "type": "array"
+        },
+        "PassingCommand": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "argv": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Argv",
+              "type": "array"
+            }
+          },
+          "required": [
+            "id",
+            "argv"
+          ],
+          "title": "PassingCommand",
+          "type": "object"
+        },
+        "RepositoryState": {
+          "properties": {
+            "branch": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch"
+            },
+            "head": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Head"
+            },
+            "dirty_count": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dirty Count"
+            },
+            "dirty": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Dirty",
+              "type": "array"
+            }
+          },
+          "required": [
+            "branch",
+            "head",
+            "dirty_count",
+            "dirty"
+          ],
+          "title": "RepositoryState",
+          "type": "object"
+        },
+        "ReviewDecision": {
+          "properties": {
+            "finding": {
+              "title": "Finding",
+              "type": "string"
+            },
+            "decision": {
+              "$ref": "#/$defs/Decision"
+            },
+            "reason": {
+              "title": "Reason",
+              "type": "string"
+            }
+          },
+          "required": [
+            "finding",
+            "decision",
+            "reason"
+          ],
+          "title": "ReviewDecision",
+          "type": "object"
+        },
+        "ReviewState": {
+          "properties": {
+            "run": {
+              "title": "Run",
+              "type": "string"
+            },
+            "depth": {
+              "$ref": "#/$defs/Depth"
+            },
+            "head": {
+              "title": "Head",
+              "type": "string"
+            },
+            "findings": {
+              "title": "Findings",
+              "type": "integer"
+            },
+            "undecided": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Undecided",
+              "type": "array"
+            },
+            "remediation_open": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Remediation Open",
+              "type": "array"
+            },
+            "decisions": {
+              "items": {
+                "$ref": "#/$defs/ReviewDecision"
+              },
+              "title": "Decisions",
+              "type": "array"
+            }
+          },
+          "required": [
+            "run",
+            "depth",
+            "head",
+            "findings",
+            "undecided",
+            "remediation_open",
+            "decisions"
+          ],
+          "title": "ReviewState",
+          "type": "object"
+        },
+        "Scope": {
+          "enum": [
+            "sm",
+            "med",
+            "large"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "Slug": {
+          "$ref": "#/$defs/SlugText",
+          "title": "Slug"
+        },
+        "SlugText": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        },
+        "SnapshotRecord": {
+          "properties": {
+            "slug": {
+              "$ref": "#/$defs/Slug"
+            },
+            "generated_at": {
+              "title": "Generated At",
+              "type": "string"
+            },
+            "ticket": {
+              "$ref": "#/$defs/TicketSummary"
+            },
+            "repository": {
+              "$ref": "#/$defs/RepositoryState"
+            },
+            "tasks": {
+              "items": {
+                "$ref": "#/$defs/TaskState"
+              },
+              "title": "Tasks",
+              "type": "array"
+            },
+            "checks": {
+              "items": {
+                "$ref": "#/$defs/CheckState"
+              },
+              "title": "Checks",
+              "type": "array"
+            },
+            "works": {
+              "items": {
+                "$ref": "#/$defs/PassingCommand"
+              },
+              "title": "Works",
+              "type": "array"
+            },
+            "decisions": {
+              "$ref": "#/$defs/NotYetRecorded",
+              "default": []
+            },
+            "open_questions": {
+              "$ref": "#/$defs/NotYetRecorded",
+              "default": []
+            },
+            "do_not_retry": {
+              "items": {
+                "$ref": "#/$defs/FailedAttempt"
+              },
+              "title": "Do Not Retry",
+              "type": "array"
+            },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReviewState"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "answers": {
+              "$ref": "#/$defs/NotYetRecorded",
+              "default": []
+            },
+            "subagents": {
+              "$ref": "#/$defs/NotYetRecorded",
+              "default": []
+            },
+            "warnings": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Warnings",
+              "type": "array"
+            }
+          },
+          "required": [
+            "slug",
+            "generated_at",
+            "ticket",
+            "repository",
+            "tasks",
+            "checks",
+            "works",
+            "do_not_retry",
+            "review",
+            "warnings"
+          ],
+          "title": "SnapshotRecord",
+          "type": "object"
+        },
+        "TaskState": {
+          "properties": {
+            "task": {
+              "title": "Task",
+              "type": "string"
+            },
+            "status": {
+              "title": "Status",
+              "type": "string"
+            },
+            "attempts": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "title": "Attempts",
+              "type": "object"
+            },
+            "reasons": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Reasons",
+              "type": "array"
+            }
+          },
+          "required": [
+            "task",
+            "status",
+            "attempts",
+            "reasons"
+          ],
+          "title": "TaskState",
+          "type": "object"
+        },
+        "TicketStatus": {
+          "enum": [
+            "staged",
+            "in-progress",
+            "closed"
+          ],
+          "title": "TicketStatus",
+          "type": "string"
+        },
+        "TicketSummary": {
+          "properties": {
+            "summary": {
+              "title": "Summary",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/TicketStatus"
+            },
+            "scope": {
+              "$ref": "#/$defs/Scope"
+            },
+            "tracker": {
+              "$ref": "#/$defs/Tracker"
+            }
+          },
+          "required": [
+            "summary",
+            "status",
+            "scope",
+            "tracker"
+          ],
+          "title": "TicketSummary",
+          "type": "object"
+        },
+        "Tracker": {
+          "properties": {
+            "issue": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Issue"
+            },
+            "jira": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jira"
+            }
+          },
+          "required": [
+            "issue",
+            "jira"
+          ],
+          "title": "Tracker",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "markdown": {
+          "title": "Markdown",
+          "type": "string"
+        },
+        "record": {
+          "$ref": "#/$defs/SnapshotRecord"
+        },
+        "markdown_path": {
+          "title": "Markdown Path",
+          "type": "string"
+        },
+        "record_path": {
+          "title": "Record Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "markdown",
+        "record",
+        "markdown_path",
+        "record_path"
+      ],
+      "title": "SnapshotView",
+      "type": "object"
+    }
+  },
+  "close": {
+    "description": "List live work that blocks closing, or close the ticket and return the archive text.",
+    "input_schema": {
+      "type": "object",
+      "$defs": {
+        "CloseAction": {
+          "enum": [
+            "check",
+            "close"
+          ],
+          "title": "CloseAction",
+          "type": "string"
+        },
+        "Closing": {
+          "additionalProperties": false,
+          "properties": {
+            "shipped": {
+              "default": "",
+              "title": "Shipped",
+              "type": "string"
+            },
+            "pr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pr"
+            },
+            "gotchas": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Gotchas",
+              "type": "array"
+            }
+          },
+          "title": "Closing",
+          "type": "object"
+        },
+        "Slug": {
+          "$ref": "#/$defs/SlugText",
+          "title": "Slug"
+        },
+        "SlugText": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/CloseAction"
+        },
+        "slug": {
+          "$ref": "#/$defs/Slug"
+        },
+        "closing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Closing"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "action",
+        "slug"
+      ],
+      "title": "closeArguments"
+    },
+    "output_schema": {
+      "$defs": {
+        "ArchiveRecord": {
+          "properties": {
+            "slug": {
+              "$ref": "#/$defs/Slug"
+            },
+            "closed_at": {
+              "title": "Closed At",
+              "type": "string"
+            },
+            "head": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Head"
+            },
+            "shipped": {
+              "title": "Shipped",
+              "type": "string"
+            },
+            "pr": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pr"
+            },
+            "tracker": {
+              "$ref": "#/$defs/Tracker"
+            },
+            "summary": {
+              "title": "Summary",
+              "type": "string"
+            },
+            "investigations": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Investigations",
+              "type": "array"
+            },
+            "tasks": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ArchivedTask"
+              },
+              "title": "Tasks",
+              "type": "object"
+            },
+            "verification": {
+              "items": {
+                "$ref": "#/$defs/ArchivedCommand"
+              },
+              "title": "Verification",
+              "type": "array"
+            },
+            "decisions": {
+              "$ref": "#/$defs/NotYetRecorded",
+              "default": []
+            },
+            "review": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArchivedReview"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "agents": {
+              "$ref": "#/$defs/WorkerRuns",
+              "default": {
+                "runs": 0,
+                "by_status": {},
+                "recent": []
+              }
+            },
+            "answers": {
+              "$ref": "#/$defs/RecordedAnswers",
+              "default": {
+                "recorded": 0,
+                "recent": []
+              }
+            },
+            "gotchas": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Gotchas",
+              "type": "array"
+            }
+          },
+          "required": [
+            "slug",
+            "closed_at",
+            "head",
+            "shipped",
+            "pr",
+            "tracker",
+            "summary",
+            "investigations",
+            "tasks",
+            "verification",
+            "review",
+            "gotchas"
+          ],
+          "title": "ArchiveRecord",
+          "type": "object"
+        },
+        "ArchivedCommand": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "argv": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Argv",
+              "type": "array"
+            },
+            "expect_exit": {
+              "title": "Expect Exit",
+              "type": "integer"
+            },
+            "outcome": {
+              "title": "Outcome",
+              "type": "string"
+            },
+            "head": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Head"
+            },
+            "digest": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Digest"
+            }
+          },
+          "required": [
+            "id",
+            "argv",
+            "expect_exit",
+            "outcome",
+            "head",
+            "digest"
+          ],
+          "title": "ArchivedCommand",
+          "type": "object"
+        },
+        "ArchivedReview": {
+          "properties": {
+            "run": {
+              "title": "Run",
+              "type": "string"
+            },
+            "depth": {
+              "$ref": "#/$defs/Depth"
+            },
+            "findings": {
+              "title": "Findings",
+              "type": "integer"
+            },
+            "by_decision": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "title": "By Decision",
+              "type": "object"
+            },
+            "reasons": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Reasons",
+              "type": "object"
+            }
+          },
+          "required": [
+            "run",
+            "depth",
+            "findings",
+            "by_decision",
+            "reasons"
+          ],
+          "title": "ArchivedReview",
+          "type": "object"
+        },
+        "ArchivedTask": {
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/Status"
+            },
+            "attempts": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "title": "Attempts",
+              "type": "object"
+            }
+          },
+          "required": [
+            "status",
+            "attempts"
+          ],
+          "title": "ArchivedTask",
+          "type": "object"
+        },
+        "ClosedArchive": {
+          "properties": {
+            "markdown": {
+              "title": "Markdown",
+              "type": "string"
+            },
+            "record": {
+              "$ref": "#/$defs/ArchiveRecord"
+            },
+            "markdown_path": {
+              "title": "Markdown Path",
+              "type": "string"
+            },
+            "record_path": {
+              "title": "Record Path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "markdown",
+            "record",
+            "markdown_path",
+            "record_path"
+          ],
+          "title": "ClosedArchive",
+          "type": "object"
+        },
+        "Depth": {
+          "enum": [
+            "quick",
+            "standard",
+            "deep"
+          ],
+          "title": "Depth",
+          "type": "string"
+        },
+        "NotYetRecorded": {
+          "maxItems": 0,
+          "minItems": 0,
+          "type": "array"
+        },
+        "RecordedAnswers": {
+          "properties": {
+            "recorded": {
+              "default": 0,
+              "title": "Recorded",
+              "type": "integer"
+            },
+            "recent": {
+              "$ref": "#/$defs/NotYetRecorded",
+              "default": []
+            }
+          },
+          "title": "RecordedAnswers",
+          "type": "object"
+        },
+        "Slug": {
+          "$ref": "#/$defs/SlugText",
+          "title": "Slug"
+        },
+        "SlugText": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        },
+        "Status": {
+          "enum": [
+            "pending",
+            "in-progress",
+            "verified",
+            "failed",
+            "blocked",
+            "superseded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "Tracker": {
+          "properties": {
+            "issue": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Issue"
+            },
+            "jira": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jira"
+            }
+          },
+          "required": [
+            "issue",
+            "jira"
+          ],
+          "title": "Tracker",
+          "type": "object"
+        },
+        "WorkerRuns": {
+          "properties": {
+            "runs": {
+              "default": 0,
+              "title": "Runs",
+              "type": "integer"
+            },
+            "by_status": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "title": "By Status",
+              "type": "object"
+            },
+            "recent": {
+              "$ref": "#/$defs/NotYetRecorded",
+              "default": []
+            }
+          },
+          "title": "WorkerRuns",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "blocked": {
+          "title": "Blocked",
+          "type": "boolean"
+        },
+        "blockers": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blockers",
+          "type": "array"
+        },
+        "archive": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClosedArchive"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text",
+        "blocked"
+      ],
+      "title": "CloseView",
       "type": "object"
     }
   }

@@ -18,10 +18,14 @@ from pathlib import Path
 from mcp.server import MCPServer
 
 from mightymodels_plugin.database import open_database
+from mightymodels_plugin.tools.close.service import CloseService
+from mightymodels_plugin.tools.close.tool import close_tool
 from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.contract.tool import contract_tool
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.review.tool import review_tool
+from mightymodels_plugin.tools.snapshot.service import SnapshotService
+from mightymodels_plugin.tools.snapshot.tool import snapshot_tool
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.task.tool import task_tool
 from mightymodels_plugin.tools.ticket.service import TicketService
@@ -29,7 +33,14 @@ from mightymodels_plugin.tools.ticket.tool import ticket_tool
 from mightymodels_plugin.workspace import find_root, workspace_at
 
 SERVER_NAME = 'state'
-TOOLS = (ticket_tool.ticket, task_tool.task, contract_tool.contract, review_tool.review)
+TOOLS = (
+    ticket_tool.ticket,
+    task_tool.task,
+    contract_tool.contract,
+    review_tool.review,
+    snapshot_tool.snapshot,
+    close_tool.close,
+)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -38,6 +49,8 @@ class AppState:
     tasks: TaskService
     contracts: ContractService
     reviews: ReviewService
+    snapshots: SnapshotService
+    closings: CloseService
 
 
 def build_server(root: Path) -> MCPServer[AppState]:
@@ -51,6 +64,8 @@ def build_server(root: Path) -> MCPServer[AppState]:
                 tasks=TaskService(workspace=workspace, database=database),
                 contracts=ContractService(workspace=workspace, database=database),
                 reviews=ReviewService(workspace=workspace, database=database),
+                snapshots=SnapshotService(workspace=workspace, database=database),
+                closings=CloseService(workspace=workspace, database=database),
             )
 
     server = MCPServer(SERVER_NAME, lifespan=lifespan)
