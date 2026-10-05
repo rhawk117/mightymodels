@@ -1,0 +1,208 @@
+"""Planned verification commands, how they ran, and what the run left behind."""
+
+import sys
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from enum import StrEnum, auto
+from pathlib import Path
+from types import MappingProxyType
+from typing import Literal
+
+from python_harness.survey.domain import Domain
+
+
+class GateTool(StrEnum):
+    RUFF_CHECK = auto()
+    RUFF_FORMAT = auto()
+    TY = auto()
+    PYTEST = auto()
+
+
+class RuffConfigSource(StrEnum):
+    REPOSITORY = auto()
+    FALLBACK = auto()
+    DEFAULTS = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class ToolInvocation:
+    distribution: str
+    arguments: tuple[str, ...]
+    reads_ruff_config: bool = False
+    runs_in_project_environment: bool = False
+    required_domain: Domain | None = None
+
+
+type ToolInvocations = Mapping[GateTool, ToolInvocation]
+
+
+def default_tool_invocations() -> ToolInvocations:
+    return MappingProxyType(
+        {
+            GateTool.RUFF_CHECK: ToolInvocation(
+                'ruff',
+                ('ruff', 'check', '--statistics', '--no-cache'),
+                reads_ruff_config=True,
+            ),
+            GateTool.RUFF_FORMAT: ToolInvocation(
+                'ruff',
+                ('ruff', 'format', '--check', '--no-cache'),
+                reads_ruff_config=True,
+            ),
+            GateTool.TY: ToolInvocation('ty', ('ty', 'check'), runs_in_project_environment=True),
+            GateTool.PYTEST: ToolInvocation(
+                'pytest',
+                ('pytest', '-q', '-p', 'no:cacheprovider'),
+                runs_in_project_environment=True,
+                required_domain=Domain.PYTEST,
+            ),
+        }
+    )
+
+
+PYTHON_HARNESS_ENVIRONMENT = frozenset(
+    {
+        'PYTHONDONTWRITEBYTECODE',
+        'UV',
+        'VIRTUAL_ENV',
+    }
+)
+
+
+def default_child_environment() -> Mapping[str, str]:
+    return MappingProxyType({'PYTHONDONTWRITEBYTECODE': '1'})
+
+
+def default_launcher_environment() -> Path | None:
+    if sys.prefix == sys.base_prefix:
+        return None
+    return Path(sys.prefix)
+
+
+@dataclass(frozen=True, slots=True)
+class GateOptions:
+    fallback_ruff_config: Path | None = None
+    dropped_environment: frozenset[str] = PYTHON_HARNESS_ENVIRONMENT
+    launcher_environment: Path | None = field(default_factory=default_launcher_environment)
+    child_environment: Mapping[str, str] = field(default_factory=default_child_environment)
+    timeout_seconds: float = 600.0
+    output_tail_lines: int = 40
+    skipped: frozenset[GateTool] = frozenset()
+    tools: ToolInvocations = field(default_factory=default_tool_invocations)
+
+
+@dataclass(frozen=True, slots=True)
+class GateInputs:
+    declared_distributions: frozenset[str]
+    has_uv_lock: bool
+    has_ruff_config: bool
+    domains: frozenset[Domain]
+    source_roots: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RuffConfigSelection:
+    source: RuffConfigSource
+    arguments: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Launcher:
+    program: str
+    arguments: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class GateCommand:
+    tool: GateTool
+    program: str
+    arguments: tuple[str, ...]
+
+    @property
+    def argv(self) -> tuple[str, ...]:
+        return (self.program, *self.arguments)
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedCommand:
+    command: GateCommand
+    executable: str
+
+    @property
+    def argv(self) -> tuple[str, ...]:
+        return (self.executable, *self.command.arguments)
+
+
+@dataclass(frozen=True, slots=True)
+class GatePlan:
+    commands: tuple[GateCommand, ...]
+    ruff_config_source: RuffConfigSource
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessSettings:
+    root: Path
+    environment: Mapping[str, str]
+    timeout_seconds: float
+    output_tail_lines: int
+
+
+@dataclass(frozen=True, slots=True)
+class Exited:
+    exit_code: int
+    kind: Literal['exited'] = field(default='exited', init=False)
+
+
+@dataclass(frozen=True, slots=True)
+class TimedOut:
+    kind: Literal['timed_out'] = field(default='timed_out', init=False)
+
+
+type GateOutcome = Exited | TimedOut
+
+
+@dataclass(frozen=True, slots=True)
+class GateResult:
+    command: GateCommand
+    outcome: GateOutcome
+    output_tail: str
+
+    @property
+    def timed_out(self) -> bool:
+        return isinstance(self.outcome, TimedOut)
+
+    @property
+    def passed(self) -> bool:
+        return isinstance(self.outcome, Exited) and self.outcome.exit_code == 0
+
+
+@dataclass(frozen=True, slots=True)
+class UntrackedSnapshot:
+    prefix: str
+    paths: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class CreatedPaths:
+    paths: tuple[str, ...]
+    kind: Literal['tracked'] = field(default='tracked', init=False)
+
+
+@dataclass(frozen=True, slots=True)
+class NotTracked:
+    kind: Literal['not_tracked'] = field(default='not_tracked', init=False)
+
+
+type CreationTracking = CreatedPaths | NotTracked
+type UntrackedBaseline = UntrackedSnapshot | NotTracked
+
+
+@dataclass(frozen=True, slots=True)
+class GateReport:
+    ruff_config_source: RuffConfigSource
+    results: tuple[GateResult, ...]
+    created_paths: CreationTracking
+
+    @property
+    def passed(self) -> bool:
+        return all(result.passed for result in self.results)

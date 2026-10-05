@@ -1,0 +1,22 @@
+#!/usr/bin/env -S uv tool run --python >=3.14 --with tree-sitter==0.26.0 --with tree-sitter-bash==0.25.1 python
+"""Run the python-harness CLI from the plugin directory this file lives in.
+
+The shebang uses `uv tool run`, not `uv run`. `uv run` adopts the `.venv`, `pyproject.toml` and
+`uv.toml` of the caller's working directory, so a hostile project could substitute its own
+interpreter, packages or index for the pinned ones. `uv tool run` builds an isolated environment
+from the pins on the shebang line alone.
+"""
+
+import importlib
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    plugin_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(plugin_root.joinpath('src')))
+    return importlib.import_module('python_harness.cli').main()
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
