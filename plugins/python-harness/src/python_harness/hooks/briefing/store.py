@@ -32,7 +32,7 @@ from python_harness.hooks.briefing.util.parsing import (
     parse_toml,
 )
 from python_harness.hooks.domain import SEARCH_BOUNDARY_MARKERS
-from python_harness.survey.domain import PYPROJECT, UV_LOCK, ProjectManifest
+from python_harness.survey.domain import NO_MANIFEST, PYPROJECT, UV_LOCK, ProjectManifest
 from python_harness.survey.util import manifest_from_document, read_nested_table
 
 EMPTY_TABLE: ConfigTable = MappingProxyType({})
@@ -86,9 +86,9 @@ def holds_any_file(directory: Path, names: tuple[str, ...]) -> bool:
     return any(has_file(directory, name) for name in names)
 
 
-def manifest_of(read: TomlRead | None) -> ProjectManifest | None:
+def manifest_of(read: TomlRead | None) -> ProjectManifest:
     if not isinstance(read, TomlDocument):
-        return None
+        return NO_MANIFEST
     return manifest_from_document(read.table)
 
 
@@ -105,7 +105,7 @@ class ScanContext:
     directories: tuple[Path, ...]
     project_directories: tuple[Path, ...]
     pyprojects: Mapping[Path, TomlRead]
-    manifest: ProjectManifest | None
+    manifest: ProjectManifest
     lock: TomlRead
     locked_versions: Mapping[str, str]
     options: ScanOptions

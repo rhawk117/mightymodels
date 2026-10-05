@@ -32,9 +32,7 @@ PYTEST_CANDIDATES = (
 )
 
 
-def classify_declaration(manifest: ProjectManifest | None, name: str) -> Declaration:
-    if manifest is None:
-        return Declaration.UNDECLARED
+def classify_declaration(manifest: ProjectManifest, name: str) -> Declaration:
     groups = (
         (Declaration.RUNTIME, manifest.dependencies),
         (Declaration.DEVELOPMENT, manifest.dev_dependencies),

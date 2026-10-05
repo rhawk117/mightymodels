@@ -6,7 +6,7 @@ from collections.abc import Collection, Mapping
 from pathlib import Path
 
 from python_harness.gate.domain import GateInputs, GateOptions
-from python_harness.survey.domain import ProjectManifest, ProjectSurvey
+from python_harness.survey.domain import ProjectSurvey
 
 SEARCH_PATH = 'PATH'
 VIRTUAL_ENV = 'VIRTUAL_ENV'
@@ -14,15 +14,9 @@ VIRTUALENV_SCRIPTS = 'Scripts' if sys.platform == 'win32' else 'bin'
 UNTRACKED_STATUS_CODES = frozenset({'??', '!!'})
 
 
-def list_declared_distributions(manifest: ProjectManifest | None) -> frozenset[str]:
-    if manifest is None:
-        return frozenset[str]()
-    return manifest.declared_distributions
-
-
 def gate_inputs_from(survey: ProjectSurvey) -> GateInputs:
     return GateInputs(
-        declared_distributions=list_declared_distributions(survey.manifest),
+        declared_distributions=survey.manifest.declared_distributions,
         has_uv_lock=survey.layout.has_uv_lock,
         has_ruff_config=survey.ruff_config is not None,
         domains=frozenset(survey.domains),

@@ -73,6 +73,18 @@ class ProjectManifest:
         return distribution in self.declared_distributions
 
 
+NO_MANIFEST = ProjectManifest(
+    name=None,
+    requires_python=None,
+    build_backend=None,
+    entry_points=(),
+    classifiers=(),
+    dependencies=(),
+    dev_dependencies=(),
+    optional_dependencies=(),
+)
+
+
 @dataclass(frozen=True, slots=True)
 class LayoutFacts:
     has_py_typed: bool
@@ -91,7 +103,7 @@ class ModeInference:
 @dataclass(frozen=True, slots=True)
 class ProjectSurvey:
     root: str
-    manifest: ProjectManifest | None
+    manifest: ProjectManifest
     layout: LayoutFacts
     mode: ModeInference
     domains: tuple[Domain, ...]

@@ -5,6 +5,7 @@ from types import MappingProxyType
 
 import pytest
 from python_harness.survey.domain import (
+    NO_MANIFEST,
     Domain,
     LayoutFacts,
     Mode,
@@ -40,7 +41,7 @@ class TestInferMode:
         ('manifest', 'layout', 'expected'),
         [
             pytest.param(
-                None,
+                NO_MANIFEST,
                 replace(PLAIN_LAYOUT, has_py_typed=True),
                 ModeInference(Mode.APPLICATION, ('no pyproject.toml',)),
                 id='no-manifest',
@@ -86,7 +87,7 @@ class TestInferMode:
     )
     def test_first_matching_rule_decides_with_its_evidence(
         self,
-        manifest: ProjectManifest | None,
+        manifest: ProjectManifest,
         layout: LayoutFacts,
         expected: ModeInference,
     ) -> None:
@@ -147,13 +148,13 @@ class TestDetectDomains:
     def test_imported_packages_mark_domains(
         self, external_packages: tuple[str, ...], expected: tuple[Domain, ...]
     ) -> None:
-        assert detect_domains(None, external_packages, PLAIN_LAYOUT) == expected
+        assert detect_domains(NO_MANIFEST, external_packages, PLAIN_LAYOUT) == expected
 
     @pytest.mark.parametrize(
         ('manifest', 'layout', 'expected'),
         [
             pytest.param(
-                None,
+                NO_MANIFEST,
                 replace(PLAIN_LAYOUT, has_tests_directory=True),
                 (Domain.PYTEST,),
                 id='tests-directory',
@@ -168,7 +169,7 @@ class TestDetectDomains:
     )
     def test_layout_and_entry_points_mark_domains(
         self,
-        manifest: ProjectManifest | None,
+        manifest: ProjectManifest,
         layout: LayoutFacts,
         expected: tuple[Domain, ...],
     ) -> None:
@@ -176,7 +177,7 @@ class TestDetectDomains:
 
     def test_marker_table_comes_from_the_options(self) -> None:
         domains = detect_domains(
-            None,
+            NO_MANIFEST,
             ('modelcontextprotocol', 'pytest'),
             PLAIN_LAYOUT,
             options=self.CUSTOM_OPTIONS,

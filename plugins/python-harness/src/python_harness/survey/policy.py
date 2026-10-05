@@ -3,6 +3,7 @@
 from collections.abc import Iterable, Iterator
 
 from python_harness.survey.domain import (
+    NO_MANIFEST,
     Domain,
     LayoutFacts,
     Mode,
@@ -29,8 +30,8 @@ def find_library_evidence(manifest: ProjectManifest, layout: LayoutFacts) -> Ite
         yield f'{TYPED_CLASSIFIER} classifier'
 
 
-def infer_mode(manifest: ProjectManifest | None, layout: LayoutFacts) -> ModeInference:
-    if manifest is None:
+def infer_mode(manifest: ProjectManifest, layout: LayoutFacts) -> ModeInference:
+    if manifest is NO_MANIFEST:
         return ModeInference(Mode.APPLICATION, ('no pyproject.toml',))
     if application_evidence := tuple(find_application_evidence(manifest, layout)):
         return ModeInference(Mode.APPLICATION, application_evidence)
@@ -41,10 +42,8 @@ def infer_mode(manifest: ProjectManifest | None, layout: LayoutFacts) -> ModeInf
 
 
 def collect_package_names(
-    manifest: ProjectManifest | None, external_packages: Iterable[str]
+    manifest: ProjectManifest, external_packages: Iterable[str]
 ) -> frozenset[str]:
-    if manifest is None:
-        return frozenset(external_packages)
     declared = (
         *manifest.dependencies,
         *manifest.dev_dependencies,
@@ -53,15 +52,15 @@ def collect_package_names(
     return frozenset((*external_packages, *declared))
 
 
-def find_layout_domains(manifest: ProjectManifest | None, layout: LayoutFacts) -> Iterator[Domain]:
+def find_layout_domains(manifest: ProjectManifest, layout: LayoutFacts) -> Iterator[Domain]:
     if layout.has_tests_directory:
         yield Domain.PYTEST
-    if manifest is not None and manifest.entry_points:
+    if manifest.entry_points:
         yield Domain.CLI
 
 
 def detect_domains(
-    manifest: ProjectManifest | None,
+    manifest: ProjectManifest,
     external_packages: Iterable[str],
     layout: LayoutFacts,
     *,

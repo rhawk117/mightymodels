@@ -9,6 +9,7 @@ import tomllib
 from python_harness.core.workspace import Workspace
 from python_harness.imports.services import load_project_index
 from python_harness.survey.domain import (
+    NO_MANIFEST,
     PYPROJECT,
     RUFF_CONFIG_FILES,
     UV_LOCK,
@@ -82,7 +83,7 @@ def list_external_packages(workspace: Workspace) -> tuple[str, ...]:
 def survey_project(workspace: Workspace, options: SurveyOptions | None = None) -> ProjectSurvey:
     chosen = SurveyOptions() if options is None else options
     pyproject = load_pyproject(workspace)
-    manifest = None if pyproject is None else manifest_from_document(pyproject)
+    manifest = NO_MANIFEST if pyproject is None else manifest_from_document(pyproject)
     layout = read_layout(workspace)
     external_packages = list_external_packages(workspace)
     return ProjectSurvey(

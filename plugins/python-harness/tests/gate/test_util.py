@@ -23,6 +23,7 @@ from python_harness.gate.util import (
     untracked_paths_from_status,
 )
 from python_harness.survey.domain import (
+    NO_MANIFEST,
     Domain,
     LayoutFacts,
     Mode,
@@ -95,7 +96,7 @@ class TestGateInputsFrom:
         assert inputs.source_roots == self.SURVEY.source_roots
 
     def test_without_a_manifest_nothing_is_declared(self) -> None:
-        inputs = gate_inputs_from(replace(self.SURVEY, manifest=None))
+        inputs = gate_inputs_from(replace(self.SURVEY, manifest=NO_MANIFEST))
 
         assert inputs.declared_distributions == frozenset()
 

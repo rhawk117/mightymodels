@@ -88,10 +88,52 @@ class TestCommandTable:
 
 
 class TestSurvey:
+    EMPTY_MANIFEST = MappingProxyType(
+        {
+            'name': None,
+            'requires_python': None,
+            'build_backend': None,
+            'entry_points': [],
+            'classifiers': [],
+            'dependencies': [],
+            'dev_dependencies': [],
+            'optional_dependencies': [],
+            'declared_distributions': [],
+        }
+    )
+
+    @pytest.fixture
+    def without_pyproject(self, project_builder: ProjectBuilder) -> Workspace:
+        return project_builder.write({'shop/__init__.py': ''})
+
+    @pytest.fixture
+    def with_empty_pyproject(self, project_builder: ProjectBuilder) -> Workspace:
+        return project_builder.write({'pyproject.toml': '', 'shop/__init__.py': ''})
+
     def test_survey_prints_the_projects_domains(self, workspace: Workspace) -> None:
         exit_code, document = run_inspect(workspace, 'survey')
 
         assert (exit_code, document['domains']) == (ExitCode.PASSED, ['cli'])
+
+    def test_a_project_without_a_pyproject_prints_a_null_manifest(
+        self, without_pyproject: Workspace
+    ) -> None:
+        _, document = run_inspect(without_pyproject, 'survey')
+
+        assert (document['manifest'], document['mode']['reasons']) == (
+            None,
+            ['no pyproject.toml'],
+        )
+
+    def test_an_empty_pyproject_still_prints_a_manifest_object(
+        self, with_empty_pyproject: Workspace
+    ) -> None:
+        _, document = run_inspect(with_empty_pyproject, 'survey')
+
+        assert (document['manifest'], document['mode']['reasons']) == (
+            self.EMPTY_MANIFEST,
+            ['no build backend: uv application layout'],
+        )
 
 
 class TestGate:

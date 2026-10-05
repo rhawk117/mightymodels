@@ -135,10 +135,9 @@ def find_environment(context: ScanContext) -> VirtualEnvironment | None:
 
 
 def scan_python(context: ScanContext) -> PythonFacts:
-    manifest = context.manifest
     return PythonFacts(
         pin=find_pin(context),
-        requires_python=None if manifest is None else manifest.requires_python,
+        requires_python=context.manifest.requires_python,
         environment=find_environment(context),
     )
 
@@ -291,9 +290,7 @@ def scan_pytest(context: ScanContext) -> ToolScan:
     return ToolScan(Tool.PYTEST, package, config.source, settings, config.problems)
 
 
-def declared_names(manifest: ProjectManifest | None) -> frozenset[str]:
-    if manifest is None:
-        return frozenset[str]()
+def declared_names(manifest: ProjectManifest) -> frozenset[str]:
     return manifest.declared_distributions | frozenset(manifest.optional_dependencies)
 
 

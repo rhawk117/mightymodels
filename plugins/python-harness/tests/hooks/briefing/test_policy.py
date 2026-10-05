@@ -3,7 +3,7 @@
 import pytest
 from python_harness.hooks.briefing.domain import Declaration
 from python_harness.hooks.briefing.policy import classify_declaration
-from python_harness.survey.domain import ProjectManifest
+from python_harness.survey.domain import NO_MANIFEST, ProjectManifest
 
 
 class TestClassifyDeclaration:
@@ -35,4 +35,4 @@ class TestClassifyDeclaration:
         assert classify_declaration(manifest, name) == expected
 
     def test_without_a_manifest_nothing_is_declared(self) -> None:
-        assert classify_declaration(None, 'ruff') == Declaration.UNDECLARED
+        assert classify_declaration(NO_MANIFEST, 'ruff') == Declaration.UNDECLARED
