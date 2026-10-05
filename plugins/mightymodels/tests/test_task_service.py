@@ -6,7 +6,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-from mightymodels_plugin.db.checkout import Checkout, open_checkout
+from mightymodels_plugin.db.checkout import Checkout, Checkouts
 from mightymodels_plugin.db.tables import TicketRow, TransitionRow
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.contract import ContractCommand, Phase
@@ -72,8 +72,12 @@ def act(
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Repo:
-    root: Path
+    checkouts: Checkouts
     runner: GitRunner
+
+    @property
+    def root(self) -> Path:
+        return self.checkouts.root
 
     def git(self, *args: str) -> str:
         return self.runner(self.root, *IDENTITY, *args).strip()
@@ -88,7 +92,7 @@ class Repo:
 
     def run(self, action: str, task_id: str | None = None, **change: object) -> Outcome:
         try:
-            with open_checkout(self.root) as checkout:
+            with self.checkouts.begin() as checkout:
                 view = act(checkout, action, task_id, change)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, out='', err=str(error))
@@ -99,12 +103,12 @@ class Repo:
         return self.root.joinpath('.mightymodels', SLUG)
 
     def task(self, task_id: str) -> TaskRecord:
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return task.records_of(checkout, TICKET)[task_id]
 
     def transitions(self) -> list[tuple[str, str]]:
         query = select(TransitionRow).order_by(TransitionRow.id)
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return [(row.before, row.after) for row in checkout.session.scalars(query)]
 
     def approve(self, *command_ids: str) -> None:
@@ -112,7 +116,7 @@ class Repo:
             ContractCommand(id=command_id, argv=('true',), approved_by='user')
             for command_id in command_ids
         ]
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             contract.approve(checkout, TICKET, commands)
 
     def receipt(self, command_id: str, outcome: str, head: str) -> None:
@@ -129,7 +133,7 @@ class Repo:
             phase=Phase.TASK,
             at=now(),
         )
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             contract.record(checkout, TICKET, [entry])
         if command_id.startswith('T'):
             task_id = command_id.split('.', 1)[0]
@@ -143,10 +147,10 @@ class Repo:
 
 
 @pytest.fixture
-def repo(repository: Path, git: GitRunner) -> Repo:
-    space = Repo(root=repository, runner=git)
+def repo(checkouts: Checkouts, git: GitRunner) -> Repo:
+    space = Repo(checkouts=checkouts, runner=git)
     space.commit('src/queue.py', 'base\n')
-    with open_checkout(repository) as checkout:
+    with checkouts.begin() as checkout:
         ticket.write(checkout, TICKET, ANSWERS)
         ticket.validate(checkout, TICKET)
     return space
@@ -260,7 +264,7 @@ def test_option_shaped_revisions_are_refused(repo: Repo) -> None:
 
 
 def test_an_unstaged_ticket_is_refused(repo: Repo) -> None:
-    with open_checkout(repo.root) as checkout:
+    with repo.checkouts.begin() as checkout:
         checkout.session.execute(delete(TicketRow))
     outcome = start(repo)
     assert 'stage the ticket with open-ticket first' in outcome.err
@@ -519,19 +523,20 @@ class TestEscalationLadder:
 
 
 class TestVerify:
+    @pytest.fixture
+    def unborn(self, checkouts: Checkouts, git: GitRunner) -> Repo:
+        with checkouts.begin() as checkout:
+            ticket.write(checkout, TICKET, ANSWERS)
+            ticket.validate(checkout, TICKET)
+        return Repo(checkouts=checkouts, runner=git)
+
     def test_a_task_that_never_started_cannot_be_verified(self, repo: Repo) -> None:
         outcome = repo.run('verify', 'T1', commit=repo.git('rev-parse', 'HEAD'))
 
         assert outcome.code == REJECTED
         assert 'T1 cannot move from pending to verified' in outcome.err
 
-    def test_a_task_started_before_the_first_commit_has_no_base(
-        self, repository: Path, git: GitRunner
-    ) -> None:
-        unborn = Repo(root=repository, runner=git)
-        with open_checkout(repository) as checkout:
-            ticket.write(checkout, TICKET, ANSWERS)
-            ticket.validate(checkout, TICKET)
+    def test_a_task_started_before_the_first_commit_has_no_base(self, unborn: Repo) -> None:
         start(unborn)
         head = unborn.commit('src/queue.py', 'first\n')
 

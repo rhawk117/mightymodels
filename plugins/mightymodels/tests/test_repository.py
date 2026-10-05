@@ -3,14 +3,15 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from mightymodels_plugin.database import DATABASE_NAME, open_database
 from mightymodels_plugin.db.repository import (
-    DATABASE_NAME,
     EXCLUDE_LINE,
     STATE_DIRECTORY,
     NotARepositoryError,
+    exclude_state_in_repository,
     find_root,
-    open_repository,
 )
+from mightymodels_plugin.tools.tests.support import StateServer
 
 type GitRunner = Callable[..., str]
 
@@ -52,42 +53,8 @@ class TestOpenRepository:
         exclude = repository.joinpath('.git', 'info', 'exclude')
         return exclude.read_text(encoding='utf-8').splitlines()
 
-    def test_creates_the_database(self, repository: Path) -> None:
-        open_repository(repository).dispose()
-
-        assert repository.joinpath(STATE_DIRECTORY, DATABASE_NAME).is_file()
-
-    def test_excludes_the_state_directory_from_git(self, repository: Path) -> None:
-        open_repository(repository).dispose()
-
-        assert EXCLUDE_LINE in self.exclude_lines(repository)
-
-    def test_excluded_state_does_not_show_in_git_status(
-        self, repository: Path, git: GitRunner
-    ) -> None:
-        open_repository(repository).dispose()
-
-        assert git(repository, 'status', '--porcelain') == ''
-
-    def test_is_idempotent(self, repository: Path) -> None:
-        open_repository(repository).dispose()
-        open_repository(repository).dispose()
-
-        assert self.exclude_lines(repository).count(EXCLUDE_LINE) == 1
-
-    def test_keeps_existing_exclude_lines_without_a_trailing_newline(
-        self, repository: Path
-    ) -> None:
-        exclude = repository.joinpath('.git', 'info', 'exclude')
-        exclude.write_text('*.log', encoding='utf-8')
-
-        open_repository(repository).dispose()
-
-        assert self.exclude_lines(repository) == ['*.log', EXCLUDE_LINE]
-
-    def test_linked_worktree_writes_to_the_common_git_dir(
-        self, repository: Path, tmp_path: Path, git: GitRunner
-    ) -> None:
+    @pytest.fixture
+    def worktree(self, repository: Path, tmp_path: Path, git: GitRunner) -> Path:
         git(
             repository,
             '-c',
@@ -99,35 +66,87 @@ class TestOpenRepository:
             '-m',
             'init',
         )
-        worktree = tmp_path.joinpath('worktree')
-        git(repository, 'worktree', 'add', '--quiet', str(worktree), '-b', 'other')
+        linked = tmp_path.joinpath('worktree')
+        git(repository, 'worktree', 'add', '--quiet', str(linked), '-b', 'other')
+        return linked
 
-        open_repository(worktree).dispose()
+    @pytest.fixture
+    def exclude_without_a_trailing_newline(self, repository: Path) -> None:
+        repository.joinpath('.git', 'info', 'exclude').write_text('*.log', encoding='utf-8')
+
+    def test_creates_the_database(self, repository: Path, state_server: StateServer) -> None:
+        state_server.connect()
+
+        assert repository.joinpath(STATE_DIRECTORY, DATABASE_NAME).is_file()
+
+    def test_excludes_the_state_directory_from_git(
+        self, repository: Path, state_server: StateServer
+    ) -> None:
+        state_server.connect()
+
+        assert EXCLUDE_LINE in self.exclude_lines(repository)
+
+    def test_excluded_state_does_not_show_in_git_status(
+        self, repository: Path, state_server: StateServer, git: GitRunner
+    ) -> None:
+        state_server.connect()
+
+        assert git(repository, 'status', '--porcelain') == ''
+
+    def test_is_idempotent(self, repository: Path, state_server: StateServer) -> None:
+        state_server.connect()
+        state_server.connect()
+
+        assert self.exclude_lines(repository).count(EXCLUDE_LINE) == 1
+
+    @pytest.mark.usefixtures('exclude_without_a_trailing_newline')
+    def test_keeps_existing_exclude_lines_without_a_trailing_newline(
+        self, repository: Path, state_server: StateServer
+    ) -> None:
+        state_server.connect()
+
+        assert self.exclude_lines(repository) == ['*.log', EXCLUDE_LINE]
+
+    def test_linked_worktree_writes_to_the_common_git_dir(
+        self, repository: Path, worktree: Path
+    ) -> None:
+        StateServer(root=worktree).connect()
 
         assert EXCLUDE_LINE in self.exclude_lines(repository)
         assert worktree.joinpath(STATE_DIRECTORY, DATABASE_NAME).is_file()
 
-    def test_finds_the_database_in_a_repository_whose_path_has_url_characters(
-        self, tmp_path: Path, git: GitRunner
-    ) -> None:
+
+class TestOpenDatabase:
+    @pytest.fixture
+    def root_with_url_characters(self, tmp_path: Path, git: GitRunner) -> Path:
         root = tmp_path.joinpath('odd?mode=memory#cache')
         root.mkdir()
         git(root, 'init', '--quiet')
-        database = root.joinpath(STATE_DIRECTORY, DATABASE_NAME)
+        return root
 
-        engine = open_repository(root)
-        engine.dispose()
+    def test_finds_the_database_in_a_repository_whose_path_has_url_characters(
+        self, root_with_url_characters: Path, tmp_path: Path
+    ) -> None:
+        database = root_with_url_characters.joinpath(STATE_DIRECTORY, DATABASE_NAME)
 
-        assert engine.url.database == str(database)
+        with open_database(root_with_url_characters) as opened:
+            located = opened.engine.url.database
+
+        assert located == str(database)
         assert database.stat().st_size > 0
-        assert [path.name for path in tmp_path.iterdir()] == [root.name]
+        assert [path.name for path in tmp_path.iterdir()] == [root_with_url_characters.name]
 
-    def test_refuses_a_directory_outside_a_repository(self, tmp_path: Path) -> None:
-        outside = tmp_path.joinpath('outside')
-        outside.mkdir()
 
-        with pytest.raises(NotARepositoryError) as error:
-            open_repository(outside)
+class TestOutsideARepository:
+    @pytest.fixture
+    def outside(self, tmp_path: Path) -> Path:
+        directory = tmp_path.joinpath('outside')
+        directory.mkdir()
+        return directory
 
-        assert error.value.root == outside
+    def test_refuses_a_directory_outside_a_repository(self, outside: Path) -> None:
+        refusal = exclude_state_in_repository(outside)
+
+        assert isinstance(refusal, NotARepositoryError)
+        assert refusal.root == outside
         assert not outside.joinpath(STATE_DIRECTORY).exists()

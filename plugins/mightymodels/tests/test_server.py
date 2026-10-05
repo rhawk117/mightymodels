@@ -1,10 +1,13 @@
-import asyncio
+import json
 from pathlib import Path
 
 import pytest
-from mcp import Client
-from mcp.types import CallToolResult, TextContent, Tool
-from mightymodels_plugin.server import SERVER_NAME, TOOLS, build_server
+from mcp.types import CallToolResult
+from mightymodels_plugin.db.checkout import Checkouts
+from mightymodels_plugin.db.tests.support import ActivityKind, DatabaseActivity
+from mightymodels_plugin.server import SERVER_NAME, TOOLS, AppState
+from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
+from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
 
 SLUG = 'retry-queue'
 ANSWERS = {
@@ -18,34 +21,16 @@ COMMAND = {'id': 'T1.AC-1', 'argv': ['true'], 'approved_by': 'user'}
 START = {'by': 'engineer', 'owned': ['src/queue.py']}
 
 
-async def list_tools() -> dict[str, Tool]:
-    async with Client(build_server()) as client:
-        result = await client.list_tools()
-    return {tool.name: tool for tool in result.tools}
-
-
-async def read_server_name() -> str | None:
-    async with Client(build_server()) as client:
-        return client.server_info.name if client.server_info else None
-
-
-async def call_tools(*calls: tuple[str, dict[str, object]]) -> list[CallToolResult]:
-    async with Client(build_server()) as client:
-        return [
-            await client.call_tool(name, {'slug': SLUG, **arguments}) for name, arguments in calls
-        ]
-
-
-def text_of(result: CallToolResult) -> str:
-    return ''.join(block.text for block in result.content if isinstance(block, TextContent))
+def ticket_results(server: StateServer, *calls: ToolCall) -> list[CallToolResult]:
+    return server.call(*((name, {'slug': SLUG, **arguments}) for name, arguments in calls))
 
 
 class TestStateServer:
-    def test_is_named_state(self) -> None:
-        assert asyncio.run(read_server_name()) == SERVER_NAME == 'state'
+    def test_is_named_state(self, state_server: StateServer) -> None:
+        assert state_server.name() == SERVER_NAME == 'state'
 
-    def test_lists_its_tools_through_the_in_memory_client(self) -> None:
-        assert sorted(asyncio.run(list_tools())) == ['contract', 'review', 'task', 'ticket']
+    def test_lists_its_tools_through_the_in_memory_client(self, state_server: StateServer) -> None:
+        assert sorted(state_server.tools()) == ['contract', 'review', 'task', 'ticket']
 
     @pytest.mark.parametrize(
         ('name', 'arguments', 'required'),
@@ -61,15 +46,15 @@ class TestStateServer:
         ],
     )
     def test_each_tool_takes_the_arguments_the_surface_gives_it(
-        self, name: str, arguments: list[str], required: list[str]
+        self, name: str, arguments: list[str], required: list[str], state_server: StateServer
     ) -> None:
-        schema = asyncio.run(list_tools())[name].input_schema
+        schema = state_server.tools()[name].input_schema
 
         assert list(schema['properties']) == arguments
         assert schema['required'] == required
 
-    def test_review_offers_the_seven_actions(self) -> None:
-        schema = asyncio.run(list_tools())['review'].input_schema
+    def test_review_offers_the_seven_actions(self, state_server: StateServer) -> None:
+        schema = state_server.tools()['review'].input_schema
 
         assert schema['$defs']['ReviewAction']['enum'] == [
             'start',
@@ -81,31 +66,104 @@ class TestStateServer:
             'list',
         ]
 
-    def test_each_tool_is_described_by_its_docstring(self) -> None:
-        listed = asyncio.run(list_tools())
+    def test_each_tool_is_described_by_its_docstring(self, state_server: StateServer) -> None:
+        listed = state_server.tools()
 
         assert {name: tool.description for name, tool in listed.items()} == {
             tool.__name__: tool.__doc__ for tool in TOOLS
         }
 
 
-@pytest.mark.usefixtures('project')
-class TestToolCalls:
-    @pytest.fixture
-    def project(self, repository: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-        monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(repository))
-        return repository
+class TestToolSchemas:
+    SNAPSHOT = Path(__file__).parent.joinpath('fixtures', 'tool-schemas.json')
 
-    def test_a_ticket_is_written_validated_and_read_back(self, project: Path) -> None:
-        written, validated, shown = asyncio.run(
-            call_tools(
-                ('ticket', {'action': 'write', 'fields': ANSWERS}),
-                ('ticket', {'action': 'validate'}),
-                ('ticket', {'action': 'show'}),
-            )
+    @pytest.fixture
+    def served_schemas(self, state_server: StateServer) -> dict[str, dict[str, object]]:
+        return {
+            name: {
+                'description': tool.description,
+                'input_schema': tool.input_schema,
+                'output_schema': tool.output_schema,
+            }
+            for name, tool in state_server.tools().items()
+        }
+
+    def test_each_tool_schema_equals_the_snapshot_taken_before_the_rework(
+        self, served_schemas: dict[str, dict[str, object]]
+    ) -> None:
+        assert served_schemas == json.loads(self.SNAPSHOT.read_text(encoding='utf-8'))
+
+
+class TestToolProtocol:
+    @pytest.mark.parametrize(
+        'tool', [pytest.param(tool.__self__, id=tool.__name__) for tool in TOOLS]
+    )
+    def test_each_registered_tool_satisfies_the_action_tool_protocol(self, tool: object) -> None:
+        assert isinstance(tool, ActionTool)
+
+    def test_the_lifespan_state_satisfies_what_the_tools_resolve(
+        self, checkouts: Checkouts
+    ) -> None:
+        assert isinstance(AppState(checkouts=checkouts), LifespanState)
+
+
+class TestLifespanState:
+    @pytest.fixture
+    def activity_of_two_calls(
+        self, state_server: StateServer, database_activity: DatabaseActivity
+    ) -> DatabaseActivity:
+        ticket_results(
+            state_server,
+            ('ticket', {'action': 'write', 'fields': ANSWERS}),
+            ('ticket', {'action': 'validate'}),
+        )
+        return database_activity
+
+    def test_one_engine_serves_every_call_and_is_disposed_when_the_client_closes(
+        self, activity_of_two_calls: DatabaseActivity
+    ) -> None:
+        assert activity_of_two_calls.kinds() == [
+            ActivityKind.TRANSACTION_OPENED,
+            ActivityKind.TRANSACTION_OPENED,
+            ActivityKind.ENGINE_DISPOSED,
+        ]
+        assert len(activity_of_two_calls.engines()) == 1
+
+
+class TestOutsideARepository:
+    @pytest.fixture
+    def state_server(self, tmp_path: Path) -> StateServer:
+        directory = tmp_path.joinpath('plain-directory')
+        directory.mkdir()
+        return StateServer(root=directory)
+
+    def test_the_server_lists_its_tools_and_a_ticket_is_written_then_shown(
+        self, state_server: StateServer
+    ) -> None:
+        listed = state_server.tools()
+        written, _, shown = ticket_results(
+            state_server,
+            ('ticket', {'action': 'write', 'fields': ANSWERS}),
+            ('ticket', {'action': 'validate'}),
+            ('ticket', {'action': 'show'}),
         )
 
-        assert project.joinpath('.mightymodels', SLUG, 'ticket.yml').is_file()
+        assert sorted(listed) == ['contract', 'review', 'task', 'ticket']
+        assert (written.is_error, shown.is_error) == (False, False)
+        assert shown.structured_content['unit']['slug'] == SLUG
+        assert not state_server.root.joinpath('.git').exists()
+
+
+class TestToolCalls:
+    def test_a_ticket_is_written_validated_and_read_back(self, state_server: StateServer) -> None:
+        written, validated, shown = ticket_results(
+            state_server,
+            ('ticket', {'action': 'write', 'fields': ANSWERS}),
+            ('ticket', {'action': 'validate'}),
+            ('ticket', {'action': 'show'}),
+        )
+
+        assert state_server.root.joinpath('.mightymodels', SLUG, 'ticket.yml').is_file()
         assert written.structured_content == {
             'text': f'wrote .mightymodels/{SLUG}/ticket.yml; review it, then run validate\n',
             'unit': None,
@@ -113,16 +171,15 @@ class TestToolCalls:
         assert validated.structured_content['unit']['ticket']['models']['architect'] == 'opus'
         assert shown.structured_content['unit'] == validated.structured_content['unit']
 
-    def test_a_staged_ticket_takes_a_contract_and_a_task(self) -> None:
-        *_, approved, started, ready, status = asyncio.run(
-            call_tools(
-                ('ticket', {'action': 'write', 'fields': ANSWERS}),
-                ('ticket', {'action': 'validate'}),
-                ('contract', {'action': 'approve', 'commands': [COMMAND]}),
-                ('task', {'action': 'start', 'task_id': 'T1', 'change': START}),
-                ('task', {'action': 'ready'}),
-                ('contract', {'action': 'status'}),
-            )
+    def test_a_staged_ticket_takes_a_contract_and_a_task(self, state_server: StateServer) -> None:
+        *_, approved, started, ready, status = ticket_results(
+            state_server,
+            ('ticket', {'action': 'write', 'fields': ANSWERS}),
+            ('ticket', {'action': 'validate'}),
+            ('contract', {'action': 'approve', 'commands': [COMMAND]}),
+            ('task', {'action': 'start', 'task_id': 'T1', 'change': START}),
+            ('task', {'action': 'ready'}),
+            ('contract', {'action': 'status'}),
         )
 
         assert approved.structured_content['text'] == 'contract: 1 commands (1 new)\n'
@@ -132,8 +189,10 @@ class TestToolCalls:
             {'id': 'T1.AC-1', 'argv': ['true'], 'state': 'never-run'}
         ]
 
-    def test_an_anticipated_failure_reaches_the_model_as_its_own_text(self) -> None:
-        (shown,) = asyncio.run(call_tools(('ticket', {'action': 'show'})))
+    def test_an_anticipated_failure_reaches_the_model_as_its_own_text(
+        self, state_server: StateServer
+    ) -> None:
+        (shown,) = ticket_results(state_server, ('ticket', {'action': 'show'}))
 
         assert shown.is_error
         assert f'{SLUG} is not staged; stage the ticket with open-ticket first' in text_of(shown)
@@ -157,9 +216,9 @@ class TestToolCalls:
         ],
     )
     def test_an_action_missing_its_arguments_says_what_it_needs(
-        self, name: str, arguments: dict[str, object], needs: str
+        self, name: str, arguments: dict[str, object], needs: str, state_server: StateServer
     ) -> None:
-        (result,) = asyncio.run(call_tools((name, arguments)))
+        (result,) = ticket_results(state_server, (name, arguments))
 
         assert result.is_error
         assert needs in text_of(result)
@@ -179,9 +238,16 @@ class TestToolCalls:
         ],
     )
     def test_arguments_outside_the_schema_are_refused(
-        self, name: str, arguments: dict[str, object], project: Path
+        self,
+        name: str,
+        arguments: dict[str, object],
+        connected_server: StateServer,
+        database_activity: DatabaseActivity,
     ) -> None:
-        (result,) = asyncio.run(call_tools((name, arguments)))
+        after_the_connect = tree(connected_server.root)
+
+        (result,) = ticket_results(connected_server, (name, arguments))
 
         assert result.is_error
-        assert not project.joinpath('.mightymodels').exists()
+        assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
+        assert tree(connected_server.root) == after_the_connect

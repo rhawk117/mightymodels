@@ -1,17 +1,13 @@
-"""Find the repository the plugin works in and open its `.mightymodels/` state database."""
+"""Find the repository the plugin works in and keep its `.mightymodels/` state out of git."""
 
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
-from sqlalchemy import URL, Engine, create_engine
-
-from mightymodels_plugin.db.tables import Base
 from mightymodels_plugin.errors import StateError
 
 PROJECT_DIR_VARIABLE = 'CLAUDE_PROJECT_DIR'
 STATE_DIRECTORY = '.mightymodels'
-DATABASE_NAME = 'mightymodels.db'
 EXCLUDE_LINE = f'{STATE_DIRECTORY}/'
 
 
@@ -49,13 +45,9 @@ def exclude_state(common_dir: Path) -> None:
     exclude.write_text(f'{current}{separator}{EXCLUDE_LINE}\n', encoding='utf-8')
 
 
-def open_repository(root: Path) -> Engine:
+def exclude_state_in_repository(root: Path) -> NotARepositoryError | None:
     common_dir = common_git_dir(root)
     if isinstance(common_dir, NotARepositoryError):
-        raise common_dir
+        return common_dir
     exclude_state(common_dir)
-    database = root.joinpath(STATE_DIRECTORY, DATABASE_NAME)
-    database.parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(URL.create('sqlite', database=str(database)))
-    Base.metadata.create_all(engine)
-    return engine
+    return None

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from mightymodels_plugin.db.checkout import open_checkout
+from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.db.tables import ReviewFindingRow
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.review import Persona, ReviewScope, StartPayload
@@ -165,8 +165,12 @@ def uncle_bob(*blocks: str, severity: str = 'Medium') -> str:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Ingest:
-    root: Path
+    checkouts: Checkouts
     run: RunId
+
+    @property
+    def root(self) -> Path:
+        return self.checkouts.root
 
     def write(self, persona: Persona, text: str) -> Path:
         path = persona_report(self.root, None, self.run, persona=persona)
@@ -174,7 +178,7 @@ class Ingest:
         return path
 
     def add(self, persona: Persona) -> str:
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return review.add(checkout, self.run, persona).text
 
     def attempt(self, persona: Persona) -> str:
@@ -184,7 +188,7 @@ class Ingest:
 
     def stored(self) -> list[Stored]:
         query = select(ReviewFindingRow).order_by(ReviewFindingRow.finding_id)
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return [
                 (
                     row.sources[0],
@@ -201,10 +205,10 @@ class Ingest:
 
 
 @pytest.fixture
-def ingest(repository: Path) -> Ingest:
-    with open_checkout(repository) as checkout:
+def ingest(checkouts: Checkouts) -> Ingest:
+    with checkouts.begin() as checkout:
         view = review.start(checkout, START, started=datetime.now(tz=UTC))
-    return Ingest(root=repository, run=RunId(view.run_id or ''))
+    return Ingest(checkouts=checkouts, run=RunId(view.run_id or ''))
 
 
 def fixture_text(name: str) -> str:
@@ -435,7 +439,7 @@ class TestWhereTheReportComesFrom:
 
         ingest.add(MERGE_VADER)
 
-        with open_checkout(ingest.root) as checkout:
+        with ingest.checkouts.begin() as checkout:
             titles = [row.title for row in checkout.session.scalars(select(ReviewFindingRow))]
         assert 'hunter22' not in ' '.join(titles)
         assert 'Hardcoded [REDACTED:assignment] in the store' in titles

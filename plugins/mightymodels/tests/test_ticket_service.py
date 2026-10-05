@@ -1,14 +1,14 @@
 """The `ticket` tool's service, with the tests moved from ticket_state.py's entry point."""
 
-import shutil
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-from mightymodels_plugin.db.checkout import Checkout, open_checkout
+from mightymodels_plugin.db.checkout import Checkout, Checkouts
 from mightymodels_plugin.db.tables import TaskRow
+from mightymodels_plugin.db.tests.support import checkouts_at
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.models.task import Implementer, Status, TaskStart
@@ -71,11 +71,15 @@ class Outcome:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Workspace:
-    root: Path
+    checkouts: Checkouts
+
+    @property
+    def root(self) -> Path:
+        return self.checkouts.root
 
     def run(self, command: str, answers: object = None) -> Outcome:
         try:
-            with open_checkout(self.root) as checkout:
+            with self.checkouts.begin() as checkout:
                 view = COMMANDS[command](checkout, answers)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, out='', err=str(error))
@@ -86,16 +90,16 @@ class Workspace:
         return self.root.joinpath('.mightymodels', SLUG, 'ticket.yml')
 
     def unit(self) -> WorkUnit:
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return ticket.unit_of(ticket.staged_row(checkout, TICKET))
 
     def tasks(self) -> dict[str, str]:
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return {record.id: record.status for record in task.show(checkout, TICKET).tasks}
 
     def verify_first_task(self) -> None:
         change = TaskStart(by=Implementer.ENGINEER, owned=('src/queue.py',))
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             task.start(checkout, TICKET, task_id='T1', change=change)
             checkout.session.execute(update(TaskRow).values(status=Status.VERIFIED))
 
@@ -105,8 +109,27 @@ class Workspace:
 
 
 @pytest.fixture
-def workspace(repository: Path) -> Workspace:
-    return Workspace(root=repository)
+def workspace(checkouts: Checkouts) -> Workspace:
+    return Workspace(checkouts=checkouts)
+
+
+@pytest.fixture
+def worktree_workspace(repository: Path, tmp_path: Path, git: GitRunner) -> Generator[Workspace]:
+    identity = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
+    git(repository, *identity, 'commit', '--quiet', '--allow-empty', '-m', 'base')
+    worktree = tmp_path.joinpath('feature')
+    git(repository, 'worktree', 'add', '--quiet', str(worktree), '-b', 'feature')
+    repository.joinpath('.git', 'info', 'exclude').unlink(missing_ok=True)
+    with checkouts_at(worktree) as opened:
+        yield Workspace(checkouts=opened)
+
+
+@pytest.fixture
+def workspace_outside_a_repository(tmp_path: Path) -> Generator[Workspace]:
+    directory = tmp_path.joinpath('plain-directory')
+    directory.mkdir()
+    with checkouts_at(directory) as opened:
+        yield Workspace(checkouts=opened)
 
 
 @pytest.mark.parametrize(
@@ -211,24 +234,20 @@ def test_revalidation_keeps_progress_and_only_adds_links(workspace: Workspace) -
 
 
 def test_exclude_goes_to_the_common_dir_from_a_worktree(
-    workspace: Workspace, tmp_path: Path, git: GitRunner
+    worktree_workspace: Workspace, repository: Path
 ) -> None:
-    identity = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
-    git(workspace.root, *identity, 'commit', '--quiet', '--allow-empty', '-m', 'base')
-    worktree = tmp_path.joinpath('feature')
-    git(workspace.root, 'worktree', 'add', '--quiet', str(worktree), '-b', 'feature')
-    exclude = workspace.root.joinpath('.git', 'info', 'exclude')
-    exclude.unlink(missing_ok=True)
-    Workspace(root=worktree).run('write', ANSWERS)
+    worktree_workspace.run('write', ANSWERS)
+    exclude = repository.joinpath('.git', 'info', 'exclude')
     assert exclude.read_text(encoding='utf-8') == '.mightymodels/\n'
 
 
-def test_outside_a_repository_nothing_is_written(workspace: Workspace) -> None:
-    shutil.rmtree(workspace.root.joinpath('.git'))
-    outcome = workspace.run('write', ANSWERS)
-    assert outcome.code == REJECTED
-    assert 'not inside a git repository' in outcome.err
-    assert list(workspace.root.iterdir()) == []
+def test_outside_a_repository_the_ticket_is_still_written(
+    workspace_outside_a_repository: Workspace,
+) -> None:
+    outcome = workspace_outside_a_repository.run('write', ANSWERS)
+    assert outcome.code == 0
+    assert workspace_outside_a_repository.ticket.is_file()
+    assert not workspace_outside_a_repository.root.joinpath('.git').exists()
 
 
 def test_hashes_and_colons_inside_quoted_values_survive(workspace: Workspace) -> None:

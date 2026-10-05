@@ -1,12 +1,11 @@
 """The `review` tool through the SDK's in-memory client."""
 
-import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from mcp import Client
-from mcp.types import CallToolResult, TextContent
-from mightymodels_plugin.server import build_server
+from mcp.types import CallToolResult
+from mightymodels_plugin.tools.tests.support import StateServer, text_of
 
 FIXTURE = Path(__file__).parent.joinpath('fixtures', 'merge-vader-report.md')
 START = {'scope': 'codebase', 'depth': 'deep', 'emphasis': 'balanced'}
@@ -20,57 +19,50 @@ DECISIONS = {
 FORBIDDEN = ('report.md', 'pr-comment.md', 'review-run.json', 'findings.jsonl')
 
 
-def text_of(result: CallToolResult) -> str:
-    return ''.join(block.text for block in result.content if isinstance(block, TextContent))
+def review_results(server: StateServer, *calls: dict[str, object]) -> list[CallToolResult]:
+    return server.call(*(('review', arguments) for arguments in calls))
 
 
-async def call(*calls: tuple[dict[str, object], Path | None]) -> list[CallToolResult]:
-    async with Client(build_server()) as client:
-        results = []
-        for arguments, report in calls:
-            if report is not None:
-                report.write_text(FIXTURE.read_text(encoding='utf-8'), encoding='utf-8')
-            results.append(await client.call_tool('review', arguments))
-        return results
+@dataclass(slots=True, kw_only=True, frozen=True)
+class StartedRun:
+    run_id: str
+    directory: Path
 
 
 @pytest.fixture
-def project(repository: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(repository))
-    return repository
-
-
-def start(project: Path) -> tuple[str, Path]:
-    (started,) = asyncio.run(call(({'action': 'start', 'payload': START}, None)))
+def started_run(state_server: StateServer) -> StartedRun:
+    (started,) = review_results(state_server, {'action': 'start', 'payload': START})
     run = started.structured_content['run_id']
-    return run, project.joinpath('.mightymodels', '.runtime', 'reviews', run)
+    directory = state_server.root.joinpath('.mightymodels', '.runtime', 'reviews', run)
+    return StartedRun(run_id=run, directory=directory)
 
 
-@pytest.mark.usefixtures('project')
 class TestReviewCalls:
-    def test_a_run_is_recorded_ingested_decided_resolved_and_reported_without_a_file(
-        self, project: Path
-    ) -> None:
-        run, directory = start(project)
-        report = directory.joinpath('MERGE-VADER-REPORT.md')
+    @pytest.fixture
+    def run_with_a_report(self, started_run: StartedRun) -> StartedRun:
+        report = started_run.directory.joinpath('MERGE-VADER-REPORT.md')
+        report.write_text(FIXTURE.read_text(encoding='utf-8'), encoding='utf-8')
+        return started_run
 
-        added, gate, disposed, resolved, full, comment, listed = asyncio.run(
-            call(
-                ({'action': 'add', 'run_id': run, 'payload': {'persona': 'merge-vader'}}, report),
-                ({'action': 'gate', 'run_id': run}, None),
-                ({'action': 'dispose', 'run_id': run, 'payload': DECISIONS}, None),
-                (
-                    {
-                        'action': 'resolve',
-                        'run_id': run,
-                        'payload': {'finding': 'F1', 'result': 'fixed', 'commit': 'abc123'},
-                    },
-                    None,
-                ),
-                ({'action': 'report', 'run_id': run}, None),
-                ({'action': 'report', 'run_id': run, 'payload': {'shape': 'comment'}}, None),
-                ({'action': 'list'}, None),
-            )
+    def test_a_run_is_recorded_ingested_decided_resolved_and_reported_without_a_file(
+        self, run_with_a_report: StartedRun, state_server: StateServer
+    ) -> None:
+        run = run_with_a_report.run_id
+        directory = run_with_a_report.directory
+
+        added, gate, disposed, resolved, full, comment, listed = review_results(
+            state_server,
+            {'action': 'add', 'run_id': run, 'payload': {'persona': 'merge-vader'}},
+            {'action': 'gate', 'run_id': run},
+            {'action': 'dispose', 'run_id': run, 'payload': DECISIONS},
+            {
+                'action': 'resolve',
+                'run_id': run,
+                'payload': {'finding': 'F1', 'result': 'fixed', 'commit': 'abc123'},
+            },
+            {'action': 'report', 'run_id': run},
+            {'action': 'report', 'run_id': run, 'payload': {'shape': 'comment'}},
+            {'action': 'list'},
         )
 
         assert added.structured_content['text'] == '5 findings in, 5 recorded: F1, F2, F3, F4, F5\n'
@@ -94,6 +86,10 @@ class TestReviewCalls:
         [
             pytest.param({'action': 'start'}, 'start needs a payload', id='start'),
             pytest.param({'action': 'gate'}, 'gate needs run_id', id='gate'),
+            pytest.param({'action': 'add'}, 'add needs run_id', id='add-run'),
+            pytest.param({'action': 'dispose'}, 'dispose needs run_id', id='dispose-run'),
+            pytest.param({'action': 'resolve'}, 'resolve needs run_id', id='resolve-run'),
+            pytest.param({'action': 'report'}, 'report needs run_id', id='report-run'),
             pytest.param({'action': 'add', 'run_id': '20260101-000000'}, 'add needs', id='add'),
             pytest.param(
                 {'action': 'dispose', 'run_id': '20260101-000000'}, 'dispose needs', id='dispose'
@@ -104,15 +100,17 @@ class TestReviewCalls:
         ],
     )
     def test_an_action_missing_its_arguments_says_what_it_needs(
-        self, arguments: dict[str, object], needs: str
+        self, arguments: dict[str, object], needs: str, state_server: StateServer
     ) -> None:
-        (result,) = asyncio.run(call((arguments, None)))
+        (result,) = review_results(state_server, arguments)
 
         assert result.is_error
         assert needs in text_of(result)
 
-    def test_an_anticipated_failure_reaches_the_model_as_its_own_text(self) -> None:
-        (result,) = asyncio.run(call(({'action': 'gate', 'run_id': '20260101-000000'}, None)))
+    def test_an_anticipated_failure_reaches_the_model_as_its_own_text(
+        self, state_server: StateServer
+    ) -> None:
+        (result,) = review_results(state_server, {'action': 'gate', 'run_id': '20260101-000000'})
 
         assert result.is_error
         assert 'no review run 20260101-000000; start one first' in text_of(result)
@@ -125,10 +123,10 @@ class TestReviewCalls:
         ],
     )
     def test_add_takes_a_persona_and_no_finding_list(
-        self, project: Path, payload: dict[str, object]
+        self, started_run: StartedRun, state_server: StateServer, payload: dict[str, object]
     ) -> None:
-        run, _ = start(project)
-
-        (result,) = asyncio.run(call(({'action': 'add', 'run_id': run, 'payload': payload}, None)))
+        (result,) = review_results(
+            state_server, {'action': 'add', 'run_id': started_run.run_id, 'payload': payload}
+        )
 
         assert result.is_error

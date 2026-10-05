@@ -1,17 +1,14 @@
 """The slug is the only caller-chosen text that becomes a path, so it is checked in one type."""
 
-import asyncio
 import inspect
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 import pytest
-from mcp import Client
-from mcp.types import CallToolResult
 from mightymodels_plugin.cli import main
-from mightymodels_plugin.db.checkout import open_checkout
+from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.db.tables import ReviewFindingRow
+from mightymodels_plugin.db.tests.support import ActivityKind, DatabaseActivity
 from mightymodels_plugin.models.review import StartPayload
 from mightymodels_plugin.models.slug import (
     SLUG_LIMIT,
@@ -21,11 +18,11 @@ from mightymodels_plugin.models.slug import (
     parsed_slug,
 )
 from mightymodels_plugin.models.ticket import TicketAnswers
-from mightymodels_plugin.server import TOOLS, build_server
+from mightymodels_plugin.server import TOOLS
 from mightymodels_plugin.services import ticket
 from mightymodels_plugin.services.layout import investigation_ledger, task_brief, ticket_file
+from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, tree
 from pydantic import ValidationError
-from pytest_mock import MockerFixture
 from sqlalchemy import select
 
 type GitRunner = Callable[..., str]
@@ -114,22 +111,6 @@ LEAKING_REPORT = """## Findings
 """
 
 
-def tree(top: Path) -> dict[str, bytes]:
-    files = (path for path in sorted(top.rglob('*')) if path.is_file())
-    return {str(path.relative_to(top)): path.read_bytes() for path in files}
-
-
-async def call_tool(name: str, arguments: dict[str, object]) -> CallToolResult:
-    async with Client(build_server()) as client:
-        return await client.call_tool(name, arguments)
-
-
-async def tool_schemas() -> dict[str, dict[str, Any]]:
-    async with Client(build_server()) as client:
-        listed = await client.list_tools()
-    return {tool.name: tool.input_schema for tool in listed.tools}
-
-
 @pytest.fixture
 def project(repository: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(repository))
@@ -169,11 +150,13 @@ class TestSlugType:
     def test_slug_confinement_the_one_slug_type_is_the_review_start_payloads_slug(self) -> None:
         assert StartPayload.model_fields['slug'].annotation == Slug | None
 
-    def test_slug_confinement_every_tool_schema_carries_the_slug_pattern(self) -> None:
+    def test_slug_confinement_every_tool_schema_carries_the_slug_pattern(
+        self, state_server: StateServer
+    ) -> None:
         schemas = {
-            name: schema
-            for name, schema in asyncio.run(tool_schemas()).items()
-            if 'slug' in schema['properties']
+            name: tool.input_schema
+            for name, tool in state_server.tools().items()
+            if 'slug' in tool.input_schema['properties']
         }
 
         assert sorted(schemas) == ['contract', 'task', 'ticket']
@@ -199,77 +182,77 @@ class TestHostileSlug:
     def test_slug_confinement_a_tool_reads_and_writes_nothing_for_a_hostile_slug(
         self,
         tmp_path: Path,
-        mocker: MockerFixture,
+        connected_server: StateServer,
+        database_activity: DatabaseActivity,
         *,
         name: str,
         arguments: dict[str, object],
         raw: str,
     ) -> None:
-        opened = mocker.patch('mightymodels_plugin.db.checkout.open_repository')
-        before = tree(tmp_path)
+        after_the_connect = tree(tmp_path)
 
-        result = asyncio.run(call_tool(name, {**arguments, 'slug': raw}))
+        (result,) = connected_server.call((name, {**arguments, 'slug': raw}))
 
         assert result.is_error
-        opened.assert_not_called()
-        assert tree(tmp_path) == before
+        assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
+        assert tree(tmp_path) == after_the_connect
 
     @pytest.mark.parametrize('raw', HOSTILE)
     def test_slug_confinement_verify_run_reads_and_writes_nothing_for_a_hostile_slug(
         self,
         tmp_path: Path,
-        mocker: MockerFixture,
+        database_activity: DatabaseActivity,
         *,
         raw: str,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        opened = mocker.patch('mightymodels_plugin.db.checkout.open_repository')
         before = tree(tmp_path)
 
         code = main(['verify', 'run', f'--slug={raw}', '--all'])
 
         assert code == REJECTED
         assert 'is not a slug' in capsys.readouterr().err
-        opened.assert_not_called()
+        assert database_activity.kinds() == []
         assert tree(tmp_path) == before
 
 
 class TestInsideTheStateDirectory:
-    def stage(self, root: Path, investigations: list[str]) -> str:
+    RETRY_QUEUE_CALLS: tuple[ToolCall, ...] = tuple(
+        (name, {**arguments, 'slug': 'retry-queue'}) for _, name, arguments in TOOL_CALLS
+    )
+
+    def stage(self, checkouts: Checkouts, investigations: list[str]) -> str:
         answers = TicketAnswers.model_validate({**ANSWERS, 'investigations': investigations})
         try:
-            with open_checkout(root) as checkout:
+            with checkouts.begin() as checkout:
                 ticket.write(checkout, Slug('retry-queue'), answers)
                 return ticket.validate(checkout, Slug('retry-queue')).text
         except ticket.InvalidTicketError as error:
             return str(error)
 
     def test_slug_confinement_a_written_investigation_id_cannot_name_a_file_outside(
-        self, project: Path
+        self, project: Path, checkouts: Checkouts
     ) -> None:
-        assert f'investigation {OUTSIDE} is not a valid id' in self.stage(project, [OUTSIDE])
+        assert f'investigation {OUTSIDE} is not a valid id' in self.stage(checkouts, [OUTSIDE])
         assert not ticket_file(project, Slug('retry-queue')).exists()
 
     def test_slug_confinement_a_hand_edited_investigation_id_cannot_name_a_file_outside(
-        self, project: Path
+        self, project: Path, checkouts: Checkouts
     ) -> None:
-        self.stage(project, [])
+        self.stage(checkouts, [])
         path = ticket_file(project, Slug('retry-queue'))
         text = path.read_text(encoding='utf-8')
         path.write_text(f'{text}  - "{OUTSIDE}"\n', encoding='utf-8')
 
-        with pytest.raises(ticket.InvalidTicketError) as error, open_checkout(project) as checkout:
+        with pytest.raises(ticket.InvalidTicketError) as error, checkouts.begin() as checkout:
             ticket.validate(checkout, Slug('retry-queue'))
 
         assert error.value.problems == [f'investigation {OUTSIDE} is not a valid id']
 
     def test_slug_confinement_a_valid_slug_writes_only_under_the_state_directory(
-        self, project: Path, git: GitRunner
+        self, project: Path, state_server: StateServer, git: GitRunner
     ) -> None:
-        results = [
-            asyncio.run(call_tool(name, {**arguments, 'slug': 'retry-queue'}))
-            for _, name, arguments in TOOL_CALLS
-        ]
+        results = state_server.call(*self.RETRY_QUEUE_CALLS)
 
         written = {Path(name).parts[0] for name in tree(project)} - {'.git', 'outside.jsonl'}
         assert not any(result.is_error for result in results)
@@ -279,38 +262,54 @@ class TestInsideTheStateDirectory:
 
 @pytest.mark.usefixtures('project')
 class TestReviewConfinement:
+    @pytest.fixture
+    def run_with_a_leaking_report(self, project: Path, state_server: StateServer) -> str:
+        (started,) = state_server.call(('review', {'action': 'start', 'payload': START_PAYLOAD}))
+        run = started.structured_content['run_id']
+        report = project.joinpath('.mightymodels', '.runtime', 'reviews', run)
+        report.joinpath('UNCLE-BOB-REPORT.md').write_text(LEAKING_REPORT, encoding='utf-8')
+        return run
+
     @pytest.mark.parametrize('raw', HOSTILE)
     def test_slug_confinement_review_start_reads_and_writes_nothing_for_a_hostile_slug(
-        self, tmp_path: Path, mocker: MockerFixture, raw: str
+        self,
+        tmp_path: Path,
+        connected_server: StateServer,
+        database_activity: DatabaseActivity,
+        raw: str,
     ) -> None:
-        opened = mocker.patch('mightymodels_plugin.db.checkout.open_repository')
-        before = tree(tmp_path)
+        after_the_connect = tree(tmp_path)
 
         payload = {**START_PAYLOAD, 'scope': 'ticket', 'base': 'main', 'slug': raw}
-        result = asyncio.run(call_tool('review', {'action': 'start', 'payload': payload}))
+        (result,) = connected_server.call(('review', {'action': 'start', 'payload': payload}))
 
         assert result.is_error
-        opened.assert_not_called()
-        assert tree(tmp_path) == before
+        assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
+        assert tree(tmp_path) == after_the_connect
 
     @pytest.mark.parametrize('raw', HOSTILE_RUN_IDS)
     @pytest.mark.parametrize('arguments', RUN_CALLS)
     def test_slug_confinement_a_path_shaped_run_id_reads_and_writes_nothing(
-        self, tmp_path: Path, mocker: MockerFixture, arguments: dict[str, object], raw: str
+        self,
+        tmp_path: Path,
+        connected_server: StateServer,
+        database_activity: DatabaseActivity,
+        *,
+        arguments: dict[str, object],
+        raw: str,
     ) -> None:
-        opened = mocker.patch('mightymodels_plugin.db.checkout.open_repository')
-        before = tree(tmp_path)
+        after_the_connect = tree(tmp_path)
 
-        result = asyncio.run(call_tool('review', {**arguments, 'run_id': raw}))
+        (result,) = connected_server.call(('review', {**arguments, 'run_id': raw}))
 
         assert result.is_error
-        opened.assert_not_called()
-        assert tree(tmp_path) == before
+        assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
+        assert tree(tmp_path) == after_the_connect
 
     def test_slug_confinement_a_run_without_a_ticket_keeps_its_directory_under_runtime(
-        self, project: Path
+        self, project: Path, state_server: StateServer
     ) -> None:
-        result = asyncio.run(call_tool('review', {'action': 'start', 'payload': START_PAYLOAD}))
+        (result,) = state_server.call(('review', {'action': 'start', 'payload': START_PAYLOAD}))
 
         run = result.structured_content['run_id']
         state = project.joinpath('.mightymodels')
@@ -319,10 +318,10 @@ class TestReviewConfinement:
         assert {path.name for path in state.iterdir()} == {'.runtime', 'mightymodels.db'}
 
     def test_slug_confinement_a_run_with_a_ticket_keeps_its_directory_under_the_ticket(
-        self, project: Path
+        self, project: Path, state_server: StateServer
     ) -> None:
         payload = {**START_PAYLOAD, 'scope': 'ticket', 'base': 'main', 'slug': 'retry-queue'}
-        result = asyncio.run(call_tool('review', {'action': 'start', 'payload': payload}))
+        (result,) = state_server.call(('review', {'action': 'start', 'payload': payload}))
 
         run = result.structured_content['run_id']
         state = project.joinpath('.mightymodels')
@@ -331,20 +330,20 @@ class TestReviewConfinement:
         assert {path.name for path in state.iterdir()} == {'retry-queue', 'mightymodels.db'}
 
     def test_slug_confinement_a_report_with_secrets_is_redacted_in_the_stored_rows(
-        self, project: Path
+        self, run_with_a_leaking_report: str, state_server: StateServer, checkouts: Checkouts
     ) -> None:
-        started = asyncio.run(call_tool('review', {'action': 'start', 'payload': START_PAYLOAD}))
-        run = started.structured_content['run_id']
-        report = project.joinpath('.mightymodels', '.runtime', 'reviews', run)
-        report.joinpath('UNCLE-BOB-REPORT.md').write_text(LEAKING_REPORT, encoding='utf-8')
-
-        added = asyncio.run(
-            call_tool(
-                'review', {'action': 'add', 'run_id': run, 'payload': {'persona': 'uncle-bob'}}
+        (added,) = state_server.call(
+            (
+                'review',
+                {
+                    'action': 'add',
+                    'run_id': run_with_a_leaking_report,
+                    'payload': {'persona': 'uncle-bob'},
+                },
             )
         )
 
-        with open_checkout(project) as checkout:
+        with checkouts.begin() as checkout:
             rows = checkout.session.scalars(select(ReviewFindingRow)).all()
             stored = ' '.join(
                 str(getattr(row, column.name)) for row in rows for column in row.__table__.columns

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from mightymodels_plugin.db.repository import open_repository
+from mightymodels_plugin.database import Database
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -16,11 +16,12 @@ class Checkout:
     session: Session
 
 
-@contextmanager
-def open_checkout(root: Path) -> Generator[Checkout]:
-    engine = open_repository(root)
-    try:
-        with Session(engine) as session, session.begin():
-            yield Checkout(root=root, session=session)
-    finally:
-        engine.dispose()
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Checkouts:
+    root: Path
+    database: Database
+
+    @contextmanager
+    def begin(self) -> Generator[Checkout]:
+        with self.database.transaction() as session:
+            yield Checkout(root=self.root, session=session)

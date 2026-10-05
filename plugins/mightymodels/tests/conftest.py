@@ -4,6 +4,13 @@ from pathlib import Path
 
 import pytest
 
+CONCEPTS = ('db', 'tools')
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    for concept in CONCEPTS:
+        config.pluginmanager.import_plugin(f'mightymodels_plugin.{concept}.tests.support')
+
 
 def run_git(directory: Path, *arguments: str) -> str:
     completed = subprocess.run(  # noqa: S603 - fixed git argv, every argument is a separate word

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from mightymodels_plugin.db.checkout import Checkout, open_checkout
+from mightymodels_plugin.db.checkout import Checkout, Checkouts
 from mightymodels_plugin.db.tables import ReviewFindingRow, ReviewRunRow, TicketRow
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.review import (
@@ -73,12 +73,16 @@ def finding(source: str, severity: str, location: str, **extra: object) -> Findi
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Workspace:
-    root: Path
+    checkouts: Checkouts
     runner: GitRunner
+
+    @property
+    def root(self) -> Path:
+        return self.checkouts.root
 
     def attempt(self, act: Callable[[Checkout], ReviewView]) -> Outcome:
         try:
-            with open_checkout(self.root) as checkout:
+            with self.checkouts.begin() as checkout:
                 view = act(checkout)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, view=None, err=str(error))
@@ -113,7 +117,7 @@ class Workspace:
 
 
 def run_state(workspace: Workspace, run: RunId) -> dict[str, object]:
-    with open_checkout(workspace.root) as checkout:
+    with workspace.checkouts.begin() as checkout:
         row = checkout.session.get(ReviewRunRow, run.root)
         assert row is not None
         return {
@@ -126,7 +130,7 @@ def run_state(workspace: Workspace, run: RunId) -> dict[str, object]:
 
 def stored_texts(workspace: Workspace, run: RunId) -> list[str]:
     query = select(ReviewFindingRow).where(ReviewFindingRow.run_id == run.root)
-    with open_checkout(workspace.root) as checkout:
+    with workspace.checkouts.begin() as checkout:
         rows = checkout.session.scalars(query).all()
         return [str(getattr(row, c.name)) for row in rows for c in row.__table__.columns]
 
@@ -139,7 +143,7 @@ def commit(workspace: Workspace) -> str:
 
 
 def pin_models(workspace: Workspace, models: Mapping[str, str | None]) -> None:
-    with open_checkout(workspace.root) as checkout:
+    with workspace.checkouts.begin() as checkout:
         ticket.write(checkout, Slug(SLUG), ANSWERS)
         ticket.validate(checkout, Slug(SLUG))
         row = checkout.session.get(TicketRow, SLUG)
@@ -148,8 +152,8 @@ def pin_models(workspace: Workspace, models: Mapping[str, str | None]) -> None:
 
 
 @pytest.fixture
-def workspace(repository: Path, git: GitRunner) -> Workspace:
-    return Workspace(root=repository, runner=git)
+def workspace(checkouts: Checkouts, git: GitRunner) -> Workspace:
+    return Workspace(checkouts=checkouts, runner=git)
 
 
 def test_deep_review_runs_both_personas_on_the_ticket_models(workspace: Workspace) -> None:

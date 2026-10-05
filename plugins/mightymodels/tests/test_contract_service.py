@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import main
-from mightymodels_plugin.db.checkout import open_checkout
+from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.db.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.contract import ContractCommand
@@ -51,8 +51,12 @@ class Recorded:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Workspace:
-    root: Path
+    checkouts: Checkouts
     capsys: pytest.CaptureFixture[str]
+
+    @property
+    def root(self) -> Path:
+        return self.checkouts.root
 
     def run(self, *argv: str, slug: str = SLUG) -> Outcome:
         code = main(['verify', 'run', '--slug', slug, *argv])
@@ -65,20 +69,20 @@ class Workspace:
                 ContractCommand.model_validate({'approved_by': 'user', **command})
                 for command in commands
             ]
-            with open_checkout(self.root) as checkout:
+            with self.checkouts.begin() as checkout:
                 view = contract.approve(checkout, Slug(slug), approved)
         except (StateError, ValidationError) as error:
             return Outcome(code=REJECTED, out='', err=str(error))
         return Outcome(code=PASSED, out=view.text, err='')
 
     def status(self) -> Outcome:
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             view = contract.status(checkout, Slug(SLUG))
         return Outcome(code=PASSED if view.passing else FAILED, out=view.text, err='')
 
     def receipts(self) -> list[Recorded]:
         query = select(ReceiptRow).order_by(ReceiptRow.id)
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return [
                 Recorded(
                     slug=row.slug,
@@ -96,7 +100,7 @@ class Workspace:
 
     def planned(self) -> dict[str, str | None]:
         query = select(CommandRow).order_by(CommandRow.command_id)
-        with open_checkout(self.root) as checkout:
+        with self.checkouts.begin() as checkout:
             return {row.command_id: row.task_id for row in checkout.session.scalars(query)}
 
     def point_head(self, sha: str) -> None:
@@ -108,10 +112,10 @@ class Workspace:
 
 @pytest.fixture
 def workspace(
-    repository: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    checkouts: Checkouts, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> Workspace:
-    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(repository))
-    space = Workspace(root=repository, capsys=capsys)
+    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(checkouts.root))
+    space = Workspace(checkouts=checkouts, capsys=capsys)
     space.point_head(SHA_A)
     return space
 

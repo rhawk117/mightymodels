@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import build_parser, main
-from mightymodels_plugin.db.checkout import open_checkout
+from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.models.contract import ContractCommand
 from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.services import contract
@@ -59,6 +59,12 @@ class TestCli:
 
 
 class TestVerifyRun:
+    @pytest.fixture
+    def approved_command(self, checkouts: Checkouts) -> None:
+        command = ContractCommand(id='I1', argv=('git', '--version'), approved_by='user')
+        with checkouts.begin() as checkout:
+            contract.approve(checkout, Slug(SLUG), [command])
+
     def test_help_shows_its_options(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exit_info:
             main(['verify', 'run', '--help'])
@@ -88,11 +94,8 @@ class TestVerifyRun:
     def test_help_loads_no_database_or_server_package(self, repository: Path) -> None:
         assert loaded_packages(repository, 'verify', 'run', '--help') == '0 []'
 
+    @pytest.mark.usefixtures('approved_command')
     def test_verify_run_does_not_import_mcp(self, repository: Path) -> None:
-        command = ContractCommand(id='I1', argv=('git', '--version'), approved_by='user')
-        with open_checkout(repository) as checkout:
-            contract.approve(checkout, Slug(SLUG), [command])
-
         loaded = loaded_packages(repository, 'verify', 'run', '--slug', SLUG, '--id', 'I1')
 
         assert loaded == "0 ['pydantic', 'sqlalchemy']"

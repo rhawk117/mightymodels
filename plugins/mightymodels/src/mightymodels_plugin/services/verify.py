@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from mightymodels_plugin.db.checkout import open_checkout
+from mightymodels_plugin.db.checkout import Checkouts
 from mightymodels_plugin.models.contract import Outcome, Phase
 from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.services.clock import now
@@ -122,11 +122,11 @@ def describe(receipt: Receipt) -> str:
     return line + ''.join(f'  | {text}\n' for text in detail.splitlines())
 
 
-def run_approved(root: Path, slug: Slug, request: RunRequest) -> RunResult:
-    with open_checkout(root) as checkout:
+def run_approved(checkouts: Checkouts, slug: Slug, request: RunRequest) -> RunResult:
+    with checkouts.begin() as checkout:
         commands = approved(checkout, slug, request.ids)
-    receipts = [receipt_for(command, root, request.phase) for command in commands]
-    with open_checkout(root) as checkout:
+    receipts = [receipt_for(command, checkouts.root, request.phase) for command in commands]
+    with checkouts.begin() as checkout:
         record(checkout, slug, receipts)
     return RunResult(
         text=''.join(describe(receipt) for receipt in receipts),
