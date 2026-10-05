@@ -110,19 +110,10 @@ def parse_tool_call(payload: HookPayload) -> ToolCall:
     return BashCall(command=command)
 
 
-def session_context_document(context: str) -> JsonValue:
+def context_document(event: HookEvent, context: str) -> JsonValue:
     return {
         'hookSpecificOutput': {
-            'hookEventName': HookEvent.SESSION_START.value,
-            'additionalContext': context,
-        }
-    }
-
-
-def note_document(context: str) -> JsonValue:
-    return {
-        'hookSpecificOutput': {
-            'hookEventName': HookEvent.PRE_TOOL_USE.value,
+            'hookEventName': event.value,
             'additionalContext': context,
         }
     }

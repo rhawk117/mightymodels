@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from python_harness.hooks.domain import BashCall, OtherToolCall, SessionStart
+from python_harness.hooks.domain import BashCall, HookEvent, OtherToolCall, SessionStart
 from python_harness.hooks.errors import (
     HookEventMismatchError,
     HookFieldMissingError,
@@ -11,11 +11,10 @@ from python_harness.hooks.errors import (
     HookPayloadNotObjectError,
 )
 from python_harness.hooks.schemas import (
-    note_document,
+    context_document,
     parse_hook_payload,
     parse_session_start,
     parse_tool_call,
-    session_context_document,
 )
 from python_harness.hooks.tests.payloads import (
     bash_payload,
@@ -93,7 +92,7 @@ class TestParseToolCall:
 
 class TestDocuments:
     def test_the_session_document_carries_additional_context(self) -> None:
-        assert session_context_document('facts') == {
+        assert context_document(HookEvent.SESSION_START, 'facts') == {
             'hookSpecificOutput': {
                 'hookEventName': 'SessionStart',
                 'additionalContext': 'facts',
@@ -101,7 +100,7 @@ class TestDocuments:
         }
 
     def test_the_note_document_carries_additional_context_only(self) -> None:
-        assert note_document('use uv') == {
+        assert context_document(HookEvent.PRE_TOOL_USE, 'use uv') == {
             'hookSpecificOutput': {
                 'hookEventName': 'PreToolUse',
                 'additionalContext': 'use uv',

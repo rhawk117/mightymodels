@@ -14,15 +14,15 @@ from python_harness.cli.exit_codes import ExitCode
 from python_harness.cli.util import add_command_parsers
 from python_harness.core.errors import PythonHarnessError
 from python_harness.core.output import JsonValue, write_document
+from python_harness.hooks.domain import HookEvent
 from python_harness.hooks.guard.domain import GuardOptions, Nudge
 from python_harness.hooks.guard.services import judge_tool_call
 from python_harness.hooks.guard.util.presentation import render_note
 from python_harness.hooks.schemas import (
-    note_document,
+    context_document,
     parse_hook_payload,
     parse_session_start,
     parse_tool_call,
-    session_context_document,
 )
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ def answer_session_start(payload: str, environment: Mapping[str, str]) -> JsonVa
     from python_harness.hooks.briefing.services import brief_session  # noqa: PLC0415  keeps the scan off the guard's path.
 
     start = parse_session_start(parse_hook_payload(payload))
-    return session_context_document(brief_session(start.cwd, environment))
+    return context_document(HookEvent.SESSION_START, brief_session(start.cwd, environment))
 
 
 def answer_guard(payload: str, _environment: Mapping[str, str]) -> JsonValue | None:
@@ -46,7 +46,7 @@ def answer_guard(payload: str, _environment: Mapping[str, str]) -> JsonValue | N
     verdict = judge_tool_call(parse_tool_call(parse_hook_payload(payload)), options)
     if not isinstance(verdict, Nudge):
         return None
-    return note_document(render_note(verdict, options))
+    return context_document(HookEvent.PRE_TOOL_USE, render_note(verdict, options))
 
 
 def run_hook(answer: HookAnswer, edge: ProcessEdge) -> ExitCode:
