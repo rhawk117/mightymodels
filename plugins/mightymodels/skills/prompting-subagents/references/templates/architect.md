@@ -5,7 +5,7 @@ For escalating one task to the recovery tier after engineer returned `failed` or
 **Ten-second checklist:** the trigger is pasted verbatim (the engineer's report, or the reviewer's finding with future pressure, expected churn, clean extension path, and locations) · the ASKED contract is the one the engineer received, unedited · files-in-scope is the original owned set, and `systemic-refactor` appears only with an approved expanded envelope attached · the brief path is named when the task has one · this is the task's first architect dispatch; a second failure goes to whats-broken, not back here.
 
 ```text
-<objective>Recover task <task id> in <recovery-implementation | systemic-refactor | diagnose-replan> mode. Brief path: .mightymodels/<slug>/briefs/task-NN.md (replace its DONE half with yours before reporting).</objective>
+<objective>Recover task <task id> in <recovery-implementation | systemic-refactor | diagnose-replan> mode. Brief path: .mightymodels/<slug>/briefs/task-NN.md (replace its DONE half with yours before reporting; when you commit, it carries `commit: <hash>` on a line of its own, which the verify gate reads).</objective>
 <context>
 Trigger: <engineer failed | engineer blocked | reviewer rejection>, verbatim below.
 <the engineer's report, or the reviewer finding, unedited>

@@ -48,7 +48,7 @@ Call `mcp__plugin_mightymodels_state__task` with action `verify`:
 {"action": "verify", "slug": "SLUG", "task_id": "T1", "change": {"commit": "<engineer commit>", "assertions": {"AC-2": "<file:line from code-scout>"}}}
 ```
 
-It passes only when the commit is the current HEAD, every `Tn.*` contract command passed at it, the brief's DONE half names that commit, every other AC in the brief carries a citation, and the commit touched nothing outside the owned set (read from git, not from the report). The tool finds the brief from the slug and the task id. It stores the outcome and its transition row in one transaction before it answers `verified`. A `blocked` result lists why and leaves the task `blocked`; treat it as a failed attempt.
+It passes only when the commit is the current HEAD, every `Tn.*` contract command passed at it, the brief's DONE half names that commit on a `commit: <hash>` line of its own, every other AC in the brief carries a citation, and the commit touched nothing outside the owned set (read from git, not from the report). The tool finds the brief from the slug and the task id. It stores the outcome and its transition row in one transaction before it answers `verified`. A `blocked` result lists why and leaves the task `blocked`; treat it as a failed attempt.
 
 **6. Route what did not verify.**
 

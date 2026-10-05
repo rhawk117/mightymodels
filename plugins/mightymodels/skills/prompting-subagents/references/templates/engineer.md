@@ -21,7 +21,7 @@ uses: [<repository skills or instruction files, when the task names them>]
 Dispatch wrapper around the stanza:
 
 ```text
-<objective>Execute the task specified in the ASKED stanza below. Brief path: .mightymodels/<slug>/briefs/task-NN.md — append your ## DONE section there before reporting (≤65 lines).</objective>
+<objective>Execute the task specified in the ASKED stanza below. Brief path: .mightymodels/<slug>/briefs/task-NN.md — append your ## DONE section there before reporting (≤65 lines, with `commit: <hash>` on a line of its own, which the verify gate reads).</objective>
 
 <ASKED stanza here>
 
