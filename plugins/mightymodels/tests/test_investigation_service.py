@@ -108,6 +108,12 @@ def investigation(workspace: Workspace) -> Slug:
     return workspace.start()
 
 
+@pytest.fixture
+def investigation_with_a_known(workspace: Workspace, investigation: Slug) -> Slug:
+    workspace.add(investigation, 1, known('a', 'a:1'))
+    return investigation
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Committed:
     workspace: Workspace
@@ -473,13 +479,11 @@ class TestHead:
         assert '| e3 | known | b | b:1 | code-scout | 2 | current |' in table
 
     def test_before_the_first_commit_every_entry_is_a_lead(
-        self, workspace: Workspace, investigation: Slug
+        self, workspace: Workspace, investigation_with_a_known: Slug
     ) -> None:
-        workspace.add(investigation, 1, known('a', 'a:1'))
+        table = workspace.knowns(investigation_with_a_known)
 
-        table = workspace.knowns(investigation)
-
-        assert f'## Knowns table, {investigation} at HEAD unknown' in table
+        assert f'## Knowns table, {investigation_with_a_known} at HEAD unknown' in table
         assert '| e2 | known | a | a:1 | code-scout | 1 | lead |' in table
 
 
@@ -533,13 +537,14 @@ class TestOutsideARepository:
         return directory
 
     def test_outside_a_repository_an_investigation_is_stored_and_every_entry_is_a_lead(
-        self, workspace: Workspace, investigation: Slug
+        self, workspace: Workspace, investigation_with_a_known: Slug
     ) -> None:
-        workspace.add(investigation, 1, known('a', 'a:1'))
+        table = workspace.knowns(investigation_with_a_known)
 
-        table = workspace.knowns(investigation)
-
-        assert [record.head for record in workspace.stored(investigation)] == [None, None]
+        assert [record.head for record in workspace.stored(investigation_with_a_known)] == [
+            None,
+            None,
+        ]
         assert '| e2 | known | a | a:1 | code-scout | 1 | lead |' in table
         assert not workspace.root.joinpath('.git').exists()
 
