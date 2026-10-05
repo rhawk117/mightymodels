@@ -3,15 +3,16 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from mightymodels_plugin.database import DATABASE_NAME, open_database
-from mightymodels_plugin.db.repository import (
+from mightymodels_plugin.database import open_database
+from mightymodels_plugin.tools.tests.support import StateServer
+from mightymodels_plugin.workspace import (
+    DATABASE_NAME,
     EXCLUDE_LINE,
     STATE_DIRECTORY,
     NotARepositoryError,
-    exclude_state_in_repository,
     find_root,
+    workspace_at,
 )
-from mightymodels_plugin.tools.tests.support import StateServer
 
 type GitRunner = Callable[..., str]
 
@@ -129,7 +130,7 @@ class TestOpenDatabase:
     ) -> None:
         database = root_with_url_characters.joinpath(STATE_DIRECTORY, DATABASE_NAME)
 
-        with open_database(root_with_url_characters) as opened:
+        with open_database(workspace_at(root_with_url_characters).database_file()) as opened:
             located = opened.engine.url.database
 
         assert located == str(database)
@@ -145,7 +146,7 @@ class TestOutsideARepository:
         return directory
 
     def test_refuses_a_directory_outside_a_repository(self, outside: Path) -> None:
-        refusal = exclude_state_in_repository(outside)
+        refusal = workspace_at(outside).git.refusal()
 
         assert isinstance(refusal, NotARepositoryError)
         assert refusal.root == outside

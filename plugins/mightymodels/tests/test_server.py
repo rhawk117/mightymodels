@@ -95,16 +95,18 @@ class TestToolSchemas:
 
 
 class TestToolProtocol:
+    @pytest.fixture
+    def app_state(self, checkouts: Checkouts) -> AppState:
+        return AppState(workspace=checkouts.workspace, database=checkouts.database)
+
     @pytest.mark.parametrize(
         'tool', [pytest.param(tool.__self__, id=tool.__name__) for tool in TOOLS]
     )
     def test_each_registered_tool_satisfies_the_action_tool_protocol(self, tool: object) -> None:
         assert isinstance(tool, ActionTool)
 
-    def test_the_lifespan_state_satisfies_what_the_tools_resolve(
-        self, checkouts: Checkouts
-    ) -> None:
-        assert isinstance(AppState(checkouts=checkouts), LifespanState)
+    def test_the_lifespan_state_satisfies_what_the_tools_resolve(self, app_state: AppState) -> None:
+        assert isinstance(app_state, LifespanState)
 
 
 class TestLifespanState:

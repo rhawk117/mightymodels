@@ -43,8 +43,6 @@ from mightymodels_plugin.models.run_id import RunId
 from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.routing import Depth, Worker, reviewer_model
 from mightymodels_plugin.services.clock import now
-from mightymodels_plugin.services.git import resolve_head, safe_revision
-from mightymodels_plugin.services.layout import persona_report, review_directory
 from mightymodels_plugin.services.redact import redact
 from mightymodels_plugin.services.review_errors import (
     BaseRequiredError,
@@ -70,6 +68,7 @@ from mightymodels_plugin.services.review_render import (
     verdict_of,
 )
 from mightymodels_plugin.services.review_report import parse_report
+from mightymodels_plugin.workspace import revision_error
 
 STANDARD_THRESHOLD = 0.25
 WEIGHT_TOLERANCE = 0.001
@@ -189,7 +188,9 @@ def reviewed_base(payload: StartPayload) -> str | None:
         raise BaseRequiredError(payload.scope)
     if payload.scope is ReviewScope.TICKET and payload.slug is None:
         raise SlugRequiredError
-    return safe_revision(payload.base) if payload.base is not None else None
+    if payload.base is not None and (error := revision_error(payload.base)) is not None:
+        raise error
+    return payload.base
 
 
 def ticket_models(checkout: Checkout, slug: Slug | None) -> Mapping[str, str | None]:
@@ -217,7 +218,7 @@ def start(checkout: Checkout, payload: StartPayload, *, started: datetime) -> Re
             slug=payload.slug.root if payload.slug else None,
             scope=payload.scope,
             base=base,
-            head=resolve_head(checkout.root),
+            head=checkout.workspace.git.resolve_head(),
             depth=payload.depth,
             emphasis=payload.emphasis,
             weights={persona.value: weight for persona, weight in weights.items()},
@@ -226,19 +227,19 @@ def start(checkout: Checkout, payload: StartPayload, *, started: datetime) -> Re
             created_at=started.isoformat(timespec='seconds'),
         )
     )
-    directory = review_directory(checkout.root, payload.slug, run)
+    directory = checkout.workspace.review_directory(payload.slug, run)
     directory.mkdir(parents=True, exist_ok=True)
     listed = ', '.join(f'{name} on {model}' for name, model in models.items())
-    relative = directory.relative_to(checkout.root)
+    relative = checkout.workspace.relative_to_root(directory)
     text = f'run {run} at {relative}\n{payload.depth} review: {listed}\n'
     return ReviewView(text=text, run_id=run.root)
 
 
 def add(checkout: Checkout, run: RunId, persona: Persona) -> ReviewView:
     row = run_row(checkout, run)
-    report = persona_report(checkout.root, slug_of(row), run, persona=persona)
+    report = checkout.workspace.persona_report(slug_of(row), run, persona=persona)
     if report.is_symlink() or not report.is_file():
-        raise ReportMissingError(persona, str(report.relative_to(checkout.root)))
+        raise ReportMissingError(persona, checkout.workspace.relative_to_root(report))
     batch = parse_report(report.read_text(encoding='utf-8'), persona)
     return add_findings(checkout, run, batch)
 
@@ -304,7 +305,9 @@ def resolve(checkout: Checkout, run: RunId, payload: ResolvePayload) -> ReviewVi
     chosen = checkout.session.get(ReviewDispositionRow, (run.root, finding_id))
     if chosen is None or chosen.decision != Decision.FIX:
         raise NotChosenError(finding_id)
-    commit = safe_revision(payload.commit) if payload.commit is not None else None
+    commit = payload.commit
+    if commit is not None and (error := revision_error(commit)) is not None:
+        raise error
     if payload.result is Result.FIXED and commit is None:
         raise CommitRequiredError(finding_id)
     if payload.result is not Result.FIXED and not payload.reason:

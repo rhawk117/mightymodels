@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, SessionTransaction
 
 from mightymodels_plugin.database import open_database
 from mightymodels_plugin.db.checkout import Checkouts
-from mightymodels_plugin.db.repository import exclude_state_in_repository
+from mightymodels_plugin.workspace import workspace_at
 
 
 class ActivityKind(StrEnum):
@@ -46,9 +46,10 @@ class DatabaseActivity:
 
 @contextmanager
 def checkouts_at(root: Path) -> Generator[Checkouts]:
-    exclude_state_in_repository(root)
-    with open_database(root) as database:
-        yield Checkouts(root=root, database=database)
+    workspace = workspace_at(root)
+    workspace.exclude_state_from_git()
+    with open_database(workspace.database_file()) as database:
+        yield Checkouts(workspace=workspace, database=database)
 
 
 @pytest.fixture

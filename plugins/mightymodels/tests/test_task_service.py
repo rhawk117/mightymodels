@@ -77,7 +77,7 @@ class Repo:
 
     @property
     def root(self) -> Path:
-        return self.checkouts.root
+        return self.checkouts.workspace.root
 
     def git(self, *args: str) -> str:
         return self.runner(self.root, *IDENTITY, *args).strip()

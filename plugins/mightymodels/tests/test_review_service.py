@@ -78,7 +78,7 @@ class Workspace:
 
     @property
     def root(self) -> Path:
-        return self.checkouts.root
+        return self.checkouts.workspace.root
 
     def attempt(self, act: Callable[[Checkout], ReviewView]) -> Outcome:
         try:

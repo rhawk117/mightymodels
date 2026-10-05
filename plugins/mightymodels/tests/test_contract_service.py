@@ -56,7 +56,7 @@ class Workspace:
 
     @property
     def root(self) -> Path:
-        return self.checkouts.root
+        return self.checkouts.workspace.root
 
     def run(self, *argv: str, slug: str = SLUG) -> Outcome:
         code = main(['verify', 'run', '--slug', slug, *argv])
@@ -114,7 +114,7 @@ class Workspace:
 def workspace(
     checkouts: Checkouts, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> Workspace:
-    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(checkouts.root))
+    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(checkouts.workspace.root))
     space = Workspace(checkouts=checkouts, capsys=capsys)
     space.point_head(SHA_A)
     return space

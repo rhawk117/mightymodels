@@ -24,7 +24,6 @@ from mightymodels_plugin.models.contract import (
 from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.models.task import TASK_ID_PATTERN
 from mightymodels_plugin.services.clock import now
-from mightymodels_plugin.services.git import resolve_head
 
 SHORT_SHA = 12
 TASK_ID = re.compile(TASK_ID_PATTERN)
@@ -116,7 +115,7 @@ def command_row(slug: Slug, command: ContractCommand, approval: Approval) -> Com
 def approve(checkout: Checkout, slug: Slug, commands: Sequence[ContractCommand]) -> ContractView:
     if any(not command.approved_by.strip() for command in commands):
         raise MissingApprovalError
-    approval = Approval(at=now(), head=resolve_head(checkout.root))
+    approval = Approval(at=now(), head=checkout.workspace.git.resolve_head())
     argv_by_id = {row.command_id: tuple(row.argv) for row in commands_of(checkout, slug)}
     fresh: list[ContractCommand] = []
     for command in commands:
@@ -139,7 +138,7 @@ def state_of(command: CommandRow, latest: ReceiptRow | None, head: str | None) -
 
 
 def status(checkout: Checkout, slug: Slug) -> ContractView:
-    head = resolve_head(checkout.root)
+    head = checkout.workspace.git.resolve_head()
     latest = latest_receipts(checkout, slug)
     states = tuple(
         CommandState(

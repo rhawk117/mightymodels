@@ -16,7 +16,7 @@ from mightymodels_plugin.models.contract import Outcome, Phase
 from mightymodels_plugin.models.slug import Slug
 from mightymodels_plugin.services.clock import now
 from mightymodels_plugin.services.contract import Approved, Receipt, approved, record
-from mightymodels_plugin.services.git import resolve_head
+from mightymodels_plugin.workspace import Git, Workspace
 
 TAIL_LINES = 40
 TAIL_CHARS = 4000
@@ -82,8 +82,8 @@ def execute(command: Approved, root: Path) -> Execution:
     )
 
 
-def at_one_head(execution: Execution, head: str | None, root: Path) -> Execution:
-    if resolve_head(root) == head:
+def at_one_head(execution: Execution, head: str | None, git: Git) -> Execution:
+    if git.resolve_head() == head:
         return execution
     return Execution(
         outcome=Outcome.FAILED,
@@ -93,10 +93,10 @@ def at_one_head(execution: Execution, head: str | None, root: Path) -> Execution
     )
 
 
-def receipt_for(command: Approved, root: Path, phase: Phase) -> Receipt:
-    head = resolve_head(root)
+def receipt_for(command: Approved, workspace: Workspace, phase: Phase) -> Receipt:
+    head = workspace.git.resolve_head()
     started = time.monotonic()
-    result = at_one_head(execute(command, root), head, root)
+    result = at_one_head(execute(command, workspace.root), head, workspace.git)
     elapsed = int((time.monotonic() - started) * 1000)
     return Receipt(
         id=command.id,
@@ -125,7 +125,7 @@ def describe(receipt: Receipt) -> str:
 def run_approved(checkouts: Checkouts, slug: Slug, request: RunRequest) -> RunResult:
     with checkouts.begin() as checkout:
         commands = approved(checkout, slug, request.ids)
-    receipts = [receipt_for(command, checkouts.root, request.phase) for command in commands]
+    receipts = [receipt_for(command, checkouts.workspace, request.phase) for command in commands]
     with checkouts.begin() as checkout:
         record(checkout, slug, receipts)
     return RunResult(

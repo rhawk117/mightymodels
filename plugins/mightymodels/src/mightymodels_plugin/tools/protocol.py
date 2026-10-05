@@ -6,8 +6,9 @@ hands its handlers and its arguments to `dispatch_action`, which runs the one ha
 transaction. The SDK shows the model the text of a `ToolError` and hides everything else as a
 crash, so the failures the services anticipate are translated here and nowhere else.
 
-`LifespanState` is what a tool needs from the server's lifespan state. The server's `AppState`
-satisfies it, and it is declared here because the server imports the tools.
+`LifespanState` is what a tool needs from the server's lifespan state: the one workspace and the
+one database, which every call joins into its `Checkouts`. The server's `AppState` satisfies it,
+and it is declared here because the server imports the tools.
 
 `ResolvedCheckouts` is a plain assignment because the SDK does not see a `Resolve` marker behind a
 PEP 695 `type` alias and would put the parameter in the tool's schema.
@@ -19,8 +20,10 @@ from typing import Annotated, Protocol, runtime_checkable
 from mcp.server.mcpserver import Context, Resolve
 from mcp.server.mcpserver.exceptions import ToolError
 
+from mightymodels_plugin.database import Database
 from mightymodels_plugin.db.checkout import Checkout, Checkouts
 from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.workspace import Workspace
 
 type ActionHandler[Call, View] = Callable[[Checkout, Call], View]
 
@@ -41,11 +44,15 @@ class ActionTool[Action, Call, View](Protocol):
 @runtime_checkable
 class LifespanState(Protocol):
     @property
-    def checkouts(self) -> Checkouts: ...
+    def workspace(self) -> Workspace: ...
+
+    @property
+    def database(self) -> Database: ...
 
 
 def lifespan_checkouts(ctx: Context[LifespanState]) -> Checkouts:
-    return ctx.request_context.lifespan_context.checkouts
+    state = ctx.request_context.lifespan_context
+    return Checkouts(workspace=state.workspace, database=state.database)
 
 
 ResolvedCheckouts = Annotated[Checkouts, Resolve(lifespan_checkouts)]

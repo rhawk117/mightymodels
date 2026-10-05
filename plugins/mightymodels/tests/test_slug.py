@@ -20,8 +20,8 @@ from mightymodels_plugin.models.slug import (
 from mightymodels_plugin.models.ticket import TicketAnswers
 from mightymodels_plugin.server import TOOLS
 from mightymodels_plugin.services import ticket
-from mightymodels_plugin.services.layout import investigation_ledger, task_brief, ticket_file
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, tree
+from mightymodels_plugin.workspace import workspace_at
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -132,9 +132,11 @@ class TestSlugType:
         slug = Slug(raw)
         state = tmp_path.joinpath('.mightymodels')
 
-        assert ticket_file(tmp_path, slug) == state.joinpath(raw, 'ticket.yml')
-        assert task_brief(tmp_path, slug, 3) == state.joinpath(raw, 'briefs', 'task-03.md')
-        assert investigation_ledger(tmp_path, slug) == state.joinpath(
+        assert workspace_at(tmp_path).ticket_file(slug) == state.joinpath(raw, 'ticket.yml')
+        assert workspace_at(tmp_path).task_brief(slug, 3) == state.joinpath(
+            raw, 'briefs', 'task-03.md'
+        )
+        assert workspace_at(tmp_path).investigation_ledger(slug) == state.joinpath(
             '.runtime', 'investigations', f'{raw}.jsonl'
         )
 
@@ -241,13 +243,13 @@ class TestInsideTheStateDirectory:
         self, project: Path, checkouts: Checkouts
     ) -> None:
         assert f'investigation {OUTSIDE} is not a valid id' in self.stage(checkouts, [OUTSIDE])
-        assert not ticket_file(project, Slug('retry-queue')).exists()
+        assert not workspace_at(project).ticket_file(Slug('retry-queue')).exists()
 
     def test_slug_confinement_a_hand_edited_investigation_id_cannot_name_a_file_outside(
         self, project: Path, checkouts: Checkouts
     ) -> None:
         self.stage(checkouts, [])
-        path = ticket_file(project, Slug('retry-queue'))
+        path = workspace_at(project).ticket_file(Slug('retry-queue'))
         text = path.read_text(encoding='utf-8')
         path.write_text(f'{text}  - "{OUTSIDE}"\n', encoding='utf-8')
 

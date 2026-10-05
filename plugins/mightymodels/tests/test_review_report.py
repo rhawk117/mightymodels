@@ -11,7 +11,6 @@ from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.models.review import Persona, ReviewScope, StartPayload
 from mightymodels_plugin.models.run_id import RunId
 from mightymodels_plugin.services import review
-from mightymodels_plugin.services.layout import persona_report
 from sqlalchemy import select
 
 type Stored = tuple[str, str, str, str, bool, str, str, tuple[str, str | None] | None]
@@ -168,12 +167,11 @@ class Ingest:
     checkouts: Checkouts
     run: RunId
 
-    @property
-    def root(self) -> Path:
-        return self.checkouts.root
+    def report(self, persona: Persona) -> Path:
+        return self.checkouts.workspace.persona_report(None, self.run, persona=persona)
 
     def write(self, persona: Persona, text: str) -> Path:
-        path = persona_report(self.root, None, self.run, persona=persona)
+        path = self.report(persona)
         path.write_text(text, encoding='utf-8')
         return path
 
@@ -426,7 +424,7 @@ class TestWhereTheReportComesFrom:
     def test_a_report_that_is_a_symlink_is_not_read(self, ingest: Ingest, tmp_path: Path) -> None:
         outside = tmp_path.joinpath('elsewhere.md')
         outside.write_text(fixture_text('merge-vader-report.md'), encoding='utf-8')
-        persona_report(ingest.root, None, ingest.run, persona=MERGE_VADER).symlink_to(outside)
+        ingest.report(MERGE_VADER).symlink_to(outside)
 
         assert 'no merge-vader report at' in ingest.attempt(MERGE_VADER)
         assert ingest.stored() == []

@@ -46,14 +46,8 @@ from mightymodels_plugin.models.task import (
 from mightymodels_plugin.models.ticket import TicketStatus
 from mightymodels_plugin.services.clock import now
 from mightymodels_plugin.services.contract import commands_of, latest_receipts
-from mightymodels_plugin.services.git import (
-    changed_files,
-    is_ancestor,
-    resolve_commit,
-    resolve_head,
-)
-from mightymodels_plugin.services.layout import task_brief
 from mightymodels_plugin.services.ticket import staged_row
+from mightymodels_plugin.workspace import Git
 
 ARCHITECT_LIMIT = 1
 SHORT_SHA = 12
@@ -230,7 +224,7 @@ def start(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskStart) ->
     error = start_error(task_id, before, mode)
     if error is not None:
         raise error
-    head = resolve_head(checkout.root)
+    head = checkout.workspace.git.resolve_head()
     checkout.session.merge(
         TaskRow(
             slug=slug.root,
@@ -258,24 +252,24 @@ def start(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskStart) ->
     return TaskView(text=text, advanced=True, tasks=(records_of(checkout, slug)[task_id],))
 
 
-def commit_problems(root: Path, base: str | None, commit: str) -> list[str]:
-    if commit != resolve_head(root):
+def commit_problems(git: Git, base: str | None, commit: str) -> list[str]:
+    if commit != git.resolve_head():
         return ['the reported commit must resolve to the current HEAD']
-    if base is None or resolve_commit(root, base) is None:
+    if base is None or git.resolve_commit(base) is None:
         return ['the task has no valid base commit']
-    if not is_ancestor(root, base, commit):
+    if not git.is_ancestor(base, commit):
         return ['the task base is not an ancestor of the reported commit']
     return []
 
 
-def brief_problems(root: Path, evidence: Evidence) -> list[str]:
+def brief_problems(git: Git, evidence: Evidence) -> list[str]:
     if evidence.brief is None:
         return []
     if not evidence.brief.is_file():
         return ['the task brief is missing']
     _, separator, done = evidence.brief.read_text(encoding='utf-8').partition(DONE_HEADING)
     named = DONE_COMMIT.search(done)
-    if not separator or named is None or resolve_commit(root, named[1]) != evidence.commit:
+    if not separator or named is None or git.resolve_commit(named[1]) != evidence.commit:
         return ['the DONE brief must name the reported HEAD commit']
     return []
 
@@ -318,21 +312,21 @@ def criteria_problems(evidence: Evidence) -> list[str]:
     return problems
 
 
-def ownership_problems(root: Path, row: TaskRow, *, base: str, commit: str) -> list[str]:
-    outside = sorted(changed_files(root, base, commit) - set(row.owned))
+def ownership_problems(git: Git, row: TaskRow, *, base: str, commit: str) -> list[str]:
+    outside = sorted(git.changed_files(base, commit) - set(row.owned))
     return [f'changed outside the owned set: {path}' for path in outside]
 
 
-def verification_problems(root: Path, row: TaskRow, evidence: Evidence) -> list[str]:
+def verification_problems(git: Git, row: TaskRow, evidence: Evidence) -> list[str]:
     base = row.base
-    problems = commit_problems(root, base, evidence.commit)
+    problems = commit_problems(git, base, evidence.commit)
     if problems or base is None:
         return problems
     return [
-        *receipt_problems(evidence.commands, evidence.receipts, resolve_head(root)),
-        *brief_problems(root, evidence),
+        *receipt_problems(evidence.commands, evidence.receipts, git.resolve_head()),
+        *brief_problems(git, evidence),
         *criteria_problems(evidence),
-        *ownership_problems(root, row, base=base, commit=evidence.commit),
+        *ownership_problems(git, row, base=base, commit=evidence.commit),
     ]
 
 
@@ -344,8 +338,8 @@ def evidence_for(
         command for command in commands_of(checkout, slug) if command.task_id == row.task_id
     ]
     return Evidence(
-        commit=resolve_commit(checkout.root, change.commit) or change.commit,
-        brief=task_brief(checkout.root, slug, task_number(row.task_id)) if planned else None,
+        commit=checkout.workspace.git.resolve_commit(change.commit) or change.commit,
+        brief=checkout.workspace.task_brief(slug, task_number(row.task_id)) if planned else None,
         assertions=change.assertions,
         commands=commands,
         receipts=latest_receipts(checkout, slug),
@@ -358,9 +352,12 @@ def verify(checkout: Checkout, slug: Slug, *, task_id: str, change: TaskVerifica
     before = status_of(row)
     if row is None or Status.VERIFIED not in ALLOWED[before]:
         raise TransitionError(task_id, before, Status.VERIFIED)
-    head = resolve_head(checkout.root)
+    refusal = checkout.workspace.git.refusal()
+    if refusal is not None:
+        raise refusal
+    head = checkout.workspace.git.resolve_head()
     evidence = evidence_for(checkout, slug, row=row, change=change)
-    problems = verification_problems(checkout.root, row, evidence)
+    problems = verification_problems(checkout.workspace.git, row, evidence)
     after = Status.BLOCKED if problems else Status.VERIFIED
     row.status, row.commit, row.reasons, row.updated_at = after, evidence.commit, problems, now()
     record_transition(
@@ -431,7 +428,7 @@ def readiness_problems(records: Sequence[TaskRecord]) -> list[str]:
 
 def ready(checkout: Checkout, slug: Slug) -> TaskView:
     staged_row(checkout, slug)
-    head = resolve_head(checkout.root)
+    head = checkout.workspace.git.resolve_head()
     records = tuple(records_of(checkout, slug).values())
     superseded = {record.id for record in records if record.status is Status.SUPERSEDED}
     live = [command for command in commands_of(checkout, slug) if command.task_id not in superseded]

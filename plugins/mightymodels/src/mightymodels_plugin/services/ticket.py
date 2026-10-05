@@ -26,7 +26,6 @@ from mightymodels_plugin.models.ticket import (
 )
 from mightymodels_plugin.routing import Scope, Worker
 from mightymodels_plugin.services.clock import now
-from mightymodels_plugin.services.layout import investigation_ledger, ticket_file
 from mightymodels_plugin.services.ticket_file import (
     CONTEXT_KEY,
     PRIMARY_AGENT,
@@ -35,6 +34,7 @@ from mightymodels_plugin.services.ticket_file import (
     ticket_text,
     with_context,
 )
+from mightymodels_plugin.workspace import Workspace
 
 CONTEXT_LIMIT = 6
 TOP_LEVEL = frozenset(
@@ -144,31 +144,31 @@ def companion_problems(companions: dict[str, Node]) -> list[str]:
     )
 
 
-def investigation_problem(root: Path, investigation: Node) -> str | None:
+def investigation_problem(workspace: Workspace, investigation: Node) -> str | None:
     slug = parsed_slug(str(investigation))
     if isinstance(slug, InvalidSlugError):
         return f'investigation {investigation} is not a valid id'
-    if not investigation_ledger(root, slug).is_file():
+    if not workspace.investigation_ledger(slug).is_file():
         return f'investigation {investigation} has no ledger file'
     return None
 
 
-def investigation_problems(tree: dict[str, Node], root: Path) -> list[str]:
+def investigation_problems(tree: dict[str, Node], workspace: Workspace) -> list[str]:
     investigations = tree.get('investigations') or []
     if not isinstance(investigations, list):
         return ['investigations must be a list']
-    problems = (investigation_problem(root, investigation) for investigation in investigations)
+    problems = (investigation_problem(workspace, investigation) for investigation in investigations)
     return [problem for problem in problems if problem is not None]
 
 
-def checked_tree(source: str, root: Path, slug: Slug) -> dict[str, Node]:
+def checked_tree(source: str, workspace: Workspace, slug: Slug) -> dict[str, Node]:
     tree = parse(source)
     problems = [
         *top_problems(tree, slug),
         *model_problems(as_mapping(tree.get('subagent-models'))),
         *handoff_problems(as_mapping(tree.get('handoff-context'))),
         *companion_problems(as_mapping(tree.get('companion-docs'))),
-        *investigation_problems(tree, root),
+        *investigation_problems(tree, workspace),
     ]
     if problems:
         raise InvalidTicketError(problems)
@@ -179,7 +179,7 @@ def section_of(tree: dict[str, Node], checkout: Checkout, slug: Slug) -> TicketS
     handoff = as_mapping(tree.get('handoff-context'))
     companions = as_mapping(tree.get('companion-docs'))
     fields = {
-        'ticket': str(ticket_file(checkout.root, slug).relative_to(checkout.root)),
+        'ticket': checkout.workspace.relative_to_root(checkout.workspace.ticket_file(slug)),
         'summary': tree.get('summary'),
         'branch': handoff.get('branch-name'),
         'scope': handoff.get('scope'),
@@ -249,8 +249,7 @@ def stage(checkout: Checkout, slug: Slug, tree: dict[str, Node]) -> WorkUnit:
     return unit_of(checkout.session.merge(row))
 
 
-def atomic_write(path: Path, text: str) -> None:
-    temporary = path.with_suffix(path.suffix + '.tmp')
+def atomic_write(path: Path, text: str, *, temporary: Path) -> None:
     temporary.write_text(text, encoding='utf-8')
     temporary.replace(path)
 
@@ -260,22 +259,22 @@ def staged_text(unit: WorkUnit) -> str:
 
 
 def write(checkout: Checkout, slug: Slug, answers: TicketAnswers) -> TicketView:
-    path = ticket_file(checkout.root, slug)
+    path = checkout.workspace.ticket_file(slug)
     if path.exists():
         raise TicketExistsError(path)
     text = ticket_text(slug, answers)
-    checked_tree(text, checkout.root, slug)
+    checked_tree(text, checkout.workspace, slug)
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(path, text)
-    relative = path.relative_to(checkout.root)
+    atomic_write(path, text, temporary=checkout.workspace.ticket_draft(slug))
+    relative = checkout.workspace.relative_to_root(path)
     return TicketView(text=f'wrote {relative}; review it, then run validate\n')
 
 
 def validate(checkout: Checkout, slug: Slug) -> TicketView:
-    path = ticket_file(checkout.root, slug)
+    path = checkout.workspace.ticket_file(slug)
     if not path.is_file():
         raise MissingTicketError(path)
-    tree = checked_tree(path.read_text(encoding='utf-8'), checkout.root, slug)
+    tree = checked_tree(path.read_text(encoding='utf-8'), checkout.workspace, slug)
     unit = stage(checkout, slug, tree)
     return TicketView(text=f'valid; {staged_text(unit)}', unit=unit)
 
@@ -286,10 +285,10 @@ def show(checkout: Checkout, slug: Slug) -> TicketView:
 
 
 def update_context(checkout: Checkout, slug: Slug, change: TicketContext) -> TicketView:
-    path = ticket_file(checkout.root, slug)
+    path = checkout.workspace.ticket_file(slug)
     if not path.is_file():
         raise MissingTicketError(path)
     text = with_context(path.read_text(encoding='utf-8'), change.context)
-    unit = stage(checkout, slug, checked_tree(text, checkout.root, slug))
-    atomic_write(path, text)
+    unit = stage(checkout, slug, checked_tree(text, checkout.workspace, slug))
+    atomic_write(path, text, temporary=checkout.workspace.ticket_draft(slug))
     return TicketView(text=f'context updated; {staged_text(unit)}', unit=unit)

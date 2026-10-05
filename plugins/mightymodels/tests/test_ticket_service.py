@@ -75,7 +75,7 @@ class Workspace:
 
     @property
     def root(self) -> Path:
-        return self.checkouts.root
+        return self.checkouts.workspace.root
 
     def run(self, command: str, answers: object = None) -> Outcome:
         try:
