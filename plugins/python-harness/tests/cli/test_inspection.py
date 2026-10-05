@@ -9,7 +9,7 @@ from python_harness.cli import main
 from python_harness.cli.domain import InspectCommand, ProcessEdge
 from python_harness.cli.exit_codes import ExitCode
 from python_harness.cli.inspection import default_inspect_commands
-from python_harness.core.tests.fixtures import GitProject, ProjectBuilder
+from python_harness.core.tests.fixtures import ProjectBuilder
 from python_harness.core.tests.support import JsonDocument
 from python_harness.core.workspace import Workspace
 
@@ -37,17 +37,13 @@ PROJECT = MappingProxyType(
             def main() -> int:
                 return price(0)
         """,
-        'REVIEW.md': """
-            - Location: src/shop/pricing.py:1 `def price(total: int) -> int:`
-            - Location: src/shop/pricing.py:40 `return total`
-        """,
     }
 )
 
 
-def run_inspect(workspace: Workspace, *arguments: str, stdin: str = '') -> tuple[int, JsonDocument]:
+def run_inspect(workspace: Workspace, *arguments: str) -> tuple[int, JsonDocument]:
     stdout = io.StringIO()
-    edge = ProcessEdge(io.StringIO(stdin), stdout, io.StringIO(), MappingProxyType({}))
+    edge = ProcessEdge(io.StringIO(), stdout, io.StringIO(), MappingProxyType({}))
     command = ('inspect', *arguments, '--root', str(workspace.root))
     exit_code = main(command, edge=edge)
     return exit_code, json.loads(stdout.getvalue())
@@ -69,6 +65,26 @@ def workspace(project_builder: ProjectBuilder) -> Workspace:
 class TestCommandTable:
     def test_every_inspect_command_has_a_definition(self) -> None:
         assert frozenset(default_inspect_commands()) == frozenset(InspectCommand)
+
+    def test_the_inspect_group_holds_exactly_survey_and_gate(self) -> None:
+        assert sorted(default_inspect_commands()) == ['gate', 'survey']
+
+    @pytest.mark.parametrize(
+        'command',
+        [
+            pytest.param('surface', id='surface'),
+            pytest.param('facts', id='facts'),
+            pytest.param('calls', id='calls'),
+            pytest.param('cite', id='cite'),
+        ],
+    )
+    def test_a_command_moved_to_the_server_is_not_parsed(
+        self, workspace: Workspace, command: str
+    ) -> None:
+        with pytest.raises(SystemExit) as refused:
+            main(('inspect', command, '--root', str(workspace.root)))
+
+        assert refused.value.code == ExitCode.ERROR
 
 
 class TestSurvey:
@@ -128,187 +144,3 @@ class TestGate:
             ExitCode.ERROR,
             f'python-harness: --fallback-ruff-config {missing} is not a file\n',
         )
-
-
-class TestSurfaceCodebase:
-    @pytest.mark.parametrize(
-        ('arguments', 'expected'),
-        [
-            pytest.param(('--codebase', 'src'), ['src'], id='one-path'),
-            pytest.param(
-                ('--codebase', 'src/shop/pricing.py', 'src/shop/cli.py'),
-                ['src/shop/pricing.py', 'src/shop/cli.py'],
-                id='several-paths',
-            ),
-            pytest.param(('--codebase',), ['.'], id='defaults-to-the-root'),
-        ],
-    )
-    def test_codebase_paths_become_the_target(
-        self, workspace: Workspace, arguments: tuple[str, ...], expected: list[str]
-    ) -> None:
-        exit_code, document = run_inspect(workspace, 'surface', *arguments)
-
-        assert (exit_code, document['target']['paths']) == (ExitCode.PASSED, expected)
-
-    def test_head_without_diff_is_refused(self, workspace: Workspace) -> None:
-        exit_code, stderr = run_failing_inspect(
-            workspace, 'surface', '--codebase', '--head', 'feature'
-        )
-
-        assert (exit_code, stderr) == (
-            ExitCode.ERROR,
-            'python-harness: --head feature needs --diff BASE\n',
-        )
-
-
-class TestSurfaceDiff:
-    @pytest.fixture
-    def workspace(self, git_project: GitProject) -> Workspace:
-        git_project.commit(PROJECT, 'base')
-        git_project.switch_to_new_branch('feature')
-        return git_project.commit({'src/shop/pricing.py': 'def price() -> int: ...\n'}, 'x')
-
-    def test_diff_surface_holds_only_changed_modules(self, workspace: Workspace) -> None:
-        _, plan = run_inspect(workspace, 'surface', '--diff', 'main')
-
-        assert plan['module_count'] == 1
-
-    @pytest.mark.parametrize(
-        ('arguments', 'expected'),
-        [
-            pytest.param(
-                ('--diff', 'main'),
-                {'base': 'main', 'head': 'HEAD', 'kind': 'diff'},
-                id='head-defaults-to-the-checkout',
-            ),
-            pytest.param(
-                ('--diff', 'main', '--head', 'feature'),
-                {'base': 'main', 'head': 'feature', 'kind': 'diff'},
-                id='named-head',
-            ),
-        ],
-    )
-    def test_diff_target(
-        self, workspace: Workspace, arguments: tuple[str, ...], expected: JsonDocument
-    ) -> None:
-        _, plan = run_inspect(workspace, 'surface', *arguments)
-
-        assert plan['target'] == expected
-
-
-class TestFacts:
-    @pytest.mark.parametrize(
-        ('paths', 'expected'),
-        [
-            pytest.param(('src/shop/pricing.py',), ['src/shop/pricing.py'], id='one-file'),
-            pytest.param(
-                ('src/shop', 'src/shop/pricing.py'),
-                ['src/shop/__init__.py', 'src/shop/cli.py', 'src/shop/pricing.py'],
-                id='overlapping-paths-report-a-module-once',
-            ),
-        ],
-    )
-    def test_facts_cover_the_given_paths(
-        self, workspace: Workspace, paths: tuple[str, ...], expected: list[str]
-    ) -> None:
-        _, facts = run_inspect(workspace, 'facts', *paths)
-
-        assert [module['path'] for module in facts['modules']] == expected
-
-
-class TestCalls:
-    def test_calls_cover_the_given_paths(self, workspace: Workspace) -> None:
-        _, calls = run_inspect(workspace, 'calls', 'src/shop/pricing.py')
-
-        paths = [module['metrics']['path'] for module in calls['modules']]
-        assert paths == ['src/shop/pricing.py']
-
-    def test_symbol_option_prints_its_references(self, workspace: Workspace) -> None:
-        _, found = run_inspect(workspace, 'calls', 'src/shop/pricing.py', '--symbol', 'price')
-
-        contexts = [item['context'] for item in found['symbols'][0]['references']]
-        assert contexts == ['import', 'call']
-
-
-class TestCite:
-    PYLENS_RETURN = '| src/shop/pricing.py:2 | `return total` | returns its argument |\n'
-    MALFORMED_RETURN = (
-        '| src/shop/pricing.py:2 | `return total` | returns its argument |\n'
-        '| src/shop/pricing.py#L2 | `return total` | returns its argument |\n'
-    )
-    MALFORMED_ROWS = (1, [2])
-
-    def test_failed_citation_exits_failed(self, workspace: Workspace) -> None:
-        exit_code, document = run_inspect(workspace, 'cite', 'REVIEW.md')
-
-        assert (exit_code, document['passed']) == (ExitCode.FAILED, False)
-
-    def test_dash_reads_the_document_from_stdin(self, workspace: Workspace) -> None:
-        exit_code, document = run_inspect(workspace, 'cite', '-', stdin=self.PYLENS_RETURN)
-
-        assert (exit_code, document['document']) == (ExitCode.PASSED, '<stdin>')
-
-    def test_a_row_without_a_parseable_citation_exits_failed(self, workspace: Workspace) -> None:
-        exit_code, document = run_inspect(workspace, 'cite', '-', stdin=self.MALFORMED_RETURN)
-
-        rows = (document['checked'], document['uncited_rows'])
-        assert (exit_code, rows) == (ExitCode.FAILED, self.MALFORMED_ROWS)
-
-
-class TestUndecodableDocument:
-    DOCUMENT = 'LATIN.md'
-
-    @pytest.fixture
-    def workspace(self, project_builder: ProjectBuilder) -> Workspace:
-        workspace = project_builder.write(PROJECT)
-        document = workspace.root.joinpath(self.DOCUMENT)
-        document.write_bytes(b'| src/shop/pricing.py:1 | `caf\xe9` | x |\n')
-        return workspace
-
-    def test_undecodable_document_exits_error_with_a_message(self, workspace: Workspace) -> None:
-        exit_code, stderr = run_failing_inspect(workspace, 'cite', self.DOCUMENT)
-
-        expected_start = f'python-harness: citation document {self.DOCUMENT} is not readable'
-        assert (exit_code, stderr.startswith(expected_start)) == (ExitCode.ERROR, True)
-
-
-class TestPathErrors:
-    @pytest.mark.parametrize(
-        'command',
-        [
-            pytest.param(('surface', '--codebase', 'src/shopp'), id='surface'),
-            pytest.param(('facts', 'src/shop/pricng.py'), id='facts'),
-            pytest.param(('calls', 'src/shopp'), id='calls'),
-        ],
-    )
-    def test_missing_target_path_exits_error_with_a_message(
-        self, workspace: Workspace, command: tuple[str, ...]
-    ) -> None:
-        exit_code, stderr = run_failing_inspect(workspace, *command)
-
-        assert (exit_code, stderr.startswith('python-harness: ')) == (ExitCode.ERROR, True)
-
-
-class TestUndecodableSource:
-    PATH = 'src/shop/legacy.py'
-
-    @pytest.fixture
-    def workspace(self, project_builder: ProjectBuilder) -> Workspace:
-        workspace = project_builder.write(PROJECT)
-        workspace.root.joinpath(self.PATH).write_bytes(b'name = "caf\xe9"\n')
-        return workspace
-
-    @pytest.mark.parametrize(
-        'command',
-        [
-            pytest.param(('facts', 'src/shop'), id='facts'),
-            pytest.param(('surface', '--codebase', 'src/shop'), id='surface'),
-        ],
-    )
-    def test_undecodable_file_is_reported_as_unparsable(
-        self, workspace: Workspace, command: tuple[str, ...]
-    ) -> None:
-        exit_code, document = run_inspect(workspace, *command)
-
-        unparsable = [item['path'] for item in document['unparsable']]
-        assert (exit_code, unparsable) == (ExitCode.PASSED, [self.PATH])

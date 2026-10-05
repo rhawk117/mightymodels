@@ -2,7 +2,7 @@
 
 import pytest
 
-CONCEPTS = ('core', 'facts', 'documentation')
+CONCEPTS = ('core', 'facts', 'documentation', 'tools')
 
 
 def pytest_configure(config: pytest.Config) -> None:

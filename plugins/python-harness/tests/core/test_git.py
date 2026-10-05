@@ -1,5 +1,7 @@
 """Changed-file listing between a base and a head revision."""
 
+from pathlib import Path
+
 import pytest
 from python_harness.core.errors import GitCommandError
 from python_harness.core.git import list_changed_python_files
@@ -32,6 +34,26 @@ class TestListChangedPythonFiles:
             list_changed_python_files(workspace, 'no-such-branch', 'HEAD')
 
         assert 'no-such-branch' in caught.value.stderr
+
+
+class TestOptionLikeRevision:
+    @pytest.fixture
+    def workspace(self, git_project: GitProject) -> Workspace:
+        return git_project.commit({'pkg/kept.py': 'a = 1\n'}, 'base')
+
+    @pytest.fixture
+    def output_directory(self, tmp_path_factory: pytest.TempPathFactory) -> Path:
+        return tmp_path_factory.mktemp('output')
+
+    def test_a_base_shaped_like_an_option_is_a_bad_revision_and_writes_nothing(
+        self, workspace: Workspace, output_directory: Path
+    ) -> None:
+        option = f'--output={output_directory.joinpath("leak")}'
+
+        with pytest.raises(GitCommandError):
+            list_changed_python_files(workspace, option, 'HEAD')
+
+        assert list(output_directory.iterdir()) == []
 
 
 class TestWorkspaceInsideTheRepository:

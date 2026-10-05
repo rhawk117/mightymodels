@@ -127,6 +127,9 @@ class TestDeclaration:
     def test_launches_through_uv_tool_run(self, launch: Launch) -> None:
         assert (launch.command, launch.args[:2]) == ('uv', ['tool', 'run'])
 
+    def test_the_project_root_is_passed_to_the_server(self, launch: Launch) -> None:
+        assert launch.env['CLAUDE_PROJECT_DIR'] == '${CLAUDE_PROJECT_DIR}'
+
 
 class TestPins:
     def test_with_pins_equal_the_locked_cli_and_server_dependencies(
@@ -176,8 +179,15 @@ class TestStartBesideAHostileProject:
     def test_the_server_reports_its_name(self, listing: ServerListing) -> None:
         assert listing.server_name == SERVER_NAME
 
-    def test_the_server_lists_exactly_the_documentation_tools(self, listing: ServerListing) -> None:
-        assert listing.tool_names == ['read_python_docs', 'search_python_docs']
+    def test_the_server_lists_exactly_its_six_tools(self, listing: ServerListing) -> None:
+        assert listing.tool_names == [
+            'check_citations',
+            'collect_python_facts',
+            'map_python_calls',
+            'plan_review_surface',
+            'read_python_docs',
+            'search_python_docs',
+        ]
 
     @pytest.mark.usefixtures('listing')
     @pytest.mark.parametrize(

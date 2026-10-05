@@ -35,7 +35,10 @@
         "sphobjinv==2.4",
         "python",
         "${CLAUDE_PLUGIN_ROOT}/bin/python-harness-mcp"
-      ]
+      ],
+      "env": {
+        "CLAUDE_PROJECT_DIR": "${CLAUDE_PROJECT_DIR}"
+      }
     }
   }
 }

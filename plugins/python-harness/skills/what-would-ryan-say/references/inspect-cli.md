@@ -1,17 +1,28 @@
-# `python-harness inspect` reference
+# `python-harness` CLI and MCP tools reference
 
-Every command prints one compact JSON document on stdout. Run it from the reviewed project's root (the directory holding its `pyproject.toml`), or pass `--root DIR`. A failure the CLI understands prints `python-harness: <message>` on stderr and exits 2. Paths in output are relative to the root and use `/`, except `survey.root` and the config paths inside the gate's argv, which are absolute.
+Two commands run on the CLI and four tools run on the `python-harness` MCP server. Each returns one compact JSON document. Paths in output are relative to the project root and use `/`, except `survey.root` and the config paths inside the gate's argv, which are absolute.
+
+## CLI commands
+
+Each prints its document on stdout. Run it from the reviewed project's root (the directory holding its `pyproject.toml`), or pass `--root DIR`. A failure the CLI understands prints `python-harness: <message>` on stderr and exits 2.
 
 | Command | Exit code | Use |
 | --- | --- | --- |
 | `python-harness inspect survey` | 0 | Mode evidence, domains, ruff config, layout |
 | `python-harness inspect gate --fallback-ruff-config ${CLAUDE_SKILL_DIR}/assets/ruff.toml` | 0 passed, 1 a tool failed | Runs the project's own ruff check, ruff format check, ty and pytest |
-| `python-harness inspect surface --codebase [PATH ...]` or `--diff BASE [--head REF]` | 0 | Review surface as import-graph clusters, one pylens dispatch each |
-| `python-harness inspect facts PATH... [--with-function-shapes]` | 0 | Mechanical AST facts per module |
-| `python-harness inspect calls PATH... [--symbol NAME]` | 0 | Per-module coupling metrics and reference tallies; `--symbol` lists one symbol's call sites |
-| `python-harness inspect cite DOCUMENT` or `cite -` (stdin) | 0 all hold, 1 any failed | Checks every `path.py:line` citation and its quote in a Markdown document |
 
-A missing target path is an error (exit 2), never an empty result. Files that cannot be read or parsed (bad encoding, syntax errors) are listed under `unparsable` instead of stopping the command.
+## MCP tools
+
+Claude Code names each tool `mcp__plugin_python-harness_python-harness__<tool>`. The document is the tool's text result. The project root is the session's project directory, `CLAUDE_PROJECT_DIR`, and nothing else: there is no root input. Every path input is relative to that root; an absolute path outside it, a `..` path that leaves it, or a symlink that points outside it is a tool error, and a directory input skips entries that resolve outside it. A failure the tool understands is a tool error whose text is the message, not a JSON document.
+
+| Tool | Inputs | Use |
+| --- | --- | --- |
+| `plan_review_surface` | `paths` (list), or `diff_base` with optional `diff_head` | Review surface as import-graph clusters, one pylens dispatch each |
+| `collect_python_facts` | `paths` (list, required), `with_function_shapes` (boolean, default false) | Mechanical AST facts per module |
+| `map_python_calls` | `paths` (list, required), `symbol` (optional) | Per-module coupling metrics and reference tallies; `symbol` lists one symbol's call sites |
+| `check_citations` | exactly one of `path` and `text` | Checks every `path.py:line` citation and its quote in a Markdown document |
+
+A missing target path is a tool error, never an empty result. Files that cannot be read or parsed (bad encoding, syntax errors) are listed under `unparsable` instead of stopping the tool. `check_citations` returns its report whether or not the citations hold; read `passed`.
 
 ## survey
 
@@ -40,7 +51,7 @@ A missing target path is an error (exit 2), never an empty result. Files that ca
 
 Declared tools run through `uv run --isolated` (plus `--frozen` when `uv.lock` exists), so the project's pinned versions apply without writing a lockfile, a `.venv` or caches. Undeclared ruff runs through `uvx`; undeclared ty and pytest join the project environment with `--with`. pytest runs only when the survey found the pytest domain. `ruff check` runs with `--statistics`, so its tail is a count per rule. Some build backends still write into the tree (setuptools writes `*.egg-info`): `created_paths.paths` lists every untracked or ignored path that appeared during the run; outside a git repository it is `{kind: "not_tracked"}`. Nothing is deleted. Options: `--skip TOOL` (repeatable), `--timeout SECONDS` (default 600). A `--fallback-ruff-config` path that does not exist is an error (exit 2); a relative one is resolved against the root. The fallback config's `src` is set to the roots the survey found, so first-party imports resolve for the reviewed project.
 
-## surface
+## plan_review_surface
 
 ```
 {target: {kind: "codebase", paths[]} | {kind: "diff", base, head},
@@ -50,9 +61,9 @@ Declared tools run through `uv run --isolated` (plus `--frozen` when `uv.lock` e
  dispatches, line_count, module_count, over_budget}
 ```
 
-A cluster is a connected group of surface modules that import each other, split when it passes `--max-cluster-lines` (default 1200). `tests` are test modules that import a cluster module; `dependents` are other project modules that import it (callers outside the surface). Modules with no code (empty, comment-only, or only a docstring, such as most `__init__.py` files) are left out. `over_budget` compares `dispatches` with `--budget` (default 24). Several `--codebase` paths form one surface. A diff surface holds only the `.py` files added or modified between `BASE...HEAD`, relative to the root, and is read from the working tree, so HEAD must be the checked-out commit. `--head` without `--diff` is an error.
+A cluster is a connected group of surface modules that import each other, split when it passes `options.max_cluster_lines` (1200; the tool has no input for it). `tests` are test modules that import a cluster module; `dependents` are other project modules that import it (callers outside the surface). Modules with no code (empty, comment-only, or only a docstring, such as most `__init__.py` files) are left out. `over_budget` compares `dispatches` with `options.dispatch_budget` (24; no input either). Several `paths` form one surface, and no `paths` and no `diff_base` means the whole project. A diff surface holds only the `.py` files added or modified between `diff_base...diff_head` (`diff_head` defaults to `HEAD`), relative to the root, and is read from the working tree, so the head must be the checked-out commit. `paths` together with `diff_base`, `diff_head` without `diff_base`, and a revision that starts with `-` are tool errors.
 
-## facts
+## collect_python_facts
 
 ```
 {modules: [{path, line_count, counts: {kind: n},
@@ -62,13 +73,13 @@ A cluster is a connected group of surface modules that import each other, split 
 
 Kinds and their detail fields: `else_branch` (statement), `while_true`, `break_in_loop`, `return_in_loop`, `match_statement`, `del_statement`, `try_block` (handlers, statements_in_try, caught: list of names), `exception_base_handler` (caught: Exception, BaseException or bare), `raise_without_cause`, `staticmethod`, `classmethod` (returns_cls_call), `private_class`, `dataclass` (frozen, slots, kw_only: each `{kind: "constant", value}` or `{kind: "expression", source}`), `protocol`, `runtime_checkable`, `abc_base`, `handwritten_init` (statements, exception_class), `post_init` (statements), `classvar` (in_dataclass), `operator_overload` (operator), `mutable_default`, `mutable_module_global` (name), `global_statement`, `module_level_call` (call), `sys_path_mutation`, `os_environ`, `lambda_in_collection`, `inline_annotated`, `future_annotations`, `any_annotation`, `typealias_annotation`, `comment` (text), `docstring` (owner), `asyncio_gather`, `asyncio_to_thread`.
 
-`function_shape` (parameters, positional, statements, max_depth, is_async, returns_annotated), one per function, is left out unless you pass `--with-function-shapes`: it is most of the output, and the gate's ruff statistics plus the per-module maxima from `calls` already show where size limits trip. Ask for it on the modules where they do.
+`function_shape` (parameters, positional, statements, max_depth, is_async, returns_annotated), one per function, is left out unless `with_function_shapes` is true: it is most of the output, and the gate's ruff statistics plus the per-module maxima from `map_python_calls` already show where size limits trip. Ask for it on the modules where they do.
 
-Modules come out in path order, each once, however the path arguments overlap. Names match as written: `from asyncio import gather` followed by `gather(...)` is not detected.
+Modules come out in path order, each once, however the `paths` overlap. Names match as written: `from asyncio import gather` followed by `gather(...)` is not detected.
 
-## calls
+## map_python_calls
 
-Summary (default):
+Summary (no `symbol`):
 
 ```
 {modules: [{metrics: {path, module, fan_in, fan_out, instability, public_symbols, private_symbols,
@@ -82,7 +93,7 @@ Summary (default):
 
 `external` holds the symbols other files reference, with who references them and how; `internal_only` names symbols used only inside their own module; `unreferenced` names symbols nothing references.
 
-Drill-down (`--symbol NAME`, a bare name or `module.name`):
+Drill-down (`symbol`, a bare name or `module.name`):
 
 ```
 {name, symbols: [{definition: {module, path, name, kind, line, is_public},
@@ -92,7 +103,7 @@ Drill-down (`--symbol NAME`, a bare name or `module.name`):
 
 A symbol's reference count is the sum of its `context_counts`; it is private when its name starts with `_`. `referencing_paths` leaves out the defining file and includes tests. Resolution is static: imports, aliases and dotted attribute chains are followed; method calls on instances, re-exports through `__init__` and star imports are not. A symbol with no references may still be used dynamically; treat that as a question for pylens, not as proof it is dead. `instability` is `fan_out / (fan_in + fan_out)`, null when both are zero.
 
-## cite
+## check_citations
 
 ```
 {document, checked: int,
@@ -103,4 +114,4 @@ A symbol's reference count is the sum of its `context_counts`; it is private whe
  passed}
 ```
 
-A citation is `path.py:12` or `path.py:12-14`; its quote is the first backticked span after it on the same line, and it is required: a citation without a quote, or with a quote under 3 characters, fails as `missing_quote`. Quotes compare with whitespace collapsed and must appear within the cited lines. Citations inside fenced code blocks are ignored. `uncited_rows` lists Markdown table data rows (outside fences, not header or separator rows) that hold no `path.py:line` citation, such as `#L34` or `:34` styles; `passed` needs no failures and no uncited rows. `checked` counts the citations that were parsed. `cite -` reads the document from stdin, so a pylens return never has to be written to disk. An unreadable document is an error (exit 2).
+A citation is `path.py:12` or `path.py:12-14`; its quote is the first backticked span after it on the same line, and it is required: a citation without a quote, or with a quote under 3 characters, fails as `missing_quote`. Quotes compare with whitespace collapsed and must appear within the cited lines. Citations inside fenced code blocks are ignored. `uncited_rows` lists Markdown table data rows (outside fences, not header or separator rows) that hold no `path.py:line` citation, such as `#L34` or `:34` styles; `passed` needs no failures and no uncited rows. `checked` counts the citations that were parsed. `path` names a document inside the project; `text` is the document itself, so a pylens return never has to be written to disk or passed through a shell. `document` is that path, or `<text>` for inline text. A document that cannot be read, a `path` outside the project, and both or neither of `path` and `text` are tool errors.

@@ -1,6 +1,6 @@
 # Smell catalogs
 
-What Ryan treats as a smell, why, and where the evidence comes from. `fact:` names the `python-harness inspect facts` kind that locates candidates mechanically; `pylens:` means the evidence needs reading. A fact is a candidate, never a finding: confirm it against the code, then decide whether it matters in this module. Do not report anything the gate's ruff run already reports.
+What Ryan treats as a smell, why, and where the evidence comes from. `fact:` names the `collect_python_facts` kind that locates candidates mechanically; `pylens:` means the evidence needs reading. A fact is a candidate, never a finding: confirm it against the code, then decide whether it matters in this module. Do not report anything the gate's ruff run already reports.
 
 ## Control flow
 
@@ -10,7 +10,7 @@ What Ryan treats as a smell, why, and where the evidence comes from. `fact:` nam
 | `while True` | The exit condition was not thought through | fact: `while_true` | Loop on the real condition; for a genuinely complex loop, expose a control such as `terminate()` |
 | `while` ending in `break` or a bare `return` | Same smell as `while True` | fact: `break_in_loop`, `return_in_loop` | State the condition in the loop header |
 | `return` inside a loop | Readers scan a loop for `continue`, `break`, `yield`, not `return`. Applies to loops only; function-level early returns are good | fact: `return_in_loop` | `next(...)`, `any(...)`, a comprehension, or assign, `break`, single return |
-| Nesting deeper than 3 control-flow blocks (guards at the top excluded) | Deep nesting means the function is several functions | fact: `function_shape.max_depth` (`facts --with-function-shapes`) | Extract the inner blocks into named functions |
+| Nesting deeper than 3 control-flow blocks (guards at the top excluded) | Deep nesting means the function is several functions | fact: `function_shape.max_depth` (`collect_python_facts` with `with_function_shapes`) | Extract the inner blocks into named functions |
 | `match` | Does not honor an exception hierarchy; see `philosophy.md` | fact: `match_statement` | `except` hierarchy, a mapping keyed by an enum, or polymorphism |
 | `del` | Called terrible by Ryan; usually manual lifetime management that structure should own | fact: `del_statement` | Scope the value so it ends naturally |
 | Dense or nested comprehensions | Crammed lines hide semantic units from coverage and from readers | pylens or reading | Split into a generator that selects plus a function that maps one item, composed as `list(map(...))` |

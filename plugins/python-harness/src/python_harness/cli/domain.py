@@ -1,18 +1,12 @@
-"""Command names, the process edge and typed requests handed to handlers, and seams."""
+"""Command names, the process edge handed to handlers, and seams."""
 
 import argparse
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from typing import TYPE_CHECKING, Protocol, TextIO
+from typing import Protocol, TextIO
 
 from python_harness.cli.exit_codes import ExitCode
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from python_harness.facts.services import FactCatalog
-
 
 type CommandGroup = argparse._SubParsersAction[argparse.ArgumentParser]  # noqa: SLF001  argparse exposes no public name for the subparsers action type.
 
@@ -25,10 +19,6 @@ class GroupName(StrEnum):
 class InspectCommand(StrEnum):
     SURVEY = auto()
     GATE = auto()
-    SURFACE = auto()
-    FACTS = auto()
-    CALLS = auto()
-    CITE = auto()
 
 
 class HookCommand(StrEnum):
@@ -42,26 +32,6 @@ class ProcessEdge:
     stdout: TextIO
     stderr: TextIO
     environment: Mapping[str, str]
-
-
-@dataclass(frozen=True, slots=True)
-class FactsRequest:
-    paths: tuple[str, ...]
-    catalog: 'FactCatalog'
-
-
-@dataclass(frozen=True, slots=True)
-class CallsRequest:
-    paths: tuple[str, ...]
-    symbol: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class StandardInput:
-    name: str = '<stdin>'
-
-
-type CitedDocument = StandardInput | Path
 
 
 class CommandHandler(Protocol):

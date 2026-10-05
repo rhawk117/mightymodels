@@ -8,7 +8,7 @@
 - Surface: {{N}} modules, {{N}} lines, {{N}} clusters; pylens dispatches: {{wave 1}} + {{wave 2}}
 - Mechanical facts: {{the counts that mattered, for example "staticmethod 1, try_block 3, mutable_module_global 1"}}
 - Gate leftovers: {{created_paths from the gate, or "none"}} (left in place)
-- Citations: {{N}} checked by `python-harness inspect cite`; {{N}} pylens facts dropped because their citation failed
+- Citations: {{N}} checked by `check_citations`; {{N}} pylens facts dropped because their citation failed
 - Unverified: {{what this review did not establish, or "nothing"}}
 
 ## Summary

@@ -21,23 +21,35 @@ def text_of(result: CallToolResult) -> str:
 
 @pytest.mark.anyio
 class TestToolSchemas:
-    async def test_both_tools_take_object_arguments(self, docs_client: Client) -> None:
+    async def test_the_server_lists_exactly_its_six_tools(self, docs_client: Client) -> None:
         tools = (await docs_client.list_tools()).tools
-        assert {tool.name: tool.input_schema['type'] for tool in tools} == {
-            'search_python_docs': 'object',
-            'read_python_docs': 'object',
-        }
+        assert sorted(tool.name for tool in tools) == [
+            'check_citations',
+            'collect_python_facts',
+            'map_python_calls',
+            'plan_review_surface',
+            'read_python_docs',
+            'search_python_docs',
+        ]
+
+    async def test_every_tool_takes_object_arguments(self, docs_client: Client) -> None:
+        tools = (await docs_client.list_tools()).tools
+        assert {tool.input_schema['type'] for tool in tools} == {'object'}
 
     async def test_only_search_declares_structured_output(self, docs_client: Client) -> None:
-        tools = {tool.name: tool for tool in (await docs_client.list_tools()).tools}
-        assert tools['search_python_docs'].output_schema is not None
-        assert tools['read_python_docs'].output_schema is None
+        tools = (await docs_client.list_tools()).tools
+        structured = [tool.name for tool in tools if tool.output_schema is not None]
+        assert structured == ['search_python_docs']
 
     async def test_each_tool_takes_its_fields_as_flat_arguments(self, docs_client: Client) -> None:
         tools = (await docs_client.list_tools()).tools
         assert {tool.name: set(tool.input_schema['properties']) for tool in tools} == {
             'search_python_docs': {'version', 'query', 'limit'},
             'read_python_docs': {'version', 'symbol', 'offset', 'max_chars'},
+            'collect_python_facts': {'paths', 'with_function_shapes'},
+            'map_python_calls': {'paths', 'symbol'},
+            'check_citations': {'path', 'text'},
+            'plan_review_surface': {'paths', 'diff_base', 'diff_head'},
         }
 
 

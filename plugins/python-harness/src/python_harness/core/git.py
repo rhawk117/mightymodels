@@ -34,6 +34,7 @@ def list_changed_python_files(workspace: Workspace, base: str, head: str) -> tup
         '--name-only',
         '--relative',
         '--diff-filter=d',
+        '--end-of-options',
         f'{base}...{head}',
         '--',
         '*.py',

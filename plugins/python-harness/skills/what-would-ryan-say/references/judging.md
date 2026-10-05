@@ -1,6 +1,6 @@
 # Judging facts into findings
 
-You, the primary, hold the rules; pylens and `python-harness inspect` hold none. This file is how you turn their facts into findings Ryan would sign. Read it before the first finding.
+You, the primary, hold the rules; pylens and the `python-harness` tools hold none. This file is how you turn their facts into findings Ryan would sign. Read it before the first finding.
 
 ## The lenses
 
@@ -13,7 +13,7 @@ Organize your reasoning per module through these eight lenses. They are how you 
 | 3. Ownership and protection | guide §7, smells: async, hidden state | `module_level_call`, `mutable_module_global`, `global_statement`; pylens: resources, callers |
 | 4. Behavior placement and interface | guide §2 and §3, smells: structure | `staticmethod`, `classmethod`, `private_class`, `handwritten_init`, `post_init`; calls: public symbols, references |
 | 5. Configuration and dependency reuse | guide §4 and §5 | `os_environ`; pylens: configuration, dependencies, duplication |
-| 6. Control flow and complexity | smells: control flow, philosophy (complexity budget, tripwires) | `else_branch`, loop facts, gate rule statistics, calls `max_parameters`/`max_function_statements`; `function_shape` via `facts --with-function-shapes` |
+| 6. Control flow and complexity | smells: control flow, philosophy (complexity budget, tripwires) | `else_branch`, loop facts, gate rule statistics, calls `max_parameters`/`max_function_statements`; `function_shape` via `collect_python_facts` with `with_function_shapes` |
 | 7. Organization, naming, platform | guide §8, §9, §11 | survey layout; calls: fan-in, fan-out, instability; reading |
 | 8. Tests | guide §10, `domains/pytest.md` | calls: `test_paths`; pylens: tests |
 
@@ -61,7 +61,7 @@ Exactly this shape, so citations can be checked and runs compared:
 - Verify: `<command or test that would prove the improvement>`
 ```
 
-Additional locations go on further `- Location:` lines. Every location is a citation in the `path.py:line` form followed by a backticked quote of that line, because `python-harness inspect cite` checks both.
+Additional locations go on further `- Location:` lines. Every location is a citation in the `path.py:line` form followed by a backticked quote of that line, because `check_citations` checks both.
 
 ## What not to do
 

@@ -31,6 +31,6 @@ Load when `inspect survey` lists `pytest` or `hypothesis`. These extend guide §
 
 ## Evidence
 
-- `inspect calls`: `test_paths` per module shows which modules have tests at all.
+- `map_python_calls`: `test_paths` per module shows which modules have tests at all.
 - pylens tests question: which tests exercise which public functions, what they patch, where arrangement lives.
-- `inspect facts` on test files: `comment` counts; `inspect facts --with-function-shapes` for `function_shape.parameters` (fixture-argument pressure).
+- `collect_python_facts` on test files: `comment` counts; `collect_python_facts` with `with_function_shapes` for `function_shape.parameters` (fixture-argument pressure).
