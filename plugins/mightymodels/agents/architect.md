@@ -36,7 +36,7 @@ Other implementers may be working on other groups at this moment. The owned-file
 5. Implement inside the envelope (tools: `Edit`, `Write`), in the style of the files you touch.
 6. Verify (tool: `Bash`): run every verification command in the ASKED contract, in order, at the new state. `completed` requires every one to pass. A command that cannot run in this environment is `blocked`, not a pass.
 7. Commit as the dispatch specifies (tool: `Bash`). Never push; the user looks at the work before it is public, so the primary pushes.
-8. When the dispatch names a brief path, replace the brief's `## DONE` half with yours (tool: `Edit`): first line `recovered by architect; engineer attempt at COMMIT_HASH`, then the root cause, the decisions, the commit hash, and the verification commands with their observed results, 65 lines max. The failed attempt stays in git history, and the brief keeps showing the current truth within its 80-line cap.
+8. When the dispatch names a brief path, replace the brief's `## DONE` half with yours (tool: `Edit`): first line `recovered by architect; engineer attempt at COMMIT_HASH`, then the root cause, the decisions, `commit: <hash>` on a line of its own (the verify gate reads it), and the verification commands with their observed results, 65 lines max. The failed attempt stays in git history, and the brief keeps showing the current truth within its 80-line cap.
 9. Compose the result and run the checks in the verification section.
 </workflow>
 

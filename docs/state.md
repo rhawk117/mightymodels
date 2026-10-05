@@ -25,38 +25,43 @@ unit of work, which is what stops working state from turning into a landfill of 
 
 ## ticket.yml
 
-Written once by `prepare-handoff` from the interview answers, then hand-tweaked by the user.
-Every later session reads it before doing anything else.
+Written once by open-ticket through the `ticket` tool's `write`, from the interview answers, then
+hand-tweaked by the user. Every later session reads it before doing anything else.
 
 ```yaml
 task: rate-limit # directory name under .mightymodels/
 summary: requests over the cap return 500 instead of 429
 triaged-at: 2026-08-20T14:02:00Z
+context:
+  - the limiter is keyed per API token, not per IP
 companion-docs:
   issue-number: 214
   reference-urls:
     - docs.example.com/rate-limiting # external docs from triage only
 subagent-models:
   primary-agent: null
-  scout: claude-haiku-4-5
-  budgetron: claude-sonnet-5
-  engineer: claude-sonnet-5 # derived: large scope would pull claude-opus-5
-  gitty-up: claude-haiku-4-5
-  grumpy: claude-sonnet-5
-  sunny: claude-opus-5
-  wingman: claude-opus-5
-  merge-vader: claude-opus-5
-  uncle-bob: claude-opus-5
+  code-scout: haiku
+  web-scout: haiku
+  qualitylens: haiku
+  engineer: sonnet # sonnet at every scope
+  architect: sonnet # derived: large scope would pull opus
+  gitty-up: haiku
+  wingman: opus
+  merge-vader-reviewer: opus
+  uncle-bob-reviewer: sonnet
 handoff-context:
   scope: sm # sm | med | large
   plan-first: false # true when a compaction is expected
   branch-name: fix/rate-limit
   worktrees-okay: false
+investigations:
+  - rate-limit-ledger-id # lets-investigate ids this ticket came from
 ```
 
-Two derivation rules matter day to day. The engineer tier comes from the scope answer, and the
-ticket value is the default for every task; the primary may bump one gnarly task a tier at
-dispatch, logging the reason in that task's ASKED stanza. `plan-first: true` means the next
+Three derivation rules matter day to day. The engineer is `sonnet` at every scope, and the ticket
+value is the default for every task; the primary may bump one gnarly task a tier at dispatch,
+logging the reason in that task's ASKED stanza. The architect comes from the scope answer: `large`
+gives `opus`, `sm` or `med` gives `sonnet`. `plan-first: true` means the next
 session writes `plan.md` before any dispatch and the SPRINT.md handoff carries the switch-models
 reminder.
 
@@ -109,8 +114,8 @@ committed `.gitignore`; when tracking is wanted, track `archives/` and `*/ticket
 ## The canonical definitions
 
 This page orients; the references define.
-`plugins/mightymodels/skills/prepare-handoff/references/ticket-schema.md` is the schema with its
-derivation rules, `plugins/mightymodels/skills/prepare-handoff/references/mightymodels-dir.md`
+`plugins/mightymodels/skills/open-ticket/references/ticket-schema.md` is the schema with its
+derivation rules, `plugins/mightymodels/skills/open-ticket/references/mightymodels-dir.md`
 is the layout with the writer/reader matrix, and
 `plugins/mightymodels/skills/agents-assemble/references/contracts.md` holds the severity table
 and verdict vocabularies. Agents read those files; nothing reads this

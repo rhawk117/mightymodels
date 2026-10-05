@@ -11,8 +11,6 @@ Read before changing a hook, a receipt struct, or any skill script whose files a
 | `.mightymodels/SLUG/briefs/task-NN.md` | agents-assemble and the engineer                               | completion-gate, for the DONE half and its commit                     |
 | the git repository                     | git, read through pygit2                                       | every hook, for branch, HEAD, status, ignore rules, and commit ranges |
 
-`src/mightymodels_plugin/workflow_state.py` reads these through msgspec structs that ignore unknown fields and skip a record whose `schema` is not 1, with a warning on stderr. Worker reports are parsed with defusedxml, DTDs forbidden.
-
 ## What hooks write
 
 | File                                              | Writer                                                                                                            |
@@ -22,7 +20,7 @@ Read before changing a hook, a receipt struct, or any skill script whose files a
 | `.mightymodels/.runtime/gate/SHA256`              | completion-gate, an empty marker named by the SHA-256 of session, worker, and tasks that makes its block one-shot |
 | `.mightymodels/SLUG/handoffs/snapshot.{json,md}`  | baton-pass's snapshot.py, run by workflow-state-snapshot                                                          |
 
-Receipt shapes are [`receipt.schema.json`](./receipt.schema.json), generated from `src/mightymodels_plugin/workflow_state.py`; a test fails when the two differ. Hooks never create `.mightymodels/` and never edit git's exclude file: the skill scripts that create the directory add `.mightymodels/` to `info/exclude`, and a hook refuses to write unless git reports the directory ignored.
+Receipt shapes are [`receipt.schema.json`](./receipt.schema.json). Hooks never create `.mightymodels/` and never edit git's exclude file: the skill scripts that create the directory add `.mightymodels/` to `info/exclude`, and a hook refuses to write unless git reports the directory ignored.
 
 Each receipt writer holds an exclusive `receipts.jsonl.lock` sidecar lock until its append
 is flushed and closed. The standalone prune script uses the same lock around reading and

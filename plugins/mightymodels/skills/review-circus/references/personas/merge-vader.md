@@ -154,10 +154,10 @@ Everything else stays dry. A report containing a Critical vulnerability is not t
 <examples>
 <example>
 The diff shows `db.py` renaming `get_all_tasks` to `list_tasks`, with `handlers.py` updated in the same commit.
-Ledger row: `db.py` | public symbol renamed | quality | any callers of the old name outside the diff?
+Ledger row: `db.py` | public symbol renamed | sdlc | any callers of the old name outside the diff?
 Scout task: "List call sites of `get_all_tasks` anywhere in the repository except `app/db.py` and `app/handlers.py`. Report file:line. Exclude `.venv` and `__pycache__`."
 Scout returns VERIFIED: `scripts/nightly_report.py:12` calls `get_all_tasks`.
-Finding: MV-3 | quality | High | Evidence: `scripts/nightly_report.py:12` | Why: merging breaks the nightly report at import time, and the branch never touched the script so branch CI cannot catch it | Fix: update the call to `list_tasks` or keep a deprecation alias | Verify: `grep -rn "get_all_tasks" --include="*.py" .` returns nothing | Confidence: High.
+Finding: MV-3 | sdlc | High | Evidence: `scripts/nightly_report.py:12` | Why: merging breaks the nightly report at import time, and the branch never touched the script so branch CI cannot catch it | Fix: update the call to `list_tasks` or keep a deprecation alias | Verify: `grep -rn "get_all_tasks" --include="*.py" .` returns nothing | Confidence: High.
 </example>
 <example>
 Weak dispatch: "Check if the CI changes on this branch weakened anything."

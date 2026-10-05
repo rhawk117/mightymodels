@@ -37,7 +37,7 @@ Severity anchors: reachable injection or a committed secret is Critical. A guard
 
 ## 2. SDLC regressions
 
-What counts: changes that weaken the pipeline's ability to catch the next defect. The shipped code can be perfect and the branch still fails this dimension. The net is part of the product.
+What counts: changes that weaken the pipeline's ability to catch the next defect, and behaviour the branch breaks for code it did not touch. The shipped code can be perfect and the branch still fails this dimension. The net is part of the product.
 
 Diff-visible signals:
 
@@ -46,6 +46,9 @@ Diff-visible signals:
 - Gates: coverage fail-under lowered, lint or type strictness reduced (`strict: false`, `noImplicitAny: false`, a shrunken select list), pre-commit hooks removed.
 - Build and release: version pins loosened, lockfile out of sync with its manifest, Dockerfile moved to `latest`, signing or SBOM steps dropped.
 - Migrations: schema change without a migration, migration without a rollback.
+- Error handling: broad except-and-pass or catch-and-continue, error returns ignored, promises unawaited.
+- Contract erosion: public API changed without a deprecation path; internal types leaking across layer boundaries.
+- Broken callers: anything renamed or re-signed whose call sites the diff does not fully cover. This is the highest-value scout dispatch in the dimension.
 
 Scout question bank:
 
@@ -53,30 +56,27 @@ Scout question bank:
 - "List test files referencing `<module>`. file:line."
 - "Show `<coverage or lint config file>` as it exists on `<base>`."
 - "Run `<one targeted test file>` and report the tail of the output." (one run, narrowest scope)
+- "List call sites of `<old symbol>` outside `<changed files>`. file:line."
+- "Which modules import `<changed module>`? file:line."
 
-Severity anchors: a deleted or skipped test without a stated replacement, and any weakened CI gate: High. New logic with no tests at all: Medium, because it never had a net; distinguish that from removing one. Renamed CI job: High finding phrased as risk, plus a Not verified entry for the branch-protection binding.
+Severity anchors: a deleted or skipped test without a stated replacement, and any weakened CI gate: High. New logic with no tests at all: Medium, because it never had a net; distinguish that from removing one. Renamed CI job: High finding phrased as risk, plus a Not verified entry for the branch-protection binding. A confirmed broken caller outside the diff: High. Swallowed exceptions on a path that matters: Medium.
 
 ## 3. Quality and maintainability
 
-What counts: changes that make the next change harder, or the current one wrong in quiet ways. This is a merge review, not a full clean-code audit: weigh regressions this branch introduces over debt the repo already carried.
+What counts: changes that make the next change harder. This is a merge review, not a full clean-code audit: weigh regressions this branch introduces over debt the repo already carried.
 
 Diff-visible signals:
 
 - Duplication: logic copy-pasted from elsewhere in the repo and lightly edited. The tell is a hunk that reads like an existing function with three lines changed.
 - Divergence: the branch introduces a second way to do a thing the repo does one way (a second HTTP client, a second config reader, a second logger setup).
 - Shape: functions accreting flag parameters and nested conditionals where the codebase uses guard clauses; god functions doing parse plus validate plus IO plus format in one body.
-- Error handling: broad except-and-pass or catch-and-continue, error returns ignored, promises unawaited.
 - Leftovers: dead code kept "just in case", commented-out blocks, debug prints, TODO or HACK or FIXME introduced by this branch.
-- Contract erosion: public API changed without a deprecation path; internal types leaking across layer boundaries.
-- Broken callers: anything renamed or re-signed whose call sites the diff does not fully cover. This is the highest-value scout dispatch in the dimension.
 
 Scout question bank:
 
-- "List call sites of `<old symbol>` outside `<changed files>`. file:line."
 - "Does a function similar in name to `<new helper>` already exist under `<src dir>`? Search `<pattern>` and report matches, file:line."
-- "Which modules import `<changed module>`? file:line."
 
-Severity anchors: a confirmed broken caller outside the diff: High. Copy-paste duplication of nontrivial logic, or swallowed exceptions on a path that matters: Medium. Naming, comments, style divergence: Low. When quality issues cluster in one new module, one finding per issue class with all locations listed beats ten one-line findings.
+Severity anchors: copy-paste duplication of nontrivial logic: Medium. Naming, comments, style divergence: Low. When quality issues cluster in one new module, one finding per issue class with all locations listed beats ten one-line findings.
 
 ## 4. Documentation drift
 
