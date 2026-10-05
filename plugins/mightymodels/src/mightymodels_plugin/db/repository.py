@@ -4,7 +4,10 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import URL, Engine, create_engine
+
+from mightymodels_plugin.db.tables import Base
+from mightymodels_plugin.errors import StateError
 
 PROJECT_DIR_VARIABLE = 'CLAUDE_PROJECT_DIR'
 STATE_DIRECTORY = '.mightymodels'
@@ -12,7 +15,7 @@ DATABASE_NAME = 'mightymodels.db'
 EXCLUDE_LINE = f'{STATE_DIRECTORY}/'
 
 
-class NotARepositoryError(Exception):
+class NotARepositoryError(StateError):
     def __init__(self, root: Path, detail: str) -> None:
         super().__init__(f'{root} is not inside a git repository: {detail}')
         self.root = root
@@ -53,7 +56,6 @@ def open_repository(root: Path) -> Engine:
     exclude_state(common_dir)
     database = root.joinpath(STATE_DIRECTORY, DATABASE_NAME)
     database.parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(f'sqlite:///{database}')
-    with engine.connect():
-        pass
+    engine = create_engine(URL.create('sqlite', database=str(database)))
+    Base.metadata.create_all(engine)
     return engine

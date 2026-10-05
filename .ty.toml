@@ -10,9 +10,6 @@ exclude-scripts = true
 exclude = [
     "plugins/**/assets/*.template.py",
     "plugins/**/assets/template/**",
-    "plugins/mightymodels/skills/agents-assemble/scripts/task_state.py",  # T3
-    "plugins/mightymodels/skills/game-plan/scripts/verification.py",  # T3
-    "plugins/mightymodels/skills/game-plan/tests/test_verification.py",  # T3
     "plugins/mightymodels/skills/review-circus/scripts/review_state.py",  # T4
     "plugins/mightymodels/skills/baton-pass/scripts/snapshot.py",  # T5
     "plugins/mightymodels/skills/prune-ticket/scripts/archive_ticket.py",  # T5

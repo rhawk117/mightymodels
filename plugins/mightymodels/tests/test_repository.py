@@ -107,6 +107,21 @@ class TestOpenRepository:
         assert EXCLUDE_LINE in self.exclude_lines(repository)
         assert worktree.joinpath(STATE_DIRECTORY, DATABASE_NAME).is_file()
 
+    def test_finds_the_database_in_a_repository_whose_path_has_url_characters(
+        self, tmp_path: Path, git: GitRunner
+    ) -> None:
+        root = tmp_path.joinpath('odd?mode=memory#cache')
+        root.mkdir()
+        git(root, 'init', '--quiet')
+        database = root.joinpath(STATE_DIRECTORY, DATABASE_NAME)
+
+        engine = open_repository(root)
+        engine.dispose()
+
+        assert engine.url.database == str(database)
+        assert database.stat().st_size > 0
+        assert [path.name for path in tmp_path.iterdir()] == [root.name]
+
     def test_refuses_a_directory_outside_a_repository(self, tmp_path: Path) -> None:
         outside = tmp_path.joinpath('outside')
         outside.mkdir()
