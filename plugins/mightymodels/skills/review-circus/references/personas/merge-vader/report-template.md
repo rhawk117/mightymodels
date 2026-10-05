@@ -28,7 +28,7 @@ VERDICT: <BLOCK | MERGE WITH CONDITIONS | CLEAR>
 #### <MV-n> | <dimension> | <title>
 
 - Evidence: `<file>:<line>` <at most one quoted line>
-- Evidence (metric|idiom|convention): <conditional; the cite, for a quality finding at Medium or above>
+- Evidence (<metric | idiom | convention>): <conditional; the cite, for a quality finding at Medium or above>
 - Why it matters: <the concrete failure mode>
 - Fix: <action an engineer can take without re-deriving the analysis>
 - Verify: <command or check that confirms the fix landed>

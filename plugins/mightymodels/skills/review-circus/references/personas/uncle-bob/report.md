@@ -125,7 +125,7 @@ package Ca/Ce/I/A/D table. Numbers only — interpretation goes in findings.>
 ### Blocker
 #### UB-<n> | [ADP] <title> — `path/file.py:12`
 - Evidence: <1–3 line evidence quote or precise description>
-- Evidence (metric|idiom|convention): <conditional; the cite, for a finding at Medium or above>
+- Evidence (<metric | idiom | convention>): <conditional; the cite, for a finding at Medium or above>
 - Why: <why it violates, citing the principle>
 - Future pressure: <the feature or change that will hit this code next, or "none foreseen">
 - Expected churn: <high | medium | low, with the git or qualitylens evidence>

@@ -82,7 +82,7 @@ and the model the run recorded. The packet carries the doctrine
 the run directory, the depth and the persona's role (the heavier weight leads), the metrics
 path, the signals script path (`${CLAUDE_SKILL_DIR}/scripts/review_signals.py`, which the persona
 hands qualitylens) and window, and for a ticket, ticket.yml, the issue, and the plan
-(merge-vader's conformance check needs them). All of these are absolute once substituted.
+(merge-vader's conformance check needs them). The `${CLAUDE_SKILL_DIR}` paths are absolute once substituted.
 
 Personas gather their own evidence through code-scout, web-scout, and qualitylens, and
 nothing else. Write each response unchanged to `RUNDIR/MERGE-VADER-REPORT.md` or

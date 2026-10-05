@@ -46,7 +46,7 @@ With a ticket: `.mightymodels/SLUG/review/RUN/`. Without one: `.mightymodels/.ru
 - `location` is the first word of merge-vader's untyped `Evidence:` bullet, and for uncle-bob the backticked path after the dash in the heading. It must be `path:line` or `path:start-end`.
 - `title` is the heading text, and the `Fix:` and `Verify:` bullets are required. A bullet's continuation lines join it. Bullets the tool does not read (Why it matters, Confidence, Signals, Architect escalation) stay in the report file.
 - `kind` and `security` come from the dimension, never from another label: merge-vader's `quality` is a quality finding, `security` is a defect with the security mark, and `sdlc`, `docs` and `plan` are defects. Every uncle-bob finding is a quality finding.
-- A quality finding at Medium or above needs the typed bullet `Evidence (metric|idiom|convention): <cite>` (idiom-evidence.md); at Low it needs none.
+- A quality finding at Medium or above needs a typed bullet naming one kind (`Evidence (metric): <cite>`, or `idiom` or `convention` in its place; idiom-evidence.md); at Low it needs none.
 - `severity` is the heading's, with uncle-bob's Blocker recorded as High.
 - Every text field is scanned for secrets and redacted before it is stored.
 

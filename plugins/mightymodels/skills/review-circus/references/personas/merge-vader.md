@@ -88,7 +88,7 @@ Convert the ledger plus scout facts into findings. Every finding carries:
 - **Dimension**: security, sdlc, quality, docs, or plan. It decides how review-circus records the finding: `security` marks a security defect, `quality` a quality finding, the rest defects.
 - **Severity**: per the ladder below.
 - **Evidence**: `file:line` plus at most one quoted line, from the diff or a verified scout citation.
-- **Typed evidence**: a `quality` finding at Medium or above carries `Evidence (metric|idiom|convention): <cite>`, as idiom-evidence.md defines.
+- **Typed evidence**: a `quality` finding at Medium or above carries a typed bullet naming one kind (`Evidence (metric): <cite>`, or `idiom` or `convention` in its place), as idiom-evidence.md defines.
 - **Why it matters**: the concrete failure mode in one or two sentences.
 - **Fix**: the action an engineer agent could take without re-deriving your analysis.
 - **Verify**: how to confirm the fix landed (a command, a grep, a test to run).
