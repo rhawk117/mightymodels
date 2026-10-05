@@ -31,6 +31,7 @@ class TestLauncher:
 
     def test_runs_the_lock_with_the_source_on_the_path(self, launcher_text: str) -> None:
         assert 'uv tool run' in launcher_text
+        assert '--compile-bytecode' in launcher_text
         assert '--with-requirements "${root}/requirements.lock"' in launcher_text
         assert 'PYTHONPATH="${root}/src"' in launcher_text
         assert 'python -P -m mightymodels_plugin "$@"' in launcher_text
