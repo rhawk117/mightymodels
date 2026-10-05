@@ -14,7 +14,6 @@ from mcp.types import ToolAnnotations
 
 from python_harness.core.errors import PythonHarnessError
 from python_harness.core.output import COMPACT_SEPARATORS, to_json_value
-from python_harness.documentation.errors import DocumentationError
 from python_harness.documentation.repository import documentation_http_client
 from python_harness.documentation.services import (
     DocumentationService,
@@ -69,7 +68,7 @@ READ_ONLY_LOCAL = ToolAnnotations(read_only_hint=True, open_world_hint=False)
 def tool_errors() -> Generator[None]:
     try:
         yield
-    except (DocumentationError, PythonHarnessError) as error:
+    except PythonHarnessError as error:
         raise ToolError(str(error)) from error
 
 

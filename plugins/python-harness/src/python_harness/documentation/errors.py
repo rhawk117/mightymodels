@@ -1,7 +1,9 @@
 """Documentation failures whose messages are safe to show the calling model."""
 
+from python_harness.core.errors import PythonHarnessError
 
-class DocumentationError(Exception):
+
+class DocumentationError(PythonHarnessError):
     """An actionable retrieval or request failure, safe to expose to the caller."""
 
 
