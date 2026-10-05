@@ -246,7 +246,7 @@ def resolution_error(payload: ResolvePayload) -> StateError | None:
         return error
     if payload.result is Result.FIXED and payload.commit is None:
         return CommitRequiredError(payload.finding)
-    if payload.result is not Result.FIXED and not payload.reason:
+    if payload.result is not Result.FIXED and (payload.reason is None or not payload.reason):
         return ResultReasonError(payload.finding, payload.result)
     return None
 

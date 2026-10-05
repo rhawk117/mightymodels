@@ -96,7 +96,7 @@ class PersonaReport:
 
 
 def find_root(environ: Mapping[str, str], cwd: Path) -> Path:
-    project_dir = environ.get(PROJECT_DIR_VARIABLE)
+    project_dir = environ.get(PROJECT_DIR_VARIABLE, '')
     return Path(project_dir) if project_dir else cwd
 
 
