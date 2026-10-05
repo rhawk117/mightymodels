@@ -14,7 +14,6 @@ from mcp.types import ToolAnnotations
 
 from python_harness.core.errors import PythonHarnessError
 from python_harness.core.output import COMPACT_SEPARATORS, to_json_value
-from python_harness.documentation.domain import PythonVersion
 from python_harness.documentation.errors import DocumentationError
 from python_harness.documentation.repository import documentation_http_client
 from python_harness.documentation.services import (
@@ -51,6 +50,7 @@ from python_harness.tools.search_python_docs.schema import (
     SearchRequest,
     SearchResult,
     SymbolQuery,
+    VersionText,
 )
 
 SERVER_NAME = 'python-harness'
@@ -101,7 +101,7 @@ class DocumentationTools:
     async def search_python_docs(
         self,
         *,
-        version: PythonVersion,
+        version: VersionText,
         query: SymbolQuery,
         limit: SearchLimit = DEFAULT_SEARCH_LIMIT,
     ) -> SearchResult:
@@ -118,7 +118,7 @@ class DocumentationTools:
     async def read_python_docs(
         self,
         *,
-        version: PythonVersion,
+        version: VersionText,
         symbol: SymbolName,
         offset: PageOffset = 0,
         max_chars: PageCharacters = DEFAULT_PAGE_CHARACTERS,

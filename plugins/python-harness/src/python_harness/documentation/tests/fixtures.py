@@ -30,7 +30,7 @@ def settings() -> Settings:
 
 @pytest.fixture(scope='session')
 def docs_version() -> PythonVersion:
-    return PythonVersion.model_validate(DOCS_VERSION)
+    return PythonVersion(text=DOCS_VERSION)
 
 
 @pytest.fixture(scope='session')

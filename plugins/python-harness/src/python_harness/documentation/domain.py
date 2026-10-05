@@ -1,22 +1,25 @@
 """Validated documentation versions, official URLs, and the per-version symbol index."""
 
 import re
-from typing import Annotated
+from dataclasses import dataclass
 from urllib.parse import urldefrag, urlsplit
-
-from pydantic import AfterValidator, BaseModel, ConfigDict, RootModel, StringConstraints
 
 from python_harness.documentation.errors import (
     AmbiguousUrlError,
     DocumentationError,
     ForeignUrlError,
+    InvalidVersionError,
     UnversionedUrlError,
 )
 
 DOCUMENTATION_HOST = 'docs.python.org'
 VERSION_PATTERN = r'3\.(0|[1-9][0-9]?)'
 
-type VersionText = Annotated[str, StringConstraints(strict=True, pattern=f'^{VERSION_PATTERN}$')]
+
+def python_version_violation(text: str) -> InvalidVersionError | None:
+    if re.fullmatch(VERSION_PATTERN, text) is None:
+        return InvalidVersionError(text)
+    return None
 
 
 def has_unsafe_characters(url: str) -> bool:
@@ -53,42 +56,34 @@ def documentation_url_violation(url: str) -> DocumentationError | None:
     return None
 
 
-def checked_documentation_url(url: str) -> str:
-    if (violation := documentation_url_violation(url)) is not None:
-        raise violation
-    return url
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PythonVersion:
+    text: str
 
-
-type DocumentationUrlText = Annotated[
-    str, StringConstraints(strict=True), AfterValidator(checked_documentation_url)
-]
-
-
-class PythonVersion(RootModel[VersionText]):
-    """Python minor version such as 3.13.
-
-    Read requires-python in pyproject.toml or .python-version first; do not guess.
-    """
-
-    model_config = ConfigDict(frozen=True)
+    def __post_init__(self) -> None:
+        if (violation := python_version_violation(self.text)) is not None:
+            raise violation
 
     @property
     def base_url(self) -> str:
-        return f'https://{DOCUMENTATION_HOST}/{self.root}/'
+        return f'https://{DOCUMENTATION_HOST}/{self.text}/'
 
 
-class DocumentationUrl(RootModel[DocumentationUrlText]):
-    """An official, versioned docs.python.org URL."""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DocumentationUrl:
+    text: str
 
-    model_config = ConfigDict(frozen=True)
+    def __post_init__(self) -> None:
+        if (violation := documentation_url_violation(self.text)) is not None:
+            raise violation
 
     @property
     def path(self) -> str:
-        return urlsplit(self.root).path
+        return urlsplit(self.text).path
 
     @property
     def version(self) -> PythonVersion:
-        return PythonVersion.model_validate(self.path.split('/')[1])
+        return PythonVersion(text=self.path.split('/')[1])
 
     @property
     def page_path(self) -> str:
@@ -96,23 +91,21 @@ class DocumentationUrl(RootModel[DocumentationUrlText]):
 
     @property
     def fragment(self) -> str:
-        return urldefrag(self.root).fragment
+        return urldefrag(self.text).fragment
 
     @property
     def page_url(self) -> 'DocumentationUrl':
-        return DocumentationUrl.model_validate(urldefrag(self.root).url)
+        return DocumentationUrl(text=urldefrag(self.text).url)
 
 
-class Model(BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True, strict=True)
-
-
-class Symbol(Model):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Symbol:
     name: str
     kind: str
     source_url: DocumentationUrl
 
 
-class SymbolIndex(Model):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SymbolIndex:
     documentation_version: str
     symbols: dict[str, Symbol]

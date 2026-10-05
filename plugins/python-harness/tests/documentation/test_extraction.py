@@ -12,7 +12,7 @@ PAGE_URL = 'https://docs.python.org/3.13/library/os.path.html'
 class TestExtractMarkdown:
     @pytest.fixture
     def join_definition(self) -> str:
-        url = DocumentationUrl.model_validate(f'{PAGE_URL}#os.path.join')
+        url = DocumentationUrl(text=f'{PAGE_URL}#os.path.join')
         return extract_markdown(OS_PATH_PAGE.encode(), url)
 
     @pytest.mark.parametrize(
@@ -45,12 +45,12 @@ class TestExtractMarkdown:
         assert unexpected not in join_definition
 
     def test_module_anchor_returns_the_enclosing_section(self) -> None:
-        url = DocumentationUrl.model_validate(f'{PAGE_URL}#module-os.path')
+        url = DocumentationUrl(text=f'{PAGE_URL}#module-os.path')
         section = extract_markdown(OS_PATH_PAGE.encode(), url)
         assert FILLER_SENTENCE.strip() in section
         assert 'os.path.isfile(path)' in section
 
     def test_missing_anchor_is_reported(self) -> None:
-        url = DocumentationUrl.model_validate(f'{PAGE_URL}#os.path.nothing')
+        url = DocumentationUrl(text=f'{PAGE_URL}#os.path.nothing')
         with pytest.raises(MissingAnchorError):
             extract_markdown(OS_PATH_PAGE.encode(), url)

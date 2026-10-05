@@ -27,6 +27,11 @@ class UnversionedUrlError(DocumentationError, ValueError):
         super().__init__('A versioned documentation page path is required.')
 
 
+class InvalidVersionError(DocumentationError, ValueError):
+    def __init__(self, version: str) -> None:
+        super().__init__(f'{version!r} is not a Python 3 minor version such as 3.13.')
+
+
 class UnsupportedInventoryError(DocumentationError):
     def __init__(self) -> None:
         super().__init__('Unsupported or malformed Sphinx inventory header.')

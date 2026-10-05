@@ -5,7 +5,8 @@ from typing import Annotated
 
 from pydantic import Field, NonNegativeInt, StringConstraints
 
-from python_harness.documentation.domain import Model, PythonVersion, Symbol
+from python_harness.documentation.domain import Symbol
+from python_harness.tools.search_python_docs.schema import Model, VersionText
 
 DEFAULT_PAGE_CHARACTERS = 8_000
 
@@ -25,7 +26,7 @@ type PageCharacters = Annotated[
 
 
 class ReadRequest(Model):
-    version: PythonVersion
+    version: VersionText
     symbol: SymbolName
     offset: PageOffset
     max_chars: PageCharacters
@@ -48,7 +49,7 @@ class SectionPage:
         symbol = self.symbol
         return (
             f'{symbol.name} ({symbol.kind}) | Python {self.documentation_version}'
-            f' documentation | {symbol.source_url.root}'
+            f' documentation | {symbol.source_url.text}'
         )
 
     @property

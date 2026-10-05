@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from rapidfuzz import fuzz, process, utils
 
-from python_harness.documentation.domain import DocumentationUrl, Model, SymbolIndex
+from python_harness.documentation.domain import DocumentationUrl, SymbolIndex
 
 SEGMENT_SEPARATORS = str.maketrans('._', '  ')
 
@@ -20,7 +20,8 @@ class MatchTier(StrEnum):
     APPROXIMATE = auto()
 
 
-class SymbolMatch(Model):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SymbolMatch:
     name: str
     kind: str
     source_url: DocumentationUrl

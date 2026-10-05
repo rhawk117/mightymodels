@@ -3,12 +3,18 @@
 import pytest
 from mcp import Client
 from mcp.types import CallToolResult
+from python_harness.core.tests.support import JsonDocument
 from python_harness.documentation.tests.support import DOCS_VERSION, DocsSite, standard_pages
 
 OS_PATH_PAGE_PATH = f'/{DOCS_VERSION}/library/os.path.html'
 INVENTORY_PATH = f'/{DOCS_VERSION}/objects.inv'
 OFFICIAL_ORIGIN = ('https', 'docs.python.org')
 FOREIGN_HOST = 'mirror.example'
+VERSION_PATTERN = r'^3\.(0|[1-9][0-9]?)$'
+VERSION_HELP = (
+    'Python minor version such as 3.13.\n\n'
+    'Read requires-python in pyproject.toml or .python-version first; do not guess.'
+)
 
 
 async def call(client: Client, tool: str, **arguments: str | int) -> CallToolResult:
@@ -17,6 +23,15 @@ async def call(client: Client, tool: str, **arguments: str | int) -> CallToolRes
 
 def text_of(result: CallToolResult) -> str:
     return ''.join(getattr(block, 'text', '') for block in result.content)
+
+
+def dereferenced(schema: JsonDocument, node: JsonDocument) -> JsonDocument:
+    reference = node.get('$ref')
+    if reference is None:
+        return node
+    target = schema['$defs'][reference.removeprefix('#/$defs/')]
+    own = {key: value for key, value in node.items() if key != '$ref'}
+    return dereferenced(schema, target) | own
 
 
 @pytest.mark.anyio
@@ -51,6 +66,25 @@ class TestToolSchemas:
             'check_citations': {'path', 'text'},
             'plan_review_surface': {'paths', 'diff_base', 'diff_head'},
         }
+
+    @pytest.mark.parametrize(
+        'name',
+        [
+            pytest.param('search_python_docs', id='search'),
+            pytest.param('read_python_docs', id='read'),
+        ],
+    )
+    async def test_version_argument_keeps_its_pattern_and_help(
+        self, docs_client: Client, name: str
+    ) -> None:
+        tools = {tool.name: tool for tool in (await docs_client.list_tools()).tools}
+        schema = tools[name].input_schema
+        version = dereferenced(schema, schema['properties']['version'])
+        assert (version['type'], version['pattern'], version['description']) == (
+            'string',
+            VERSION_PATTERN,
+            VERSION_HELP,
+        )
 
 
 @pytest.mark.anyio

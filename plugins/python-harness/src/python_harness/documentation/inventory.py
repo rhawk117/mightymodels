@@ -5,7 +5,6 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urljoin
 
-from pydantic import ValidationError
 from sphobjinv import DataObjStr, Inventory
 
 from python_harness.documentation.domain import (
@@ -17,6 +16,7 @@ from python_harness.documentation.domain import (
 )
 from python_harness.documentation.errors import (
     CorruptInventoryError,
+    DocumentationError,
     EmptyInventoryError,
     InventoryEntryLimitError,
     InventoryTooLargeError,
@@ -75,8 +75,8 @@ def entry_url(entry: DataObjStr, version: PythonVersion) -> DocumentationUrl | N
     if ambiguous_url_violation(uri) is not None:
         return None
     try:
-        url = DocumentationUrl.model_validate(urljoin(version.base_url, uri))
-    except ValidationError:
+        url = DocumentationUrl(text=urljoin(version.base_url, uri))
+    except DocumentationError:
         return None
     return url if url.version == version else None
 

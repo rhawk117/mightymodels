@@ -3,8 +3,8 @@
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
-from pydantic import ValidationError
 from python_harness.documentation.domain import DocumentationUrl, PythonVersion
+from python_harness.documentation.errors import DocumentationError, InvalidVersionError
 
 VALID_URL = 'https://docs.python.org/3.13/library/os.path.html#os.path.join'
 
@@ -21,7 +21,7 @@ class TestDocumentationUrl:
         ],
     )
     def test_accepts_official_versioned_pages(self, url: str) -> None:
-        assert DocumentationUrl.model_validate(url).root == url
+        assert DocumentationUrl(text=url).text == url
 
     @pytest.mark.parametrize(
         'url',
@@ -37,8 +37,8 @@ class TestDocumentationUrl:
         ],
     )
     def test_rejects_ambiguous_or_foreign_urls(self, url: str) -> None:
-        with pytest.raises(ValidationError):
-            DocumentationUrl.model_validate(url)
+        with pytest.raises(DocumentationError):
+            DocumentationUrl(text=url)
 
     @given(
         position=st.integers(min_value=0, max_value=len(VALID_URL)),
@@ -47,14 +47,44 @@ class TestDocumentationUrl:
     def test_rejects_whitespace_and_control_characters_anywhere(
         self, position: int, character: str
     ) -> None:
-        with pytest.raises(ValidationError):
-            DocumentationUrl.model_validate(VALID_URL[:position] + character + VALID_URL[position:])
+        with pytest.raises(DocumentationError):
+            DocumentationUrl(text=VALID_URL[:position] + character + VALID_URL[position:])
 
     def test_exposes_version_page_and_fragment(self) -> None:
-        url = DocumentationUrl.model_validate(VALID_URL)
-        assert (url.version, url.page_path, url.fragment, url.page_url.root) == (
-            PythonVersion.model_validate('3.13'),
+        url = DocumentationUrl(text=VALID_URL)
+        assert (url.version, url.page_path, url.fragment, url.page_url.text) == (
+            PythonVersion(text='3.13'),
             'library/os.path.html',
             'os.path.join',
             'https://docs.python.org/3.13/library/os.path.html',
         )
+
+
+class TestPythonVersion:
+    @pytest.mark.parametrize(
+        'text',
+        [
+            pytest.param('3.0', id='oldest'),
+            pytest.param('3.13', id='current'),
+            pytest.param('3.99', id='future'),
+        ],
+    )
+    def test_accepts_python_three_minor_versions(self, text: str) -> None:
+        assert PythonVersion(text=text).base_url == f'https://docs.python.org/{text}/'
+
+    @pytest.mark.parametrize(
+        'text',
+        [
+            pytest.param('2.7', id='python-two'),
+            pytest.param('3', id='major-only'),
+            pytest.param('3.13.1', id='patch'),
+            pytest.param('3.100', id='three-digit-minor'),
+            pytest.param('3.01', id='leading-zero'),
+            pytest.param('3.13\n', id='trailing-newline'),
+            pytest.param(' 3.13', id='leading-space'),
+            pytest.param('', id='empty'),
+        ],
+    )
+    def test_rejects_text_outside_the_version_pattern(self, text: str) -> None:
+        with pytest.raises(InvalidVersionError):
+            PythonVersion(text=text)

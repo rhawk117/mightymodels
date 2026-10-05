@@ -41,7 +41,7 @@ class TestParseInventory:
         index = parse_inventory(inventory_bytes(), docs_version, settings)
         url = index.symbols['object.__getattr__'].source_url
         assert (
-            url.root == 'https://docs.python.org/3.13/reference/datamodel.html#object.__getattr__'
+            url.text == 'https://docs.python.org/3.13/reference/datamodel.html#object.__getattr__'
         )
 
     def test_skips_a_tolerable_share_of_unusable_entries(self, docs_version: PythonVersion) -> None:
@@ -99,6 +99,6 @@ class TestParseInventory:
         settings_override: dict[str, int],
         error: type[DocumentationError],
     ) -> None:
-        version = PythonVersion.model_validate('3.13')
+        version = PythonVersion(text='3.13')
         with pytest.raises(error):
             parse_inventory(content, version, Settings.model_validate(settings_override))

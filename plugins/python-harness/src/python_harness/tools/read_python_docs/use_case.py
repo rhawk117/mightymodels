@@ -1,5 +1,6 @@
 """Resolve an exact symbol and render one page of its documentation section."""
 
+from python_harness.documentation.domain import PythonVersion
 from python_harness.documentation.errors import OffsetOutOfRangeError, UnknownSymbolError
 from python_harness.documentation.matching import SymbolCatalog, match_symbols
 from python_harness.documentation.services import DocumentationService
@@ -13,7 +14,7 @@ def suggested_names(catalog: SymbolCatalog, symbol: str, settings: Settings) -> 
 
 
 async def run(service: DocumentationService, request: ReadRequest) -> str:
-    catalog = await service.catalog(request.version)
+    catalog = await service.catalog(PythonVersion(text=request.version))
     symbol = catalog.index.symbols.get(request.symbol)
     if symbol is None:
         suggestions = suggested_names(catalog, request.symbol, service.settings)

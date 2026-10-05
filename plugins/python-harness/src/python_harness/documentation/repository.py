@@ -40,7 +40,7 @@ def documentation_http_client(
 
 
 def inventory_url(version: PythonVersion) -> DocumentationUrl:
-    return DocumentationUrl.model_validate(f'{version.base_url}objects.inv')
+    return DocumentationUrl(text=f'{version.base_url}objects.inv')
 
 
 def response_failure(response: httpx.Response) -> DocumentationError | None:
@@ -75,12 +75,12 @@ class DocumentationSource:
         try:
             return await self.download(url)
         except httpx.RequestError as error:
-            raise RetrievalFailedError(url.root) from error
+            raise RetrievalFailedError(url.text) from error
 
     async def download(self, url: DocumentationUrl) -> bytes:
         async with (
             self.downloads,
-            self.client.stream('GET', url.root, follow_redirects=False) as response,
+            self.client.stream('GET', url.text, follow_redirects=False) as response,
         ):
             if (failure := response_failure(response)) is not None:
                 raise failure
@@ -90,7 +90,7 @@ class DocumentationSource:
         try:
             content = await self.fetch(inventory_url(version))
         except PageNotFoundError as error:
-            raise VersionNotPublishedError(version.root) from error
+            raise VersionNotPublishedError(version.text) from error
         return await anyio.to_thread.run_sync(
             build_catalog, content, version, self.settings, limiter=self.parsers
         )

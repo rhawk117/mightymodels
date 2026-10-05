@@ -59,7 +59,7 @@ def extract_markdown(content: bytes, source_url: DocumentationUrl) -> str:
     section = BeautifulSoup(section_html(document, source_url.fragment), 'html.parser')
     for node in section.select(REMOVED_NODES):
         node.decompose()
-    absolutize_links(section, source_url.page_url.root)
+    absolutize_links(section, source_url.page_url.text)
     result = markdownify(str(section), heading_style='ATX').strip()
     if not result:
         raise EmptyExtractionError
