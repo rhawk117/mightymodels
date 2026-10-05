@@ -1,15 +1,6 @@
 ---
 name: crashout
-description: >-
-  The user has invoked /crashout to vent extreme dissatisfaction at the primary
-  agent. Run the crashout protocol: stop changing things, journal the rant
-  verbatim to .mightymodels/crashouts.yml, check whether this failure has happened
-  before, diagnose it against real evidence, deliver an honest verdict (own what
-  is deserved, whimsically contest what is not), name the exact fix, and wait
-  for the go-ahead. Also handles /crashout journal, the read-back mode that
-  reports recurring failure patterns. Explicit invocation only: this skill fires
-  when the user invokes crashout by name, never because the user merely seems
-  angry or frustrated.
+description: Use when the user explicitly invokes crashout to record dissatisfaction, diagnose the failure, and await approval before resuming work.
 ---
 
 # crashout
@@ -133,7 +124,7 @@ Schema, one YAML list item per crashout:
 
 ```yaml
 - at: 2026-08-21T17:42:03Z
-  ticket: rate-limit            # .mightymodels ticket slug if working under one, else null
+  ticket: jira-1234          # .mightymodels ticket slug if working under one, else null
   branch: feat/auth-retry    # current git branch, else null
   severity: crashout         # mild-tilt | heated | crashout | full-meltdown
   verdict: deserved          # deserved | split | unreasonable

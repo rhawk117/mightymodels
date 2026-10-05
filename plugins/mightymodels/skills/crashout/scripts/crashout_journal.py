@@ -41,13 +41,21 @@ class _Dumper(yaml.SafeDumper):
     pass
 
 
-def _repr_str(dumper: yaml.SafeDumper, data: str) -> object:
+def _repr_str(dumper: yaml.SafeDumper, data: str) -> yaml.ScalarNode:
     style = '|' if '\n' in data else None
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style=style)
+    node = dumper.represent_scalar('tag:yaml.org,2002:str', data, style=style)
+    if not isinstance(node, yaml.ScalarNode):
+        message = 'yaml representer returned a non-scalar node'
+        raise TypeError(message)
+    return node
 
 
-def _repr_rant(dumper: yaml.SafeDumper, data: _Rant) -> object:
-    return dumper.represent_scalar('tag:yaml.org,2002:str', str(data), style='|')
+def _repr_rant(dumper: yaml.SafeDumper, data: _Rant) -> yaml.ScalarNode:
+    node = dumper.represent_scalar('tag:yaml.org,2002:str', str(data), style='|')
+    if not isinstance(node, yaml.ScalarNode):
+        message = 'yaml representer returned a non-scalar node'
+        raise TypeError(message)
+    return node
 
 
 _Dumper.add_representer(str, _repr_str)
@@ -60,7 +68,11 @@ def _fail(message: str) -> NoReturn:
 
 
 def _dump(entries: list[dict[str, Any]]) -> str:
-    return str(yaml.dump(entries, Dumper=_Dumper, sort_keys=False, allow_unicode=True, width=100))
+    dumped = yaml.dump(entries, Dumper=_Dumper, sort_keys=False, allow_unicode=True, width=100)
+    if not isinstance(dumped, str):
+        message = 'yaml.dump() returned a non-string value'
+        raise TypeError(message)
+    return dumped
 
 
 def _load(journal: Path) -> list[dict[str, Any]]:
@@ -81,7 +93,17 @@ def _nonempty_str(raw: dict[str, Any], key: str) -> str:
     return value
 
 
-def _check_keys(raw: dict[str, Any]) -> None:
+def _validated(raw: dict[str, Any]) -> dict[str, Any]:
+    _validate_keys(raw)
+    _validate_fields(raw)
+    entry = {key: raw.get(key) for key in ENTRY_KEYS if key != 'at'}
+    entry['root_cause'] = _nonempty_str(raw, 'root_cause').strip()
+    entry['corrective_action'] = _nonempty_str(raw, 'corrective_action').strip()
+    entry['rant'] = _normalize_rant(raw)
+    return entry
+
+
+def _validate_keys(raw: dict[str, Any]) -> None:
     provided = set(raw)
     required = set(ENTRY_KEYS) - set(NULLABLE_KEYS) - {'at'}
     if missing := sorted(required - provided):
@@ -90,7 +112,7 @@ def _check_keys(raw: dict[str, Any]) -> None:
         _fail(f'unknown keys: {unknown} (schema drift: fix the caller, not the journal)')
 
 
-def _check_values(raw: dict[str, Any]) -> None:
+def _validate_fields(raw: dict[str, Any]) -> None:
     if raw['severity'] not in SEVERITIES:
         _fail(f'severity must be one of {SEVERITIES}')
     if raw['verdict'] not in VERDICTS:
@@ -109,16 +131,11 @@ def _check_values(raw: dict[str, Any]) -> None:
             _fail(f"'{key}' must be a string or null")
 
 
-def _validated(raw: dict[str, Any]) -> dict[str, Any]:
-    _check_keys(raw)
-    _check_values(raw)
-    entry = {key: raw.get(key) for key in ENTRY_KEYS if key != 'at'}
-    entry['root_cause'] = _nonempty_str(raw, 'root_cause').strip()
-    entry['corrective_action'] = _nonempty_str(raw, 'corrective_action').strip()
-    # Literal block scalars cannot carry trailing whitespace or CR; normalize, never rewrite words.
+def _normalize_rant(raw: dict[str, Any]) -> _Rant:
+    # Literal block scalars cannot carry trailing whitespace or CR; normalize,
+    # never rewrite words.
     rant_lines = _nonempty_str(raw, 'rant').replace('\r\n', '\n').replace('\r', '\n').split('\n')
-    entry['rant'] = _Rant('\n'.join(line.rstrip() for line in rant_lines).strip('\n'))
-    return entry
+    return _Rant('\n'.join(line.rstrip() for line in rant_lines).strip('\n'))
 
 
 def _ensure_gitignored(journal: Path) -> None:
@@ -153,6 +170,7 @@ def _cmd_add(journal: Path) -> None:
     journal.parent.mkdir(parents=True, exist_ok=True)
     with journal.open('a', encoding='utf-8') as handle:
         handle.write(_dump([ordered]))
+
     _ensure_gitignored(journal)
     print(f'journaled crashout #{len(_load(journal))} -> {journal}')
 

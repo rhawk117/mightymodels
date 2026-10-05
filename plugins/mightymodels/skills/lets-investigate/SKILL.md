@@ -7,10 +7,9 @@ description: >-
   chooses to dig further, redirect, or consolidate. Use at the START of work, before any ticket
   exists, whenever the user wants to understand something before acting: "let's investigate X",
   "look into this claim", "triage this bug report", "why would Y be happening", "dig into this
-  error", "how does library Z actually handle this, check the docs and our usage", "gather
-  context on how this subsystem works before we plan". Also use for research questions about a
-  dependency, API, protocol, or tool the repository relies on. Writes no files and changes
-  nothing. Not for reviewing a branch (merge-vader), grading a codebase (uncle-bob), debugging
+  error", "how does library Z actually handle this, check the docs and our usage". Also for
+  research questions about a dependency, API, protocol, or tool the repository relies on. Persists its ledger under
+  .mightymodels/.runtime/investigations/ and changes nothing else. Not for reviewing a branch or grading a codebase (review-circus), debugging
   with a known reproduction (whats-broken), or non-engineering research such as market or
   vendor comparisons.
 ---
@@ -19,10 +18,14 @@ description: >-
 
 The opening move: understand before anything gets named, ticketed, or built. The session's
 product is a ledger, restated in chat at the end of every round, that the user has agreed is
-sufficient. Nothing is written to disk; prepare-handoff persists what matters once there is
-something worth persisting.
+sufficient. The ledger is persisted before every gate by `scripts/ledger.py`, so a compaction
+or a new conversation resumes from the file instead of from memory; the chat restatement is
+the script's own rendering, so the two cannot disagree.
 
-<important>Invoke `using-mightymodels` before the first dispatch.</important>
+Run the script as `python3 BASE/scripts/ledger.py`, where `BASE` is the `Base directory for this skill` line, from the repository's working directory: it finds the repository by walking
+up to `.git`. Read `references/ledger-schema.md` when an entry is rejected.
+
+<important>Invoke `prompting-subagents` before the first dispatch.</important>
 
 The skill runs as a loop with a gate, and the gate is the point. An investigation that runs
 until the primary feels done ends up wherever the primary's curiosity went. One that stops after
@@ -46,8 +49,19 @@ that depend on it.
 Put the framing to the user through the ask-user dialog before dispatching anything: the
 target line, the classification, and one question asking what they already know or have ruled
 out. Scouts pointed at a vague target return precise answers to the wrong question, and facts
-the user already holds cost nothing to record and a round to rediscover. Each answer becomes a
-ledger entry with source `user, round 0`.
+the user already holds cost nothing to record and a round to rediscover.
+
+Once the user confirms the framing, open the ledger and record their answers as round 0:
+
+```bash
+python3 BASE/scripts/ledger.py start --target "<target line>" --kind <behavior|claim|research>
+python3 BASE/scripts/ledger.py add --id <id> --round 0 <<'JSON'
+[{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]
+JSON
+```
+
+`start` prints the investigation id; every later call names it. When the user is resuming an
+earlier investigation, `ledger.py list` shows the ids and `render` restores the ledger.
 
 ## Each round
 
@@ -55,10 +69,10 @@ ledger entry with source `user, round 0`.
 Next section (round one takes them from the framing). Route each by where the answer lives:
 
 - Repository facts (definitions, call sites, config values, versions, one command's output) go
-  to a scout with exact paths, symbols, and search terms.
+  to code-scout with exact paths, symbols, and search terms.
 - External facts (documented behavior, changelog entries, defaults, deprecations) go to a
-  scout with the URL or the search phrase, the version pinned in the lockfile, and the specific
-  question. A scout fetches and cites the page; it does not summarize a library.
+  web-scout with the URL or the search phrase, the version pinned in the lockfile, and the
+  specific question. web-scout fetches and cites the page; it does not summarize a library.
 - Facts only the user holds (intent, production observations, history) are held for the gate,
   where they are asked alongside the round's decision.
 
@@ -66,14 +80,15 @@ Shape every scout question as locate, list, extract, fetch, or run. A "why" or "
 back as `NEEDS-ANALYSIS` and costs a dispatch; that judgment is yours, made in the open and
 recorded as a decision only once the user agrees with it.
 
-**2. Dispatch through promptlint.** Scouts have not seen this conversation, so each dispatch
+**2. Dispatch through prompting-subagents.** Scouts have not seen this conversation, so each dispatch
 carries the question, the scope, and the citation form wanted back. No ticket exists, so no
 `subagent-models` routing applies: scouts run on their agent-file default.
 
-**3. Fold reports into the ledger.** Each verdict has one destination:
+**3. Fold reports into the ledger.** Each verdict has one destination, and each destination
+is an entry `kind`:
 
-- `VERIFIED` becomes a Known, with its `file:line` or `URL#heading` citation.
-- `INFERRED` becomes an Open question stating what the inference rests on. It never becomes a
+- `VERIFIED` becomes a `known`, with its `file:line` or `URL#heading` citation.
+- `INFERRED` becomes an `open` question stating what the inference rests on. It never becomes a
   Known by being repeated.
 - `NEEDS-ANALYSIS` is a judgment call for you. Make it in chat with the evidence in view; it
   becomes a Decision only if the user accepts it at the gate.
@@ -82,8 +97,25 @@ carries the question, the scope, and the citation form wanted back. No ticket ex
 - Two scouts disagreeing is a finding. Record the contradiction as its own Open question with
   both citations; never reconcile it silently.
 
-**4. Restate the whole ledger.** Not a delta. The ledger is the only state this session has,
-and the last restatement is what what-we-know and prepare-handoff will read.
+**4. Persist, then restate the whole ledger.** Write the round's entries in one batch:
+
+```bash
+python3 BASE/scripts/ledger.py add --id <id> --round <n> <<'JSON'
+[
+  {"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout"},
+  {"kind": "open", "text": "... rests on ...", "cite": "CHANGELOG 3.x", "source": "web-scout"},
+  {"kind": "known", "text": "...", "cite": "https://...#backoff", "source": "web-scout", "supersedes": [4]},
+  {"kind": "next", "text": "<exact question>", "source": "code-scout"}
+]
+JSON
+python3 BASE/scripts/ledger.py render --id <id>
+```
+
+An answered Open question is retired by the entry that answers it (`supersedes`), never
+edited. Paste the `render` output into chat as the restatement: not a delta, the whole ledger.
+If `add` is rejected, fix the entry the error names and retry; if it cannot be written at all,
+stop at the gate and say so. A gate on an unpersisted round is the loss this skill exists to
+prevent.
 
 **5. Stop at the gate.** Open the ask-user dialog with the round's decision and any questions
 held for the user, batched into one dialog where the tool allows. The decision offers exactly
@@ -105,27 +137,27 @@ out, and wait for the answer.
 
 ## The ledger
 
-Restate it in this shape every round. The sections are ordered so what-we-know can lift Knowns
-and Open straight into its knowns table and uncertainties list.
+`ledger.py render` prints it in this shape. The sections are ordered so what-we-know can lift
+Knowns and Open straight into its knowns table and uncertainties list.
 
 ```markdown
 ## Ledger, round N
 Target: <one line> (<behavior | claim | research>)
 
 ### Knowns
-- <claim> [<file:line> | <URL#heading> | user, round N]
+- e<seq>: <claim> [<file:line> | <URL#heading> | user] (<source>, round N)
 
 ### Open
-- <question>: rests on <what the inference rests on> | answer lives in <location>
+- e<seq>: <question>: rests on <what> [<where the answer lives>] (<source>, round N)
 
 ### Decisions
-- R<n>: <what was settled> (user)
+- e<seq>: <what was settled> (user, round N)
 
 ### Resources
-- <path or URL>: <what it answered, and the version or date if it matters>
+- e<seq>: <what it answered, and the version or date if it matters> [<path or URL>] (...)
 
 ### Next
-- <exact question>: <scout, repository | scout, docs | user>
+- e<seq>: <exact question> (<code-scout | web-scout | user>, round N)
 ```
 
 Rules that keep the ledger honest:
@@ -134,12 +166,13 @@ Rules that keep the ledger honest:
   no line goes in Open.
 - A Decision carries the user's word from a gate or a framing dialog. Your own conclusion,
   however well cited, is a Known or an Open item until the user takes it.
-- Resources record where facts came from so prepare-handoff can name them in the issue and the
+- Resources record where facts came from so open-ticket can name them in the issue and the
   next session does not re-find them. A fetched docs page goes here with the version it
   describes; a docs page for the wrong version is a Resource with a warning, not a Known.
 - The ledger stays readable in one screen. When it grows past roughly forty lines, merge
-  Knowns that say the same thing, retire Open questions the user has waved off (recording
-  the wave-off as a Decision), and drop Next items the user has redirected away from. Growth
+  Knowns that say the same thing (one new entry superseding both), retire Open questions the
+  user has waved off (a Decision superseding them), and supersede Next items the user has
+  redirected away from. Growth
   past that point means the investigation is sprawling, which is itself something to say at
   the gate.
 
@@ -147,23 +180,23 @@ Rules that keep the ledger honest:
 
 A research question is answered by two facts joined together: what the documentation says for
 the version the repository resolves, and where the repository depends on that behavior. One
-without the other is trivia. So a research round usually pairs one docs scout with one
-repository scout: the docs scout fetches the page for the pinned version and cites the section;
-the repository scout cites the lockfile line and the call sites. Prefer primary sources, in this
+without the other is trivia. So a research round usually pairs one web-scout with one
+code-scout: web-scout fetches the page for the pinned version and cites the section;
+code-scout cites the lockfile line and the call sites. Prefer primary sources, in this
 order: the project's official documentation, its changelog or release notes, the dependency's
 own source at the resolved version. A blog post or forum answer is a lead that names where the
 primary source is, not a citation.
 
 ## Ending
 
-The loop ends only at a gate. On Sufficient, offer what-we-know and hand it the final ledger as
-its input; never invoke it unasked. On Stop here, leave the final ledger as the last message so
-it can be copied forward.
+The loop ends only at a gate. On Sufficient, offer what-we-know and hand it the investigation
+id; never invoke it unasked. On Stop here, leave the final rendered ledger as the last message;
+the file keeps it for a later session.
 
 ## Boundaries
 
-Read-only throughout: no files, no `.mightymodels/`, no edits, no commands beyond the single
-read-only command a scout runs. If the investigation surfaces something needing immediate
+Read-only apart from the ledger file: no other writes, no edits, no commands beyond
+`ledger.py` and the single read-only command a scout runs. If the investigation surfaces something needing immediate
 action (a live secret, a data-loss path in production), say so plainly and let the user act;
 the pipeline is for work, not for emergencies.
 
@@ -172,13 +205,13 @@ the pipeline is for work, not for emergencies.
 Target: `Explain a behavior`: the retry queue drains at roughly a tenth of its configured rate
 after 2am.
 
-Round 1 dispatches a repository scout for the drain loop's definition and its concurrency
-setting, a repository scout for every reader of `RETRY_CONCURRENCY`, and a docs scout for the
+Round 1 dispatches a code-scout for the drain loop's definition and its concurrency
+setting, a code-scout for every reader of `RETRY_CONCURRENCY`, and a web-scout for the
 queue client's documented default backoff at the version in `uv.lock`. The reports come back
 `VERIFIED`, `VERIFIED`, and `INFERRED` (the docs page found is for a newer major version). The
 ledger restates with two Knowns, one Open ("documented backoff for 3.2.x: rests on a 4.x page;
 answer lives in the 3.x changelog"), one Resource carrying the version warning, and a Next
-section proposing the 3.x changelog fetch and a scout to run the drain loop's unit test once.
+section proposing the 3.x changelog fetch and a code-scout to run the drain loop's unit test once.
 The gate asks the user to choose, and adds the held question: "does the slowdown correlate
 with the nightly compaction job you mentioned?" The user picks Dig further and answers yes;
 both land in the ledger as `user, round 1` entries before round 2 dispatches.

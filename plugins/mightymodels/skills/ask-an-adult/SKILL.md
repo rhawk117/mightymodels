@@ -14,9 +14,8 @@ description: >-
 
 # ask-an-adult
 
-`wingman` is a one-shot advisor with **no tools**, running on the model the
-active ticket's `subagent-models` block names (agent-file pin as the headless
-fallback). It sees nothing except what this dispatch contains. The quality of its answer is capped
+`wingman` is a one-shot advisor on `gpt-5.6-sol` with **no tools**. It sees
+nothing except what this dispatch contains. The quality of its answer is capped
 by the quality of the packet you send it, and a thin packet wastes a frontier
 turn.
 
@@ -36,31 +35,17 @@ re-open a decision the user already made, or a second time on the same packet.
 
 ## Build the packet
 
-Gather this before dispatching. Missing sections are the usual reason wingman
-comes back at low confidence.
+Fill prompting-subagents' wingman template:
+the decision in one sentence, each option with its cost, every fact with its citation and every
+assumption marked as one, constraints, what was tried, and your lean. Missing sections are the
+usual reason wingman comes back at low confidence.
 
-```
-<decision>The single choice at stake, in one sentence.</decision>
-<options>Each option under consideration, and what it costs.</options>
-<facts>
-  Everything gathered, with citations: file:line, scout findings, command
-  output, test results. Mark anything you assumed rather than confirmed.
-</facts>
-<constraints>Deadlines, policy, toolchain, prior user decisions.</constraints>
-<attempted>What has already been tried and how it failed.</attempted>
-<lean>Your own preference, stated plainly, or "none".</lean>
-```
+State your lean honestly. wingman is instructed to form its own view first and to lead with
+disagreement, so hiding your preference buys nothing and costs the advisor a useful signal.
 
-State your lean honestly. wingman is instructed to form its own view first and to
-lead with disagreement, so hiding your preference buys nothing and costs the
-advisor a useful signal.
-
-## Dispatch
-
-Run the packet through `promptlint` first, using the full prompt architecture because wingman
-has no dedicated template. Then send the linted packet to the `wingman` agent. Do not paraphrase
-file contents you have not read, and do not summarize scout findings into conclusions - pass the
-citations through as they came back.
+Run the template's ten-second checklist, then send the packet to `mightymodels:wingman`. Do not
+paraphrase file contents you have not read, and do not summarize scout findings into
+conclusions: pass the citations through as they came back.
 
 ## Act on the report
 
@@ -73,7 +58,8 @@ wingman returns a `<report agent="wingman">` block. Handle it in this order:
    resolve `<missing>` before acting on it.
 3. **Run `<ask_user>` immediately.** Put wingman's questions to the user through
    `ask_user`, using the options it supplied. This is the point of the call.
-4. **Dispatch scouts for `<missing>` items marked `scout`.** Do those in parallel
+4. **Dispatch scouts for `<missing>` items marked `scout`:** code-scout for repository
+   facts, web-scout for external documentation. Do those in parallel
    with the user's answer where possible.
 5. **Carry `<verify>` into the work.** It is the acceptance criterion for
    whatever gets built next.
@@ -81,8 +67,22 @@ wingman returns a `<report agent="wingman">` block. Handle it in this order:
 Surface `<verdict>`, `<confidence>`, and `<ask_user>` to the user verbatim.
 Summarizing an advisor whose whole value is its reasoning defeats the call.
 
+The user decides; this skill is the only tie-break path. When the user cannot choose and
+says so ("you pick", "either is fine"), adopt wingman's verdict and record it as the user's
+decision to defer to it, in those words. Do not escalate the same packet again.
+
 ## Record it
 
-If the session has a ticket directory, append the decision, the verdict, and the
-user's answers to that ticket's notes. A decision escalated once and then lost to
-compaction gets escalated again.
+A decision escalated once and then lost to compaction gets escalated again, so persist it
+before any work resumes. When an investigation is active, or the ticket's `investigations`
+list links one, append it through lets-investigate's ledger:
+
+```bash
+python3 BASE/../lets-investigate/scripts/ledger.py add --id ID --round N <<'JSON'
+[{"kind": "decision", "text": "<the choice> (wingman: <verdict, one line>; user: <answer>)", "source": "user"}]
+JSON
+```
+
+`BASE` is the `Base directory for this skill` line and `N` is the ledger's latest round
+(`ledger.py render` shows it). With no investigation, say in chat that the decision is not
+persisted yet; baton-pass records settled decisions when the session is handed off.
