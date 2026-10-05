@@ -125,6 +125,7 @@ package Ca/Ce/I/A/D table. Numbers only — interpretation goes in findings.>
 ### Blocker
 #### UB-<n> | [ADP] <title> — `path/file.py:12`
 - Evidence: <1–3 line evidence quote or precise description>
+- Evidence (metric|idiom|convention): <conditional; the cite, for a finding at Medium or above>
 - Why: <why it violates, citing the principle>
 - Future pressure: <the feature or change that will hit this code next, or "none foreseen">
 - Expected churn: <high | medium | low, with the git or qualitylens evidence>
@@ -152,6 +153,8 @@ to findings above. First step should be the grade's binding constraint.>
 confidence caveats (JS function metrics approximate, A/D low-confidence in
 dynamic languages, etc.).>
 ```
+
+Recording: review-circus's `add` reads the Findings section only. A heading ends with a dash and the finding's `path:line` or `path:start-end` in backticks, the id is `UB-<n>`, and Fix and Verify are required. Every finding is recorded as a quality finding, so at Medium or above, Blocker and High included, the typed Evidence bullet is required (idiom-evidence.md); a Blocker is recorded as High.
 
 Volume discipline: detail at most ~25 findings (the highest-severity,
 highest-leverage ones); roll the rest into counts by catalog ID inside the

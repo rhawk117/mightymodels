@@ -2,11 +2,13 @@
 name: review-circus
 description: >-
   Review a diff, branch, ticket, or whole codebase with the mightymodels persona reviewers. One
-  ask-user gate sets depth (quick Luna, standard Terra, deep on ticket.yml's reviewer models),
-  persona emphasis, and scope; review_state.py records the run, metrics.py and review_signals.py
-  measure, merge-vader-reviewer and uncle-bob-reviewer report, and their findings are normalized,
-  deduplicated, and presented by id through ask-user. Only the findings the user picks go to
-  remediation, risk first, through task_state.py; an abridged PR comment is always posted. Use for
+  AskUserQuestion gate sets depth (quick haiku, standard sonnet, deep on ticket.yml's reviewer
+  models: opus for merge-vader-reviewer, sonnet for uncle-bob-reviewer when unset), persona
+  emphasis, and scope; the `review` tool records the run, metrics.py and review_signals.py
+  measure, merge-vader-reviewer and uncle-bob-reviewer report, and the tool reads their reports
+  and merges overlapping findings, presented by id through AskUserQuestion. Only the findings
+  the user picks go to remediation, risk first, through the `task` tool; an abridged PR comment
+  is always posted. Use for
   "run the review circus", "review the sprint", "full review pass", "both reviewers on this", and
   for a quick single-persona pass: "quick merge-vader on this branch", "uncle-bob this module",
   "is this safe to merge". Not for fixing CI (stick-the-landing) or mid-sprint work
@@ -20,12 +22,13 @@ sets the profile, measures, dispatches, normalizes, and routes what the user cho
 It never reviews code itself and never invents a finding. An empty run means the reviewers
 have not reported, not that the primary should improvise.
 
-Run the scripts from the repository root, where `BASE` is the `Base directory for this skill`
-line. Subagents do not inherit it, so every path a dispatch carries is absolute.
+Run the scripts from the repository root. `${CLAUDE_SKILL_DIR}` is this skill's directory, which
+Claude Code substitutes in this file as an absolute path. Subagents do not inherit it, so every
+path a dispatch carries is absolute.
 
-- `python3 BASE/scripts/review_state.py` records the run, the findings, and the decisions.
-- `python3 BASE/scripts/metrics.py` measures structure (fan-in, fan-out, cycles, sizes).
-- `python3 BASE/scripts/review_signals.py` measures git history (churn, coupling, hotspots).
+- `mcp__plugin_mightymodels_state__review` records the run, the findings, and the decisions.
+- `python3 "${CLAUDE_SKILL_DIR}/scripts/metrics.py"` measures structure (fan-in, fan-out, cycles, sizes).
+- `python3 "${CLAUDE_SKILL_DIR}/scripts/review_signals.py"` measures git history (churn, coupling, hotspots).
 
 Read `references/profiles.md` and `references/review-state.md` before the first run in a
 session, and `agents-assemble/references/contracts.md` for the severity table. Dispatch every
@@ -33,29 +36,31 @@ worker through prompting-subagents.
 
 ## 1. Profile
 
-One ask-user dialog, with only what the conversation has not already settled:
+One `AskUserQuestion` dialog (up to four questions a call, two to four options each), with only
+what the conversation has not already settled:
 
 - **Scope**: diff, branch (against which base), ticket, or codebase.
 - **Depth**: quick, standard, or deep. Say what each costs (profiles.md): quick is one
-  persona on Luna, standard is Terra, deep runs ticket.yml's reviewer models.
+  persona on haiku, standard is sonnet, deep runs ticket.yml's reviewer models (opus for
+  merge-vader-reviewer, sonnet for uncle-bob-reviewer when unset).
 - **Emphasis**: release-readiness, maintainability, balanced, or custom weights.
 - For a quick review with balanced weights: which persona.
 
-Then record it:
+Then record it with `mcp__plugin_mightymodels_state__review` and action `start`:
 
-```bash
-python3 BASE/scripts/review_state.py start --scope ticket --slug SLUG --base main --depth standard --emphasis balanced
+```json
+{"action": "start", "payload": {"scope": "ticket", "depth": "standard", "emphasis": "balanced", "slug": "SLUG", "base": "main"}}
 ```
 
-It prints the run id, the run directory, and each persona's model. Every later step names
-the run with `--run RUN`.
+It answers with the run id, the run directory, and each persona's model. Every later step
+names the run with `run_id`.
 
 ## 2. Measure
 
 When uncle-bob-reviewer is in the run, measure structure into the run directory:
 
 ```bash
-python3 BASE/scripts/metrics.py <repo root> --out RUNDIR/uncle-bob-metrics.json
+python3 "${CLAUDE_SKILL_DIR}/scripts/metrics.py" <repo root> --out RUNDIR/uncle-bob-metrics.json
 ```
 
 Add `--package-depth 2` when the repository is one top-level package. When the languages are
@@ -63,7 +68,7 @@ ones it does not parse (it reads Python, JavaScript, and TypeScript), skip it an
 the dispatch.
 
 At standard and deep, pick the history window for review_signals.py per profiles.md
-(`--baseline-ref BASE` for branch and ticket scope). At standard and deep, a code-scout
+(`--baseline-ref BASE_REF` for branch and ticket scope). At standard and deep, a code-scout
 surface triage also runs first: diff stat, risk hotspots (auth, input handling, CI config,
 dependency manifests), tests covering the changed area. Quick skips both unless the persona
 names a specific gap.
@@ -72,46 +77,45 @@ names a specific gap.
 
 Dispatch each persona in the run, in parallel, with prompting-subagents' reviewer template
 and the model the run recorded. The packet carries the doctrine
-(`BASE/references/personas/merge-vader.md` or `uncle-bob.md`), `BASE/references/profiles.md`,
-`BASE/references/idiom-evidence.md`, the run directory, the depth and the persona's role (the
-heavier weight leads), the metrics path, the signals script path and window, and for a
-ticket, ticket.yml, the issue, and the plan (merge-vader's conformance check needs them).
+(`${CLAUDE_SKILL_DIR}/references/personas/merge-vader.md` or `uncle-bob.md`),
+`${CLAUDE_SKILL_DIR}/references/profiles.md`, `${CLAUDE_SKILL_DIR}/references/idiom-evidence.md`,
+the run directory, the depth and the persona's role (the heavier weight leads), the metrics
+path, the signals script path (`${CLAUDE_SKILL_DIR}/scripts/review_signals.py`, which the persona
+hands qualitylens) and window, and for a ticket, ticket.yml, the issue, and the plan
+(merge-vader's conformance check needs them). All of these are absolute once substituted.
 
 Personas gather their own evidence through code-scout, web-scout, and qualitylens, and
 nothing else. Write each response unchanged to `RUNDIR/MERGE-VADER-REPORT.md` or
-`RUNDIR/UNCLE-BOB-REPORT.md`. Wait for every persona in the run.
+`RUNDIR/UNCLE-BOB-REPORT.md`, the files `add` reads. Wait for every persona in the run.
 
-## 4. Normalize
+## 4. Record the reports
 
-Turn every finding in the reports into one JSON array and record it:
+Call `mcp__plugin_mightymodels_state__review` with action `add`, once per persona in the run:
 
-```bash
-python3 BASE/scripts/review_state.py add --run RUN <<'JSON'
-[{"sources": ["MV-3"], "severity": "High", "security": true, "kind": "defect", "title": "...",
-  "location": "path:line", "fix": "...", "verify": "..."}]
-JSON
+```json
+{"action": "add", "run_id": "20261005-103000", "payload": {"persona": "merge-vader"}}
 ```
 
-Copy severities, locations, Fix and Verify lines as the reviewer wrote them. Mark structure
-and idiom findings `quality` and carry their evidence cite; the script refuses a quality
-finding at Medium or above without one (idiom-evidence.md), and the answer is to lower it to
-Low or to find the evidence, never to relabel it a defect. A security question a reviewer
-left UNKNOWN-BLOCKED becomes a High security finding whose Fix is to answer it, since CLEAR is
-impossible while it stands. Overlapping findings merge in the script, and a two-level severity
-gap is flagged for the user.
+The tool reads that persona's report itself, so no step retypes a finding, and one finding it
+refuses rejects the batch with the reason and stores nothing. A quality finding at Medium or
+above needs typed evidence (idiom-evidence.md): lower it to Low or find the evidence, never
+relabel it a defect. A security question a reviewer left UNKNOWN-BLOCKED belongs in its report
+as a High finding in the `security` dimension whose Fix is to answer it, since CLEAR is
+impossible while it stands. Overlapping findings merge in the tool, and a two-level severity
+gap is flagged for the user. When `add` answers that findings are `back to undecided`, show
+the gate again and put them to the user before any remediation continues.
 
 ## 5. The finding gate
 
-Always, when any finding exists. Show the user `review_state.py gate --run RUN`: findings by
-severity, security first, then by persona weight, with sources, location, and any severity
-conflict. One ask-user dialog: which findings to fix now. For the rest, defer (ticketed for
-later), accept the risk, or dismiss; the last two need a reason. A severity conflict is
-settled here by the decision the user makes about it. Record the answer:
+Always, when any finding exists. Show the user the `review` answer to action `gate`: findings
+by severity, security first, then by persona weight, with sources, location, any severity
+conflict, and the decision so far. One `AskUserQuestion` dialog: which findings to fix now. For
+the rest, defer (ticketed for later), accept the risk, or dismiss; the last two need a reason. A
+severity conflict is settled here by the decision the user makes about it. Record the answer
+with `mcp__plugin_mightymodels_state__review` and action `dispose`:
 
-```bash
-python3 BASE/scripts/review_state.py dispose --run RUN <<'JSON'
-{"by": "user", "decisions": {"F1": {"decision": "fix"}, "F2": {"decision": "accept-risk", "reason": "..."}}}
-JSON
+```json
+{"action": "dispose", "run_id": "20261005-103000", "payload": {"by": "user", "decisions": {"F1": {"decision": "fix"}, "F2": {"decision": "accept-risk", "reason": "..."}}}}
 ```
 
 Nothing the user did not pick is remediated.
@@ -119,18 +123,22 @@ Nothing the user did not pick is remediated.
 ## 6. Comment the PR, always
 
 Pass or fail, one finding or twenty: render the report and the abridged comment, check the
-comment, and post it.
+comment, and post it. `mcp__plugin_mightymodels_state__review` with action `report` returns
+text and writes no file, so the primary writes the full report (the call without `payload`) to
+`RUNDIR/report.md` and this call's answer to `RUNDIR/pr-comment.md`:
+
+```json
+{"action": "report", "run_id": "20261005-103000", "payload": {"shape": "comment"}}
+```
 
 ```bash
-python3 BASE/scripts/review_state.py report --run RUN
-python3 BASE/scripts/review_state.py report --run RUN --shape comment
-python3 BASE/../open-ticket/scripts/humanize_tracker_body.py fix RUNDIR/pr-comment.md --shape comment
+python3 "${CLAUDE_PLUGIN_ROOT}/skills/open-ticket/scripts/humanize_tracker_body.py" fix RUNDIR/pr-comment.md --shape comment
 gh pr comment <PR> --body-file RUNDIR/pr-comment.md
 ```
 
 Reword whatever `fix` still reports; the finding ids stay so the thread links back to the
 report. Without `gh` or a PR, keep the file and surface the command. With nothing chosen for
-fixing, the session ends here with the verdict the script computed.
+fixing, the session ends here with the verdict `report` returned.
 
 ## 7. Remediate, risk first
 
@@ -141,26 +149,30 @@ rollup, and stop.
 Order: Critical findings and High security findings first, then the rest in gate order. For
 each finding `Fn` chosen for fixing:
 
-1. `task_state.py start --slug SLUG --task Rn --by engineer --owned <files the Fix touches>`
-   (agents-assemble's script, `BASE/../agents-assemble/scripts/`).
-2. The finding's Verify command goes to the user as contract id `Rn.AC-1` in one ask-user
-   dialog, then `verification.py contract` (game-plan's script).
+1. `task` `start` with `task_id` `Rn`, `by` `engineer` and `owned` the files the Fix touches
+   (agents-assemble's call).
+2. The finding's Verify command goes to the user as contract id `Rn.AC-1` in one
+   `AskUserQuestion` dialog, then `contract` `approve` with it as a `commands` entry (game-plan's call).
 3. Dispatch an **engineer**: the residual variant for a single-concern merge-vader finding
    with usable Fix and Verify lines; the full template for uncle-bob findings, findings both
    personas raised, and anything Critical or High security.
-4. `verification.py run --id Rn.AC-1 --phase review`, then `task_state.py verify --task Rn --commit <commit>`, then `review_state.py resolve --run RUN --finding Fn --result fixed --commit <commit>`.
-5. Failed or blocked: `task_state.py mark`, then **architect** once, then whats-broken, as in
-   agents-assemble. Record `resolve --result failed|blocked --reason ...` when a finding stops.
+4. `mightymodels verify run --slug SLUG --phase review --id Rn.AC-1`, then `task` `verify` with
+   `task_id` `Rn` and `change` `commit`, then `review` `resolve` with `payload` `finding` `Fn`,
+   `result` `fixed` and `commit` (it takes only a finding the user chose to fix).
+5. Failed or blocked: `task` `mark` (a task the gate blocked already is `blocked`), then
+   **architect** once, then whats-broken, as in agents-assemble. Record `resolve` with `result`
+   `failed` or `blocked` and a `reason` when a finding stops.
 
 A finding whose reviewer wrote an Architect escalation line (a design decision beyond its
 Fix) is a question for the user first. On their yes, dispatch architect in diagnose-replan
 mode; its revised plan goes back to agents-assemble as new tasks, not into this loop.
 
-Before every push: `verification.py run --all --phase review` and `task_state.py ready`, as
-stick-the-landing does, then push and have gitty-up watch CI.
+Before every push: `mightymodels verify run --slug SLUG --all --phase review` and `task`
+`ready`, as stick-the-landing does, then push (only the primary pushes) and dispatch gitty-up
+with the PR number to watch CI.
 
 ## 8. Close
 
-Re-render with `report` and `report --shape comment`, and replace the PR comment
+Re-render with `report` in both shapes, rewrite the two files, and replace the PR comment
 (`gh pr comment <PR> --edit-last --body-file RUNDIR/pr-comment.md`) so it shows each finding's
 outcome by id. The human review comes after this session; say so, and stop.

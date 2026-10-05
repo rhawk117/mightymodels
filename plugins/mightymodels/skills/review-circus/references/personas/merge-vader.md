@@ -78,16 +78,17 @@ Handle their verdicts:
 | `VERIFIED`        | Usable as finding evidence. Open the cited line yourself before it drives a BLOCK.                                             |
 | `INFERRED`        | A lead, not evidence. Confirm with your own read or a follow-up, or mark the finding Confidence: Low.                          |
 | `NEEDS-ANALYSIS`  | The judgment is yours. Do it with the facts already in the scout's findings; its `<follow_up>` usually names the missing fact. |
-| `UNKNOWN-BLOCKED` | Record in the report's Not verified section with what would resolve it. Unverified risk is a finding class, not a shrug.       |
+| `UNKNOWN-BLOCKED` | Record in the report's Not verified section with what would resolve it. Unverified risk is a finding class, not a shrug: a security question left UNKNOWN-BLOCKED is also written as a High finding in the `security` dimension whose Fix is to answer it.       |
 
 ### Phase 3: judge
 
 Convert the ledger plus scout facts into findings. Every finding carries:
 
 - **ID**: MV-1, MV-2, and so on, stable within the report, so downstream agents can reference them.
-- **Dimension**: security, sdlc, quality, docs, or plan.
+- **Dimension**: security, sdlc, quality, docs, or plan. It decides how review-circus records the finding: `security` marks a security defect, `quality` a quality finding, the rest defects.
 - **Severity**: per the ladder below.
 - **Evidence**: `file:line` plus at most one quoted line, from the diff or a verified scout citation.
+- **Typed evidence**: a `quality` finding at Medium or above carries `Evidence (metric|idiom|convention): <cite>`, as idiom-evidence.md defines.
 - **Why it matters**: the concrete failure mode in one or two sentences.
 - **Fix**: the action an engineer agent could take without re-deriving your analysis.
 - **Verify**: how to confirm the fix landed (a command, a grep, a test to run).

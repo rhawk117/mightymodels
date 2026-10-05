@@ -1,8 +1,8 @@
 # Idiom evidence
 
-Read before normalizing findings, and pass this file's absolute path to every reviewer. A quality finding (structure, naming, abstraction, idiom, duplication) at Medium or above needs structured evidence. Without it the finding is a preference, and preferences are Low at most. `review_state.py add` refuses a quality finding at Medium or above that has no `evidence` object, so the rule holds whether or not a reviewer remembered it.
+Read before recording findings, and pass this file's absolute path to every reviewer. A quality finding (structure, naming, abstraction, idiom, duplication) at Medium or above needs structured evidence. Without it the finding is a preference, and preferences are Low at most. The `review` tool's `add` refuses a quality finding at Medium or above whose report block has no typed `Evidence (metric|idiom|convention): <cite>` bullet, so the rule holds whether or not a reviewer remembered it. The bullet sits beside the block's `Evidence:` line, and `add` reads the kind and the cite from it.
 
-Defects (wrong behavior, security, data loss, broken compatibility) are not quality findings. Their location and the quoted line are the evidence, and this file does not apply to them.
+Defects (wrong behavior, security, data loss, broken compatibility) are not quality findings. Their location and the quoted line are the evidence, and this file does not apply to them. `add` takes a finding as quality when it is uncle-bob's, or merge-vader's in the `quality` dimension; merge-vader's `security`, `sdlc`, `docs` and `plan` findings are defects.
 
 ## The three kinds
 
