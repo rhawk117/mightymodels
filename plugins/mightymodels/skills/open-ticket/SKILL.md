@@ -1,43 +1,42 @@
 ---
 name: open-ticket
 description: >-
-  Turn an understood problem into a staged unit of work: one ask-user interview (slug, tracker
-  GitHub / Jira / both / none, branch, compaction likely, per-task scope), then the ticket
-  directory, a Findings rollup from the lets-investigate ledger or what-we-know, the GitHub
-  issue and/or Jira ticket (a draft file when the CLI is absent) with a checked tracker body,
-  the branch, ticket.yml with derived model routing, and a validated work-unit.json. Ends by
-  asking whether to plan now (game-plan), go straight to one-shot, or hand off (baton-pass). Use
-  when triage is done: "cut a ticket for this", "open a ticket", "make a jira ticket under this
-  epic", "turn this investigation into a ticket", "stage this for the next session", "get this
-  ready to implement". Not for starting the implementation itself (game-plan or one-shot), and not
-  for handing off an existing ticket (baton-pass).
+  Turn an understood problem into a staged unit of work: one AskUserQuestion interview (slug,
+  tracker GitHub / Jira / both / none, branch, compaction likely, per-task scope), then the
+  ticket directory, a Findings rollup from the lets-investigate ledger or what-we-know, the
+  GitHub issue and/or Jira ticket (a draft file when the CLI is absent) with a checked tracker
+  body, the branch, ticket.yml with derived model routing, and a validated ticket row in the
+  state database. Ends by asking whether to plan now (game-plan), go straight to one-shot, or
+  hand off (baton-pass). Use when triage is done: "cut a ticket for this", "open a ticket",
+  "make a jira ticket under this epic", "turn this investigation into a ticket", "stage this
+  for the next session", "get this ready to implement". Not for starting the implementation
+  itself (game-plan or one-shot), and not for handing off an existing ticket (baton-pass).
 ---
 
 # open-ticket
 
 Turn an understood problem into a unit of work that this session or a later one can pick up
-cold. Everything durable lands in `ticket.yml`, `work-unit.json`, and the tracker; what
-happens next is the user's call, asked at the end.
+cold. Everything durable lands in `ticket.yml`, the ticket's row in `.mightymodels/mightymodels.db`,
+and the tracker; what happens next is the user's call, asked at the end.
 
 Read `references/ticket-schema.md` and `references/mightymodels-dir.md` before the first run
-in a session; they are the contract this skill instantiates. Run the scripts as
-`python3 BASE/scripts/NAME.py`, where `BASE` is the `Base directory for this skill` line, from
-the repository's working directory.
+in a session; they are the contract this skill instantiates. State goes through the plugin's MCP
+tools, called by full name: `mcp__plugin_mightymodels_state__ticket`, `..._investigation`.
 
-Nothing under `.mightymodels/` is ever tracked by git. `ticket_state.py` adds `.mightymodels/`
-to the repository's local exclude file on every run, so a `git add -A` cannot ship briefs,
-reports, or ledgers that may carry raw command output.
+Nothing under `.mightymodels/` is ever tracked by git. The state server adds `.mightymodels/`
+to the repository's local exclude file when it starts, so a `git add -A` cannot ship briefs,
+reports, or the database, which may carry raw command output.
 
 ## The interview
 
-One ask-user dialog, batched where the tool allows (five sequential dialogs is an
-interrogation), containing only the questions the conversation has not already answered.
+One `AskUserQuestion` dialog, batched (a call takes up to four questions, so ask 1 to 4 first
+and 5 second), containing only the questions the conversation has not already answered. Each
+question carries two to four options, and the user can always type an answer of their own.
 Answers already given are confirmed in the summary, not re-asked.
 
-1. **Name** this unit of work; propose a slug from the triage target.
+1. **Name** this unit of work; options: a slug proposed from the triage target, a shorter one.
 2. **Tracker**: GitHub issue, Jira ticket, both, or none.
-3. **Branch**: use the current checkout as-is, or create a new branch (propose a name; base
-   defaults to HEAD).
+3. **Branch**: the current checkout as-is, or a new branch from HEAD (the user types the name).
 4. **Compaction**: would implementing this likely cause at least one compaction?
 5. **Scope** of each anticipated task: sm, med, or large.
 
@@ -54,9 +53,22 @@ the end.
 The tracker body is built from the triage, not from memory of it. Take the findings in this
 order of preference:
 
-1. **The investigation ledger.** `python3 BASE/../lets-investigate/scripts/ledger.py knowns --id ID` (`ledger.py list` when the id is unknown). Rows marked `current` are findings.
-   Rows marked `lead` were cited at an older HEAD: they go under Open questions as "unverified
-   at HEAD", never under Findings, because the ramp would otherwise re-verify the wrong things.
+1. **The investigation ledger.** Call `mcp__plugin_mightymodels_state__investigation` with
+   action `knowns`:
+
+   ```json
+   {"action": "knowns", "investigation_id": "ID"}
+   ```
+
+   With action `list` when the id is unknown:
+
+   ```json
+   {"action": "list"}
+   ```
+
+   Rows marked `current` are findings. Rows marked `lead` were cited at an older HEAD: they go
+   under Open questions as "unverified at HEAD", never under Findings, because the ramp would
+   otherwise re-verify the wrong things.
 2. **The final what-we-know output** in the conversation.
 3. **Cited facts** scattered in the conversation.
 
@@ -84,7 +96,7 @@ abuse cases phrased as candidate acceptance criteria; omit the section otherwise
 inventing threats for a docs change teaches readers to skip the section that matters). Then:
 
 ```bash
-python3 BASE/scripts/humanize_tracker_body.py fix .mightymodels/SLUG/issue-body.md
+python3 "${CLAUDE_SKILL_DIR}/scripts/humanize_tracker_body.py" fix .mightymodels/SLUG/issue-body.md
 ```
 
 `fix` repairs dashes and filler openers itself and reports what still needs rewording (tell
@@ -104,41 +116,44 @@ it exits 0. No body reaches a tracker before it passes.
   `.mightymodels/SLUG/jira-ticket.md` carrying the fields as a header block, the body, and the
   exact command, and say so in the summary.
 - *Both.* Create the GitHub issue first, then the Jira ticket with the issue URL in its body,
-  so the two link one way and the sprint's checklist has one home (the GitHub issue).
+  so the two link one way and the sprint's task list has one home (the GitHub issue).
 
 **C. Branch.** *New*: create and push it; a rejected push (no remote, no auth) is a note in the
 summary, not a blocker, since the branch exists locally. *Current checkout*: record the
 current branch name and create nothing. A detached HEAD is not a checkout the sprint can run
 on; say so and ask for a branch.
 
-**D. ticket.yml.** Write it from the answers, the rollup, and the tracker keys:
+**D. ticket.yml.** Call `mcp__plugin_mightymodels_state__ticket` with action `write` and
+the interview, rollup and tracker answers under `fields`:
 
-```bash
-python3 BASE/scripts/ticket_state.py write --slug SLUG <<'JSON'
-{"summary": "...", "scope": "med", "compaction": false, "branch": "fix/...",
- "context": ["...", "..."], "issue": 42, "jira": "PLAT-41",
- "reference_urls": ["https://..."], "investigations": ["20260928-..."]}
-JSON
+```json
+{"action": "write", "slug": "SLUG",
+ "fields": {"summary": "...", "scope": "med", "compaction": false, "branch": "fix/...",
+            "context": ["...", "..."], "issue": 42, "jira": "PLAT-41",
+            "reference_urls": ["https://..."], "investigations": ["20260928-..."]}}
 ```
 
-The script derives the engineer and architect models and `plan-first` per the schema, and
-refuses to overwrite an existing ticket.yml. Tell the user the file exists and pause: they
-tweak it by hand before anything else happens, and their edit wins over the derivation.
+The tool derives the model routing from the scope and `plan-first` from the compaction answer,
+per the schema, and refuses to overwrite an existing ticket.yml. Tell the user the file exists
+and pause: they tweak it by hand before anything else happens, and their
+edit wins over the derivation.
 
 **E. Validate and stage.** After the tweak pass:
 
-```bash
-python3 BASE/scripts/ticket_state.py validate --slug SLUG
+Call `mcp__plugin_mightymodels_state__ticket` with action `validate`:
+
+```json
+{"action": "validate", "slug": "SLUG"}
 ```
 
-It parses ticket.yml in the canonical subset the schema describes, checks every field and
-every linked investigation, and writes `work-unit.json`. A hand edit outside the subset is
-reported with its line; fix it rather than working around it. The ticket is not staged until
-this passes.
+It parses ticket.yml in the canonical subset the schema describes, checks every field and every
+linked investigation, and stages the ticket as a row in `.mightymodels/mightymodels.db`. A hand
+edit outside the subset is reported with its line; fix it rather than working around it. The
+ticket is not staged until this passes.
 
 ## What next
 
-Ask once, through the ask-user dialog:
+Ask once, through `AskUserQuestion`:
 
 - **Plan now**: invoke game-plan in this session. Recommended when `plan-first` is true and the
   context has room for it.

@@ -12,7 +12,7 @@
 
 ## Acceptance
 
-- [ ] {{a checkable criterion: a command that passes, or an assertion with a location}}
+- {{a checkable criterion: a command that passes, or an assertion with a location}}
 
 ## Security surface
 

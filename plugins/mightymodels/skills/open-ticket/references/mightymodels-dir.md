@@ -1,48 +1,51 @@
 # The .mightymodels/ directory
 
-Per-ticket, sparse, organized by unit of work. The unit of deletion is the unit of work: `/prune-ticket` removes a whole ticket directory, so rot cannot outlive its ticket.
+Per-ticket files, sparse, organized by unit of work, beside one SQLite database that holds the state. The unit of deletion for files is the unit of work: `/prune-ticket` removes a whole ticket directory, so file rot cannot outlive its ticket. The ticket's rows stay in the database.
 
 ```
 .mightymodels/
+├── mightymodels.db                    state store: tickets, tasks, contract, ledgers, reviews, crashouts, closings
 ├── <task-slug>/
 │   ├── ticket.yml                     source of truth (see ticket-schema.md)
-│   ├── work-unit.json                 staged state: ticket section from validate, progress from the loop
 │   ├── plan.md                        game-plan ramp only; high-level, citation-free
-│   ├── transitions.jsonl              task_state.py's append-only transition log
-│   ├── verification/contract.json     user-approved commands (verification.py)
-│   ├── verification/receipts.jsonl    one receipt per run, stamped with HEAD
 │   ├── issue-body.md                  when no forge issue was created, or as the local draft
 │   ├── pr-body.md                     stick-the-landing's checked PR body
-│   ├── handoffs/snapshot.{json,md}    baton-pass's snapshot.py: objective state from the files above
+│   ├── handoffs/snapshot.{json,md}    baton-pass writes what the snapshot tool returns: objective state from the database
 │   ├── handoffs/BATON.md              mid-work handoff, ≤40 lines, facts that live nowhere else
 │   ├── briefs/task-NN.md              two halves, ≤80 lines (contracts.md)
-│   ├── review/<run>/                  one review-circus run (review_state.py): review-run.json,
-│   │                                  findings.jsonl, persona reports, metrics, report.md
+│   ├── review/<run>/                  one review-circus run: persona reports, metrics, the rendered report
 │   ├── whats-broken.md                only while a debug is live; regenerated per attempt
 │   └── REPORT.md                      ≤50 lines, sprint summary
-├── .runtime/investigations/<id>.jsonl  lets-investigate ledgers (ledger.py is the only writer)
-├── .runtime/reviews/<run>/          review runs with no ticket (review_state.py)
-├── .runtime/subagents/receipts.jsonl  worker stop receipts (subagent-recorder hook), ticket-tagged
-├── .runtime/decisions/receipts.jsonl  ask_user answers (decision-recorder hook), ticket-tagged
-├── .runtime/gate/<sha256>            completion-gate's one-block-per-worker markers
-└── archives/<task-slug>.{md,json}     ≤30-line archive plus bounded JSON record, written by prune-ticket's archive_ticket.py
+├── .runtime/reviews/<run>/            review runs with no ticket
+└── archives/<task-slug>.{md,json}     ≤30-line archive plus bounded JSON record, written by prune-ticket from the close tool's text
 ```
 
-## Writer/reader matrix — one writer per file class
+The decision and subagent recorder hooks record rows in the database; they arrive with the hooks (surface.md "Hooks").
 
-| Path                                       | Writer                                                                                          | Readers                                                  |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| ticket.yml                                 | open-ticket's ticket_state.py, or one-shot when ramping without a ticket (then the user's hand) | every session                                            |
-| plan.md                                    | game-plan primary, after user approval                                                          | primary, dispatch compilation                            |
-| briefs/ ASKED half                         | primary at dispatch                                                                             | engineer, verifying scout                                |
-| briefs/ DONE half                          | engineer                                                                                        | primary, verifying scout                                 |
-| review/<run>/                              | review-circus: review_state.py for run state, the primary for persona reports and metrics       | review-circus, stick-the-landing, prune-ticket, the user |
-| work-unit.json progress, transitions.jsonl | agents-assemble's task_state.py                                                                 | agents-assemble, stick-the-landing, baton-pass           |
-| verification/                              | game-plan's verification.py                                                                     | task_state.py, every skill that proves work              |
-| pr-body.md                                 | stick-the-landing                                                                               | `gh pr create`                                           |
-| handoffs/                                  | baton-pass                                                                                      | the next session's primary                               |
-| REPORT.md                                  | agents-assemble primary                                                                         | stick-the-landing, review-circus, prune-ticket           |
-| archives/                                  | prune-ticket's archive_ticket.py                                                                | future humans and sessions                               |
+## Writer/reader matrix: one writer per file class
+
+The database's only writers are the state server's eight tools and `mightymodels verify run`. Each group of tables has one.
+
+| Path or tables                                                       | Writer                                                                                              | Readers                                                  |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `tickets`                                                            | the `ticket` tool (`validate` and `update-context` stage the row)                                   | every session                                            |
+| `tasks`, `task_attempts`, `task_transitions`                         | the `task` tool, called by agents-assemble                                                          | agents-assemble, stick-the-landing, baton-pass           |
+| `contract_commands`                                                  | the `contract` tool's `approve`, called by game-plan and one-shot                                   | the `task` tool, every skill that proves work            |
+| `receipts`                                                           | `mightymodels verify run`                                                                           | the `task` and `snapshot` tools, every skill that proves work |
+| `ledger_entries`                                                     | the `investigation` tool                                                                            | what-we-know, open-ticket, the `snapshot` tool           |
+| `review_runs`, `review_findings`, `review_dispositions`, `review_outcomes` | the `review` tool                                                                             | review-circus, stick-the-landing, the `close` tool       |
+| `crashouts`                                                          | the `crashout` tool                                                                                 | crashout                                                 |
+| `closings`                                                           | the `close` tool                                                                                    | prune-ticket, future sessions                            |
+| ticket.yml                                                           | open-ticket's `ticket` `write`, or one-shot when ramping without a ticket (then the user's hand)    | every session                                            |
+| plan.md                                                              | game-plan primary, after user approval                                                              | primary, dispatch compilation                            |
+| briefs/ ASKED half                                                   | primary at dispatch                                                                                 | engineer, verifying scout                                |
+| briefs/ DONE half                                                    | engineer                                                                                            | primary, verifying scout                                 |
+| review/<run>/ directory                                              | the `review` tool's `start` creates it; the primary writes persona reports, metrics and the rendered report | review-circus, stick-the-landing, prune-ticket, the user |
+| issue-body.md, pr-body.md                                            | open-ticket or one-shot (issue-body.md), stick-the-landing (pr-body.md)                             | `gh issue create`, `gh pr create`                        |
+| handoffs/                                                            | baton-pass, from the `snapshot` tool's text; BATON.md is the primary's own                          | the next session's primary                               |
+| whats-broken.md                                                      | the whats-broken primary                                                                              | the `close` tool, which blocks closing while it exists   |
+| REPORT.md                                                            | agents-assemble primary                                                                             | stick-the-landing, review-circus, prune-ticket           |
+| archives/                                                            | prune-ticket, from the `close` tool's text                                                          | future humans and sessions                               |
 
 ## Thinness rule for handoffs
 
@@ -50,4 +53,4 @@ Per-ticket, sparse, organized by unit of work. The unit of deletion is the unit 
 
 ## Never tracked
 
-Nothing under `.mightymodels/` is ever committed. `open-ticket`'s `ticket_state.py` (on every `write` and `validate`), `ledger.py` (on `start` and `add`), and `review_state.py` (on `start`) add `.mightymodels/` to the repository's local exclude file (`info/exclude` in the common git dir, so worktrees share it). `briefs/`, `review/`, and the ledgers carry raw command output that can hold secrets, and local-only exclusion means a careless `git add -A` cannot ship them. A later session that finds `.mightymodels/` missing from the exclude file restores it before writing anything there.
+Nothing under `.mightymodels/` is ever committed. The state server at start and `mightymodels verify run` add `.mightymodels/` to the repository's local exclude file (`info/exclude` in the common git dir, so worktrees share it). `briefs/`, `review/`, and the database carry raw command output that can hold secrets, and local-only exclusion means a careless `git add -A` cannot ship them. A later session that finds `.mightymodels/` missing from the exclude file restarts the server, which restores it before anything is written there.

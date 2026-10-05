@@ -1,7 +1,7 @@
 {
   "skill_name": "open-ticket",
   "rigor": 1,
-  "eval_model": "gpt-5.6-luna",
+  "eval_model": "haiku",
   "max_runs_per_iteration": 8,
   "repeats": 1,
   "permissions": [],

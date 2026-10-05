@@ -1,6 +1,6 @@
 # ticket.yml schema
 
-The per-ticket source of truth, written once by open-ticket (`ticket_state.py write`) from the interview answers, then hand-tweaked by the user and checked by `ticket_state.py validate`. Every later session reads it before doing anything else; agent-file model pins are only the fallback for headless runs where nobody answered.
+The per-ticket source of truth, written once by open-ticket (the `ticket` tool's `write`) from the interview answers, then hand-tweaked by the user and checked by the `ticket` tool's `validate`, which stages the ticket as a row in `.mightymodels/mightymodels.db`. Every later session reads it before doing anything else; agent-file model pins are only the fallback for headless runs where nobody answered.
 
 ```yaml
 task: "<slug>"                   # directory name under .mightymodels/
@@ -15,15 +15,15 @@ companion-docs:
     - "https://..."
 subagent-models:
   primary-agent:                 # user hint, not source of truth
-  code-scout: "gpt-5.6-luna"
-  web-scout: "gpt-5.6-luna"
-  qualitylens: "gpt-5.6-luna"
-  engineer: "<derived>"          # see derivation rules
+  code-scout: "haiku"
+  web-scout: "haiku"
+  qualitylens: "haiku"
+  engineer: "sonnet"             # sonnet at every scope
   architect: "<derived>"         # see derivation rules
-  gitty-up: "gpt-5.6-luna"
-  wingman: "gpt-5.6-sol"
-  merge-vader-reviewer: "gpt-5.6-sol"
-  uncle-bob-reviewer: "claude-sonnet-5"
+  gitty-up: "haiku"
+  wingman: "opus"
+  merge-vader-reviewer: "opus"
+  uncle-bob-reviewer: "sonnet"
 handoff-context:
   scope: "<sm|med|large>"
   plan-first: <true|false>       # derived from the compaction answer
@@ -35,24 +35,24 @@ investigations:                  # lets-investigate ids whose ledgers this ticke
 
 ## The subset
 
-`scripts/ticket_state.py` writes this file and reads back exactly this YAML subset, so hand edits validate as long as they stay inside it:
+The `ticket` tool writes this file and reads back exactly this YAML subset, so hand edits validate as long as they stay inside it:
 
-- mappings nested at most two levels, indented by two spaces;
+- mappings indented by two spaces (the tool writes them two levels deep and checks keys, not depth);
 - scalars: double-quoted strings (JSON escapes), plain words, integers, `true`/`false`, or empty for null;
 - lists of scalars, one `- item` per line;
 - `#` comments on their own line or after a value.
 
-Anchors, flow collections (`[a, b]`, `{a: b}`), single quotes, and block scalars (`|`, `>`) are refused with the line number. Unknown keys are refused too, including retired worker keys such as `scout` or `budgetron`, because a key nobody reads is a setting that silently does nothing.
+Anchors, flow collections (`[a, b]`, `{a: b}`), single quotes, and block scalars (`|`, `>`) are refused with the line number. `validate` refuses unknown keys too, at the top level and under `companion-docs`, `handoff-context` and `subagent-models`, including retired worker keys such as `scout` or `budgetron`, because a key nobody reads is a setting that silently does nothing. It also requires a non-empty `summary`, a `task` equal to the slug, one to six `context` lines, a `scope` of sm, med or large, a boolean `plan-first`, a non-empty `branch-name`, a numeric `issue-number`, a model for `engineer` and `architect`, and a ledger for every linked investigation.
 
 ## Derivation rules
 
-**engineer**: from the task-scope answer — `large` → `claude-sonnet-5`; `sm` or `med` → `gpt-5.6-luna`. The ticket value is the default for every task; the primary may bump a single gnarly task one tier at dispatch, but never above `claude-sonnet-5`, logging the reason in that task's ASKED stanza. A ticket has one scope value; its tasks do not.
+**engineer**: `sonnet` at every scope. The ticket value is the default for every task; the primary may bump a single gnarly task one tier at dispatch, logging the reason in that task's ASKED stanza. A ticket has one scope value; its tasks do not.
 
-**architect**: from the task-scope answer — `large` → `gpt-5.6-sol`; `sm` or `med` → `gpt-5.6-terra`. Architect recovers a failed engineer task, so its tier must sit above the engineer tier the scope derived; `claude-sonnet-5` is the engineer ceiling, which is why large scope skips terra.
+**architect**: from the task-scope answer: `large` → `opus`; `sm` or `med` → `sonnet`. Architect recovers a failed engineer task; it runs the engineer's tier at sm and med and one above it at large.
 
 **plan-first**: `true` when the user expects at least one compaction. `true` also means the baton-pass handoff prompt carries the switch-models reminder, and the next session's low-tier primary writes the plan before any dispatch.
 
-**Reviewer split** (decision of record, 2026-08-29; carried to the reviewer workers 2026-09-28): `uncle-bob-reviewer` runs `claude-sonnet-5` and `merge-vader-reviewer` runs `gpt-5.6-sol`. The split is by role and report, not model — uncle-bob grades abstraction and structure, merge-vader runs the adversarial pre-merge pass, and their reports land separately so neither hedges the other. User-overridable per ticket like everything else in this block.
+**Reviewer split** (decision of record, 2026-08-29; carried to the reviewer workers 2026-09-28): `uncle-bob-reviewer` runs `sonnet` and `merge-vader-reviewer` runs `opus`. The split is by role and report, not model — uncle-bob grades abstraction and structure, merge-vader runs the adversarial pre-merge pass, and their reports land separately so neither hedges the other. A ticket value is used for a deep review; a quick review runs both on `haiku` and a standard one on `sonnet`, whatever the ticket says. Everything else in this block is user-overridable per ticket.
 
 ## Field discipline
 
