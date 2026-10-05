@@ -89,11 +89,11 @@ class TestOutputTail:
 
 class TestChildEnvironment:
     PLAN = plan_of(
-        python_command(GateTool.TY, 'import os; print(os.getenv("UV_PROJECT"), os.getenv("KEPT"))'),
+        python_command(GateTool.TY, 'import os; print(os.getenv("UV"), os.getenv("KEPT"))'),
     )
-    PARENT = MappingProxyType({'UV_PROJECT': '/plugins/pythonista', 'KEPT': 'yes'})
+    PARENT = MappingProxyType({'UV': '/usr/local/bin/uv', 'KEPT': 'yes'})
 
-    def test_the_shims_uv_variables_do_not_reach_the_projects_tools(
+    def test_the_launchers_uv_variable_does_not_reach_the_projects_tools(
         self, workspace: Workspace
     ) -> None:
         report = run_gate(workspace, self.PLAN, environment=self.PARENT)
@@ -102,7 +102,7 @@ class TestChildEnvironment:
 
 
 class TestProgramResolution:
-    LAUNCHER = 'pythonista-test-launcher'
+    LAUNCHER = 'python-harness-test-launcher'
     PLAN = plan_of(GateCommand(GateTool.TY, LAUNCHER, ('check',)))
 
     @pytest.fixture
@@ -123,7 +123,7 @@ class TestProgramResolution:
 
 
 class TestMissingProgram:
-    MISSING = 'pythonista-test-missing-launcher'
+    MISSING = 'python-harness-test-missing-launcher'
     PLAN = plan_of(
         python_command(GateTool.RUFF_CHECK, 'open("started.flag", "w").close()'),
         GateCommand(GateTool.TY, MISSING, ('ty', 'check')),

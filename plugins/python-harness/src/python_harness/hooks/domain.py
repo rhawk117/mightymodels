@@ -1,4 +1,4 @@
-"""The Claude Code hook events the pythonista hooks answer."""
+"""The Claude Code hook events the python-harness hooks answer."""
 
 from dataclasses import dataclass, field
 from enum import StrEnum

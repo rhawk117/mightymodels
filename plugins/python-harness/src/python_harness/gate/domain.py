@@ -1,5 +1,6 @@
 """Planned verification commands, how they ran, and what the run left behind."""
 
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
@@ -59,14 +60,10 @@ def default_tool_invocations() -> ToolInvocations:
     )
 
 
-PYTHONISTA_ENVIRONMENT = frozenset(
+PYTHON_HARNESS_ENVIRONMENT = frozenset(
     {
         'PYTHONDONTWRITEBYTECODE',
-        'PYTHONPYCACHEPREFIX',
-        'UV_FROZEN',
-        'UV_NO_DEV',
-        'UV_PROJECT',
-        'UV_PROJECT_ENVIRONMENT',
+        'UV',
         'VIRTUAL_ENV',
     }
 )
@@ -76,10 +73,17 @@ def default_child_environment() -> Mapping[str, str]:
     return MappingProxyType({'PYTHONDONTWRITEBYTECODE': '1'})
 
 
+def default_launcher_environment() -> Path | None:
+    if sys.prefix == sys.base_prefix:
+        return None
+    return Path(sys.prefix)
+
+
 @dataclass(frozen=True, slots=True)
 class GateOptions:
     fallback_ruff_config: Path | None = None
-    dropped_environment: frozenset[str] = PYTHONISTA_ENVIRONMENT
+    dropped_environment: frozenset[str] = PYTHON_HARNESS_ENVIRONMENT
+    launcher_environment: Path | None = field(default_factory=default_launcher_environment)
     child_environment: Mapping[str, str] = field(default_factory=default_child_environment)
     timeout_seconds: float = 600.0
     output_tail_lines: int = 40

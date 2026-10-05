@@ -8,7 +8,7 @@ from functools import singledispatch
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
-from python_harness.core.errors import PythonistaError
+from python_harness.core.errors import PythonHarnessError
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -18,7 +18,7 @@ type JsonValue = str | int | float | bool | list[JsonValue] | dict[str, JsonValu
 COMPACT_SEPARATORS = (',', ':')
 
 
-class UnsupportedJsonValueError(PythonistaError):
+class UnsupportedJsonValueError(PythonHarnessError):
     def __init__(self, value: object) -> None:
         super().__init__(f'cannot encode {type(value).__name__} as JSON')
         self.value = value

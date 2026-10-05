@@ -1,6 +1,6 @@
 # Judging facts into findings
 
-You, the primary, hold the rules; pylens and `pythonista inspect` hold none. This file is how you turn their facts into findings Ryan would sign. Read it before the first finding.
+You, the primary, hold the rules; pylens and `python-harness inspect` hold none. This file is how you turn their facts into findings Ryan would sign. Read it before the first finding.
 
 ## The lenses
 
@@ -61,7 +61,7 @@ Exactly this shape, so citations can be checked and runs compared:
 - Verify: `<command or test that would prove the improvement>`
 ```
 
-Additional locations go on further `- Location:` lines. Every location is a citation in the `path.py:line` form followed by a backticked quote of that line, because `pythonista inspect cite` checks both.
+Additional locations go on further `- Location:` lines. Every location is a citation in the `path.py:line` form followed by a backticked quote of that line, because `python-harness inspect cite` checks both.
 
 ## What not to do
 

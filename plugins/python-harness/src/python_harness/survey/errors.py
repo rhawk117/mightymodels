@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from python_harness.core.errors import PythonistaError
+from python_harness.core.errors import PythonHarnessError
 
 
-class ManifestUnreadableError(PythonistaError):
+class ManifestUnreadableError(PythonHarnessError):
     def __init__(self, path: Path, reason: str) -> None:
         super().__init__(f'{path} is not valid TOML: {reason}')
         self.path = path

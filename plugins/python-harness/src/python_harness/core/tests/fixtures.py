@@ -60,5 +60,5 @@ def git_project(project_builder: ProjectBuilder) -> GitProject:
     project = GitProject(project_builder, executable)
     project.git('init', '--quiet', '--initial-branch', 'main')
     project.git('config', 'user.email', 'tests@example.invalid')
-    project.git('config', 'user.name', 'pythonista tests')
+    project.git('config', 'user.name', 'python-harness tests')
     return project

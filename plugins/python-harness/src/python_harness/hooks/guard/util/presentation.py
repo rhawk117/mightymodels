@@ -20,7 +20,7 @@ def render_note(verdict: Nudge, options: GuardOptions) -> str:
     names = sorted({call.interpreter for call in verdict.calls})
     interpreters = ', '.join(code_span(name) for name in names)
     explanation = (
-        f'Note from the pythonista plugin: this command ran plain {interpreters},'
+        f'Note from the python-harness plugin: this command ran plain {interpreters},'
         ' which can pick a different interpreter or packages than the project'
         ' environment, so its result may be incorrect. Run Python with'
         f' {code_span(options.replacement)}, and rerun it that way if the result'
@@ -37,6 +37,6 @@ def describe_guard_rule(options: GuardOptions) -> str:
     return (
         f'- Run Python with {code_span(options.replacement + " ...")}: plain'
         f' {options.interpreter_names} can pick a different interpreter or packages'
-        ' than the project environment and give an incorrect result. The pythonista'
+        ' than the project environment and give an incorrect result. The python-harness'
         ' plugin adds a note when a Bash command runs one.'
     )

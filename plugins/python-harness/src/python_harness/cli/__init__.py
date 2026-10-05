@@ -1,4 +1,4 @@
-"""Entry point for the `pythonista` command line; a group loads only when it runs."""
+"""Entry point for the `python-harness` command line; a group loads only when it runs."""
 
 import argparse
 import os
@@ -7,24 +7,24 @@ from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import TextIO
 
-from python_harness.commands.domain import (
+from python_harness.cli.domain import (
     ArgumentRegistrar,
     GroupDefinition,
     GroupName,
     ProcessEdge,
 )
-from python_harness.commands.exit_codes import ExitCode
-from python_harness.core.errors import PythonistaError
+from python_harness.cli.exit_codes import ExitCode
+from python_harness.core.errors import PythonHarnessError
 
 
 def load_inspect_group() -> ArgumentRegistrar:
-    from python_harness.commands.inspection import register_inspect_commands  # noqa: PLC0415  loads with its group.
+    from python_harness.cli.inspection import register_inspect_commands  # noqa: PLC0415  loads with its group.
 
     return register_inspect_commands
 
 
 def load_hooks_group() -> ArgumentRegistrar:
-    from python_harness.commands.hooks import register_hooks_commands  # noqa: PLC0415  loads with its group.
+    from python_harness.cli.hooks import register_hooks_commands  # noqa: PLC0415  loads with its group.
 
     return register_hooks_commands
 
@@ -51,8 +51,8 @@ def requested_groups(argv: Sequence[str]) -> frozenset[str]:
 def build_parser(loaded: Iterable[str]) -> argparse.ArgumentParser:
     chosen = frozenset(loaded)
     parser = argparse.ArgumentParser(
-        prog='pythonista',
-        description='Python engineering tools for the pythonista plugin.',
+        prog='python-harness',
+        description='Python engineering tools for the python-harness plugin.',
     )
     commands = parser.add_subparsers(dest='group', required=True)
     for name, definition in default_groups().items():
@@ -76,8 +76,8 @@ def main(argv: Sequence[str] | None = None, *, edge: ProcessEdge | None = None) 
     try:
         exit_code = ExitCode(arguments.handler(arguments, chosen))
         chosen.stdout.flush()
-    except PythonistaError as error:
-        chosen.stderr.write(f'pythonista: {error}\n')
+    except PythonHarnessError as error:
+        chosen.stderr.write(f'python-harness: {error}\n')
         return ExitCode.ERROR
     except BrokenPipeError:
         discard_further_output(chosen.stdout)

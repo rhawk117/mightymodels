@@ -10,8 +10,8 @@ from typing import TextIO
 
 import pytest
 from python_harness.cli import main
-from python_harness.commands.domain import ProcessEdge
-from python_harness.commands.exit_codes import ExitCode
+from python_harness.cli.domain import ProcessEdge
+from python_harness.cli.exit_codes import ExitCode
 from python_harness.core.tests.fixtures import ProjectBuilder
 from python_harness.core.workspace import Workspace
 
@@ -52,7 +52,7 @@ class TestReportedFailure:
 
         assert (exit_code, stderr.getvalue()) == (
             ExitCode.ERROR,
-            f'pythonista: workspace root {missing} is not a directory\n',
+            f'python-harness: workspace root {missing} is not a directory\n',
         )
 
 

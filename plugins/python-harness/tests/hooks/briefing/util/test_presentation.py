@@ -83,7 +83,7 @@ class TestSessionContext:
         text = render_session_context(self.BASE_SCAN, BriefingOptions(), RUNNER)
 
         assert text.splitlines() == [
-            '## Python toolchain (pythonista session scan)',
+            '## Python toolchain (python-harness session scan)',
             '- Root: /work/demo (pyproject.toml; dependency files: uv.lock)',
             (
                 '- Python: pinned `3.14` (`.python-version`); requires-python `>=3.14`;'

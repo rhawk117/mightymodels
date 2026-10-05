@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Protocol, TextIO
 
-from python_harness.commands.exit_codes import ExitCode
+from python_harness.cli.exit_codes import ExitCode
 
 if TYPE_CHECKING:
     from pathlib import Path

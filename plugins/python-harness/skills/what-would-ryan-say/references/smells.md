@@ -1,6 +1,6 @@
 # Smell catalogs
 
-What Ryan treats as a smell, why, and where the evidence comes from. `fact:` names the `pythonista inspect facts` kind that locates candidates mechanically; `pylens:` means the evidence needs reading. A fact is a candidate, never a finding: confirm it against the code, then decide whether it matters in this module. Do not report anything the gate's ruff run already reports.
+What Ryan treats as a smell, why, and where the evidence comes from. `fact:` names the `python-harness inspect facts` kind that locates candidates mechanically; `pylens:` means the evidence needs reading. A fact is a candidate, never a finding: confirm it against the code, then decide whether it matters in this module. Do not report anything the gate's ruff run already reports.
 
 ## Control flow
 

@@ -1,6 +1,8 @@
 """Gate inputs from a survey, child environments, output tails and git status entries."""
 
+import json
 import os
+import subprocess
 from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -148,48 +150,53 @@ class TestTakeOutputTail:
 
 
 class TestBuildChildEnvironment:
-    SHIM_ENVIRONMENT = Path('/cache/pythonista/venv')
-    SHIM_SCRIPTS = SHIM_ENVIRONMENT.joinpath(VIRTUALENV_SCRIPTS)
-    SHIM_PARENT = MappingProxyType(
+    ACTIVE_VIRTUALENV = Path('/work/shop/.venv')
+    ACTIVE_SCRIPTS = ACTIVE_VIRTUALENV.joinpath(VIRTUALENV_SCRIPTS)
+    LAUNCHER_ENVIRONMENT = Path('/home/ryan/.cache/uv/archive-v0/pinned')
+    LAUNCHER_SCRIPTS = LAUNCHER_ENVIRONMENT.joinpath(VIRTUALENV_SCRIPTS)
+    SESSION_PARENT = MappingProxyType(
         {
-            'PATH': join_search_path(SHIM_SCRIPTS, '/usr/local/bin', '/usr/bin'),
-            'VIRTUAL_ENV': str(SHIM_ENVIRONMENT),
-            'UV_PROJECT': '/plugins/pythonista',
-            'PYTHONPYCACHEPREFIX': '/home/ryan/.cache/pythonista/pycache',
+            'PATH': join_search_path(ACTIVE_SCRIPTS, '/usr/local/bin', '/usr/bin'),
+            'VIRTUAL_ENV': str(ACTIVE_VIRTUALENV),
+            'UV': '/usr/local/bin/uv',
             'HOME': '/home/ryan',
         }
     )
+    LAUNCHER_PARENT = MappingProxyType(
+        {'PATH': join_search_path(LAUNCHER_SCRIPTS, ACTIVE_SCRIPTS, '/usr/bin')}
+    )
+    LAUNCHER_OPTIONS = GateOptions(launcher_environment=LAUNCHER_ENVIRONMENT)
 
     @pytest.mark.parametrize(
         ('parent', 'expected'),
         [
             pytest.param(
-                SHIM_PARENT,
+                SESSION_PARENT,
                 {
                     'PATH': join_search_path('/usr/local/bin', '/usr/bin'),
                     'HOME': '/home/ryan',
                     'PYTHONDONTWRITEBYTECODE': '1',
                 },
-                id='shim-virtualenv-scripts-leave-path-with-its-variables',
+                id='active-virtualenv-scripts-leave-path-with-the-dropped-variables',
             ),
             pytest.param(
                 {
-                    'PATH': join_search_path('/usr/bin', f'{SHIM_SCRIPTS}/'),
-                    'VIRTUAL_ENV': str(SHIM_ENVIRONMENT),
+                    'PATH': join_search_path('/usr/bin', f'{ACTIVE_SCRIPTS}/'),
+                    'VIRTUAL_ENV': str(ACTIVE_VIRTUALENV),
                 },
                 {'PATH': '/usr/bin', 'PYTHONDONTWRITEBYTECODE': '1'},
                 id='trailing-separator-still-matches',
             ),
             pytest.param(
-                {'PATH': join_search_path(SHIM_SCRIPTS, '/usr/bin')},
+                {'PATH': join_search_path(ACTIVE_SCRIPTS, '/usr/bin')},
                 {
-                    'PATH': join_search_path(SHIM_SCRIPTS, '/usr/bin'),
+                    'PATH': join_search_path(ACTIVE_SCRIPTS, '/usr/bin'),
                     'PYTHONDONTWRITEBYTECODE': '1',
                 },
                 id='path-untouched-without-a-virtualenv',
             ),
             pytest.param(
-                {'VIRTUAL_ENV': str(SHIM_ENVIRONMENT)},
+                {'VIRTUAL_ENV': str(ACTIVE_VIRTUALENV)},
                 {'PYTHONDONTWRITEBYTECODE': '1'},
                 id='no-path-is-invented',
             ),
@@ -201,9 +208,55 @@ class TestBuildChildEnvironment:
     def test_child_environment_overrides_the_parent(self) -> None:
         override = MappingProxyType({'HOME': '/home/isolated'})
 
-        child = build_child_environment(self.SHIM_PARENT, GateOptions(child_environment=override))
+        child = build_child_environment(
+            self.SESSION_PARENT, GateOptions(child_environment=override)
+        )
 
         assert child['HOME'] == override['HOME']
+
+    def test_the_launchers_scripts_leave_path(self) -> None:
+        child = build_child_environment(self.LAUNCHER_PARENT, self.LAUNCHER_OPTIONS)
+
+        assert child['PATH'] == join_search_path(self.ACTIVE_SCRIPTS, '/usr/bin')
+
+
+class TestLauncherEnvironment:
+    PLUGIN_ROOT = Path(__file__).parents[2]
+    LAUNCHER = PLUGIN_ROOT.joinpath('bin', 'python-harness')
+    SET_BY_UV_RUN = frozenset({'UV', 'UV_RUN_RECURSION_DEPTH', 'VIRTUAL_ENV'})
+    REPORT = (
+        'import json, os, sys\n'
+        'sys.path.insert(0, sys.argv[1])\n'
+        'from python_harness.gate.domain import GateOptions\n'
+        'from python_harness.gate.util import build_child_environment\n'
+        'child = build_child_environment(os.environ, GateOptions())\n'
+        'print(json.dumps([dict(os.environ), child]))\n'
+    )
+
+    @pytest.fixture
+    def session(self) -> dict[str, str]:
+        return {name: value for name, value in os.environ.items() if name not in self.SET_BY_UV_RUN}
+
+    @pytest.fixture
+    def launched(self, session: dict[str, str]) -> list[dict[str, str]]:
+        shebang = self.LAUNCHER.read_text(encoding='utf-8').splitlines()[0]
+        interpreter, arguments = shebang.removeprefix('#!').split(' ', 1)
+        completed = subprocess.run(  # noqa: S603  the launcher's own shebang, with a fixed script.
+            (interpreter, arguments, '-c', self.REPORT, str(self.PLUGIN_ROOT.joinpath('src'))),
+            env=session,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return json.loads(completed.stdout)
+
+    def test_nothing_the_launcher_adds_reaches_the_tools(
+        self, session: dict[str, str], launched: list[dict[str, str]]
+    ) -> None:
+        environment, child = launched
+
+        assert environment != session
+        assert child == session | dict(GateOptions().child_environment)
 
 
 class TestUntrackedPathsFromStatus:

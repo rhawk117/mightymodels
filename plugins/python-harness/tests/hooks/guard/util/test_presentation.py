@@ -20,7 +20,7 @@ class TestNote:
 
         assert note.splitlines() == [
             (
-                'Note from the pythonista plugin: this command ran plain `python`,'
+                'Note from the python-harness plugin: this command ran plain `python`,'
                 ' `python3`, which can pick a different interpreter or packages than the'
                 ' project environment, so its result may be incorrect. Run Python with'
                 ' `uv run python`, and rerun it that way if the result matters:'
@@ -46,6 +46,6 @@ class TestGuardRule:
         assert describe_guard_rule(GuardOptions()) == (
             '- Run Python with `uv run python ...`: plain python, python3 or pythonX.Y'
             ' can pick a different interpreter or packages than the project environment'
-            ' and give an incorrect result. The pythonista plugin adds a note when a'
+            ' and give an incorrect result. The python-harness plugin adds a note when a'
             ' Bash command runs one.'
         )

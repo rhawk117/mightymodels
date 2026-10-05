@@ -1,15 +1,15 @@
-# `pythonista inspect` reference
+# `python-harness inspect` reference
 
-Every command prints one compact JSON document on stdout. Run it from the reviewed project's root (the directory holding its `pyproject.toml`), or pass `--root DIR`. A failure the CLI understands prints `pythonista: <message>` on stderr and exits 2. Paths in output are relative to the root and use `/`, except `survey.root` and the config paths inside the gate's argv, which are absolute.
+Every command prints one compact JSON document on stdout. Run it from the reviewed project's root (the directory holding its `pyproject.toml`), or pass `--root DIR`. A failure the CLI understands prints `python-harness: <message>` on stderr and exits 2. Paths in output are relative to the root and use `/`, except `survey.root` and the config paths inside the gate's argv, which are absolute.
 
 | Command | Exit code | Use |
 | --- | --- | --- |
-| `pythonista inspect survey` | 0 | Mode evidence, domains, ruff config, layout |
-| `pythonista inspect gate --fallback-ruff-config ${CLAUDE_SKILL_DIR}/assets/ruff.toml` | 0 passed, 1 a tool failed | Runs the project's own ruff check, ruff format check, ty and pytest |
-| `pythonista inspect surface --codebase [PATH ...]` or `--diff BASE [--head REF]` | 0 | Review surface as import-graph clusters, one pylens dispatch each |
-| `pythonista inspect facts PATH... [--with-function-shapes]` | 0 | Mechanical AST facts per module |
-| `pythonista inspect calls PATH... [--symbol NAME]` | 0 | Per-module coupling metrics and reference tallies; `--symbol` lists one symbol's call sites |
-| `pythonista inspect cite DOCUMENT` or `cite -` (stdin) | 0 all hold, 1 any failed | Checks every `path.py:line` citation and its quote in a Markdown document |
+| `python-harness inspect survey` | 0 | Mode evidence, domains, ruff config, layout |
+| `python-harness inspect gate --fallback-ruff-config ${CLAUDE_SKILL_DIR}/assets/ruff.toml` | 0 passed, 1 a tool failed | Runs the project's own ruff check, ruff format check, ty and pytest |
+| `python-harness inspect surface --codebase [PATH ...]` or `--diff BASE [--head REF]` | 0 | Review surface as import-graph clusters, one pylens dispatch each |
+| `python-harness inspect facts PATH... [--with-function-shapes]` | 0 | Mechanical AST facts per module |
+| `python-harness inspect calls PATH... [--symbol NAME]` | 0 | Per-module coupling metrics and reference tallies; `--symbol` lists one symbol's call sites |
+| `python-harness inspect cite DOCUMENT` or `cite -` (stdin) | 0 all hold, 1 any failed | Checks every `path.py:line` citation and its quote in a Markdown document |
 
 A missing target path is an error (exit 2), never an empty result. Files that cannot be read or parsed (bad encoding, syntax errors) are listed under `unparsable` instead of stopping the command.
 

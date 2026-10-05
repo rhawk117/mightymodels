@@ -1,4 +1,4 @@
-"""The `pythonista hooks` commands as Claude Code runs them, and lazy group loading."""
+"""The `python-harness hooks` commands as Claude Code runs them, and lazy group loading."""
 
 import io
 import json
@@ -8,8 +8,8 @@ from types import MappingProxyType
 
 import pytest
 from python_harness.cli import build_parser, main, requested_groups
-from python_harness.commands.domain import ProcessEdge
-from python_harness.commands.exit_codes import ExitCode
+from python_harness.cli.domain import ProcessEdge
+from python_harness.cli.exit_codes import ExitCode
 from python_harness.core.tests.fixtures import ProjectBuilder
 from python_harness.hooks.tests.payloads import (
     bash_payload,
@@ -49,7 +49,7 @@ class TestGuardPython:
     def test_an_unreadable_payload_exits_one(self) -> None:
         exit_code, stdout, stderr = run_hook('guard-python', 'not json')
 
-        assert (exit_code, stdout, stderr.startswith('pythonista hooks: ')) == (
+        assert (exit_code, stdout, stderr.startswith('python-harness hooks: ')) == (
             ExitCode.FAILED,
             '',
             True,

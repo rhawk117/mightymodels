@@ -6,9 +6,9 @@ from types import MappingProxyType
 
 import pytest
 from python_harness.cli import main
-from python_harness.commands.domain import InspectCommand, ProcessEdge
-from python_harness.commands.exit_codes import ExitCode
-from python_harness.commands.inspection import default_inspect_commands
+from python_harness.cli.domain import InspectCommand, ProcessEdge
+from python_harness.cli.exit_codes import ExitCode
+from python_harness.cli.inspection import default_inspect_commands
 from python_harness.core.tests.fixtures import GitProject, ProjectBuilder
 from python_harness.core.tests.support import JsonDocument
 from python_harness.core.workspace import Workspace
@@ -126,7 +126,7 @@ class TestGate:
 
         assert (exit_code, stderr) == (
             ExitCode.ERROR,
-            f'pythonista: --fallback-ruff-config {missing} is not a file\n',
+            f'python-harness: --fallback-ruff-config {missing} is not a file\n',
         )
 
 
@@ -157,7 +157,7 @@ class TestSurfaceCodebase:
 
         assert (exit_code, stderr) == (
             ExitCode.ERROR,
-            'pythonista: --head feature needs --diff BASE\n',
+            'python-harness: --head feature needs --diff BASE\n',
         )
 
 
@@ -268,7 +268,7 @@ class TestUndecodableDocument:
     def test_undecodable_document_exits_error_with_a_message(self, workspace: Workspace) -> None:
         exit_code, stderr = run_failing_inspect(workspace, 'cite', self.DOCUMENT)
 
-        expected_start = f'pythonista: citation document {self.DOCUMENT} is not readable'
+        expected_start = f'python-harness: citation document {self.DOCUMENT} is not readable'
         assert (exit_code, stderr.startswith(expected_start)) == (ExitCode.ERROR, True)
 
 
@@ -286,7 +286,7 @@ class TestPathErrors:
     ) -> None:
         exit_code, stderr = run_failing_inspect(workspace, *command)
 
-        assert (exit_code, stderr.startswith('pythonista: ')) == (ExitCode.ERROR, True)
+        assert (exit_code, stderr.startswith('python-harness: ')) == (ExitCode.ERROR, True)
 
 
 class TestUndecodableSource:

@@ -4,7 +4,7 @@ import argparse
 from collections.abc import Mapping
 from pathlib import Path
 
-from python_harness.commands.domain import CommandDefinition, CommandGroup
+from python_harness.cli.domain import CommandDefinition, CommandGroup
 
 
 def add_root_option(parser: argparse.ArgumentParser) -> None:

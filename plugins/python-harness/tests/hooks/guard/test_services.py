@@ -66,7 +66,7 @@ class TestQuietCommands:
             pytest.param('env python x', id='behind-a-wrapper'),
             pytest.param('bash -c "python3 -V"', id='nested-shell'),
             pytest.param("cat <<'EOF' > f\npython x\nEOF", id='heredoc-data'),
-            pytest.param('pythonista docs read json.dumps', id='longer-name'),
+            pytest.param('python-harness inspect survey', id='longer-name'),
             pytest.param('$PYTHON x.py', id='expansion-name'),
             pytest.param('', id='empty'),
             pytest.param('echo "unterminated python', id='syntax-error'),

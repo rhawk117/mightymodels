@@ -27,7 +27,7 @@ from python_harness.hooks.briefing.util.environments import (
 )
 from python_harness.hooks.presentation import ELLIPSIS, code_span
 
-HEADER = '## Python toolchain (pythonista session scan)'
+HEADER = '## Python toolchain (python-harness session scan)'
 TRUNCATION_MARK = '\n- (briefing truncated)'
 LIST_SEPARATOR = ', '
 WORD_SEPARATOR = ' '

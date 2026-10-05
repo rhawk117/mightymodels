@@ -52,7 +52,7 @@ Decisions belong in the layer that has the information to make them. Configurati
 
 ## Library mode and application mode
 
-The skill infers the mode from `pythonista inspect survey` and the user can override it.
+The skill infers the mode from `python-harness inspect survey` and the user can override it.
 
 - Library code is written for strangers who do not share Ryan's opinions: deliberately defensive, readable, with a narrow, sealed public surface (one entry point to import, configuration through builders or options with safe defaults and named presets, entry functions of about two arguments). Breadth of public surface is a finding here.
 - Application code is boring and conventional by design, because the reader shares the author's priors. Do not demand a sealed surface or defensive validation inside the application; demand conventional structure and explicit dependencies.

@@ -1,4 +1,4 @@
-"""The plugin's hook registration: both events, the Bash filter, and the shim they run."""
+"""The plugin's hook registration: both events, the Bash filter, and the launcher they run."""
 
 import json
 import os
@@ -41,13 +41,13 @@ class TestHooksJson:
         )
 
     @pytest.mark.parametrize(('event', 'handler'), hook_handlers())
-    def test_each_hook_runs_the_cli_shim(self, event: str, handler: dict[str, object]) -> None:
-        executable, group, _ = shlex.split(str(handler['command']))
-        shim = PLUGIN_ROOT.joinpath(executable.removeprefix(PLUGIN_ROOT_VARIABLE))
+    def test_each_hook_runs_the_cli_launcher(self, event: str, handler: dict[str, object]) -> None:
+        executable, group, *_ = shlex.split(str(handler['command']))
+        launcher = PLUGIN_ROOT.joinpath(executable.removeprefix(PLUGIN_ROOT_VARIABLE))
 
-        assert (event, shim.relative_to(PLUGIN_ROOT).as_posix(), group) == (
+        assert (event, launcher.relative_to(PLUGIN_ROOT).as_posix(), group) == (
             event,
-            'bin/pythonista',
+            'bin/python-harness',
             'hooks',
         )
 
@@ -55,11 +55,11 @@ class TestHooksJson:
     def test_each_subcommand_is_one_the_cli_knows(
         self, event: str, handler: dict[str, object]
     ) -> None:
-        _, group, subcommand = shlex.split(str(handler['command']))
+        _, group, subcommand, *_ = shlex.split(str(handler['command']))
 
         arguments = build_parser({group}).parse_args((group, subcommand))
 
         assert arguments.command == SUBCOMMANDS[event]
 
-    def test_the_shim_is_executable(self) -> None:
-        assert os.access(PLUGIN_ROOT.joinpath('bin', 'pythonista'), os.X_OK)
+    def test_the_launcher_is_executable(self) -> None:
+        assert os.access(PLUGIN_ROOT.joinpath('bin', 'python-harness'), os.X_OK)

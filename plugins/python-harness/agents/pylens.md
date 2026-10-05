@@ -42,5 +42,5 @@ A question with nothing to report gets the line `None found.` instead of a table
 </output_format>
 
 <verification>
-Before returning, re-open every cited line and confirm the quote appears in it exactly and the fact follows from the cited code alone. Delete any row that fails. The reviewer verifies by running `pythonista inspect cite -` on your output.
+Before returning, re-open every cited line and confirm the quote appears in it exactly and the fact follows from the cited code alone. Delete any row that fails. The reviewer verifies by running `python-harness inspect cite -` on your output.
 </verification>

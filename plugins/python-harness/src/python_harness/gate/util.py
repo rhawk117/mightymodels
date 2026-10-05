@@ -2,7 +2,7 @@
 
 import os
 import sys
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
 
 from python_harness.gate.domain import GateInputs, GateOptions
@@ -35,18 +35,24 @@ def take_output_tail(output: bytes | bytearray, line_count: int) -> str:
     return '\n'.join(lines[max(len(lines) - line_count, 0) :])
 
 
-def remove_search_path_entry(search_path: str, directory: Path) -> str:
+def remove_search_path_entries(search_path: str, directories: Collection[Path]) -> str:
     entries = search_path.split(os.pathsep)
-    return os.pathsep.join(entry for entry in entries if Path(entry) != directory)
+    return os.pathsep.join(entry for entry in entries if Path(entry) not in directories)
+
+
+def list_virtualenv_scripts(parent: Mapping[str, str], options: GateOptions) -> frozenset[Path]:
+    virtualenvs = (parent.get(VIRTUAL_ENV), options.launcher_environment)
+    return frozenset(
+        Path(virtualenv, VIRTUALENV_SCRIPTS) for virtualenv in virtualenvs if virtualenv is not None
+    )
 
 
 def build_child_environment(parent: Mapping[str, str], options: GateOptions) -> dict[str, str]:
     dropped = options.dropped_environment
     kept = {name: value for name, value in parent.items() if name not in dropped}
-    virtual_env = parent.get(VIRTUAL_ENV)
-    if virtual_env is not None and SEARCH_PATH in kept:
-        scripts = Path(virtual_env, VIRTUALENV_SCRIPTS)
-        kept[SEARCH_PATH] = remove_search_path_entry(kept[SEARCH_PATH], scripts)
+    if SEARCH_PATH in kept:
+        scripts = list_virtualenv_scripts(parent, options)
+        kept[SEARCH_PATH] = remove_search_path_entries(kept[SEARCH_PATH], scripts)
     return kept | dict(options.child_environment)
 
 

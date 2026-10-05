@@ -1,4 +1,4 @@
-"""The `pythonista inspect` group: facts about a project as JSON, never verdicts."""
+"""The `python-harness inspect` group: facts about a project as JSON, never verdicts."""
 
 import argparse
 from pathlib import Path
@@ -15,7 +15,7 @@ from python_harness.citations.services import (
     check_citations,
     check_citations_in_stream,
 )
-from python_harness.commands.domain import (
+from python_harness.cli.domain import (
     CallsRequest,
     CitedDocument,
     CommandDefinition,
@@ -25,12 +25,12 @@ from python_harness.commands.domain import (
     ProcessEdge,
     StandardInput,
 )
-from python_harness.commands.errors import (
+from python_harness.cli.errors import (
     FallbackRuffConfigMissingError,
     HeadWithoutDiffError,
 )
-from python_harness.commands.exit_codes import ExitCode, exit_code_for
-from python_harness.commands.util import add_command_parsers, build_root_parent
+from python_harness.cli.exit_codes import ExitCode, exit_code_for
+from python_harness.cli.util import add_command_parsers, build_root_parent
 from python_harness.core.output import write_document
 from python_harness.core.workspace import Workspace, open_workspace
 from python_harness.facts.services import (

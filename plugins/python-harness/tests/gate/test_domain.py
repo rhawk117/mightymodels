@@ -1,7 +1,4 @@
-"""Gate values: command argv, outcomes, and the environment the shim exports."""
-
-import re
-from pathlib import Path
+"""Gate values: command argv, outcomes and created paths."""
 
 import pytest
 from python_harness.core.output import to_json_value
@@ -10,7 +7,6 @@ from python_harness.gate.domain import (
     CreationTracking,
     Exited,
     GateCommand,
-    GateOptions,
     GateOutcome,
     GateResult,
     GateTool,
@@ -67,19 +63,3 @@ class TestCreatedPathsDocument:
         self, created_paths: CreationTracking, expected: dict[str, object]
     ) -> None:
         assert to_json_value(created_paths) == expected
-
-
-class TestShimEnvironment:
-    SHIM = Path(__file__).parents[2].joinpath('bin', 'pythonista')
-    EXPORT = re.compile(r'^export (?P<name>\w+)=', re.MULTILINE)
-
-    @pytest.fixture
-    def exported(self) -> frozenset[str]:
-        text = self.SHIM.read_text(encoding='utf-8')
-        return frozenset(found['name'] for found in self.EXPORT.finditer(text))
-
-    def test_every_variable_the_shim_exports_is_dropped_for_the_tools(
-        self, exported: frozenset[str]
-    ) -> None:
-        assert exported
-        assert exported <= GateOptions().dropped_environment

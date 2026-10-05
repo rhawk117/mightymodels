@@ -1,14 +1,14 @@
 {
-  "description": "pythonista: brief each session on the project's Python toolchain, and add a note when a Bash command runs plain python instead of uv run python.",
+  "description": "python-harness: brief each session on the project's Python toolchain, and add a note when a Bash command runs plain python instead of uv run python.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pythonista\" hooks session-start",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/python-harness\" hooks session-start || exit 1",
             "timeout": 300,
-            "statusMessage": "pythonista: scanning the Python toolchain"
+            "statusMessage": "python-harness: scanning the Python toolchain"
           }
         ]
       }
@@ -20,7 +20,7 @@
           {
             "type": "command",
             "if": "Bash(*python*)",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/pythonista\" hooks guard-python",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/python-harness\" hooks guard-python || exit 1",
             "timeout": 60
           }
         ]

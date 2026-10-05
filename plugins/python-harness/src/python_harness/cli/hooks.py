@@ -1,4 +1,4 @@
-"""The `pythonista hooks` group: Claude Code hook handlers, event JSON in, hook JSON out.
+"""The `python-harness hooks` group: Claude Code hook handlers, event JSON in, hook JSON out.
 
 A payload they cannot read is reported on stderr with exit code 1, a non-blocking hook
 error to Claude Code; exit code 2 would block the tool call.
@@ -9,10 +9,10 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from python_harness.commands.domain import CommandDefinition, HookCommand, HookCommands, ProcessEdge
-from python_harness.commands.exit_codes import ExitCode
-from python_harness.commands.util import add_command_parsers
-from python_harness.core.errors import PythonistaError
+from python_harness.cli.domain import CommandDefinition, HookCommand, HookCommands, ProcessEdge
+from python_harness.cli.exit_codes import ExitCode
+from python_harness.cli.util import add_command_parsers
+from python_harness.core.errors import PythonHarnessError
 from python_harness.core.output import JsonValue, write_document
 from python_harness.hooks.guard.domain import GuardOptions, Nudge
 from python_harness.hooks.guard.services import judge_tool_call
@@ -52,8 +52,8 @@ def answer_guard(payload: str, _environment: Mapping[str, str]) -> JsonValue | N
 def run_hook(answer: HookAnswer, edge: ProcessEdge) -> ExitCode:
     try:
         document = answer(edge.stdin.read(), edge.environment)
-    except PythonistaError as error:
-        edge.stderr.write(f'pythonista hooks: {error}\n')
+    except PythonHarnessError as error:
+        edge.stderr.write(f'python-harness hooks: {error}\n')
         return NON_BLOCKING_FAILURE
     if document is not None:
         write_document(document, edge.stdout)
