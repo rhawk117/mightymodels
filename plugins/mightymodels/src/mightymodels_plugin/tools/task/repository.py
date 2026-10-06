@@ -7,6 +7,9 @@ here on that same session and nowhere else: one transaction serves the three.
 
 A method that changes a task takes the transition the change is part of and stores the
 transition's row with it, so no task moves without its record.
+
+A task's base is the HEAD of its first start that had one. A restart keeps it, so what the task
+changed is measured from where its first attempt began.
 """
 
 from collections.abc import Collection, Generator, Sequence
@@ -90,13 +93,15 @@ class TaskRepository:
         return list(self.session.scalars(query))
 
     def record_start(self, slug: Slug, transition: Transition, attempt: Attempt) -> None:
+        started = self.row(slug, transition.task_id)
+        first_base = None if started is None else started.base
         self.session.merge(
             TaskRow(
                 slug=slug.root,
                 task_id=transition.task_id,
                 status=transition.after,
                 owned=list(attempt.owned),
-                base=transition.head,
+                base=transition.head if first_base is None else first_base,
                 commit=None,
                 reasons=[],
                 updated_at=transition.at,

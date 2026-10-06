@@ -586,6 +586,56 @@ class TestReadyBeforeTheFirstCommit:
         assert '  - T1.AC-1 has no receipt at the current HEAD' in outcome.out.splitlines()
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Restarted:
+    first_base: str
+    head: str
+    blocked: Outcome
+    restart: Outcome
+
+
+class TestARestart:
+    OUTSIDE = 'deploy/values.yaml'
+    BLOCKED_ON_THE_CHANGE = f'T1 blocked\n  - changed outside the owned set: {OUTSIDE}\n'
+    TRANSITIONS = (
+        ('pending', 'in-progress'),
+        ('in-progress', 'blocked'),
+        ('blocked', 'in-progress'),
+    )
+
+    @pytest.fixture
+    def restarted(self, repo: Repo) -> Restarted:
+        repo.approve('T1.AC-1')
+        first_base = repo.git('rev-parse', 'HEAD')
+        start(repo)
+        head = repo.commit(self.OUTSIDE, 'pool: 5\n')
+        repo.receipt('T1.AC-1', 'pass', head)
+        blocked = repo.run('verify', 'T1', commit=head)
+        return Restarted(first_base=first_base, head=head, blocked=blocked, restart=start(repo))
+
+    def test_a_restart_keeps_the_base_of_the_first_start(
+        self, repo: Repo, restarted: Restarted
+    ) -> None:
+        task = repo.task('T1')
+
+        assert restarted.restart.code == ADVANCED
+        assert (task.status, task.base, task.owned, task.attempts) == (
+            'in-progress',
+            restarted.first_base,
+            ('src/queue.py',),
+            {'engineer': 2},
+        )
+        assert repo.transitions() == list(self.TRANSITIONS)
+
+    def test_a_restarted_task_stays_blocked_on_the_same_change_outside_the_owned_set(
+        self, repo: Repo, restarted: Restarted
+    ) -> None:
+        outcome = repo.run('verify', 'T1', commit=restarted.head)
+
+        assert restarted.blocked.out == self.BLOCKED_ON_THE_CHANGE
+        assert (outcome.code, outcome.out) == (BLOCKED, self.BLOCKED_ON_THE_CHANGE)
+
+
 def ticket_status(repo: Repo) -> str:
     with ticket_transaction(repo.tasks.database) as repository:
         return repository.staged_row(TICKET).status
