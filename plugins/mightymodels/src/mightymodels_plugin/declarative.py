@@ -18,10 +18,10 @@ repository key, a slug, a task id and a run id are refused over theirs before th
 `Word` is a member of an enum, a `Sha` is a git object name or a SHA-256 digest, and a `Timestamp`
 is written by the clock. A `Name` and a `Prose` hold text a caller wrote, and the request model
 that takes the text refuses it over the column's length before a row is written:
-`tools/request.py` has the types. Two texts reach such a column another way and are not held to
-it. One is text redaction has lengthened, since the marker that replaces a secret can be longer
-than the secret. The other is a ticket's lines, which `validate` reads from a `ticket.yml` the
-user may have edited by hand.
+`tools/request.py` has the types. One text reaches such a column another way and is not held to
+it: a ticket's lines, which `validate` reads from a `ticket.yml` the user may have edited by
+hand. Text that redaction has lengthened past its column is refused, since the marker that
+replaces a secret can be longer than the secret.
 
 A column the plugin has a default for carries it as a server default, so a row written without the
 column reads as one the plugin wrote. A `Timestamp` left out is the time of the write, in the

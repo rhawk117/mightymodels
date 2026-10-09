@@ -27,8 +27,9 @@ from types import MappingProxyType
 
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.declarative import NAME_LIMIT, PROSE_LIMIT
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.redaction import redact
+from mightymodels_plugin.redaction import redact_within
 from mightymodels_plugin.routing import Depth, Worker, reviewer_model
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
@@ -262,8 +263,8 @@ def decided_finding(finding_id: str, entry: Disposition, *, by: str) -> DecidedF
     return DecidedFinding(
         finding_id=finding_id,
         decision=entry.decision,
-        reason=redact(entry.reason.strip()),
-        by=redact(by),
+        reason=redact_within(entry.reason.strip(), 'reason', PROSE_LIMIT),
+        by=redact_within(by, 'by', NAME_LIMIT),
         at=now(),
     )
 
@@ -377,7 +378,9 @@ class ReviewService:
                     finding_id=payload.finding,
                     result=payload.result,
                     commit='' if payload.commit is None else payload.commit,
-                    reason='' if payload.reason is None else redact(payload.reason),
+                    reason=''
+                    if payload.reason is None
+                    else redact_within(payload.reason, 'reason', PROSE_LIMIT),
                     at=now(),
                 ),
             )

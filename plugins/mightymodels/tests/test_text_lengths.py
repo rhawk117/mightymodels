@@ -626,6 +626,8 @@ class RedactedCall:
     field: str
     limit: int = PROSE_LIMIT
     report: str = report_with()
+    findings: int = 0
+    chosen: bool = False
 
     def refusal(self) -> str:
         redacted = self.limit + GROWTH
@@ -635,6 +637,25 @@ class RedactedCall:
 def reported(field: str, **given: str) -> RedactedCall:
     added = {'action': 'add', 'run_id': RUN.root, 'payload': {'persona': 'merge-vader'}}
     return RedactedCall(tool='review', arguments=added, field=field, report=report_with(**given))
+
+
+def decided(
+    field: str,
+    payload: dict[str, object],
+    *,
+    action: str = 'dispose',
+    limit: int = PROSE_LIMIT,
+    chosen: bool = False,
+) -> RedactedCall:
+    arguments = {'action': action, 'run_id': RUN.root, 'payload': payload}
+    return RedactedCall(
+        tool='review',
+        arguments=arguments,
+        field=field,
+        limit=limit,
+        findings=1,
+        chosen=chosen,
+    )
 
 
 class TestRedactionWithinALimit:
@@ -684,9 +705,23 @@ class TestTextRedactionLengthensPastItsLimit:
         reported('fix', fix=PROSE),
         reported('verify', verify=PROSE),
         reported('evidence cite', cite=PROSE),
+        decided(
+            'reason',
+            {'by': 'user', 'decisions': {'F1': {'decision': 'fix', 'reason': PROSE}}},
+        ),
+        decided('by', {'by': NAME, 'decisions': {'F1': {'decision': 'fix'}}}, limit=NAME_LIMIT),
+        decided(
+            'reason',
+            {'finding': 'F1', 'result': 'failed', 'reason': PROSE},
+            action='resolve',
+            chosen=True,
+        ),
     )
     EACH_CALL = tuple(
-        pytest.param(call, id=f'{call.tool}-{call.field.replace(" ", "-")}') for call in CALLS
+        pytest.param(
+            call, id=f'{call.tool}-{call.arguments["action"]}-{call.field.replace(" ", "-")}'
+        )
+        for call in CALLS
     )
 
     @pytest.fixture
@@ -711,6 +746,10 @@ class TestTextRedactionLengthensPastItsLimit:
     @pytest.fixture
     def run_with_the_report(self, call: RedactedCall, review_service: ReviewService) -> None:
         started_run_with(review_service, call.report)
+        if call.findings:
+            review_service.add(RUN, Persona.MERGE_VADER)
+        if call.chosen:
+            review_service.dispose(RUN, DisposePayload.model_validate(VALID[DisposePayload]))
 
     @pytest.mark.parametrize('call', EACH_CALL)
     @pytest.mark.usefixtures('closable_ticket', 'started_investigation', 'run_with_the_report')
@@ -722,7 +761,10 @@ class TestTextRedactionLengthensPastItsLimit:
         assert result.is_error
         assert call.refusal() in text_of(result)
         assert 'validation error' not in text_of(result)
-        assert rows_held(repository_database) == self.ARRANGED
+        assert rows_held(repository_database) == {
+            **self.ARRANGED,
+            'review_findings': call.findings,
+        }
 
 
 class TestAReviewReportWithTextOverItsLength:
