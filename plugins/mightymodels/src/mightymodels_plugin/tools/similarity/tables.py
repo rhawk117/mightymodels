@@ -25,7 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from mightymodels_plugin.declarative import (
     Base,
     Name,
-    Prose,
+    ReportProse,
     RepositoryName,
     Serial,
     Timestamp,
@@ -59,7 +59,7 @@ class SimilarityRow(Base):
     repository_key: Mapped[RepositoryName]
     kind: Mapped[Word]
     reference: Mapped[Name]
-    text: Mapped[Prose]
+    text: Mapped[ReportProse]
     at: Mapped[Timestamp]
 
 
@@ -70,7 +70,7 @@ class ScoutReportRow(Base):
     repository_key: Mapped[IndexedRepositoryName]
     scout: Mapped[Word]
     target: Mapped[Name]
-    report: Mapped[Prose]
+    report: Mapped[ReportProse]
     at: Mapped[Timestamp]
 
 

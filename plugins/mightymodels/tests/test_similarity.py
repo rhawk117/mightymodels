@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.database import DATABASE_NAME, Database, open_database
-from mightymodels_plugin.declarative import PROSE_LIMIT
+from mightymodels_plugin.declarative import REPORT_LIMIT
 from mightymodels_plugin.redaction import RedactedTextTooLongError
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.routing import Depth
@@ -60,6 +60,7 @@ THE_DRAIN_LOOP_REWORDED = 'drain loop sleeps between every retry batches'
 SHARES_ONE_WORD = 'drain the queue before shutdown completes'
 ONLY_COMMON_WORDS = 'it was the and that they would have about this'
 CREDENTIALS = '://a:b@'
+WORDS = 'the drain loop sleeps between every retry batch '
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -68,6 +69,10 @@ class Services:
     reviews: ReviewService
     crashouts: CrashoutService
     similarity: SimilarityService
+
+
+def words_of(length: int) -> str:
+    return (WORDS * (length // len(WORDS) + 1))[:length]
 
 
 def started_investigation(services: Services) -> Slug:
@@ -364,7 +369,7 @@ class TestStoredText:
     def test_that_redaction_takes_past_the_column_is_refused_and_nothing_is_stored(
         self, repository_database: Database, similarity_service: SimilarityService
     ) -> None:
-        lengthened = 'x' * (PROSE_LIMIT - len(CREDENTIALS)) + CREDENTIALS
+        lengthened = words_of(REPORT_LIMIT - len(CREDENTIALS)) + CREDENTIALS
         written = Written(kind=SimilarityKind.CRASHOUT, reference='#1', text=lengthened)
 
         with (
@@ -373,8 +378,8 @@ class TestStoredText:
         ):
             repository.record(written)
 
-        assert (refused.value.field, refused.value.limit) == ('text', PROSE_LIMIT)
-        assert refused.value.length > PROSE_LIMIT
+        assert (refused.value.field, refused.value.limit) == ('text', REPORT_LIMIT)
+        assert refused.value.length > REPORT_LIMIT
         assert references_found(similarity_service, lengthened) == []
 
 

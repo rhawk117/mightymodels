@@ -99,13 +99,13 @@
     "type": "table",
     "name": "scout_reports",
     "tbl_name": "scout_reports",
-    "sql": "CREATE TABLE scout_reports (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tscout VARCHAR(32) NOT NULL, \n\ttarget VARCHAR(255) NOT NULL, \n\treport VARCHAR(4000) NOT NULL, \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id)\n)"
+    "sql": "CREATE TABLE scout_reports (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tscout VARCHAR(32) NOT NULL, \n\ttarget VARCHAR(255) NOT NULL, \n\treport VARCHAR(60000) NOT NULL, \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id)\n)"
   },
   {
     "type": "table",
     "name": "similarity",
     "tbl_name": "similarity",
-    "sql": "CREATE TABLE similarity (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tkind VARCHAR(32) NOT NULL, \n\treference VARCHAR(255) NOT NULL, \n\ttext VARCHAR(4000) NOT NULL, \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id), \n\tUNIQUE (repository_key, kind, reference)\n)"
+    "sql": "CREATE TABLE similarity (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tkind VARCHAR(32) NOT NULL, \n\treference VARCHAR(255) NOT NULL, \n\ttext VARCHAR(60000) NOT NULL, \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id), \n\tUNIQUE (repository_key, kind, reference)\n)"
   },
   {
     "type": "table",

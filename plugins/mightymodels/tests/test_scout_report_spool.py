@@ -8,8 +8,12 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.database import DATABASE_NAME, SCHEMA_VERSION, Database
-from mightymodels_plugin.declarative import PROSE_LIMIT
-from mightymodels_plugin.repository_key import RepositoryKey, spool_file_prefix
+from mightymodels_plugin.declarative import NAME_LIMIT, REPORT_LIMIT
+from mightymodels_plugin.repository_key import (
+    REPOSITORY_KEY_LIMIT,
+    RepositoryKey,
+    spool_file_prefix,
+)
 from mightymodels_plugin.tools.similarity.schema import SimilarityKind
 from mightymodels_plugin.tools.similarity.spool import (
     REJECTED_DIRECTORY,
@@ -35,6 +39,11 @@ OTHER_KEY = 'acme/gadgets'
 REPORT_TEXT = 'the drain loop sleeps between every retry batch'
 SEARCH: ToolCall = ('similarity', {'action': 'search', 'query': REPORT_TEXT})
 CREDENTIALS = '://a:b@'
+WORDS = 'the drain loop sleeps between every retry batch '
+
+
+def words_of(length: int) -> str:
+    return (WORDS * (length // len(WORDS) + 1))[:length]
 
 
 def report_for(key: str, **given: object) -> Report:
@@ -164,7 +173,7 @@ class TestAMalformedFile:
         pytest.param(json.dumps(report_for('../../escape')).encode(), id='key-with-separators'),
         pytest.param(json.dumps(report_for('')).encode(), id='empty-key'),
         pytest.param(
-            json.dumps(report_for(OTHER_KEY, report='x' * (PROSE_LIMIT + 1))).encode(),
+            json.dumps(report_for(OTHER_KEY, report=words_of(REPORT_LIMIT + 1))).encode(),
             id='report-over-its-column',
         ),
         pytest.param(b' ' * (SPOOL_FILE_BYTES + 1), id='over-the-file-size'),
@@ -218,7 +227,7 @@ class TestAMalformedFile:
     def test_with_text_that_redaction_lengthens_past_its_column_is_set_aside(
         self, own_key: str, spool: Path, state_server: StateServer, repository_database: Database
     ) -> None:
-        lengthened = 'x' * (PROSE_LIMIT - len(CREDENTIALS)) + CREDENTIALS
+        lengthened = words_of(REPORT_LIMIT - len(CREDENTIALS)) + CREDENTIALS
         file = spooled(spool, named(own_key, 'long'), report_for(own_key, report=lengthened))
 
         (searched,) = state_server.call(SEARCH)
@@ -426,6 +435,54 @@ class TestFilesOfAnotherRepositoryWaitingBeyondTheBound:
         assert not own_file.exists()
         assert len(scout_reports(repository_database)) == 1
         assert len(list(spool.glob('*.json'))) == SPOOL_FILES_PER_CALL + 2
+
+
+class TestALongReport:
+    @pytest.fixture
+    def at_the_limit(
+        self, own_key: str, spool: Path, state_server: StateServer
+    ) -> tuple[Path, Report]:
+        report = report_for(own_key, report=words_of(REPORT_LIMIT))
+        file = spooled(spool, named(own_key, 'long'), report)
+        state_server.call(SEARCH)
+        return file, report
+
+    @pytest.fixture
+    def over_the_limit(self, own_key: str, spool: Path, state_server: StateServer) -> Path:
+        file = spooled(
+            spool, named(own_key, 'longer'), report_for(own_key, report=words_of(REPORT_LIMIT + 1))
+        )
+        state_server.call(SEARCH)
+        return file
+
+    def test_the_limit_leaves_room_in_the_file_for_the_longest_key_and_target(self) -> None:
+        envelope = report_for('a' * REPOSITORY_KEY_LIMIT, target='t' * NAME_LIMIT, report='')
+
+        assert REPORT_LIMIT + len(json.dumps(envelope)) <= SPOOL_FILE_BYTES
+
+    def test_at_the_limit_it_is_stored_whole(
+        self, at_the_limit: tuple[Path, Report], repository_database: Database
+    ) -> None:
+        file, report = at_the_limit
+        (stored,) = scout_reports(repository_database)
+
+        assert not file.exists()
+        assert stored.report == report['report']
+        assert similarity_kinds(repository_database) == [SimilarityKind.SCOUT_REPORT]
+
+    def test_over_the_limit_it_is_set_aside_and_stores_nothing(
+        self, over_the_limit: Path, spool: Path, repository_database: Database
+    ) -> None:
+        assert not over_the_limit.exists()
+        assert len(rejected_files(spool)) == 1
+        assert scout_reports(repository_database) == []
+
+
+class TestTheSpoolFileNamePrefix:
+    WIDGETS_DIGEST = 'd782c874402305a00adcd10a58001c708039c0d0e86a047a74cc3616dd1fc713'
+
+    def test_is_the_sha256_hex_of_the_key_followed_by_a_dash(self) -> None:
+        assert spool_file_prefix(RepositoryKey('acme/widgets')) == f'{self.WIDGETS_DIGEST}-'
 
 
 class TestWhereNothingIsToBeTakenIn:

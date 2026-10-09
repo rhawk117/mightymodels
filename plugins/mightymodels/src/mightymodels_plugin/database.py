@@ -76,7 +76,7 @@ from mightymodels_plugin.tools.task.tables import AttemptRow, FailedFixRow, Task
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 
 DATABASE_NAME = 'mightymodels.db'
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 UNSTAMPED = 0
 STORED_VERSION = 'PRAGMA user_version'
 STAMP = f'{STORED_VERSION} = {SCHEMA_VERSION}'

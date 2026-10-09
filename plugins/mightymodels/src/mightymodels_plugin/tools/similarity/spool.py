@@ -7,8 +7,9 @@ object with exactly these keys:
     {"repository_key": "owner/name", "scout": "code-scout", "target": "...", "report": "..."}
 
 `scout` is `code-scout` or `web-scout`, `target` is at most `NAME_LIMIT` characters and `report`
-is non-blank text of at most `PROSE_LIMIT`. A writer creates the file under a name that does not
-end in `.json` and renames it to one that does, so the server never reads half a report.
+is non-blank text of at most `REPORT_LIMIT`, which leaves room for the other keys in a file of
+`SPOOL_FILE_BYTES`. A writer creates the file under a name that does not end in `.json` and
+renames it to one that does, so the server never reads half a report.
 
 `<digest>` is the SHA-256 hex digest of the repository key's text in UTF-8, and
 `spool_file_prefix` in `repository_key.py` gives `<digest>-` for a key, so a writer names its file

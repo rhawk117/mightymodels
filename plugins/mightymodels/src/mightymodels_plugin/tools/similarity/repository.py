@@ -24,7 +24,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
-from mightymodels_plugin.declarative import NAME_LIMIT, PROSE_LIMIT
+from mightymodels_plugin.declarative import NAME_LIMIT, REPORT_LIMIT
 from mightymodels_plugin.redaction import redact_within
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.tools.similarity.matching import (
@@ -108,7 +108,7 @@ class SimilarityRepository:
         return self.session.scalars(query).one_or_none()
 
     def record(self, written: Written) -> Duplicate | None:
-        stored = redact_within(written.text, 'text', PROSE_LIMIT)
+        stored = redact_within(written.text, 'text', REPORT_LIMIT)
         words = content_words(stored)
         rows = self.candidates(words, kind=None, excluding=written)
         earlier = closest(match_of(row, words) for row in rows)
@@ -135,7 +135,7 @@ class SimilarityRepository:
             repository_key=self.repository_key.root,
             scout=report.scout,
             target=redact_within(report.target, 'target', NAME_LIMIT),
-            report=redact_within(report.report, 'report', PROSE_LIMIT),
+            report=redact_within(report.report, 'report', REPORT_LIMIT),
         )
         self.session.add(row)
         self.session.flush()

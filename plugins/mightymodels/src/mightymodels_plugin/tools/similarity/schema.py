@@ -13,11 +13,11 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
-from mightymodels_plugin.declarative import PROSE_LIMIT
+from mightymodels_plugin.declarative import REPORT_LIMIT
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.tools.request import NameText, RequestModel
 
-type ReportText = Annotated[str, StringConstraints(pattern=r'\S', max_length=PROSE_LIMIT)]
+type ReportText = Annotated[str, StringConstraints(pattern=r'\S', max_length=REPORT_LIMIT)]
 
 
 class SimilarityAction(StrEnum):

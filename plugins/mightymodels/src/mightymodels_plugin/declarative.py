@@ -16,12 +16,16 @@ Every string column is declared from such a type, and each type has a length. SQ
 a value to its declared length, so a length is true only where the value's own type is: a
 repository key, a slug, a task id and a run id are refused over theirs before they reach a row, a
 `Word` is a member of an enum, a `Sha` is a git object name or a SHA-256 digest, and a `Timestamp`
-is written by the clock. A `Name` and a `Prose` hold text a caller wrote, and the request model
-that takes the text refuses it over the column's length before a row is written:
-`tools/request.py` has the types. One text reaches such a column another way and is not held to
-it: a ticket's lines, which `validate` reads from a `ticket.yml` the user may have edited by
-hand. Text that redaction has lengthened past its column is refused, since the marker that
+is written by the clock. A `Name`, a `Prose` and a `ReportProse` hold text a caller wrote, and
+the request model that takes the text refuses it over the column's length before a row is
+written: `tools/request.py` has the types. One text reaches such a column another way and is
+not held to it: a ticket's lines, which `validate` reads from a `ticket.yml` the user may have
+edited by hand. Text that redaction has lengthened past its column is refused, since the marker that
 replaces a secret can be longer than the secret.
+
+`ReportProse` is the column of a scout report and of a similarity row's text, with a limit of
+its own, `REPORT_LIMIT`, sized to the spool's file cap (`SPOOL_FILE_BYTES` in
+`tools/similarity/spool.py`) so that a long report is stored whole.
 
 A column the plugin has a default for carries it as a server default, so a row written without the
 column reads as one the plugin wrote. A `Timestamp` left out is the time of the write, in the
@@ -47,6 +51,7 @@ TIMESTAMP_LIMIT = 25
 SHA_LIMIT = 64
 NAME_LIMIT = 255
 PROSE_LIMIT = 4000
+REPORT_LIMIT = 60_000
 TIME_OF_THE_WRITE = text("(strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now'))")
 EMPTY_LIST = '[]'
 
@@ -66,6 +71,7 @@ type Word = Annotated[str, mapped_column(String(WORD_LIMIT))]
 type Sha = Annotated[str, mapped_column(String(SHA_LIMIT))]
 type Name = Annotated[str, mapped_column(String(NAME_LIMIT))]
 type Prose = Annotated[str, mapped_column(String(PROSE_LIMIT))]
+type ReportProse = Annotated[str, mapped_column(String(REPORT_LIMIT))]
 type Timestamp = Annotated[
     str, mapped_column(String(TIMESTAMP_LIMIT), server_default=TIME_OF_THE_WRITE)
 ]
