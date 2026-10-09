@@ -8,7 +8,9 @@ for, and reads and writes entries under that key only.
 
 An investigation has no row of its own. It exists once its target is stored, which is entry 1 of
 its ledger, so `has_entries` asks for that row. `append` is the only write and nothing updates or
-deletes an entry: a later entry retires an earlier one by naming it in `supersedes`.
+deletes an entry: a later entry retires an earlier one by naming it in `supersedes`. It stores each
+entry's text in the similarity table in the same transaction and answers the near-duplicates of
+earlier rows that the texts turned up.
 
 A ledger is read whole, and the read is refused once an investigation holds more than `ENTRIES`.
 `append` is refused with `WriteLimitError` when the investigation would hold more than `ENTRIES`,
@@ -32,6 +34,8 @@ from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.investigation.schema import EntryKind, Source
 from mightymodels_plugin.tools.investigation.tables import LedgerEntryRow
+from mightymodels_plugin.tools.similarity.repository import SimilarityRepository, Written
+from mightymodels_plugin.tools.similarity.schema import Duplicate, SimilarityKind
 
 TARGET_SEQ = 1
 ENTRIES = ReadLimit(rows=2000, kept='ledger entries')
@@ -68,6 +72,14 @@ def entry_row(
         supersedes=list(record.supersedes),
         at=record.at,
         head=record.head,
+    )
+
+
+def written_entry(investigation: Slug, record: LedgerRecord) -> Written:
+    return Written(
+        kind=SimilarityKind.LEDGER_ENTRY,
+        reference=f'{investigation} e{record.seq}',
+        text=record.text,
     )
 
 
@@ -121,10 +133,11 @@ class InvestigationRepository:
         ]
         return INVESTIGATIONS_LISTED.latest(newest_first)
 
-    def append(self, investigation: Slug, records: Iterable[LedgerRecord]) -> None:
+    def append(self, investigation: Slug, records: Iterable[LedgerRecord]) -> list[Duplicate]:
+        appended = list(records)
         self.session.add_all(
             entry_row(investigation, record, repository_key=self.repository_key)
-            for record in records
+            for record in appended
         )
         self.session.flush()
         held = (
@@ -140,6 +153,8 @@ class InvestigationRepository:
         )
         if error is not None:
             raise error
+        similarity = SimilarityRepository(session=self.session, repository_key=self.repository_key)
+        return similarity.record_all(written_entry(investigation, record) for record in appended)
 
 
 @contextmanager

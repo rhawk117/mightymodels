@@ -14,6 +14,10 @@ A run's findings, decisions and outcomes are each read whole, the findings in th
 numbers, and a read is refused once a run holds more than `FINDINGS`. `latest_run_rows` lists the
 newest runs, oldest first, and no more than `RUNS_LISTED` of them.
 
+Recording findings also stores each title in the similarity table in the same transaction, under
+the run and the finding's id, and answers the near-duplicates of earlier rows that the titles
+turned up. A finding that merges into a recorded one replaces its title there.
+
 A write of findings, decisions or an outcome is refused with `WriteLimitError` when the run would
 hold more than `FINDINGS` of them, and then stores none of what it was given. `write_error` counts
 what the run holds of one row type once the write is flushed.
@@ -41,6 +45,8 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewOutcomeRow,
     ReviewRunRow,
 )
+from mightymodels_plugin.tools.similarity.repository import SimilarityRepository, Written
+from mightymodels_plugin.tools.similarity.schema import Duplicate, SimilarityKind
 from mightymodels_plugin.tools.ticket.repository import TicketRepository
 
 type RowOfARun = ReviewFindingRow | ReviewDispositionRow | ReviewOutcomeRow
@@ -103,6 +109,12 @@ def finding_row_of(
         evidence_kind=None if evidence is None else evidence.kind,
         evidence_cite=None if evidence is None else evidence.cite,
         conflict=finding.conflict,
+    )
+
+
+def written_finding(run: RunId, finding: Finding) -> Written:
+    return Written(
+        kind=SimilarityKind.REVIEW_FINDING, reference=f'{run} {finding.id}', text=finding.title
     )
 
 
@@ -264,12 +276,15 @@ class ReviewRepository:
     def record_models(self, run: RunId, models: Mapping[str, str | None]) -> None:
         self.started_run_row(run).models = dict(models)
 
-    def record_findings(self, run: RunId, findings: Iterable[Finding]) -> None:
-        for finding in findings:
+    def record_findings(self, run: RunId, findings: Iterable[Finding]) -> list[Duplicate]:
+        recorded = list(findings)
+        for finding in recorded:
             self.session.merge(finding_row_of(run, finding, repository_key=self.repository_key))
         error = write_error(self.session, ReviewFindingRow, run, repository_key=self.repository_key)
         if error is not None:
             raise error
+        similarity = SimilarityRepository(session=self.session, repository_key=self.repository_key)
+        return similarity.record_all(written_finding(run, finding) for finding in recorded)
 
 
 @contextmanager

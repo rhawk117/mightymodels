@@ -10,6 +10,9 @@ The target and every entry's text and cite are redacted before they are stored, 
 investigation is named after the redacted target, so a secret reaches neither a row nor an id.
 A text that redaction lengthens past its limit is refused, and in `add` it refuses the batch.
 
+Each entry's text is also stored in the similarity table, and when it resembles a row stored
+earlier, of any kind, the answer says so after its own line. The entry is stored all the same.
+
 HEAD is read from git when an entry is stored and when the knowns are asked for. Outside a
 repository, or with no git binary, it is absent and every entry reads as a lead.
 
@@ -55,6 +58,7 @@ from mightymodels_plugin.tools.investigation.schema import (
     LedgerEntry,
     Source,
 )
+from mightymodels_plugin.tools.similarity.rendering import duplicates_text
 from mightymodels_plugin.workspace import Workspace
 
 DAY_FORMAT = '%Y%m%d'
@@ -185,9 +189,10 @@ class InvestigationService:
         stem = f'{started.strftime(DAY_FORMAT)}-{target_name(target)}'
         with investigation_transaction(self.database) as repository:
             investigation = free_investigation(repository, stem)
-            repository.append(investigation, [record])
+            duplicates = repository.append(investigation, [record])
         return InvestigationView(
-            text=f'started {investigation}\n', investigation_id=investigation.root
+            text=f'started {investigation}\n{duplicates_text(duplicates)}',
+            investigation_id=investigation.root,
         )
 
     def add(
@@ -200,9 +205,10 @@ class InvestigationService:
                 raise error
             numbered = enumerate(entries, start=ledger.next_seq())
             batch = [redacted_record(entry, seq, stamp) for seq, entry in numbered]
-            repository.append(investigation, (redacted.record for redacted in batch))
+            duplicates = repository.append(investigation, (redacted.record for redacted in batch))
         return InvestigationView(
-            text=saved_text(investigation, batch), investigation_id=investigation.root
+            text=saved_text(investigation, batch) + duplicates_text(duplicates),
+            investigation_id=investigation.root,
         )
 
     def render(self, investigation: Slug) -> InvestigationView:

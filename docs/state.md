@@ -53,6 +53,51 @@ does not carry over: stage the ticket again. The old file can be deleted. The ne
 with a schema version, and a file with another stamp is refused by name instead of read, and
 nothing is written to it.
 
+## Similarity and the scout-report spool
+
+The same file holds one `similarity` table with a `kind` column: `ledger-entry`, `scout-report`,
+`review-finding` and `crashout`. Writing an investigation entry, a review finding or a crashout
+stores its text there in the same transaction (the entry's text, the finding's title, the
+crashout's root cause), and so does a scout report, whose full text is also kept in `scout_reports`.
+The text is redacted on its way in. An FTS5 index, `similarity_index`, reads the table's text, and
+SQLite triggers keep it current. The index is created after the schema stamp is accepted, so a file
+stamped with another version is still refused untouched. The schema version is 3.
+
+A write answers with a line when the text resembles a row stored earlier, of any kind:
+`near-duplicate: <written> resembles <kind> <reference> (overlap 0.75): <start of the earlier text>`.
+The write is stored all the same. A match is a hint that this has probably been recorded already,
+and it is found by words, so it misses a duplicate that shares no wording with the earlier row.
+The `similarity` tool's `search` action takes a `query` and an optional `kind` and returns the
+rows that share a content word with the query, best BM25 rank first, each with its overlap.
+
+How a match is decided, with both constants in `tools/similarity/matching.py`: a text is reduced to
+its content words (lowercase letters and digits, less common English words). BM25 ranks the rows of
+the same repository that share one, and the best `CANDIDATE_CAP` = 20 are read. BM25 scores are
+relative to the whole index, so no score says two texts are alike; instead a candidate is a match
+when the share of the words of both texts that are in each (Jaccard overlap) reaches
+`MATCH_OVERLAP` = 0.6. A text with only common words has no candidate. Every read filters on the
+repository key, since FTS5 keeps one set of term statistics for all repositories.
+
+Scout reports reach the database through a spool, so a hook can leave one without calling the
+server. The spool is the directory `scout-spool` in the plugin data directory, beside
+`mightymodels.db`. A report is one file `<anything>.json` directly in it, whose content is one
+JSON object with exactly these keys:
+
+```json
+{"repository_key": "owner/name", "scout": "code-scout", "target": "...", "report": "..."}
+```
+
+`repository_key` is the key described above (`owner/name`, or `local:` and 64 hex digits),
+`scout` is `code-scout` or `web-scout`, `target` is at most 255 characters and `report` is
+non-blank text of at most 4000, and the file is at most 64 KiB. A writer creates the file under
+a name that does not end in `.json` and renames it, so a half-written file is never read. The
+directory is shared by every repository, so the key is in the file: the server takes in the files
+of its own repository on its next tool call, stores each as a scout report with a similarity row,
+and deletes the file. It leaves every other repository's file where it is, ignores symlinks and
+directories, and takes in at most 100 files per call. A file that is not valid, or whose text
+redaction lengthens past its column, is moved to `scout-spool/rejected/` under a new name and kept;
+the call goes on. No key is ever part of a path.
+
 ## ticket.yml
 
 Written once by open-ticket through the `ticket` tool's `write`, from the interview answers, then

@@ -7,6 +7,9 @@ lengthens past its limit refuses the crashout. `stats` reports the recurring
 patterns of the journal's latest crashouts, and says so when older ones are left out. `last`
 returns the newest crashout, as fields and as text.
 
+When the root cause resembles a row stored earlier, of any kind, the answer says so after its own
+line. The crashout is journaled all the same.
+
 The service reads and writes the database and nothing else: no file, and nothing in git.
 
 Everything above the class reads no service state.
@@ -28,6 +31,7 @@ from mightymodels_plugin.tools.crashout.schema import (
     Verdict,
 )
 from mightymodels_plugin.tools.crashout.tables import CrashoutRow
+from mightymodels_plugin.tools.similarity.rendering import duplicates_text
 
 NOTHING_JOURNALED = 'no crashouts recorded yet.'
 SERENITY = f'{NOTHING_JOURNALED} serenity.'
@@ -78,8 +82,10 @@ class CrashoutService:
     def add(self, entry: CrashoutEntry) -> CrashoutView:
         crashout = journaled(entry, at=now())
         with crashout_transaction(self.database) as repository:
-            number = repository.journal(crashout)
-        return CrashoutView(text=f'journaled crashout #{number}\n')
+            journaled_crashout = repository.journal(crashout)
+        number = journaled_crashout.number
+        text = f'journaled crashout #{number}\n{duplicates_text(journaled_crashout.duplicates)}'
+        return CrashoutView(text=text)
 
     def stats(self) -> CrashoutView:
         with crashout_transaction(self.database) as repository:

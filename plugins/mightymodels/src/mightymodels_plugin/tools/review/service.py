@@ -7,6 +7,7 @@ persona's report from the run directory and records its findings; the reports an
 file are the only files a run keeps, and `report` returns its text for the agent to write.
 `listing` names the newest runs and says so when older ones are left out.
 Every write is validated in full before anything is stored, so a rejected batch stores nothing.
+A recorded batch says after its own line which findings resemble a row stored earlier, of any kind.
 Only the user's dispositions move a finding to remediation, and a decision stands for the finding
 as the user saw it: when a later `add` merges into a decided finding and changes it, its decision
 and its fix outcome are deleted and `add` names it as back to undecided.
@@ -82,6 +83,7 @@ from mightymodels_plugin.tools.review.schema import (
     StartPayload,
 )
 from mightymodels_plugin.tools.review.tables import ReviewFindingRow, ReviewRunRow
+from mightymodels_plugin.tools.similarity.rendering import duplicates_text
 from mightymodels_plugin.workspace import Workspace, revision_error
 
 STANDARD_THRESHOLD = 0.25
@@ -255,11 +257,14 @@ def record_batch(
     recorded = findings_of(repository, run)
     changed = fold(recorded, incoming)
     reopened = reopened_ids(recorded, changed, dispositions_of(repository, run))
-    repository.record_findings(run, changed)
+    duplicates = repository.record_findings(run, changed)
     repository.decisions.reopen(run, reopened)
     ids = ', '.join(finding.id for finding in changed) or 'none'
     tail = f'; back to undecided: {", ".join(reopened)}' if reopened else ''
-    text = f'{len(incoming)} findings in, {len(changed)} recorded: {ids}{tail}\n'
+    text = (
+        f'{len(incoming)} findings in, {len(changed)} recorded: {ids}{tail}\n'
+        f'{duplicates_text(duplicates)}'
+    )
     return ReviewView(text=text, run_id=run.root)
 
 
