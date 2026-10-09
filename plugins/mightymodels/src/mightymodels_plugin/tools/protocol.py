@@ -20,7 +20,9 @@ imports the tools.
 A server that could not open its state still starts, so that the reason reaches whoever calls a
 tool. Its lifespan state is then a `StartRefusal` holding that reason. Every tool reaches its
 service through `served_services`, which is the one place that tells the two apart: it hands out
-the services, or raises the refusal as a `ToolError` before the tool does anything.
+the services, or raises the refusal as a `ToolError` before the tool does anything. It also takes
+in the scout reports waiting in the spool before it hands the services out, so every call that
+reaches a service finds the reports written since the last one.
 """
 
 from collections.abc import Callable, Generator, Mapping
@@ -37,6 +39,7 @@ from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.review.service import ReviewService
+from mightymodels_plugin.tools.similarity.service import SimilarityService
 from mightymodels_plugin.tools.snapshot.service import SnapshotService
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.ticket.service import TicketService
@@ -83,6 +86,9 @@ class LifespanState(Protocol):
     @property
     def crashouts(self) -> CrashoutService: ...
 
+    @property
+    def similarity(self) -> SimilarityService: ...
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class StartRefusal:
@@ -96,6 +102,7 @@ def served_services(ctx: Context[ServedState]) -> LifespanState:
     served = ctx.request_context.lifespan_context
     if isinstance(served, StartRefusal):
         raise ToolError(str(served.error)) from served.error
+    served.similarity.take_in_spool()
     return served
 
 

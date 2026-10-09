@@ -14,6 +14,7 @@ CONCEPTS = (
     'tools.close',
     'tools.investigation',
     'tools.crashout',
+    'tools.similarity',
 )
 
 

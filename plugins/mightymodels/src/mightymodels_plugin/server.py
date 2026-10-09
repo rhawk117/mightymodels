@@ -46,6 +46,9 @@ from mightymodels_plugin.tools.investigation.tool import investigation_tool
 from mightymodels_plugin.tools.protocol import ServedState, StartRefusal
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.review.tool import review_tool
+from mightymodels_plugin.tools.similarity.service import SimilarityService
+from mightymodels_plugin.tools.similarity.spool import SPOOL_DIRECTORY
+from mightymodels_plugin.tools.similarity.tool import similarity_tool
 from mightymodels_plugin.tools.snapshot.service import SnapshotService
 from mightymodels_plugin.tools.snapshot.tool import snapshot_tool
 from mightymodels_plugin.tools.task.service import TaskService
@@ -64,6 +67,7 @@ TOOLS = (
     close_tool.close,
     investigation_tool.investigation,
     crashout_tool.crashout,
+    similarity_tool.similarity,
 )
 
 
@@ -77,6 +81,7 @@ class AppState:
     closings: CloseService
     investigations: InvestigationService
     crashouts: CrashoutService
+    similarity: SimilarityService
 
 
 def tool_refusing_unknown_arguments(served: Callable[..., object]) -> Tool:
@@ -103,6 +108,7 @@ def build_server(start: Path, data_directory: DataDirectory) -> MCPServer[Served
                 yield StartRefusal(error=error)
                 return
             workspace, database = state.workspace, state.database
+            spool = state.data_directory.joinpath(SPOOL_DIRECTORY)
             yield AppState(
                 tickets=TicketService(workspace=workspace, database=database),
                 tasks=TaskService(workspace=workspace, database=database),
@@ -112,6 +118,7 @@ def build_server(start: Path, data_directory: DataDirectory) -> MCPServer[Served
                 closings=CloseService(workspace=workspace, database=database),
                 investigations=InvestigationService(workspace=workspace, database=database),
                 crashouts=CrashoutService(database=database),
+                similarity=SimilarityService(database=database, spool=spool),
             )
 
     tools = list(map(tool_refusing_unknown_arguments, TOOLS))

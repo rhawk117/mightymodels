@@ -60,6 +60,8 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewOutcomeRow,
     ReviewRunRow,
 )
+from mightymodels_plugin.tools.similarity.schema import Scout, SimilarityKind
+from mightymodels_plugin.tools.similarity.tables import ScoutReportRow, SimilarityRow
 from mightymodels_plugin.tools.task.schema import ArchitectMode, Implementer, Status
 from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.tests.support import RowValues, filled_row, table_of
@@ -197,6 +199,13 @@ SHAPES = (
         defaults={'supersedes': list(ENTRY.supersedes)},
     ),
     Shape(row_type=CrashoutRow, key=SERIAL, filtered_on=((REPOSITORY,),)),
+    Shape(
+        row_type=SimilarityRow,
+        key=SERIAL,
+        filtered_on=((REPOSITORY,), (REPOSITORY, 'kind', 'reference')),
+        unique=((REPOSITORY, 'kind', 'reference'),),
+    ),
+    Shape(row_type=ScoutReportRow, key=SERIAL, filtered_on=((REPOSITORY,),)),
 )
 SHAPE_OF = {shape.row_type: shape for shape in SHAPES}
 
@@ -280,6 +289,8 @@ class TestStringColumns:
         pytest.param(Source, id='ledger-entry-source'),
         pytest.param(crashout.Severity, id='crashout-severity'),
         pytest.param(crashout.Verdict, id='crashout-verdict'),
+        pytest.param(SimilarityKind, id='similarity-kind'),
+        pytest.param(Scout, id='scout-report-scout'),
     )
     LARGEST_COUNT = 2**63 - 1
 

@@ -10,6 +10,8 @@ resets the state of every repository.
 `open_database` is the only way to a `Database`, and it creates the table of every row type in
 `ROW_TYPES` by name, whatever else the owner has imported. So no owner opens a database with a
 table missing, and a domain's `tables.py` adds a table only by adding its row type here.
+The FTS5 index over the similarity table is created by DDL that its `tables.py` registers on the
+same `create_all`, so it too waits for the stamp check.
 
 The file is stamped with `SCHEMA_VERSION`, kept in SQLite's `user_version`. A file that holds
 nothing is stamped before its tables are created. A file with any other stamp is refused by name
@@ -69,11 +71,12 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewOutcomeRow,
     ReviewRunRow,
 )
+from mightymodels_plugin.tools.similarity.tables import ScoutReportRow, SimilarityRow
 from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 
 DATABASE_NAME = 'mightymodels.db'
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 UNSTAMPED = 0
 STORED_VERSION = 'PRAGMA user_version'
 STAMP = f'{STORED_VERSION} = {SCHEMA_VERSION}'
@@ -95,6 +98,8 @@ ROW_TYPES: tuple[type[Base], ...] = (
     ClosingRow,
     LedgerEntryRow,
     CrashoutRow,
+    SimilarityRow,
+    ScoutReportRow,
 )
 
 

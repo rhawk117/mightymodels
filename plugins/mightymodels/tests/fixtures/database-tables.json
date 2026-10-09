@@ -37,6 +37,12 @@
   },
   {
     "type": "index",
+    "name": "ix_scout_reports_repository_key",
+    "tbl_name": "scout_reports",
+    "sql": "CREATE INDEX ix_scout_reports_repository_key ON scout_reports (repository_key)"
+  },
+  {
+    "type": "index",
     "name": "ix_task_attempts_task_mode",
     "tbl_name": "task_attempts",
     "sql": "CREATE INDEX ix_task_attempts_task_mode ON task_attempts (repository_key, slug, task_id, mode)"
@@ -84,6 +90,66 @@
     "sql": "CREATE TABLE review_runs (\n\trepository_key VARCHAR(140) NOT NULL, \n\trun_id VARCHAR(15) NOT NULL, \n\tslug VARCHAR(64), \n\tscope VARCHAR(32) NOT NULL, \n\tbase VARCHAR(255), \n\thead VARCHAR(64), \n\tdepth VARCHAR(32) NOT NULL, \n\temphasis VARCHAR(32) NOT NULL, \n\tweights JSON NOT NULL, \n\tpersonas JSON NOT NULL, \n\tmodels JSON NOT NULL, \n\tcreated_at VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (repository_key, run_id)\n)"
   },
   {
+    "type": "table",
+    "name": "scout_reports",
+    "tbl_name": "scout_reports",
+    "sql": "CREATE TABLE scout_reports (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tscout VARCHAR(32) NOT NULL, \n\ttarget VARCHAR(255) NOT NULL, \n\treport VARCHAR(4000) NOT NULL, \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id)\n)"
+  },
+  {
+    "type": "table",
+    "name": "similarity",
+    "tbl_name": "similarity",
+    "sql": "CREATE TABLE similarity (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tkind VARCHAR(32) NOT NULL, \n\treference VARCHAR(255) NOT NULL, \n\ttext VARCHAR(4000) NOT NULL, \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id), \n\tUNIQUE (repository_key, kind, reference)\n)"
+  },
+  {
+    "type": "table",
+    "name": "similarity_index",
+    "tbl_name": "similarity_index",
+    "sql": "CREATE VIRTUAL TABLE similarity_index\nUSING fts5(text, content='similarity', content_rowid='id', tokenize='unicode61')"
+  },
+  {
+    "type": "table",
+    "name": "similarity_index_config",
+    "tbl_name": "similarity_index_config",
+    "sql": "CREATE TABLE 'similarity_index_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+  },
+  {
+    "type": "table",
+    "name": "similarity_index_data",
+    "tbl_name": "similarity_index_data",
+    "sql": "CREATE TABLE 'similarity_index_data'(id INTEGER PRIMARY KEY, block BLOB)"
+  },
+  {
+    "type": "trigger",
+    "name": "similarity_index_delete",
+    "tbl_name": "similarity",
+    "sql": "CREATE TRIGGER similarity_index_delete AFTER DELETE ON similarity BEGIN\n  INSERT INTO similarity_index(similarity_index, rowid, text) VALUES ('delete', old.id, old.text);\nEND"
+  },
+  {
+    "type": "table",
+    "name": "similarity_index_docsize",
+    "tbl_name": "similarity_index_docsize",
+    "sql": "CREATE TABLE 'similarity_index_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+  },
+  {
+    "type": "table",
+    "name": "similarity_index_idx",
+    "tbl_name": "similarity_index_idx",
+    "sql": "CREATE TABLE 'similarity_index_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+  },
+  {
+    "type": "trigger",
+    "name": "similarity_index_insert",
+    "tbl_name": "similarity",
+    "sql": "CREATE TRIGGER similarity_index_insert AFTER INSERT ON similarity BEGIN\n  INSERT INTO similarity_index(rowid, text) VALUES (new.id, new.text);\nEND"
+  },
+  {
+    "type": "trigger",
+    "name": "similarity_index_update",
+    "tbl_name": "similarity",
+    "sql": "CREATE TRIGGER similarity_index_update AFTER UPDATE ON similarity BEGIN\n  INSERT INTO similarity_index(similarity_index, rowid, text) VALUES ('delete', old.id, old.text);\n  INSERT INTO similarity_index(rowid, text) VALUES (new.id, new.text);\nEND"
+  },
+  {
     "type": "index",
     "name": "sqlite_autoindex_closings_1",
     "tbl_name": "closings",
@@ -129,6 +195,12 @@
     "type": "index",
     "name": "sqlite_autoindex_review_runs_1",
     "tbl_name": "review_runs",
+    "sql": null
+  },
+  {
+    "type": "index",
+    "name": "sqlite_autoindex_similarity_1",
+    "tbl_name": "similarity",
     "sql": null
   },
   {

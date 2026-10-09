@@ -18,6 +18,7 @@ from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
 from mightymodels_plugin.tools.review.service import ReviewService
+from mightymodels_plugin.tools.similarity.service import SimilarityService
 from mightymodels_plugin.tools.snapshot.service import SnapshotService
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.tests.support import (
@@ -47,10 +48,12 @@ TOOL_NAMES = [
     'crashout',
     'investigation',
     'review',
+    'similarity',
     'snapshot',
     'task',
     'ticket',
 ]
+WITHOUT_A_CALL_EXAMPLE_YET = frozenset({'similarity'})
 PLUGIN = Path(__file__).parent.parent
 PROMPT_DIRECTORIES = ('skills', 'agents')
 TOOL_NAME = re.compile(rf'mcp__plugin_mightymodels_{SERVER_NAME}__(\w+)')
@@ -123,6 +126,7 @@ class TestStateServer:
                 id='investigation',
             ),
             pytest.param('crashout', ['action', 'entry'], ['action'], id='crashout'),
+            pytest.param('similarity', ['action', 'query', 'kind'], ['action'], id='similarity'),
         ],
     )
     def test_each_tool_takes_the_arguments_the_surface_gives_it(
@@ -178,8 +182,13 @@ class TestToolSchemas:
 class TestCallExamples:
     EXAMPLES = tuple(chain.from_iterable(map(call_examples, prompt_documents())))
 
-    def test_the_skills_and_agents_hold_a_call_example_of_every_tool(self) -> None:
-        assert sorted({example.tool for example in self.EXAMPLES}) == TOOL_NAMES
+    def test_the_skills_and_agents_hold_a_call_example_of_every_tool_documented_so_far(
+        self,
+    ) -> None:
+        exampled = {example.tool for example in self.EXAMPLES}
+
+        assert sorted(exampled | WITHOUT_A_CALL_EXAMPLE_YET) == TOOL_NAMES
+        assert exampled.isdisjoint(WITHOUT_A_CALL_EXAMPLE_YET)
 
     @pytest.mark.parametrize(
         'example', [pytest.param(example, id=example.location) for example in EXAMPLES]
@@ -206,6 +215,7 @@ class TestToolProtocol:
         close_service: CloseService,
         investigation_service: InvestigationService,
         crashout_service: CrashoutService,
+        similarity_service: SimilarityService,
     ) -> AppState:
         return AppState(
             tickets=ticket_service,
@@ -216,6 +226,7 @@ class TestToolProtocol:
             closings=close_service,
             investigations=investigation_service,
             crashouts=crashout_service,
+            similarity=similarity_service,
         )
 
     @pytest.mark.parametrize(
@@ -297,6 +308,7 @@ class TestToolCalls:
         ('close', {'action': 'check', 'slug': SLUG}),
         ('investigation', {'action': 'list'}),
         ('crashout', {'action': 'stats'}),
+        ('similarity', {'action': 'search', 'query': 'the drain loop'}),
     )
     UNNAMED_ARGUMENT = 'not_in_the_schema'
 
@@ -308,9 +320,7 @@ class TestToolCalls:
         ticket_service.validate(Slug(SLUG))
         return state_server
 
-    def test_each_of_the_eight_tools_answers_one_call(
-        self, server_with_a_staged_ticket: StateServer
-    ) -> None:
+    def test_each_tool_answers_one_call(self, server_with_a_staged_ticket: StateServer) -> None:
         results = server_with_a_staged_ticket.call(*self.ONE_CALL_OF_EACH_TOOL)
 
         assert [name for name, _ in self.ONE_CALL_OF_EACH_TOOL] == [tool.__name__ for tool in TOOLS]

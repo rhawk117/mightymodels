@@ -68,6 +68,8 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewOutcomeRow,
     ReviewRunRow,
 )
+from mightymodels_plugin.tools.similarity.schema import SpooledReport
+from mightymodels_plugin.tools.similarity.tables import ScoutReportRow
 from mightymodels_plugin.tools.task.schema import (
     Status,
     TaskMark,
@@ -152,6 +154,12 @@ VALID: Mapping[type[RequestModel], dict[str, object]] = MappingProxyType(
             'location': 'src/queue.py:12',
             'fix': 'drain in one pass',
             'verify': 'run the drain test',
+        },
+        SpooledReport: {
+            'repository_key': 'acme/widgets',
+            'scout': 'code-scout',
+            'target': 'the drain loop',
+            'report': 'the drain loop sleeps between batches',
         },
         StartPayload: {'scope': 'codebase', 'depth': 'deep', 'emphasis': 'balanced'},
         Disposition: {'decision': 'fix'},
@@ -343,6 +351,8 @@ class TestEveryStringOfARequestModel:
         stored(FindingInput, 'location', ReviewFindingRow, 'location'),
         stored(FindingInput, 'fix', ReviewFindingRow, 'fix'),
         stored(FindingInput, 'verify', ReviewFindingRow, 'verify'),
+        stored(SpooledReport, 'target', ScoutReportRow, 'target'),
+        stored(SpooledReport, 'report', ScoutReportRow, 'report'),
         stored(StartPayload, 'base', ReviewRunRow, 'base'),
         stored(Disposition, 'reason', ReviewDispositionRow, 'reason'),
         stored(DisposePayload, 'by', ReviewDispositionRow, 'by'),

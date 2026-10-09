@@ -55,6 +55,11 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewOutcomeRow,
     ReviewRunRow,
 )
+from mightymodels_plugin.tools.similarity.repository import similarity_transaction
+from mightymodels_plugin.tools.similarity.schema import Scout, SimilarityKind, SpooledReport
+from mightymodels_plugin.tools.similarity.service import SimilarityService
+from mightymodels_plugin.tools.similarity.spool import SPOOL_DIRECTORY
+from mightymodels_plugin.tools.similarity.tables import ScoutReportRow, SimilarityRow
 from mightymodels_plugin.tools.task.repository import Attempt, Transition, task_transaction
 from mightymodels_plugin.tools.task.schema import Implementer, Status
 from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
@@ -122,6 +127,8 @@ CRASHOUT = CrashoutEntry(
     barked_back=False,
 )
 CLOSING = Closing(shipped='Retry queue drains in under a second')
+SCOUT_REPORT_TEXT = 'the retry loop sleeps between drain batches'
+SIMILAR_TO_EVERY_TEXT = 'queue floor drain sleeps optimised speed retry'
 ONE_READ_OF_EACH_TOOL: tuple[ToolCall, ...] = (
     ('ticket', {'action': 'show', 'slug': SLUG}),
     ('task', {'action': 'show', 'slug': SLUG}),
@@ -131,6 +138,7 @@ ONE_READ_OF_EACH_TOOL: tuple[ToolCall, ...] = (
     ('close', {'action': 'check', 'slug': SLUG}),
     ('investigation', {'action': 'list'}),
     ('crashout', {'action': 'stats'}),
+    ('similarity', {'action': 'search', 'query': SIMILAR_TO_EVERY_TEXT}),
 )
 
 
@@ -220,6 +228,16 @@ def crashouts_read(database: Database) -> int:
         return len(repository.latest_rows().rows)
 
 
+def similar_rows_read(database: Database) -> int:
+    with similarity_transaction(database) as repository:
+        return len(repository.search(SIMILAR_TO_EVERY_TEXT, kind=None))
+
+
+def scout_reports_read(database: Database) -> int:
+    with similarity_transaction(database) as repository:
+        return len(repository.search(SIMILAR_TO_EVERY_TEXT, kind=SimilarityKind.SCOUT_REPORT))
+
+
 def answers_of(server: StateServer) -> list[str]:
     return [text_of(result) for result in server.call(*ONE_READ_OF_EACH_TOOL)]
 
@@ -244,6 +262,8 @@ READS = (
     pytest.param(ClosingRow, closings_read, id='closings'),
     pytest.param(LedgerEntryRow, ledger_entries_read, id='ledger-entries'),
     pytest.param(CrashoutRow, crashouts_read, id='crashouts'),
+    pytest.param(SimilarityRow, similar_rows_read, id='similarity'),
+    pytest.param(ScoutReportRow, scout_reports_read, id='scout-reports'),
 )
 
 
@@ -255,6 +275,7 @@ class Clone:
     closings: CloseService
     investigations: InvestigationService
     crashouts: CrashoutService
+    similarity: SimilarityService
 
     @property
     def database(self) -> Database:
@@ -278,6 +299,16 @@ class Clone:
         self.reviews.dispose(RUN, FIX_IT)
         self.reviews.resolve(RUN, FIXED)
 
+    def store_a_scout_report(self) -> None:
+        report = SpooledReport(
+            repository_key=self.database.repository_key,
+            scout=Scout.CODE_SCOUT,
+            target='the drain loop',
+            report=SCOUT_REPORT_TEXT,
+        )
+        with similarity_transaction(self.database) as repository:
+            repository.add_scout_report(report)
+
     def write_every_table(self) -> None:
         self.stage_the_ticket()
         self.contracts.approve(TICKET, [COMMAND])
@@ -288,6 +319,7 @@ class Clone:
         self.investigations.start(LEDGER_TARGET, started=STARTED)
         self.investigations.add(LEDGER, 1, [LEDGER_DECISION])
         self.crashouts.add(CRASHOUT)
+        self.store_a_scout_report()
         self.closings.close(TICKET, CLOSING)
 
     def ticket_status(self) -> str:
@@ -317,6 +349,9 @@ def clone_of(state: OpenState) -> Clone:
         closings=CloseService(workspace=workspace, database=database),
         investigations=InvestigationService(workspace=workspace, database=database),
         crashouts=CrashoutService(database=database),
+        similarity=SimilarityService(
+            database=database, spool=state.data_directory.joinpath(SPOOL_DIRECTORY)
+        ),
     )
 
 

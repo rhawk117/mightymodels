@@ -44,6 +44,7 @@ TOOL_NAMES = [
     'crashout',
     'investigation',
     'review',
+    'similarity',
     'snapshot',
     'task',
     'ticket',

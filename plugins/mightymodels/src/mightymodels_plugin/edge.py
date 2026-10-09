@@ -2,8 +2,9 @@
 
 The server's lifespan and `verify run` start in whatever directory the session did. `open_state`
 takes that directory and the plugin data directory the edge read from its environment, and hands
-out the workspace at the git toplevel with the database opened under that repository's key. So
-the two edges of one session open the same file and see the same rows.
+out the workspace at the git toplevel with the database opened under that repository's key, and
+the data directory itself for the spool beside the database. So the two edges of one session
+open the same file and see the same rows.
 
 Every refusal comes before anything is created: no data directory, no git executable, no work
 tree, and a database file of another schema version. Each is a `StateError` naming what is
@@ -26,6 +27,7 @@ from mightymodels_plugin.workspace import Checkout, Workspace, git_at, workspace
 class OpenState:
     workspace: Workspace
     database: Database
+    data_directory: Path
 
 
 @contextmanager
@@ -40,4 +42,4 @@ def open_state(start: Path, data_directory: DataDirectory) -> Generator[OpenStat
     workspace = workspace_of(replace(git, root=checkout.toplevel))
     with open_database(data_directory.joinpath(DATABASE_NAME), repository_key) as database:
         workspace.exclude_state_from_git()
-        yield OpenState(workspace=workspace, database=database)
+        yield OpenState(workspace=workspace, database=database, data_directory=data_directory)
