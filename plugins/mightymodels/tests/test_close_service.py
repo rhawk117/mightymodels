@@ -462,16 +462,19 @@ class TestWhenGitIsMissing:
 
 
 class TestABranchNameGitCannotTake:
+    BRANCH = '--all'
+    UNCHECKED = f"branch {BRANCH} could not be checked: '{BRANCH}' is not a plain revision name"
+
     @pytest.fixture
     def ticket_branch(self) -> str:
-        return '--all'
+        return self.BRANCH
 
-    def test_a_branch_name_that_is_not_a_plain_revision_is_not_asked_about(
+    def test_a_branch_name_that_is_not_a_plain_revision_blocks_and_is_named(
         self, repo: Repo
     ) -> None:
         view = repo.closings.check(TICKET)
 
-        assert (view.blocked, view.text) == (False, f'{SLUG} has no live work\n')
+        assert (view.blocked, view.text) == (True, f'live work remains\n  - {self.UNCHECKED}\n')
 
 
 class TestALegalBranchNameOutsideTheRevisionPattern:
