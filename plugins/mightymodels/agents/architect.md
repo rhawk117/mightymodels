@@ -1,7 +1,7 @@
 ---
 name: architect
 tools: Read, Grep, Glob, Bash, Edit, Write, Agent
-model: sonnet
+model: opus
 description: >-
   Higher-cost recovery implementer. Use only after engineer returns failed or blocked on a
   task, or a designated merge-vader-reviewer or uncle-bob-reviewer rejects an implementation
