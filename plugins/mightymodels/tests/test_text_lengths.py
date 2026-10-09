@@ -72,12 +72,13 @@ from mightymodels_plugin.tools.similarity.schema import SpooledReport
 from mightymodels_plugin.tools.similarity.tables import ScoutReportRow
 from mightymodels_plugin.tools.task.schema import (
     Status,
+    TaskFailedFix,
     TaskMark,
     TaskPayload,
     TaskStart,
     TaskVerification,
 )
-from mightymodels_plugin.tools.task.tables import TaskRow
+from mightymodels_plugin.tools.task.tables import FailedFixRow, TaskRow
 from mightymodels_plugin.tools.tests.support import (
     ActivityKind,
     DatabaseActivity,
@@ -104,7 +105,13 @@ INVESTIGATION = '20260928-the-drain-loop'
 CREDENTIALS = '://a:b@'
 REDACTED_CREDENTIALS = '://[REDACTED:url-credentials]@'
 GROWTH = len(REDACTED_CREDENTIALS) - len(CREDENTIALS)
-REDACTED_ON_THE_WAY_TO_A_ROW = (ClosingRow, CrashoutRow, LedgerEntryRow, ReviewFindingRow)
+REDACTED_ON_THE_WAY_TO_A_ROW = (
+    ClosingRow,
+    CrashoutRow,
+    FailedFixRow,
+    LedgerEntryRow,
+    ReviewFindingRow,
+)
 TOO_LONG = 'string_too_long'
 OFF_THE_PATTERN = 'string_pattern_mismatch'
 STARTED = ReviewRun(
@@ -168,6 +175,7 @@ VALID: Mapping[type[RequestModel], dict[str, object]] = MappingProxyType(
         TaskStart: {'by': 'engineer', 'owned': ['src/queue.py']},
         TaskVerification: {'commit': 'abc1234'},
         TaskMark: {'to': 'failed', 'reason': 'the drain test fails'},
+        TaskFailedFix: {'hypothesis': 'the drain loop sleeps between batches'},
         TaskPayload: {},
         TicketAnswers: {
             'summary': 'Retry queue drains slowly',
@@ -420,6 +428,7 @@ class TestEveryStringOfARequestModel:
             placed=as_an_assertion,
         ),
         CallerText(model=TaskMark, field='reason', limit=PROSE_LIMIT),
+        CallerText(model=TaskFailedFix, field='hypothesis', limit=PROSE_LIMIT),
         CallerText(
             model=TicketAnswers, field='context', limit=PROSE_LIMIT, part='item', placed=in_a_list
         ),
@@ -688,7 +697,13 @@ class TestTextRedactionLengthensPastItsLimit:
     PROSE = with_a_secret(PROSE_LIMIT)
     NAME = with_a_secret(NAME_LIMIT)
     ARRANGED = MappingProxyType(
-        {'closings': 0, 'crashouts': 0, 'ledger_entries': 1, 'review_findings': 0}
+        {
+            'closings': 0,
+            'crashouts': 0,
+            'task_failed_fixes': 0,
+            'ledger_entries': 1,
+            'review_findings': 0,
+        }
     )
     CALLS = (
         RedactedCall(tool='close', arguments=closing_with(shipped=PROSE), field='shipped'),
@@ -706,6 +721,15 @@ class TestTextRedactionLengthensPastItsLimit:
             tool='crashout',
             arguments=crashout_with(corrective_action=PROSE),
             field='corrective_action',
+        ),
+        RedactedCall(
+            tool='task',
+            arguments={
+                'action': 'record-failed-fix',
+                'slug': SLUG,
+                'payload': {'task_id': 'T1', 'change': {'hypothesis': PROSE}},
+            },
+            field='hypothesis',
         ),
         RedactedCall(tool='investigation', arguments=target_of(PROSE), field='target'),
         RedactedCall(tool='investigation', arguments=entry_with(text=PROSE), field='text'),

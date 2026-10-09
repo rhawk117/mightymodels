@@ -49,6 +49,12 @@
   },
   {
     "type": "index",
+    "name": "ix_task_failed_fixes_task",
+    "tbl_name": "task_failed_fixes",
+    "sql": "CREATE INDEX ix_task_failed_fixes_task ON task_failed_fixes (repository_key, slug, task_id)"
+  },
+  {
+    "type": "index",
     "name": "ix_task_transitions_after",
     "tbl_name": "task_transitions",
     "sql": "CREATE INDEX ix_task_transitions_after ON task_transitions (repository_key, slug, \"after\")"
@@ -226,6 +232,12 @@
     "name": "task_attempts",
     "tbl_name": "task_attempts",
     "sql": "CREATE TABLE task_attempts (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tslug VARCHAR(64) NOT NULL, \n\ttask_id VARCHAR(7) NOT NULL, \n\tworker VARCHAR(32) NOT NULL, \n\tmode VARCHAR(32), \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id), \n\tFOREIGN KEY(repository_key, slug, task_id) REFERENCES tasks (repository_key, slug, task_id) DEFERRABLE INITIALLY DEFERRED\n)"
+  },
+  {
+    "type": "table",
+    "name": "task_failed_fixes",
+    "tbl_name": "task_failed_fixes",
+    "sql": "CREATE TABLE task_failed_fixes (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR(140) NOT NULL, \n\tslug VARCHAR(64) NOT NULL, \n\ttask_id VARCHAR(7) NOT NULL, \n\thypothesis VARCHAR(4000) NOT NULL, \n\tat VARCHAR(25) DEFAULT (strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now')) NOT NULL, \n\tPRIMARY KEY (id), \n\tFOREIGN KEY(repository_key, slug, task_id) REFERENCES tasks (repository_key, slug, task_id) DEFERRABLE INITIALLY DEFERRED\n)"
   },
   {
     "type": "table",

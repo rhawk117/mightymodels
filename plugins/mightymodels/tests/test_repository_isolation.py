@@ -62,7 +62,7 @@ from mightymodels_plugin.tools.similarity.spool import SPOOL_DIRECTORY
 from mightymodels_plugin.tools.similarity.tables import ScoutReportRow, SimilarityRow
 from mightymodels_plugin.tools.task.repository import Attempt, Transition, task_transaction
 from mightymodels_plugin.tools.task.schema import Implementer, Status
-from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
+from mightymodels_plugin.tools.task.tables import AttemptRow, FailedFixRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.tests.support import (
     FILES_OF_AN_OPEN_DATABASE,
     StateServer,
@@ -178,6 +178,11 @@ def attempts_read(database: Database) -> int:
         return len(repository.attempts_by_worker(TICKET))
 
 
+def failed_fixes_read(database: Database) -> int:
+    with task_transaction(database) as repository:
+        return len(repository.failed_fixes(TICKET, TASK))
+
+
 def transitions_read(database: Database) -> int:
     with task_transaction(database) as repository:
         return len(repository.latest_transitions_into(TICKET, tuple(Status), limit=2))
@@ -252,6 +257,7 @@ READS = (
     pytest.param(TicketRow, tickets_read, id='tickets'),
     pytest.param(TaskRow, tasks_read, id='tasks'),
     pytest.param(AttemptRow, attempts_read, id='task-attempts'),
+    pytest.param(FailedFixRow, failed_fixes_read, id='task-failed-fixes'),
     pytest.param(TransitionRow, transitions_read, id='task-transitions'),
     pytest.param(CommandRow, commands_read, id='contract-commands'),
     pytest.param(ReceiptRow, receipts_read, id='contract-receipts'),
@@ -290,6 +296,7 @@ class Clone:
             repository.tickets.mark_in_progress(TICKET)
             attempt = Attempt(worker=Implementer.ENGINEER, mode=None, owned=['queue.py'])
             repository.record_start(TICKET, transition_to(Status.IN_PROGRESS), attempt)
+            repository.record_failed_fix(TICKET, TASK, 'the drain loop sleeps', at=now())
         with task_transaction(self.database) as repository:
             repository.record_mark(TICKET, transition_to(Status.VERIFIED))
 

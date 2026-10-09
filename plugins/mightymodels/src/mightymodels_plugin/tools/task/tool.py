@@ -22,6 +22,7 @@ from mightymodels_plugin.tools.protocol import (
 )
 from mightymodels_plugin.tools.task.schema import (
     TaskAction,
+    TaskFailedFix,
     TaskMark,
     TaskPayload,
     TaskStart,
@@ -53,6 +54,14 @@ def mark_task(tasks: TaskService, call: TaskCall) -> TaskView:
     if call.payload.task_id is None or not isinstance(call.payload.change, TaskMark):
         raise MissingArgumentsError(TaskAction.MARK, 'task_id and a change holding to and reason')
     return tasks.mark(call.slug, call.payload.task_id, call.payload.change)
+
+
+def record_failed_fix(tasks: TaskService, call: TaskCall) -> TaskView:
+    if call.payload.task_id is None or not isinstance(call.payload.change, TaskFailedFix):
+        raise MissingArgumentsError(
+            TaskAction.RECORD_FAILED_FIX, 'task_id and a change holding hypothesis'
+        )
+    return tasks.record_failed_fix(call.slug, call.payload.task_id, call.payload.change)
 
 
 def show_tasks(tasks: TaskService, call: TaskCall) -> TaskView:
@@ -93,6 +102,7 @@ task_tool = TaskTool(
             TaskAction.START: start_task,
             TaskAction.VERIFY: verify_task,
             TaskAction.MARK: mark_task,
+            TaskAction.RECORD_FAILED_FIX: record_failed_fix,
             TaskAction.SHOW: show_tasks,
             TaskAction.READY: gate_readiness,
         }

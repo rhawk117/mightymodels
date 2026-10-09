@@ -72,11 +72,11 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewRunRow,
 )
 from mightymodels_plugin.tools.similarity.tables import ScoutReportRow, SimilarityRow
-from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
+from mightymodels_plugin.tools.task.tables import AttemptRow, FailedFixRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 
 DATABASE_NAME = 'mightymodels.db'
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 UNSTAMPED = 0
 STORED_VERSION = 'PRAGMA user_version'
 STAMP = f'{STORED_VERSION} = {SCHEMA_VERSION}'
@@ -88,6 +88,7 @@ ROW_TYPES: tuple[type[Base], ...] = (
     TicketRow,
     TaskRow,
     AttemptRow,
+    FailedFixRow,
     TransitionRow,
     CommandRow,
     ReceiptRow,

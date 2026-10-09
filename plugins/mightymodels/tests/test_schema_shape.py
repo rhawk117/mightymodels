@@ -63,7 +63,7 @@ from mightymodels_plugin.tools.review.tables import (
 from mightymodels_plugin.tools.similarity.schema import Scout, SimilarityKind
 from mightymodels_plugin.tools.similarity.tables import ScoutReportRow, SimilarityRow
 from mightymodels_plugin.tools.task.schema import ArchitectMode, Implementer, Status
-from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
+from mightymodels_plugin.tools.task.tables import AttemptRow, FailedFixRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.tests.support import RowValues, filled_row, table_of
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers, TicketStatus
 from mightymodels_plugin.tools.ticket.tables import TicketRow
@@ -130,6 +130,12 @@ SHAPES = (
         row_type=AttemptRow,
         key=SERIAL,
         filtered_on=(OF_A_TICKET, (*OF_A_TICKET, 'task_id', 'mode')),
+        parent=TaskRow,
+    ),
+    Shape(
+        row_type=FailedFixRow,
+        key=SERIAL,
+        filtered_on=(OF_A_TICKET, (*OF_A_TICKET, 'task_id')),
         parent=TaskRow,
     ),
     Shape(

@@ -74,10 +74,15 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewRunRow,
 )
 from mightymodels_plugin.tools.task.gates import STUCK
-from mightymodels_plugin.tools.task.repository import ATTEMPT_COUNTS, TASKS, task_transaction
+from mightymodels_plugin.tools.task.repository import (
+    ATTEMPT_COUNTS,
+    FAILED_FIXES,
+    TASKS,
+    task_transaction,
+)
 from mightymodels_plugin.tools.task.schema import ArchitectMode, Implementer, Status, TaskStart
 from mightymodels_plugin.tools.task.service import TaskService
-from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
+from mightymodels_plugin.tools.task.tables import AttemptRow, FailedFixRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.tests.support import (
     RowValues,
     SelectsSent,
@@ -176,6 +181,11 @@ def attempt_counts(database: Database) -> list[tuple[str, str, int]]:
         for task, by_worker in counts.items()
         for worker, count in by_worker.items()
     ]
+
+
+def failed_fixes(database: Database) -> Sized:
+    with task_transaction(database) as repository:
+        return repository.failed_fixes(TICKET, TASK)
 
 
 def attempts_in_modes(database: Database) -> int:
@@ -686,6 +696,11 @@ def an_attempt_at_every_task(database: Database, count: int) -> None:
     store(database, AttemptRow, tried)
 
 
+def a_failed_fix_for_the_task(database: Database, count: int) -> None:
+    a_ticket_with_two_tasks(database)
+    store(database, FailedFixRow, [{'slug': SLUG, 'task_id': TASK}] * count)
+
+
 def findings_of_the_run(database: Database, count: int) -> None:
     with review_transaction(database) as repository:
         repository.record_run(started(RUN))
@@ -747,6 +762,15 @@ class TestACollectionReadWhole:
                 owner=OF_THE_TICKET,
             ),
             id='attempt-counts',
+        ),
+        pytest.param(
+            Collection(
+                limit=FAILED_FIXES,
+                fill=a_failed_fix_for_the_task,
+                read=failed_fixes,
+                owner=f'task {TASK} of ticket {SLUG}',
+            ),
+            id='failed-fixes',
         ),
         pytest.param(
             Collection(

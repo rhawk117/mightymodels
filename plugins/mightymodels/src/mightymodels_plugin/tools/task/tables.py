@@ -1,6 +1,8 @@
-"""The `tasks`, `task_attempts` and `task_transitions` tables: a task, who tried it, each move.
+"""The `tasks`, `task_attempts`, `task_failed_fixes` and `task_transitions` tables.
 
-A task belongs to a staged ticket, and an attempt and a transition belong to a task.
+A task, who tried it, each fix that failed with the hypothesis it tested, each move.
+
+A task belongs to a staged ticket, and an attempt, a failed fix and a transition belong to a task.
 """
 
 from typing import Annotated
@@ -12,6 +14,7 @@ from mightymodels_plugin.declarative import (
     TASK_ID_LIMIT,
     Base,
     Name,
+    Prose,
     RepositoryKeyPart,
     RepositoryName,
     Serial,
@@ -58,6 +61,21 @@ class AttemptRow(Base):
     task_id: Mapped[TaskName]
     worker: Mapped[Word]
     mode: Mapped[Word | None]
+    at: Mapped[Timestamp]
+
+
+class FailedFixRow(Base):
+    __tablename__ = 'task_failed_fixes'
+    __table_args__ = (
+        child_of(TaskRow),
+        Index('ix_task_failed_fixes_task', 'repository_key', 'slug', 'task_id'),
+    )
+
+    id: Mapped[Serial]
+    repository_key: Mapped[RepositoryName]
+    slug: Mapped[SlugName]
+    task_id: Mapped[TaskName]
+    hypothesis: Mapped[Prose]
     at: Mapped[Timestamp]
 
 

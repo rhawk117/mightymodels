@@ -3,7 +3,9 @@
 Every transition is checked and stored with its transition row in one transaction, and puts the
 ticket in progress. `start` records an attempt and the HEAD it starts from, `verify` moves a task
 to verified or blocked on the proof in `gates.py`, `mark` closes or parks one with a reason,
-`show` lists a ticket's tasks and `ready` is the gate before any push.
+`record_failed_fix` stores the hypothesis of a fix that failed, up to `FAILED_FIX_LIMIT` per task,
+and refuses the next with the hypotheses tried, `show` lists a ticket's tasks and `ready` is the
+gate before any push.
 
 A closed ticket is final. `start`, `verify` and `mark` refuse one before they read a task, and
 `show` and `ready` still answer for it.
@@ -25,10 +27,13 @@ from types import MappingProxyType
 
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.declarative import PROSE_LIMIT
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.head import short_head
+from mightymodels_plugin.redaction import redact_within
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.task_id import is_plan_task, task_number
+from mightymodels_plugin.tools.task.errors import FixesSpentError, FixNotUnderwayError
 from mightymodels_plugin.tools.task.gates import (
     Evidence,
     readiness_problems,
@@ -36,6 +41,7 @@ from mightymodels_plugin.tools.task.gates import (
     verification_problems,
 )
 from mightymodels_plugin.tools.task.repository import (
+    FAILED_FIX_LIMIT,
     Attempt,
     TaskRepository,
     Transition,
@@ -45,6 +51,7 @@ from mightymodels_plugin.tools.task.schema import (
     ArchitectMode,
     Implementer,
     Status,
+    TaskFailedFix,
     TaskMark,
     TaskRecord,
     TaskStart,
@@ -129,6 +136,16 @@ def records_of(repository: TaskRepository, slug: Slug) -> dict[str, TaskRecord]:
     }
     pending = [TaskRecord(id=task_id, status=Status.PENDING) for task_id in planned - known]
     return {record.id: record for record in sorted([*started, *pending], key=task_order)}
+
+
+def fix_error(
+    task_id: str, before: Status, tried: Sequence[str]
+) -> FixNotUnderwayError | FixesSpentError | None:
+    if before is not Status.IN_PROGRESS:
+        return FixNotUnderwayError(task_id, before)
+    if len(tried) >= FAILED_FIX_LIMIT:
+        return FixesSpentError(task_id, tried)
+    return None
 
 
 def mode_error(change: TaskStart) -> ModeNeedsArchitectError | None:
@@ -265,6 +282,20 @@ class TaskService:
             record = records_of(repository, slug)[task_id]
         text = f'{task_id} {change.to}: {change.reason}\n'
         return TaskView(text=text, advanced=True, tasks=(record,))
+
+    def record_failed_fix(self, slug: Slug, task_id: str, change: TaskFailedFix) -> TaskView:
+        hypothesis = redact_within(change.hypothesis, 'hypothesis', PROSE_LIMIT)
+        with task_transaction(self.database) as repository:
+            repository.tickets.unclosed_row(slug)
+            before = status_of(repository.row(slug, task_id))
+            tried = repository.failed_fixes(slug, task_id)
+            if (error := fix_error(task_id, before, tried)) is not None:
+                raise error
+            repository.record_failed_fix(slug, task_id, hypothesis, at=now())
+            record = records_of(repository, slug)[task_id]
+        left = FAILED_FIX_LIMIT - len(tried) - 1
+        text = f'{task_id} failed fix {len(tried) + 1} recorded: {hypothesis}\n{left} left\n'
+        return TaskView(text=text, advanced=False, tasks=(record,))
 
     def show(self, slug: Slug) -> TaskView:
         with task_transaction(self.database) as repository:

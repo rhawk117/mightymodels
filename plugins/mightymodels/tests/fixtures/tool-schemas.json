@@ -624,6 +624,7 @@
             "start",
             "verify",
             "mark",
+            "record-failed-fix",
             "show",
             "ready"
           ],
@@ -640,8 +641,24 @@
             },
             {
               "$ref": "#/$defs/TaskMark"
+            },
+            {
+              "$ref": "#/$defs/TaskFailedFix"
             }
           ]
+        },
+        "TaskFailedFix": {
+          "additionalProperties": false,
+          "properties": {
+            "hypothesis": {
+              "$ref": "#/$defs/ProseText"
+            }
+          },
+          "required": [
+            "hypothesis"
+          ],
+          "title": "TaskFailedFix",
+          "type": "object"
         },
         "TaskId": {
           "pattern": "^[TCR][0-9]{1,6}$",

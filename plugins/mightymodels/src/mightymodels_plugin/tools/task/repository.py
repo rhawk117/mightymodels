@@ -16,6 +16,8 @@ The attempts are counted by the database, so a read fetches one row per task and
 many attempts there were, and `latest_transitions_into` fetches only the transitions it is asked
 for.
 
+A task's failed fixes are read whole, up to `FAILED_FIX_LIMIT`, the most the service lets it hold.
+
 A task's base is the HEAD of its first start that had one. A restart keeps it, so what the task
 changed is measured from where its first attempt began.
 """
@@ -32,13 +34,15 @@ from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.repository import ContractRepository
 from mightymodels_plugin.tools.task.schema import ArchitectMode, Implementer, Status
-from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
+from mightymodels_plugin.tools.task.tables import AttemptRow, FailedFixRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.ticket.repository import TicketRepository
 
 type AttemptCounts = dict[str, dict[str, int]]
 
 TASKS = ReadLimit(rows=1000, kept='tasks')
 ATTEMPT_COUNTS = ReadLimit(rows=TASKS.rows * len(Implementer), kept='attempt counts')
+FAILED_FIX_LIMIT = 3
+FAILED_FIXES = ReadLimit(rows=FAILED_FIX_LIMIT, kept='failed fixes')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -126,6 +130,23 @@ class TaskRepository:
         )
         return self.session.scalars(query).one()
 
+    def failed_fixes(self, slug: Slug, task_id: str) -> list[str]:
+        query = (
+            select(FailedFixRow.hypothesis)
+            .where(
+                FailedFixRow.repository_key == self.repository_key.root,
+                FailedFixRow.slug == slug.root,
+                FailedFixRow.task_id == task_id,
+            )
+            .order_by(FailedFixRow.id)
+            .limit(FAILED_FIXES.fetched)
+        )
+        hypotheses = list(self.session.scalars(query))
+        error = FAILED_FIXES.error(hypotheses, owner=f'task {task_id} of ticket {slug}')
+        if error is not None:
+            raise error
+        return hypotheses
+
     def latest_transitions_into(
         self, slug: Slug, statuses: Collection[Status], limit: int
     ) -> list[TransitionRow]:
@@ -177,6 +198,17 @@ class TaskRepository:
         error = TASKS.write_error(self.session.scalars(held).one(), owner=f'ticket {slug}')
         if error is not None:
             raise error
+
+    def record_failed_fix(self, slug: Slug, task_id: str, hypothesis: str, *, at: str) -> None:
+        self.session.add(
+            FailedFixRow(
+                repository_key=self.repository_key.root,
+                slug=slug.root,
+                task_id=task_id,
+                hypothesis=hypothesis,
+                at=at,
+            )
+        )
 
     def record_verification(self, slug: Slug, transition: Transition, commit: str) -> None:
         row = self.session.get_one(

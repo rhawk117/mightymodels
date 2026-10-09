@@ -17,6 +17,7 @@ class TaskAction(StrEnum):
     START = 'start'
     VERIFY = 'verify'
     MARK = 'mark'
+    RECORD_FAILED_FIX = 'record-failed-fix'
     SHOW = 'show'
     READY = 'ready'
 
@@ -60,7 +61,11 @@ class TaskMark(RequestModel):
     reason: ProseText
 
 
-type TaskChange = TaskStart | TaskVerification | TaskMark
+class TaskFailedFix(RequestModel):
+    hypothesis: ProseText
+
+
+type TaskChange = TaskStart | TaskVerification | TaskMark | TaskFailedFix
 
 
 class TaskPayload(RequestModel):
