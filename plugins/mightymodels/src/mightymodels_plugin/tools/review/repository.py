@@ -22,7 +22,7 @@ A method that writes takes values and builds the rows itself. `DecidedFinding` a
 `ResolvedFinding` are what the user decided and what a fix came to, as they are stored.
 """
 
-from collections.abc import Collection, Generator, Iterable
+from collections.abc import Collection, Generator, Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -260,6 +260,9 @@ class ReviewRepository:
 
     def record_run(self, run: ReviewRun) -> None:
         self.session.add(run_row_of(run, repository_key=self.repository_key))
+
+    def record_models(self, run: RunId, models: Mapping[str, str | None]) -> None:
+        self.started_run_row(run).models = dict(models)
 
     def record_findings(self, run: RunId, findings: Iterable[Finding]) -> None:
         for finding in findings:

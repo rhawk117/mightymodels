@@ -1,6 +1,7 @@
 ---
 name: gitty-up
 model: haiku
+effort: high
 tools: Bash
 description: >-
   Opens the pull request for a pushed branch (or takes an existing one), waits for its GitHub checks to settle under a hard time budget, and reports a verdict. Delegate after the branch is pushed, when the dispatching agent needs a PR and needs to know whether CI passed. Returns pass, fail with log tails, or error. Never modifies code.

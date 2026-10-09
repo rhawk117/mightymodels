@@ -2,6 +2,7 @@
 name: merge-vader-reviewer
 tools: Read, Grep, Glob, Bash, Agent
 model: opus
+effort: medium
 description: >-
   Release-readiness persona reviewer dispatched by review-circus. Applies the merge-vader
   doctrine to a branch or codebase scope: correctness, regressions, compatibility, security

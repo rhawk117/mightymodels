@@ -1,6 +1,6 @@
 """The `review` tool's service against a real git repository, moved from review_state.py's tests."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.run_id import InvalidRunIdError, RunId, parsed_run_id
-from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.review.schema import (
     DisposePayload,
     Disposition,
@@ -27,9 +26,7 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewOutcomeRow,
     ReviewRunRow,
 )
-from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
-from mightymodels_plugin.tools.ticket.tables import TicketRow
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -41,15 +38,6 @@ ADVANCED, REJECTED = 0, 2
 IDENTITY = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
 BALANCED = {'scope': 'ticket', 'slug': SLUG, 'base': 'main', 'emphasis': 'balanced'}
 NON_ASCII_DIGIT_RUN_ID = '2026010\u0662-000000'
-ANSWERS = TicketAnswers.model_validate(
-    {
-        'summary': 'Retry queue drains slowly',
-        'scope': 'large',
-        'compaction': False,
-        'branch': 'fix/retry-queue',
-        'context': ['drain loop sleeps between batches'],
-    }
-)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -164,16 +152,6 @@ def commit(workspace: Workspace) -> str:
     return workspace.runner(workspace.root, 'rev-parse', 'HEAD').strip()
 
 
-def pin_models(workspace: Workspace, models: Mapping[str, str | None]) -> None:
-    workspace.tickets.write(Slug(SLUG), ANSWERS)
-    workspace.tickets.validate(Slug(SLUG))
-    database = workspace.reviews.database
-    with database.transaction() as session:
-        row = session.get(TicketRow, (database.repository_key.root, SLUG))
-        assert row is not None
-        row.models = dict(models)
-
-
 @pytest.fixture
 def workspace(
     review_service: ReviewService, ticket_service: TicketService, git: GitRunner
@@ -181,28 +159,25 @@ def workspace(
     return Workspace(reviews=review_service, tickets=ticket_service, runner=git)
 
 
-def test_deep_review_runs_both_personas_on_the_ticket_models(workspace: Workspace) -> None:
+def test_deep_review_runs_both_personas(workspace: Workspace) -> None:
     head = commit(workspace)
-    models = {'uncle-bob-reviewer': 'opus', 'merge-vader-reviewer': 'sonnet'}
-    pin_models(workspace, models)
     run = workspace.start(depth='deep')
     state = run_state(workspace, run)
     assert state['personas'] == ['merge-vader', 'uncle-bob']
-    assert state['models'] == models
     assert state['head'] == head
 
 
-def test_deep_review_without_a_pinned_model_uses_the_routing_table(workspace: Workspace) -> None:
+def test_deep_review_runs_both_personas_on_opus(workspace: Workspace) -> None:
     run = workspace.start(depth='deep')
     assert run_state(workspace, run)['models'] == {
         'merge-vader-reviewer': 'opus',
-        'uncle-bob-reviewer': 'sonnet',
+        'uncle-bob-reviewer': 'opus',
     }
 
 
-def test_quick_review_runs_the_heavier_persona_on_luna(workspace: Workspace) -> None:
+def test_quick_review_runs_the_heavier_persona_on_sonnet(workspace: Workspace) -> None:
     run = workspace.start(depth='quick', emphasis='maintainability')
-    assert run_state(workspace, run)['models'] == {'uncle-bob-reviewer': 'haiku'}
+    assert run_state(workspace, run)['models'] == {'uncle-bob-reviewer': 'sonnet'}
 
 
 def test_quick_review_with_tied_weights_needs_a_persona(workspace: Workspace) -> None:
@@ -214,7 +189,7 @@ def test_quick_review_with_tied_weights_needs_a_persona(workspace: Workspace) ->
 def test_standard_review_drops_a_persona_below_the_threshold(workspace: Workspace) -> None:
     weights = {'merge-vader': 0.8, 'uncle-bob': 0.2}
     run = workspace.start(depth='standard', emphasis='custom', weights=weights)
-    assert run_state(workspace, run)['models'] == {'merge-vader-reviewer': 'sonnet'}
+    assert run_state(workspace, run)['models'] == {'merge-vader-reviewer': 'opus'}
 
 
 def test_custom_weights_must_sum_to_one(workspace: Workspace) -> None:

@@ -24,7 +24,7 @@ from pydantic import ValidationError
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.routing import Scope, Worker
+from mightymodels_plugin.routing import FIXED_WORKERS, Scope, Worker, fixed_model
 from mightymodels_plugin.slug import InvalidSlugError, Slug, parsed_slug
 from mightymodels_plugin.tools.ticket.repository import TicketRepository, ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import (
@@ -115,13 +115,23 @@ def top_level_problems(tree: Tree, slug: Slug) -> list[str]:
     )
 
 
+def changed_fixed_workers(models: Tree) -> list[str]:
+    return [
+        f'{worker.value} runs on {fixed_model(worker)}'
+        for worker in sorted(FIXED_WORKERS)
+        if models.get(worker.value) not in (None, '', fixed_model(worker).value)
+    ]
+
+
 def model_problems(models: Tree) -> list[str]:
     unknown = sorted(set(models) - KNOWN_WORKERS)
     missing = sorted(IMPLEMENTERS - {worker for worker, model in models.items() if model})
+    changed = changed_fixed_workers(models)
     return failed_messages(
         (
             (not unknown, f'subagent-models has unknown workers {unknown}'),
             (not missing, f'subagent-models needs a model for {missing}'),
+            (not changed, f'subagent-models cannot change a fixed worker: {changed}'),
         )
     )
 

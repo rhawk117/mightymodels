@@ -6,11 +6,11 @@ Read before the scope dialog and when building a reviewer dispatch. The `review`
 
 | Depth    | Personas                                                   | Reviewer model                                                                                           | Evidence                                                                                                                 |
 | -------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| quick    | one: `persona`, else the heavier weight (a tie is refused) | `haiku`                                                                                                  | Scouts or qualitylens only to close one named evidence gap. Bounded second opinion. Replaces calling a persona directly. |
-| standard | each persona weighted 0.25 or more                         | `sonnet`                                                                                                 | Targeted code-scout waves; qualitylens for churn and coupling on the changed files.                                      |
-| deep     | both                                                       | ticket.yml's reviewer keys (`opus` for merge-vader-reviewer, `sonnet` for uncle-bob-reviewer when unset) | Broad evidence waves, web-scout idiom documentation for quality findings, full report.                                   |
+| quick    | one: `persona`, else the heavier weight (a tie is refused) | `sonnet`                                                                                                 | Scouts or qualitylens only to close one named evidence gap. Bounded second opinion. Replaces calling a persona directly. |
+| standard | each persona weighted 0.25 or more                         | `opus`                                                                                                   | Targeted code-scout waves; qualitylens for churn and coupling on the changed files.                                      |
+| deep     | both                                                       | `opus`                                                                                                   | Broad evidence waves, web-scout idiom documentation for quality findings, full report.                                   |
 
-Deep keeps the split of record from ticket.yml, since that is the pass the user chose to pay for. Evidence workers (code-scout, web-scout, qualitylens) always use ticket.yml's models.
+The `override` action moves the run's heavier-weighted reviewer to `fable` once, to be dispatched with effort high; a ticket's reviewer keys change nothing. Evidence workers (code-scout, web-scout, qualitylens) always use ticket.yml's models.
 
 ## Emphasis
 

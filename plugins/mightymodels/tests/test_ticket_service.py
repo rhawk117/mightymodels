@@ -151,8 +151,8 @@ def workspace_outside_a_repository(tmp_path: Path, data_directory: Path) -> Gene
 @pytest.mark.parametrize(
     ('scope', 'models'),
     [
-        ('sm', ('sonnet', 'sonnet')),
-        ('med', ('sonnet', 'sonnet')),
+        ('sm', ('sonnet', 'opus')),
+        ('med', ('sonnet', 'opus')),
         ('large', ('sonnet', 'opus')),
     ],
 )
@@ -202,7 +202,7 @@ def test_validate_stages_the_work_unit(workspace: Workspace) -> None:
     assert 'status staged' in outcome.out
     assert (unit.status, unit.ticket.branch) == ('staged', 'fix/retry-queue')
     assert unit.ticket.tracker == Tracker(issue=42, jira=None)
-    assert unit.ticket.models['uncle-bob-reviewer'] == 'sonnet'
+    assert unit.ticket.models['uncle-bob-reviewer'] == 'opus'
 
 
 def test_hand_edits_inside_the_subset_validate(workspace: Workspace) -> None:

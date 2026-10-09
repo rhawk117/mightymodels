@@ -50,6 +50,12 @@ class RunExistsError(StateError):
         self.run = run
 
 
+class OverrideSpentError(StateError):
+    def __init__(self, run: RunId) -> None:
+        super().__init__(f'review run {run!s} has used its one reviewer override')
+        self.run = run
+
+
 class ReportMissingError(StateError):
     def __init__(self, persona: Persona, relative: str) -> None:
         super().__init__(f'no {persona} report at {relative}; the reviewer writes it there first')

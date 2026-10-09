@@ -1,7 +1,8 @@
 ---
 name: uncle-bob-reviewer
 tools: Read, Grep, Glob, Bash, Agent
-model: sonnet
+model: opus
+effort: medium
 description: >-
   Maintainability persona reviewer dispatched by review-circus. Applies the uncle-bob doctrine
   (SOLID, the Clean Code smells catalog, Clean Architecture component metrics) to a branch or

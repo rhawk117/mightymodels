@@ -2,6 +2,7 @@
 name: code-scout
 tools: Read, Grep, Glob, Bash
 model: haiku
+effort: high
 description: >-
   Repository retrieval worker. Use to locate files or symbols, find call sites and imports,
   read a config value or literal, list declared and resolved dependency versions, pull git

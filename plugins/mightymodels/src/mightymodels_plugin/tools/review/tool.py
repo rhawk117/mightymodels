@@ -59,6 +59,10 @@ def start_run(reviews: ReviewService, call: ReviewCall) -> ReviewView:
     return reviews.start(call.payload, started=datetime.now(tz=UTC))
 
 
+def override_reviewer(reviews: ReviewService, call: ReviewCall) -> ReviewView:
+    return reviews.override(run_id_for(ReviewAction.OVERRIDE, call))
+
+
 def add_persona_report(reviews: ReviewService, call: ReviewCall) -> ReviewView:
     run = run_id_for(ReviewAction.ADD, call)
     if not isinstance(call.payload, AddPayload):
@@ -128,6 +132,7 @@ review_tool = ReviewTool(
     handlers=MappingProxyType(
         {
             ReviewAction.START: start_run,
+            ReviewAction.OVERRIDE: override_reviewer,
             ReviewAction.ADD: add_persona_report,
             ReviewAction.GATE: gate_run,
             ReviewAction.DISPOSE: dispose_findings,

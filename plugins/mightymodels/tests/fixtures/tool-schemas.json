@@ -337,6 +337,7 @@
         "ReviewAction": {
           "enum": [
             "start",
+            "override",
             "add",
             "gate",
             "dispose",

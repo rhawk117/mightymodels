@@ -37,6 +37,7 @@ type Sources = Annotated[tuple[SourceId, ...], Field(min_length=1)]
 
 class ReviewAction(StrEnum):
     START = 'start'
+    OVERRIDE = 'override'
     ADD = 'add'
     GATE = 'gate'
     DISPOSE = 'dispose'

@@ -21,9 +21,9 @@ subagent-models:
   engineer: "sonnet"             # sonnet at every scope
   architect: "<derived>"         # see derivation rules
   gitty-up: "haiku"
-  wingman: "opus"
-  merge-vader-reviewer: "opus"
-  uncle-bob-reviewer: "sonnet"
+  wingman: "fable"
+  merge-vader-reviewer: "opus"   # ignored: a review run sets reviewer models
+  uncle-bob-reviewer: "opus"     # ignored: a review run sets reviewer models
 handoff-context:
   scope: "<sm|med|large>"
   plan-first: <true|false>       # derived from the compaction answer
@@ -42,17 +42,17 @@ The `ticket` tool writes this file and reads back exactly this YAML subset, so h
 - lists of scalars, one `- item` per line;
 - `#` comments on their own line or after a value.
 
-Anchors, flow collections (`[a, b]`, `{a: b}`), single quotes, and block scalars (`|`, `>`) are refused with the line number. `validate` refuses unknown keys too, at the top level and under `companion-docs`, `handoff-context` and `subagent-models`, including retired worker keys such as `scout` or `budgetron`, because a key nobody reads is a setting that silently does nothing. It also requires a non-empty `summary`, a `task` equal to the slug, one to six `context` lines, a `scope` of sm, med or large, a boolean `plan-first`, a non-empty `branch-name`, a numeric `issue-number`, a model for `engineer` and `architect`, and a ledger for every linked investigation.
+Anchors, flow collections (`[a, b]`, `{a: b}`), single quotes, and block scalars (`|`, `>`) are refused with the line number. `validate` refuses unknown keys too, at the top level and under `companion-docs`, `handoff-context` and `subagent-models`, including retired worker keys such as `scout` or `budgetron`, because a key nobody reads is a setting that silently does nothing. It also requires a non-empty `summary`, a `task` equal to the slug, one to six `context` lines, a `scope` of sm, med or large, a boolean `plan-first`, a non-empty `branch-name`, a numeric `issue-number`, a model for `engineer` and `architect`, no model for a fixed worker (every worker but the two reviewers) other than the one routing fixes, and a ledger for every linked investigation.
 
 ## Derivation rules
 
-**engineer**: `sonnet` at every scope. The ticket value is the default for every task; the primary may bump a single gnarly task one tier at dispatch, logging the reason in that task's ASKED stanza. A ticket has one scope value; its tasks do not.
+**engineer**: `sonnet` at every scope. The primary may bump a single gnarly task one tier at dispatch, logging the reason in that task's ASKED stanza. A ticket has one scope value; its tasks do not.
 
-**architect**: from the task-scope answer: `large` → `opus`; `sm` or `med` → `sonnet`. Architect recovers a failed engineer task; it runs the engineer's tier at sm and med and one above it at large.
+**architect**: `opus` at every scope. Architect recovers a failed engineer task, one tier above the engineer.
 
 **plan-first**: `true` when the user expects at least one compaction. `true` also means the baton-pass handoff prompt carries the switch-models reminder, and the next session's low-tier primary writes the plan before any dispatch.
 
-**Reviewer split** (decision of record, 2026-08-29; carried to the reviewer workers 2026-09-28): `uncle-bob-reviewer` runs `sonnet` and `merge-vader-reviewer` runs `opus`. The split is by role and report, not model — uncle-bob grades abstraction and structure, merge-vader runs the adversarial pre-merge pass, and their reports land separately so neither hedges the other. A ticket value is used for a deep review; a quick review runs its one persona on `haiku` and a standard review runs on `sonnet`, whatever the ticket says. Everything else in this block is user-overridable per ticket.
+**Reviewers**: a review run sets its reviewers' models from its depth, `sonnet` for quick and `opus` for standard and deep, and the run's one override moves the heavier-weighted reviewer to `fable`. The two reviewer keys are written for completeness and change no review. The other workers are fixed: `validate` refuses a value that differs from `code-scout`, `web-scout`, `qualitylens` and `gitty-up` on `haiku`, `engineer` on `sonnet`, `architect` on `opus` and `wingman` on `fable`.
 
 ## Field discipline
 

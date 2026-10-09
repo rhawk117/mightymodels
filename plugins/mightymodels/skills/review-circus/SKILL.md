@@ -2,8 +2,7 @@
 name: review-circus
 description: >-
   Review a diff, branch, ticket, or whole codebase with the mightymodels persona reviewers. One
-  AskUserQuestion gate sets depth (quick haiku, standard sonnet, deep on ticket.yml's reviewer
-  models: opus for merge-vader-reviewer, sonnet for uncle-bob-reviewer when unset), persona
+  AskUserQuestion gate sets depth (quick runs its reviewers on sonnet, standard and deep on opus), persona
   emphasis, and scope; the `review` tool records the run, metrics.py and review_signals.py
   measure, merge-vader-reviewer and uncle-bob-reviewer report, and the tool reads their reports
   and merges overlapping findings, presented by id through AskUserQuestion. Only the findings
@@ -41,8 +40,7 @@ what the conversation has not already settled:
 
 - **Scope**: diff, branch (against which base), ticket, or codebase.
 - **Depth**: quick, standard, or deep. Say what each costs (profiles.md): quick is one
-  persona on haiku, standard is sonnet, deep runs ticket.yml's reviewer models (opus for
-  merge-vader-reviewer, sonnet for uncle-bob-reviewer when unset).
+  persona on sonnet, standard and deep run their reviewers on opus.
 - **Emphasis**: release-readiness, maintainability, balanced, or custom weights.
 - For a quick review with balanced weights: which persona.
 
@@ -54,6 +52,14 @@ Then record it with `mcp__plugin_mightymodels_state__review` and action `start`:
 
 It answers with the run id, the run directory, and each persona's model. Every later step
 names the run with `run_id`.
+
+A run may spend one override on its heavier-weighted reviewer (the first persona, merge-vader, on equal weights), moving it to fable. Ask for it only when the user wants the strongest reviewer, with action `override`:
+
+```json
+{"action": "override", "run_id": "20261005-103000"}
+```
+
+The answer names the reviewer and says to dispatch it with effort high; a second request on the run is refused. A ticket's reviewer keys change no review.
 
 ## 2. Measure
 

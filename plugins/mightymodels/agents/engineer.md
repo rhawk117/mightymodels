@@ -2,6 +2,7 @@
 name: engineer
 tools: Read, Grep, Glob, Bash, Edit, Write, Agent
 model: sonnet
+effort: medium
 description: >-
   Default low-cost implementer. Use to execute exactly one task group from an approved plan,
   or one residual fix carrying explicit Fix and Verify lines: edits only the files the dispatch

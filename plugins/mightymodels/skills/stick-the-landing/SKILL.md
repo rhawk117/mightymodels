@@ -25,8 +25,8 @@ an absolute path:
   `mightymodels verify run` to run its commands.
 - `python3 "${CLAUDE_PLUGIN_ROOT}/skills/open-ticket/scripts/humanize_tracker_body.py"` for the PR body.
 
-Dispatch workers through prompting-subagents. Models come from ticket.yml's `subagent-models`
-block, never from memory.
+Dispatch workers through prompting-subagents. Models are the fixed aliases `subagent-models`
+lists, never memory.
 
 ## 1. Gate
 

@@ -1,4 +1,9 @@
-"""The one routing table: which model alias each worker runs on at each ticket scope."""
+"""The one routing table: which model alias and effort each worker runs on.
+
+Every worker but the two reviewers is fixed: it runs on the same model at every scope and a ticket
+cannot change it. A reviewer's model comes from the review's depth, and `OVERRIDE_MODEL` is the one
+model a single review run may move its heavier-weighted reviewer to.
+"""
 
 from collections.abc import Mapping
 from enum import StrEnum, auto
@@ -10,6 +15,14 @@ class Model(StrEnum):
     SONNET = auto()
     OPUS = auto()
     FABLE = auto()
+
+
+class Effort(StrEnum):
+    LOW = auto()
+    MEDIUM = auto()
+    HIGH = auto()
+    XHIGH = auto()
+    MAX = auto()
 
 
 class Scope(StrEnum):
@@ -49,15 +62,23 @@ ROUTING: Mapping[Worker, ScopeRouting] = MappingProxyType(
         Worker.WEB_SCOUT: at_every_scope(Model.HAIKU),
         Worker.QUALITYLENS: at_every_scope(Model.HAIKU),
         Worker.ENGINEER: at_every_scope(Model.SONNET),
-        Worker.ARCHITECT: MappingProxyType(
-            {Scope.SM: Model.SONNET, Scope.MED: Model.SONNET, Scope.LARGE: Model.OPUS}
-        ),
+        Worker.ARCHITECT: at_every_scope(Model.OPUS),
         Worker.GITTY_UP: at_every_scope(Model.HAIKU),
-        Worker.WINGMAN: at_every_scope(Model.OPUS),
+        Worker.WINGMAN: at_every_scope(Model.FABLE),
         Worker.MERGE_VADER_REVIEWER: at_every_scope(Model.OPUS),
-        Worker.UNCLE_BOB_REVIEWER: at_every_scope(Model.SONNET),
+        Worker.UNCLE_BOB_REVIEWER: at_every_scope(Model.OPUS),
     }
 )
+EFFORT: Mapping[Model, Effort] = MappingProxyType(
+    {
+        Model.HAIKU: Effort.HIGH,
+        Model.SONNET: Effort.MEDIUM,
+        Model.OPUS: Effort.MEDIUM,
+        Model.FABLE: Effort.HIGH,
+    }
+)
+REVIEWER_WORKERS = frozenset({Worker.MERGE_VADER_REVIEWER, Worker.UNCLE_BOB_REVIEWER})
+FIXED_WORKERS = frozenset(Worker) - REVIEWER_WORKERS
 
 
 def models_at(scope: Scope) -> dict[Worker, Model]:
@@ -65,13 +86,15 @@ def models_at(scope: Scope) -> dict[Worker, Model]:
 
 
 DEPTH_MODELS: Mapping[Depth, Model] = MappingProxyType(
-    {Depth.QUICK: Model.HAIKU, Depth.STANDARD: Model.SONNET}
+    {Depth.QUICK: Model.SONNET, Depth.STANDARD: Model.OPUS, Depth.DEEP: Model.OPUS}
 )
+OVERRIDE_MODEL = Model.FABLE
 DEFAULT_SCOPE = Scope.MED
 
 
-def reviewer_model(worker: Worker, depth: Depth, ticket_models: Mapping[str, str | None]) -> str:
-    fixed = DEPTH_MODELS.get(depth)
-    if fixed is not None:
-        return fixed.value
-    return ticket_models.get(worker.value) or ROUTING[worker][DEFAULT_SCOPE].value
+def fixed_model(worker: Worker) -> Model:
+    return ROUTING[worker][DEFAULT_SCOPE]
+
+
+def reviewer_model(depth: Depth) -> Model:
+    return DEPTH_MODELS[depth]

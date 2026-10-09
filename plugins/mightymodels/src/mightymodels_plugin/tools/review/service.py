@@ -1,6 +1,8 @@
 """The review service: a review run, its findings, the user's decisions and the fix outcomes.
 
-A run records its scope, depth, persona weights and reviewer models at HEAD. `add` reads a
+A run records its scope, depth, persona weights and reviewer models at HEAD. A reviewer's model
+comes from the depth alone, and `override` moves the heavier-weighted reviewer of the run to the
+strongest model once; on equal weights the first persona, merge-vader, is the heavier. `add` reads a
 persona's report from the run directory and records its findings; the reports and the metrics
 file are the only files a run keeps, and `report` returns its text for the agent to write.
 `listing` names the newest runs and says so when older ones are left out.
@@ -30,13 +32,14 @@ from mightymodels_plugin.database import Database
 from mightymodels_plugin.declarative import NAME_LIMIT, PROSE_LIMIT
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.redaction import redact_within
-from mightymodels_plugin.routing import Depth, Worker, reviewer_model
+from mightymodels_plugin.routing import EFFORT, OVERRIDE_MODEL, Depth, Worker, reviewer_model
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.review.errors import (
     BaseRequiredError,
     CommitRequiredError,
     NotChosenError,
+    OverrideSpentError,
     PersonaChoiceError,
     ReasonRequiredError,
     ReportMissingError,
@@ -211,20 +214,23 @@ def personas_for(
     return leaders
 
 
-def pinned_models(repository: ReviewRepository, slug: Slug | None) -> Mapping[str, str | None]:
-    ticket = None if slug is None else repository.tickets.row(slug)
-    if ticket is None:
-        return dict[str, str | None]()
-    return ticket.models
+def reviewer_models(personas: Sequence[Persona], depth: Depth) -> dict[str, str]:
+    return {REVIEWERS[persona].value: reviewer_model(depth).value for persona in personas}
 
 
-def reviewer_models(
-    personas: Sequence[Persona], depth: Depth, pinned: Mapping[str, str | None]
-) -> dict[str, str]:
-    return {
-        REVIEWERS[persona].value: reviewer_model(REVIEWERS[persona], depth, pinned)
-        for persona in personas
-    }
+def override_spent(run: ReviewRun) -> bool:
+    return OVERRIDE_MODEL.value in run.models.values()
+
+
+def heavier_persona(run: ReviewRun) -> Persona:
+    return max(run.personas, key=run.weights.__getitem__)
+
+
+def overridden_text(run: RunId, reviewer: Worker) -> str:
+    return (
+        f'run {run}: {reviewer} on {OVERRIDE_MODEL}\n'
+        f'dispatch it with effort {EFFORT[OVERRIDE_MODEL]}\n'
+    )
 
 
 def started_text(started_run: ReviewRun, relative: str) -> str:
@@ -298,7 +304,6 @@ class ReviewService:
         personas = personas_for(payload.depth, weights, payload.persona)
         run = RunId(started.strftime(RUN_ID_FORMAT))
         with review_transaction(self.database) as repository:
-            pinned = pinned_models(repository, payload.slug)
             if repository.run_row(run) is not None:
                 raise RunExistsError(run)
             started_run = ReviewRun(
@@ -311,7 +316,7 @@ class ReviewService:
                 emphasis=payload.emphasis,
                 weights=weights,
                 personas=tuple(personas),
-                models=reviewer_models(personas, payload.depth, pinned),
+                models=reviewer_models(personas, payload.depth),
                 created_at=started.isoformat(timespec='seconds'),
             )
             repository.record_run(started_run)
@@ -319,6 +324,17 @@ class ReviewService:
             directory.mkdir(parents=True, exist_ok=True)
         text = started_text(started_run, self.workspace.relative_to_root(directory))
         return ReviewView(text=text, run_id=run.root)
+
+    def override(self, run: RunId) -> ReviewView:
+        with review_transaction(self.database) as repository:
+            started_run = run_of(repository.started_run_row(run))
+            if override_spent(started_run):
+                raise OverrideSpentError(run)
+            reviewer = REVIEWERS[heavier_persona(started_run)]
+            repository.record_models(
+                run, {**started_run.models, reviewer.value: OVERRIDE_MODEL.value}
+            )
+        return ReviewView(text=overridden_text(run, reviewer), run_id=run.root)
 
     def add(self, run: RunId, persona: Persona) -> ReviewView:
         with review_transaction(self.database) as repository:

@@ -1,7 +1,8 @@
 ---
 name: wingman
 tools: mcp__plugin_mightymodels_state__ticket
-model: opus
+model: fable
+effort: high
 description: >-
   One-shot advisory consult for a decision the primary agent cannot confidently
   make on its own. Give it the decision at stake and every fact gathered so far;

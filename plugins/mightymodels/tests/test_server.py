@@ -133,11 +133,12 @@ class TestStateServer:
         assert list(schema['properties']) == arguments
         assert schema['required'] == required
 
-    def test_review_offers_the_seven_actions(self, state_server: StateServer) -> None:
+    def test_review_offers_the_eight_actions(self, state_server: StateServer) -> None:
         schema = state_server.tools()['review'].input_schema
 
         assert schema['$defs']['ReviewAction']['enum'] == [
             'start',
+            'override',
             'add',
             'gate',
             'dispose',
