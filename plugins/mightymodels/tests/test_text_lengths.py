@@ -36,6 +36,7 @@ from mightymodels_plugin.tools.contract.tables import CommandRow
 from mightymodels_plugin.tools.crashout.schema import CrashoutEntry
 from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.crashout.tables import CrashoutRow
+from mightymodels_plugin.tools.failed_fix.schema import FailedFixPayload, TaskFailedFix
 from mightymodels_plugin.tools.investigation.schema import InvestigationStart, LedgerEntry
 from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.investigation.tables import LedgerEntryRow
@@ -72,7 +73,6 @@ from mightymodels_plugin.tools.similarity.schema import SpooledReport
 from mightymodels_plugin.tools.similarity.tables import ScoutReportRow
 from mightymodels_plugin.tools.task.schema import (
     Status,
-    TaskFailedFix,
     TaskMark,
     TaskPayload,
     TaskStart,
@@ -175,6 +175,7 @@ VALID: Mapping[type[RequestModel], dict[str, object]] = MappingProxyType(
         TaskStart: {'by': 'engineer', 'owned': ['src/queue.py']},
         TaskVerification: {'commit': 'abc1234'},
         TaskMark: {'to': 'failed', 'reason': 'the drain test fails'},
+        FailedFixPayload: {'task_id': 'T1', 'change': {'hypothesis': 'the drain loop sleeps'}},
         TaskFailedFix: {'hypothesis': 'the drain loop sleeps between batches'},
         TaskPayload: {},
         TicketAnswers: {
@@ -386,6 +387,13 @@ class TestEveryStringOfARequestModel:
         stored(TicketAnswers, 'jira', TicketRow, 'jira'),
         CallerText(
             model=TaskPayload,
+            field='task_id',
+            limit=length_of(TaskRow, 'task_id'),
+            spelled=task_id,
+            refused_as=OFF_THE_PATTERN,
+        ),
+        CallerText(
+            model=FailedFixPayload,
             field='task_id',
             limit=length_of(TaskRow, 'task_id'),
             spelled=task_id,
@@ -723,9 +731,9 @@ class TestTextRedactionLengthensPastItsLimit:
             field='corrective_action',
         ),
         RedactedCall(
-            tool='task',
+            tool='failed_fix',
             arguments={
-                'action': 'record-failed-fix',
+                'action': 'record',
                 'slug': SLUG,
                 'payload': {'task_id': 'T1', 'change': {'hypothesis': PROSE}},
             },

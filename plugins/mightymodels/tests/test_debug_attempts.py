@@ -5,12 +5,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
 from mightymodels_plugin.declarative import PROSE_LIMIT
 from mightymodels_plugin.redaction import RedactedTextTooLongError
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.failed_fix.schema import (
+    FailedFixAction,
+    FailedFixPayload,
+    TaskFailedFix,
+)
+from mightymodels_plugin.tools.failed_fix.tool import failed_fix_tool
 from mightymodels_plugin.tools.task.errors import FixesSpentError, FixNotUnderwayError
 from mightymodels_plugin.tools.task.repository import FAILED_FIX_LIMIT, task_transaction
-from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskFailedFix, TaskStart
+from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskStart, TaskView
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.tests.support import (
     StateServer,
@@ -40,8 +47,9 @@ CREDENTIALS = '://user:hunter2@'
 REDACTED_CREDENTIALS = '://[REDACTED:url-credentials]@'
 
 
-def fix_of(hypothesis: str) -> TaskFailedFix:
-    return TaskFailedFix(hypothesis=hypothesis)
+def record(tasks: TaskService, slug: Slug, task_id: str, hypothesis: str) -> TaskView:
+    payload = FailedFixPayload(task_id=task_id, change=TaskFailedFix(hypothesis=hypothesis))
+    return failed_fix_tool.failed_fix(FailedFixAction.RECORD, slug, payload, tasks=tasks)
 
 
 def tried(tasks: TaskService, slug: Slug, task_id: str) -> list[str]:
@@ -72,7 +80,7 @@ def started(ticket_service: TicketService, task_service: TaskService) -> TaskSer
 @pytest.fixture
 def three_failed(started: TaskService) -> TaskService:
     for hypothesis in HYPOTHESES:
-        started.record_failed_fix(TICKET, 'T1', fix_of(hypothesis))
+        record(started, TICKET, 'T1', hypothesis)
     return started
 
 
@@ -94,24 +102,28 @@ def another_repository(
 
 class TestAFailedFix:
     def test_is_recorded_with_the_hypothesis_it_tested(self, started: TaskService) -> None:
-        view = started.record_failed_fix(TICKET, 'T1', fix_of(HYPOTHESES[0]))
+        view = record(started, TICKET, 'T1', HYPOTHESES[0])
 
         assert tried(started, TICKET, 'T1') == [HYPOTHESES[0]]
         assert HYPOTHESES[0] in view.text
         assert [record.status for record in view.tasks] == [Status.IN_PROGRESS]
 
     def test_says_how_many_fixes_are_left(self, started: TaskService) -> None:
-        started.record_failed_fix(TICKET, 'T1', fix_of(HYPOTHESES[0]))
-        view = started.record_failed_fix(TICKET, 'T1', fix_of(HYPOTHESES[1]))
+        record(started, TICKET, 'T1', HYPOTHESES[0])
+        view = record(started, TICKET, 'T1', HYPOTHESES[1])
 
         assert view.text.splitlines()[0].startswith('T1 failed fix 2 recorded')
         assert view.text.splitlines()[1] == '1 left'
 
     def test_is_refused_on_a_task_that_is_not_in_progress(self, started: TaskService) -> None:
-        with pytest.raises(FixNotUnderwayError) as refused:
-            started.record_failed_fix(TICKET, 'T9', fix_of(HYPOTHESES[0]))
+        with pytest.raises(ToolError) as refused:
+            record(started, TICKET, 'T9', HYPOTHESES[0])
 
-        assert (refused.value.task_id, refused.value.current) == ('T9', Status.PENDING)
+        assert isinstance(refused.value.__cause__, FixNotUnderwayError)
+        assert (refused.value.__cause__.task_id, refused.value.__cause__.current) == (
+            'T9',
+            Status.PENDING,
+        )
         assert tried(started, TICKET, 'T9') == []
 
 
@@ -124,9 +136,10 @@ class TestThreeFailedFixesOfOneTask:
 class TestAFourthFailedFix:
     @pytest.fixture
     def refusal(self, three_failed: TaskService) -> FixesSpentError:
-        with pytest.raises(FixesSpentError) as refused:
-            three_failed.record_failed_fix(TICKET, 'T1', fix_of('a fourth idea'))
-        return refused.value
+        with pytest.raises(ToolError) as refused:
+            record(three_failed, TICKET, 'T1', 'a fourth idea')
+        assert isinstance(refused.value.__cause__, FixesSpentError)
+        return refused.value.__cause__
 
     def test_is_refused_with_the_three_hypotheses_in_order(self, refusal: FixesSpentError) -> None:
         assert refusal.tried == HYPOTHESES
@@ -142,12 +155,12 @@ class TestAFourthFailedFix:
         self, three_failed: TaskService, connected_server: StateServer
     ) -> None:
         arguments: dict[str, object] = {
-            'action': 'record-failed-fix',
+            'action': 'record',
             'slug': TICKET.root,
             'payload': {'task_id': 'T1', 'change': {'hypothesis': 'a fourth idea'}},
         }
 
-        (result,) = connected_server.call(('task', arguments))
+        (result,) = connected_server.call(('failed_fix', arguments))
 
         text = text_of(result)
         assert result.is_error
@@ -161,12 +174,12 @@ class TestAFourthFailedFix:
 
 class TestTheCount:
     def test_of_another_task_starts_at_zero(self, three_failed: TaskService) -> None:
-        three_failed.record_failed_fix(TICKET, 'T2', fix_of('another task, first idea'))
+        record(three_failed, TICKET, 'T2', 'another task, first idea')
 
         assert tried(three_failed, TICKET, 'T2') == ['another task, first idea']
 
     def test_of_another_ticket_starts_at_zero(self, three_failed: TaskService) -> None:
-        three_failed.record_failed_fix(OTHER_TICKET, 'T1', fix_of('another ticket, first idea'))
+        record(three_failed, OTHER_TICKET, 'T1', 'another ticket, first idea')
 
         assert tried(three_failed, OTHER_TICKET, 'T1') == ['another ticket, first idea']
         assert tried(three_failed, TICKET, 'T1') == list(HYPOTHESES)
@@ -176,7 +189,7 @@ class TestTheCount:
     ) -> None:
         stage_and_start(another_repository.tickets, another_repository.tasks, TICKET, 'T1')
 
-        another_repository.tasks.record_failed_fix(TICKET, 'T1', fix_of('other key, first idea'))
+        record(another_repository.tasks, TICKET, 'T1', 'other key, first idea')
 
         assert tried(another_repository.tasks, TICKET, 'T1') == ['other key, first idea']
         assert tried(three_failed, TICKET, 'T1') == list(HYPOTHESES)
@@ -184,7 +197,7 @@ class TestTheCount:
 
 class TestTheHypothesis:
     def test_is_redacted_before_it_is_stored(self, started: TaskService) -> None:
-        started.record_failed_fix(TICKET, 'T1', fix_of(f'the config holds {CREDENTIALS}'))
+        record(started, TICKET, 'T1', f'the config holds {CREDENTIALS}')
 
         (stored,) = tried(started, TICKET, 'T1')
         assert REDACTED_CREDENTIALS in stored
@@ -195,8 +208,26 @@ class TestTheHypothesis:
     ) -> None:
         hypothesis = 'x' * (PROSE_LIMIT - len(CREDENTIALS)) + CREDENTIALS
 
-        with pytest.raises(RedactedTextTooLongError) as refused:
-            started.record_failed_fix(TICKET, 'T1', fix_of(hypothesis))
+        with pytest.raises(ToolError) as refused:
+            record(started, TICKET, 'T1', hypothesis)
 
-        assert refused.value.field == 'hypothesis'
+        assert isinstance(refused.value.__cause__, RedactedTextTooLongError)
+        assert refused.value.__cause__.field == 'hypothesis'
+        assert tried(started, TICKET, 'T1') == []
+
+
+class TestTheTaskTool:
+    def test_refuses_the_old_action_as_unknown_and_stores_nothing(
+        self, started: TaskService, connected_server: StateServer
+    ) -> None:
+        arguments: dict[str, object] = {
+            'action': 'record-failed-fix',
+            'slug': TICKET.root,
+            'payload': {'task_id': 'T1', 'change': {'hypothesis': HYPOTHESES[0]}},
+        }
+
+        (result,) = connected_server.call(('task', arguments))
+
+        assert result.is_error
+        assert 'record-failed-fix' in text_of(result)
         assert tried(started, TICKET, 'T1') == []

@@ -33,6 +33,7 @@ from mightymodels_plugin.head import short_head
 from mightymodels_plugin.redaction import redact_within
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.task_id import is_plan_task, task_number
+from mightymodels_plugin.tools.failed_fix.schema import TaskFailedFix
 from mightymodels_plugin.tools.task.errors import FixesSpentError, FixNotUnderwayError
 from mightymodels_plugin.tools.task.gates import (
     Evidence,
@@ -51,7 +52,6 @@ from mightymodels_plugin.tools.task.schema import (
     ArchitectMode,
     Implementer,
     Status,
-    TaskFailedFix,
     TaskMark,
     TaskRecord,
     TaskStart,

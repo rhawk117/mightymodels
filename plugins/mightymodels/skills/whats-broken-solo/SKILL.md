@@ -19,14 +19,14 @@ The engineer's form of whats-broken, for one worker with no one to dispatch. The
 
 **5. Fix inside your owned files, then run the verification again.** A fix that needs a file outside the owned set is not yours to make: report `blocked` with the file and the hypothesis.
 
-**6. Record a fix that failed.** When the verification still fails, call `mcp__plugin_mightymodels_state__task` with action `record-failed-fix` before you try anything else (`SLUG` is the directory in the brief path `.mightymodels/<slug>/briefs/`, `T1` the task id from the dispatch):
+**6. Record a fix that failed.** When the verification still fails, call `mcp__plugin_mightymodels_state__failed_fix` with action `record` before you try anything else (`SLUG` is the directory in the brief path `.mightymodels/<slug>/briefs/`, `T1` the task id from the dispatch):
 
 ```json
-{"action": "record-failed-fix", "slug": "SLUG", "payload": {"task_id": "T1", "change": {"hypothesis": "I believe the batch size is zero because the drain log shows an empty batch; the fix that set it did not change the log"}}}
+{"action": "record", "slug": "SLUG", "payload": {"task_id": "T1", "change": {"hypothesis": "I believe the batch size is zero because the drain log shows an empty batch; the fix that set it did not change the log"}}}
 ```
 
 The answer says how many fixes are left. The hypothesis is stored redacted, so keep secrets out of it anyway.
 
 ## The limit
 
-The tool stores three failed fixes per task. A fourth call is refused with an error that says the task is blocked and lists the three hypotheses in order. That refusal ends the work: report `blocked`, copy the listed hypotheses into the report, and make no further edit. The coordinator routes a blocked report to architect, then to whats-broken, and the engineer dispatches neither; a hypothesis already tried is not tried again there. Do not call `start`, `mark` or `verify` on the task tool to get around the refusal.
+The tool stores three failed fixes per task. A fourth call is refused with an error that says the task is blocked and lists the three hypotheses in order. That refusal ends the work: report `blocked`, copy the listed hypotheses into the report, and make no further edit. The coordinator routes a blocked report to architect, then to whats-broken, and the engineer dispatches neither; a hypothesis already tried is not tried again there. The `task` tool is not yours: do not start, mark or verify a task to get around the refusal.

@@ -624,7 +624,6 @@
             "start",
             "verify",
             "mark",
-            "record-failed-fix",
             "show",
             "ready"
           ],
@@ -641,24 +640,8 @@
             },
             {
               "$ref": "#/$defs/TaskMark"
-            },
-            {
-              "$ref": "#/$defs/TaskFailedFix"
             }
           ]
-        },
-        "TaskFailedFix": {
-          "additionalProperties": false,
-          "properties": {
-            "hypothesis": {
-              "$ref": "#/$defs/ProseText"
-            }
-          },
-          "required": [
-            "hypothesis"
-          ],
-          "title": "TaskFailedFix",
-          "type": "object"
         },
         "TaskId": {
           "pattern": "^[TCR][0-9]{1,6}$",
@@ -2961,6 +2944,190 @@
         "text"
       ],
       "title": "SimilarityView",
+      "type": "object"
+    }
+  },
+  "failed_fix": {
+    "description": "Record a fix that failed, with the hypothesis it tested; the fourth is refused.",
+    "input_schema": {
+      "type": "object",
+      "$defs": {
+        "FailedFixAction": {
+          "enum": [
+            "record"
+          ],
+          "title": "FailedFixAction",
+          "type": "string"
+        },
+        "FailedFixPayload": {
+          "additionalProperties": false,
+          "properties": {
+            "task_id": {
+              "$ref": "#/$defs/TaskId"
+            },
+            "change": {
+              "$ref": "#/$defs/TaskFailedFix"
+            }
+          },
+          "required": [
+            "task_id",
+            "change"
+          ],
+          "title": "FailedFixPayload",
+          "type": "object"
+        },
+        "ProseText": {
+          "maxLength": 4000,
+          "type": "string"
+        },
+        "Slug": {
+          "$ref": "#/$defs/SlugText",
+          "title": "Slug"
+        },
+        "SlugText": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+          "type": "string"
+        },
+        "TaskFailedFix": {
+          "additionalProperties": false,
+          "properties": {
+            "hypothesis": {
+              "$ref": "#/$defs/ProseText"
+            }
+          },
+          "required": [
+            "hypothesis"
+          ],
+          "title": "TaskFailedFix",
+          "type": "object"
+        },
+        "TaskId": {
+          "pattern": "^[TCR][0-9]{1,6}$",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/FailedFixAction"
+        },
+        "slug": {
+          "$ref": "#/$defs/Slug"
+        },
+        "payload": {
+          "$ref": "#/$defs/FailedFixPayload"
+        }
+      },
+      "required": [
+        "action",
+        "slug",
+        "payload"
+      ],
+      "title": "failed_fixArguments"
+    },
+    "output_schema": {
+      "$defs": {
+        "Status": {
+          "enum": [
+            "pending",
+            "in-progress",
+            "verified",
+            "failed",
+            "blocked",
+            "superseded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "TaskRecord": {
+          "properties": {
+            "id": {
+              "title": "Id",
+              "type": "string"
+            },
+            "status": {
+              "$ref": "#/$defs/Status"
+            },
+            "owned": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Owned",
+              "type": "array"
+            },
+            "base": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Base"
+            },
+            "commit": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Commit"
+            },
+            "attempts": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "title": "Attempts",
+              "type": "object"
+            },
+            "reasons": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Reasons",
+              "type": "array"
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "title": "TaskRecord",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "advanced": {
+          "title": "Advanced",
+          "type": "boolean"
+        },
+        "tasks": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TaskRecord"
+          },
+          "title": "Tasks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "advanced"
+      ],
+      "title": "TaskView",
       "type": "object"
     }
   }

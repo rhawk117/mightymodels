@@ -55,11 +55,12 @@ nothing is written to it.
 
 ## Failed fixes
 
-The `task_failed_fixes` table holds the hypothesis behind each fix that failed on a task, written
-by the `task` tool's `record-failed-fix` action. The hypothesis is redacted on its way in. A task
-holds at most `FAILED_FIX_LIMIT` = 3 of them, counted per repository key, ticket and task, and a
-fourth is refused with an error that says the task is blocked and lists the three in order; nothing
-is stored for it. The limit is what stops a stuck engineer after three fixes.
+The `task_failed_fixes` table holds the hypothesis behind each fix that failed on a task, written by
+the `failed_fix` tool, whose one action is `record`; it asks the task service, which keeps the
+count. The hypothesis is redacted on its way in. A task holds at most `FAILED_FIX_LIMIT` = 3 of
+them, counted per repository key, ticket and task, and a fourth is refused with an error that says
+the task is blocked and lists the three in order; nothing is stored for it. The limit is what stops
+a stuck engineer after three fixes.
 
 ## Similarity and the scout-report spool
 

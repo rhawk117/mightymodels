@@ -41,6 +41,7 @@ from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.contract.tool import contract_tool
 from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.crashout.tool import crashout_tool
+from mightymodels_plugin.tools.failed_fix.tool import failed_fix_tool
 from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.investigation.tool import investigation_tool
 from mightymodels_plugin.tools.protocol import ServedState, StartRefusal
@@ -68,6 +69,7 @@ TOOLS = (
     investigation_tool.investigation,
     crashout_tool.crashout,
     similarity_tool.similarity,
+    failed_fix_tool.failed_fix,
 )
 
 

@@ -20,6 +20,7 @@ from mightymodels_plugin.tools.protocol import ActionTool, LifespanState
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.similarity.service import SimilarityService
 from mightymodels_plugin.tools.snapshot.service import SnapshotService
+from mightymodels_plugin.tools.task.schema import TaskStart
 from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.tests.support import (
     ActivityKind,
@@ -42,10 +43,16 @@ ANSWERS = {
 }
 COMMAND = {'id': 'T1.AC-1', 'argv': ['true'], 'approved_by': 'user'}
 START = {'by': 'engineer', 'owned': ['src/queue.py']}
+FAILED_FIX = {
+    'action': 'record',
+    'slug': SLUG,
+    'payload': {'task_id': 'T1', 'change': {'hypothesis': 'the drain loop sleeps'}},
+}
 TOOL_NAMES = [
     'close',
     'contract',
     'crashout',
+    'failed_fix',
     'investigation',
     'review',
     'similarity',
@@ -126,6 +133,12 @@ class TestStateServer:
             ),
             pytest.param('crashout', ['action', 'entry'], ['action'], id='crashout'),
             pytest.param('similarity', ['action', 'query', 'kind'], ['action'], id='similarity'),
+            pytest.param(
+                'failed_fix',
+                ['action', 'slug', 'payload'],
+                ['action', 'slug', 'payload'],
+                id='failed_fix',
+            ),
         ],
     )
     def test_each_tool_takes_the_arguments_the_surface_gives_it(
@@ -303,19 +316,21 @@ class TestToolCalls:
         ('investigation', {'action': 'list'}),
         ('crashout', {'action': 'stats'}),
         ('similarity', {'action': 'search', 'query': 'the drain loop'}),
+        ('failed_fix', FAILED_FIX),
     )
     UNNAMED_ARGUMENT = 'not_in_the_schema'
 
     @pytest.fixture
-    def server_with_a_staged_ticket(
-        self, state_server: StateServer, ticket_service: TicketService
+    def server_with_a_started_task(
+        self, state_server: StateServer, ticket_service: TicketService, task_service: TaskService
     ) -> StateServer:
         ticket_service.write(Slug(SLUG), TicketAnswers.model_validate(ANSWERS))
         ticket_service.validate(Slug(SLUG))
+        task_service.start(Slug(SLUG), 'T1', TaskStart.model_validate(START))
         return state_server
 
-    def test_each_tool_answers_one_call(self, server_with_a_staged_ticket: StateServer) -> None:
-        results = server_with_a_staged_ticket.call(*self.ONE_CALL_OF_EACH_TOOL)
+    def test_each_tool_answers_one_call(self, server_with_a_started_task: StateServer) -> None:
+        results = server_with_a_started_task.call(*self.ONE_CALL_OF_EACH_TOOL)
 
         assert [name for name, _ in self.ONE_CALL_OF_EACH_TOOL] == [tool.__name__ for tool in TOOLS]
         assert [result.is_error for result in results] == [False] * len(TOOLS)
