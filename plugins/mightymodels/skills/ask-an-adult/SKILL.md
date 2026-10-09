@@ -14,7 +14,7 @@ description: >-
 
 # ask-an-adult
 
-`wingman` is a one-shot advisor on the ticket's alias (`opus`). Its one tool is `ticket` with
+`wingman` is a one-shot advisor on the ticket's alias (`fable`). Its one tool is `ticket` with
 action `show`, so it can read the active ticket and nothing else; the packet you send
 remains its evidence. The quality of its answer is capped
 by the quality of the packet you send it, and a thin packet wastes a frontier

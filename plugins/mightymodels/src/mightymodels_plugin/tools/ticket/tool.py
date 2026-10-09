@@ -77,7 +77,7 @@ class TicketTool:
         *,
         tickets: ResolvedTickets,
     ) -> TicketView:
-        """Create, validate, read or update a ticket's context lines; routes models by scope."""
+        """Create, validate, read or update a ticket's context lines; writes the fixed models."""
         call = TicketCall(slug=slug, fields=fields)
         return dispatch_to_service(self.handlers, action, call, service=tickets)
 

@@ -870,7 +870,7 @@
     }
   },
   "ticket": {
-    "description": "Create, validate, read or update a ticket's context lines; routes models by scope.",
+    "description": "Create, validate, read or update a ticket's context lines; writes the fixed models.",
     "input_schema": {
       "type": "object",
       "$defs": {
