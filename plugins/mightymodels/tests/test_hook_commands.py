@@ -31,7 +31,12 @@ from mightymodels_plugin.tools.similarity.spool import SPOOL_DIRECTORY, SPOOL_FI
 from mightymodels_plugin.tools.similarity.tables import ScoutReportRow
 from mightymodels_plugin.tools.task.schema import Implementer, TaskStart
 from mightymodels_plugin.tools.task.service import TaskService
-from mightymodels_plugin.tools.tests.support import StateServer, repository_key_of, text_of
+from mightymodels_plugin.tools.tests.support import (
+    StateServer,
+    ToolCall,
+    repository_key_of,
+    text_of,
+)
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.workspace import PROJECT_DIR_VARIABLE, Workspace
@@ -51,7 +56,7 @@ TICKET = Slug(SLUG)
 OTHER_SLUG = 'retry-queue-again'
 BRANCH = 'fix/retry'
 REPORT = '<report><verdict>VERIFIED</verdict><findings>the drain loop sleeps</findings></report>'
-SEARCH = ('similarity', {'action': 'search', 'query': 'the drain loop sleeps'})
+SEARCH: ToolCall = ('similarity', {'action': 'search', 'query': 'the drain loop sleeps'})
 SCOUTS = ('mightymodels:code-scout', 'mightymodels:web-scout')
 IMPLEMENTERS = ('mightymodels:engineer', 'mightymodels:architect')
 OTHER_AGENTS = (
