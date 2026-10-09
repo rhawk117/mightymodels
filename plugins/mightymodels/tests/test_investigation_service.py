@@ -31,6 +31,7 @@ from mightymodels_plugin.tools.tests.support import (
     ActivityKind,
     DatabaseActivity,
     StateServer,
+    stored_bytes,
     text_of,
 )
 
@@ -89,7 +90,7 @@ class Workspace:
             return recorded_ledger(repository, investigation).records
 
     def database_bytes(self) -> bytes:
-        return Path(str(self.investigations.database.engine.url.database)).read_bytes()
+        return stored_bytes(self.investigations.database)
 
 
 def added_empty_round(workspace: Workspace, investigation: Slug) -> str:

@@ -26,6 +26,9 @@ type RowValues = Mapping[str, object]
 SELECT = 'SELECT'
 EXPLAINED = 'EXPLAIN QUERY PLAN '
 FILLERS = MappingProxyType({str: 'x', int: 1, bool: True, object: ()})
+FILES_OF_AN_OPEN_DATABASE = frozenset(
+    {DATABASE_NAME, f'{DATABASE_NAME}-wal', f'{DATABASE_NAME}-shm'}
+)
 
 
 class ActivityKind(StrEnum):
@@ -119,6 +122,11 @@ def filled_row(row_type: type[Base], **given: object) -> RowValues:
 def tree(top: Path) -> dict[str, bytes]:
     files = (path for path in sorted(top.rglob('*')) if path.is_file())
     return {str(path.relative_to(top)): path.read_bytes() for path in files}
+
+
+def stored_bytes(database: Database) -> bytes:
+    data_directory = Path(str(database.engine.url.database)).parent
+    return b''.join(tree(data_directory).values())
 
 
 def text_of(result: CallToolResult) -> str:

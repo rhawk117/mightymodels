@@ -42,10 +42,16 @@ hook exports the same directory as `MIGHTYMODELS_DATA_DIR`, and `mightymodels ve
 that one. With its variable unset, or outside a git work tree, the server answers every tool call
 with what is missing, and `verify run` exits 2 with the same on standard error.
 
+Every session of every repository writes that one file. It is kept in SQLite's write-ahead log
+mode, so `mightymodels.db-wal` and `mightymodels.db-shm` sit beside it while a session has it
+open, and a write waits up to 10 seconds for another session's write before it is refused as
+locked.
+
 This breaks with earlier versions, which kept the database inside the repository, under
 `.mightymodels/`. That file is not read, not imported and not changed, so state recorded in it
 does not carry over: stage the ticket again. The old file can be deleted. The new file is stamped
-with a schema version, and a file with another stamp is refused by name instead of read.
+with a schema version, and a file with another stamp is refused by name instead of read, and
+nothing is written to it.
 
 ## ticket.yml
 

@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from mightymodels_plugin.database import DATABASE_NAME
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.crashout.repository import crashout_transaction
 from mightymodels_plugin.tools.crashout.schema import (
@@ -15,9 +14,11 @@ from mightymodels_plugin.tools.crashout.schema import (
 )
 from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.tests.support import (
+    FILES_OF_AN_OPEN_DATABASE,
     ActivityKind,
     DatabaseActivity,
     StateServer,
+    stored_bytes,
     text_of,
     tree,
 )
@@ -138,10 +139,10 @@ class TestAdd:
         assert journaled.corrective_action == 'run the gate  before reporting'
 
     def test_every_free_text_field_is_redacted_before_it_is_stored(
-        self, journal_of_a_leaking_crashout: CrashoutService, data_directory: Path
+        self, journal_of_a_leaking_crashout: CrashoutService
     ) -> None:
         journaled = last_entry(journal_of_a_leaking_crashout)
-        stored = data_directory.joinpath(DATABASE_NAME).read_bytes()
+        stored = stored_bytes(journal_of_a_leaking_crashout.database)
 
         assert journaled.branch == 'fix/[REDACTED:github-token]'
         assert journaled.corrective_action == 'never echo [REDACTED:github-token]'
@@ -156,7 +157,7 @@ class TestAdd:
 
         written = {name for name in tree(repository) if not name.startswith('.git/')}
         assert written == set()
-        assert set(tree(data_directory)) == {DATABASE_NAME}
+        assert set(tree(data_directory)) == FILES_OF_AN_OPEN_DATABASE
         assert not repository.joinpath('.gitignore').exists()
         assert not repository.joinpath(STATE_DIRECTORY, 'crashouts.yml').exists()
 

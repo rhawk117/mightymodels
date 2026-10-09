@@ -12,6 +12,7 @@ import sys
 from collections.abc import Callable, Sequence
 from contextlib import closing
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -24,8 +25,10 @@ from mightymodels_plugin.data_directory import (
     data_directory_from,
 )
 from mightymodels_plugin.database import (
+    BUSY_TIMEOUT,
     DATABASE_NAME,
     SCHEMA_VERSION,
+    Database,
     SchemaVersionError,
     open_database,
 )
@@ -110,6 +113,9 @@ class KeptFile:
     def is_as_it_was(self) -> bool:
         return self.file.read_bytes() == self.content
 
+    def has_nothing_beside_it(self) -> bool:
+        return list(self.file.parent.iterdir()) == [self.file]
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RefusedStart:
@@ -147,6 +153,15 @@ def approved_command(state_server: StateServer) -> StateServer:
 
 
 class TestTheDatabaseFile:
+    @pytest.fixture
+    def busy_timeouts_of_two_connections(self, repository_database: Database) -> list[int]:
+        engine = repository_database.engine
+        with engine.connect() as one, engine.connect() as another:
+            return [
+                connection.exec_driver_sql('PRAGMA busy_timeout').scalar_one()
+                for connection in (one, another)
+            ]
+
     def test_the_server_creates_it_in_the_data_directory_and_none_in_the_repository(
         self, state_server: StateServer, repository: Path, data_directory: Path
     ) -> None:
@@ -172,6 +187,20 @@ class TestTheDatabaseFile:
             (stamp,) = connection.execute('PRAGMA user_version').fetchone()
 
         assert stamp == SCHEMA_VERSION
+
+    @pytest.mark.usefixtures('connected_server')
+    def test_an_opened_file_is_in_write_ahead_log_mode(self, data_directory: Path) -> None:
+        with closing(sqlite3.connect(data_directory.joinpath(DATABASE_NAME))) as connection:
+            (mode,) = connection.execute('PRAGMA journal_mode').fetchone()
+
+        assert mode == 'wal'
+
+    def test_every_connection_waits_the_stated_time_for_another_write(
+        self, busy_timeouts_of_two_connections: list[int]
+    ) -> None:
+        stated_milliseconds = BUSY_TIMEOUT / timedelta(milliseconds=1)
+
+        assert busy_timeouts_of_two_connections == [stated_milliseconds, stated_milliseconds]
 
     @pytest.mark.usefixtures('approved_command', 'session_in_the_repository')
     def test_verify_run_opens_the_database_the_server_wrote(
@@ -281,6 +310,11 @@ class TestASchemaVersionMismatch:
         pytest.param(
             (f'PRAGMA user_version = {ANOTHER_VERSION}',), ANOTHER_VERSION, id='another-version'
         ),
+        pytest.param(
+            ('PRAGMA journal_mode = WAL', f'PRAGMA user_version = {ANOTHER_VERSION}'),
+            ANOTHER_VERSION,
+            id='another-version-in-write-ahead-log-mode',
+        ),
         pytest.param(OLD_TABLES, 0, id='unstamped-with-tables'),
     )
 
@@ -300,6 +334,7 @@ class TestASchemaVersionMismatch:
 
         assert (refused.value.database_file, refused.value.found) == (mismatched.file, found)
         assert mismatched.is_as_it_was()
+        assert mismatched.has_nothing_beside_it()
 
     @pytest.mark.parametrize(('mismatched', 'found'), MISMATCHES, indirect=['mismatched'])
     def test_the_server_refuses_every_call_with_text_naming_the_file(
@@ -310,6 +345,7 @@ class TestASchemaVersionMismatch:
         assert written.is_error
         assert f'{mismatched.file} holds schema version {found}' in text_of(written)
         assert mismatched.is_as_it_was()
+        assert mismatched.has_nothing_beside_it()
         assert not repository.joinpath(STATE_DIRECTORY).exists()
 
     @pytest.mark.usefixtures('session_in_the_repository')
@@ -322,6 +358,7 @@ class TestASchemaVersionMismatch:
         assert code == REJECTED
         assert f'{mismatched.file} holds schema version {found}' in capsys.readouterr().err
         assert mismatched.is_as_it_was()
+        assert mismatched.has_nothing_beside_it()
 
 
 class TestWithNoDataDirectory:

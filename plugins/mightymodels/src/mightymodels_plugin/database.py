@@ -21,6 +21,15 @@ SQLite checks a foreign key only on a connection that asks it to, so every conne
 engine asks as it opens. A row whose parent is missing is then refused when its transaction
 commits.
 
+Every session of every repository writes this one file, so it is kept in SQLite's write-ahead
+log mode, where a read does not wait for a write, and every connection waits `BUSY_TIMEOUT`, ten
+seconds, for another session's write before its own is refused as locked. A transaction holds
+rows only and no command runs inside one, so a wait is as long as the commits queued ahead, and
+ten seconds covers several of them on a slow disk while a call still answers. The mode is kept in
+the file's header and setting it writes the file, so it is set only once the stamp is accepted:
+a refused file is not written at all. While a session has the file open, a `-wal` and a `-shm`
+file sit beside it.
+
 No read returns more rows as a repository's history grows, and none answers from a part of what
 it was asked for without saying so. A `ReadLimit` is the most rows one read returns, and the read
 asks for one row more to learn whether there were more. A read of everything a ticket, a run or an
@@ -31,6 +40,7 @@ history returns its newest rows as a `Latest`, which says whether older ones wer
 from collections.abc import Generator, Sequence, Sized
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
 from sqlalchemy import URL, Connection, Engine, create_engine, event
@@ -61,6 +71,8 @@ STORED_VERSION = 'PRAGMA user_version'
 STAMP = f'{STORED_VERSION} = {SCHEMA_VERSION}'
 STORED_OBJECTS = 'SELECT count(*) FROM sqlite_master'
 ENFORCE_FOREIGN_KEYS = 'PRAGMA foreign_keys = ON'
+KEEP_A_WRITE_AHEAD_LOG = 'PRAGMA journal_mode = WAL'
+BUSY_TIMEOUT = timedelta(seconds=10)
 ROW_TYPES: tuple[type[Base], ...] = (
     TicketRow,
     TaskRow,
@@ -161,7 +173,10 @@ def schema_version_error(connection: Connection, database_file: Path) -> SchemaV
 @contextmanager
 def open_database(database_file: Path, repository_key: RepositoryKey) -> Generator[Database]:
     database_file.parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(URL.create('sqlite', database=str(database_file)))
+    engine = create_engine(
+        URL.create('sqlite', database=str(database_file)),
+        connect_args={'timeout': BUSY_TIMEOUT.total_seconds()},
+    )
     event.listen(engine, 'connect', enforce_foreign_keys)
     tables = [Base.metadata.tables[row_type.__tablename__] for row_type in ROW_TYPES]
     try:
@@ -170,6 +185,8 @@ def open_database(database_file: Path, repository_key: RepositoryKey) -> Generat
             error = schema_version_error(connection, database_file)
         if error is not None:
             raise error
+        with engine.begin() as connection:
+            connection.exec_driver_sql(KEEP_A_WRITE_AHEAD_LOG)
         Base.metadata.create_all(engine, tables=tables)
         yield Database(engine=engine, sessions=sessionmaker(engine), repository_key=repository_key)
     finally:

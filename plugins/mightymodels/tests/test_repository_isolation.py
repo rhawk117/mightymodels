@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.clock import now
-from mightymodels_plugin.database import DATABASE_NAME, ROW_TYPES, Database
+from mightymodels_plugin.database import ROW_TYPES, Database
 from mightymodels_plugin.declarative import Base
 from mightymodels_plugin.edge import OpenState, open_state
 from mightymodels_plugin.routing import Depth
@@ -58,7 +58,13 @@ from mightymodels_plugin.tools.review.tables import (
 from mightymodels_plugin.tools.task.repository import Attempt, Transition, task_transaction
 from mightymodels_plugin.tools.task.schema import Implementer, Status
 from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
-from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
+from mightymodels_plugin.tools.tests.support import (
+    FILES_OF_AN_OPEN_DATABASE,
+    StateServer,
+    ToolCall,
+    text_of,
+    tree,
+)
 from mightymodels_plugin.tools.ticket.repository import ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService
@@ -361,7 +367,7 @@ class TestTwoRepositoriesInOneDatabase:
 
     @pytest.mark.usefixtures('both_written')
     def test_both_repositories_keep_their_rows_in_the_one_file(self, data_directory: Path) -> None:
-        assert set(tree(data_directory)) == {DATABASE_NAME}
+        assert set(tree(data_directory)) == FILES_OF_AN_OPEN_DATABASE
 
     @pytest.mark.parametrize(('row_type', 'rows_read'), READS)
     def test_a_read_under_one_key_finds_no_row_written_under_another(
