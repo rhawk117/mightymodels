@@ -600,6 +600,7 @@ class TestTheSessionStartHook:
         assert set(hooks) == {
             'SessionStart',
             'PreToolUse',
+            'PostToolUse',
             'SubagentStop',
             'PreCompact',
         }

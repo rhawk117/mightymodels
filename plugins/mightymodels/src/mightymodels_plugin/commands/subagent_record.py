@@ -1,8 +1,10 @@
 """The `mightymodels subagent-record` command, which the SubagentStop hook on the scouts runs.
 
-When `mightymodels:code-scout` or `mightymodels:web-scout` stops, its final message is its report.
-The command leaves it in the scout-report spool for the state server to take in on its next tool
-call: one file named `spool_file_prefix(key)`, a unique part and `.json`, written under the suffix
+When `mightymodels:code-scout` or `mightymodels:web-scout` stops, its final message is its report,
+unless it handed the report back with the SubagentHandback tool (`subagent_handback.py`), in which
+case the final message is closing text that the server drops. The command leaves it in the
+scout-report spool for the state server to take in on its next tool call: one file named
+`spool_file_prefix(key)`, `CLOSING_PART`, a unique part and `.json`, written under the suffix
 `.part` and renamed, so the server never reads half a report. The key is the repository the session
 started in, and the target is the scout and its `agent_id`, since the hook input carries no
 dispatch. The command needs the data directory and a git work tree but not the database.
@@ -26,6 +28,7 @@ from mightymodels_plugin.repository_key import RepositoryKey, spool_file_prefix
 from mightymodels_plugin.routing import Worker
 from mightymodels_plugin.tools.similarity.schema import Scout
 from mightymodels_plugin.tools.similarity.spool import (
+    CLOSING_PART,
     REPORT_SUFFIX,
     SPOOL_DIRECTORY,
     SPOOL_FILE_BYTES,
@@ -38,7 +41,7 @@ UNFINISHED_SUFFIX = '.part'
 
 class NoReportError(StateError):
     def __init__(self) -> None:
-        super().__init__('the scout stopped without a final message, so there is no report to keep')
+        super().__init__('the scout left no report text, so there is no report to keep')
 
 
 class ReportTooLargeError(StateError):
@@ -70,17 +73,20 @@ class ScoutStop:
         return json.dumps(document).encode()
 
 
-def scout_stop_of(fields: dict[str, object]) -> ScoutStop | NoReportError | None:
+def scout_report_of(fields: dict[str, object], report: object) -> ScoutStop | NoReportError | None:
     worker = plugin_worker(fields)
     if worker not in SCOUTS:
         return None
-    report = fields.get('last_assistant_message')
     if not isinstance(report, str) or not report.strip():
         return NoReportError()
     scout = Scout(worker)
     agent_id = fields.get('agent_id')
     target = f'{scout} {agent_id}'[:NAME_LIMIT] if isinstance(agent_id, str) else str(scout)
     return ScoutStop(scout=scout, target=target, report=report)
+
+
+def scout_stop_of(fields: dict[str, object]) -> ScoutStop | NoReportError | None:
+    return scout_report_of(fields, fields.get('last_assistant_message'))
 
 
 def write_to_spool(spool: Path, name: str, content: bytes) -> SpoolNotWrittenError | None:
@@ -94,7 +100,7 @@ def write_to_spool(spool: Path, name: str, content: bytes) -> SpoolNotWrittenErr
     return None
 
 
-def spool_report(stop: ScoutStop, context: HookContext) -> StateError | None:
+def spool_report(stop: ScoutStop, context: HookContext, part: str) -> StateError | None:
     data_directory = context.data_directory()
     if isinstance(data_directory, DataDirectoryMissingError):
         return data_directory
@@ -105,7 +111,7 @@ def spool_report(stop: ScoutStop, context: HookContext) -> StateError | None:
     content = stop.spool_file_content(key)
     if len(content) > SPOOL_FILE_BYTES:
         return ReportTooLargeError(len(content))
-    name = f'{spool_file_prefix(key)}{uuid4().hex}'
+    name = f'{spool_file_prefix(key)}{part}{uuid4().hex}'
     return write_to_spool(data_directory.joinpath(SPOOL_DIRECTORY), name, content)
 
 
@@ -116,5 +122,5 @@ def run_hook(context: HookContext) -> int:
     stop = scout_stop_of(fields)
     if stop is None:
         return 0
-    failure = stop if isinstance(stop, NoReportError) else spool_report(stop, context)
+    failure = stop if isinstance(stop, NoReportError) else spool_report(stop, context, CLOSING_PART)
     return 0 if failure is None else skipped(failure)

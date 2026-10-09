@@ -24,6 +24,7 @@ from mightymodels_plugin.cli import build_parser, main
 from mightymodels_plugin.commands.session_start import ENV_FILE_VARIABLE
 from mightymodels_plugin.data_directory import PLUGIN_DATA_VARIABLE, SESSION_DATA_VARIABLE
 from mightymodels_plugin.database import DATABASE_NAME, Database
+from mightymodels_plugin.declarative import REPORT_LIMIT
 from mightymodels_plugin.repository_key import spool_file_prefix
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.similarity.schema import SimilarityKind
@@ -167,7 +168,7 @@ class TestHooksJson:
     def test_the_events_are_the_ones_the_behaviours_need(self) -> None:
         events = {event for event, _, _ in hooks_registered()}
 
-        assert events == {'SessionStart', 'PreToolUse', 'SubagentStop', 'PreCompact'}
+        assert events == {'SessionStart', 'PreToolUse', 'PostToolUse', 'SubagentStop', 'PreCompact'}
 
     def test_the_subagent_hooks_are_matched_on_the_agent_types_they_serve(self) -> None:
         matchers = {
@@ -311,6 +312,128 @@ class TestSubagentRecorder:
         assert code == 0
         assert str(SPOOL_FILE_BYTES) in err
         assert not spool.exists()
+
+
+def scout_handback(agent_type: str = 'mightymodels:code-scout', **given: object) -> str:
+    handback = {
+        'agent_id': 'a1b2',
+        'tool_name': 'SubagentHandback',
+        'tool_input': {'message': REPORT},
+    }
+    return hook_input('PostToolUse', agent_type, **(handback | given))
+
+
+class TestSubagentHandback:
+    @pytest.fixture(params=SCOUTS)
+    def scout(self, request: pytest.FixtureRequest) -> str:
+        return request.param
+
+    def test_the_hook_is_matched_on_the_tool_and_runs_the_subcommand(self) -> None:
+        (registered,) = [
+            (matcher, command.split()[-1])
+            for event, matcher, command in hooks_registered()
+            if event == 'PostToolUse'
+        ]
+
+        assert registered == ('SubagentHandback', 'subagent-handback')
+
+    def test_the_message_is_left_as_one_file_and_nothing_is_said(
+        self, scout: str, hook: Hook, spool: Path
+    ) -> None:
+        code, out, err = hook.run('subagent-handback', scout_handback(scout))
+        (file,) = spool.iterdir()
+        content = json.loads(file.read_text(encoding='utf-8'))
+
+        assert (code, out, err) == (0, '', '')
+        assert file.suffix == '.json'
+        assert (content['report'], content['target']) == (REPORT, f'{scout.split(":")[1]} a1b2')
+
+    @pytest.mark.usefixtures('in_the_repository')
+    def test_the_server_stores_the_handed_back_report_and_not_the_closing_text(
+        self,
+        scout: str,
+        hook: Hook,
+        state_server: StateServer,
+        repository_database: Database,
+        spool: Path,
+    ) -> None:
+        hook.run('subagent-handback', scout_handback(scout))
+        hook.run('subagent-record', scout_stop(scout, last_assistant_message='Done.'))
+
+        state_server.call(SEARCH)
+        with repository_database.transaction() as session:
+            (stored,) = session.scalars(select(ScoutReportRow.report))
+
+        assert stored == REPORT
+        assert list(spool.iterdir()) == []
+
+    @pytest.mark.parametrize('agent_type', OTHER_AGENTS)
+    def test_another_agent_type_writes_nothing(
+        self, agent_type: str, hook: Hook, spool: Path
+    ) -> None:
+        code, out, err = hook.run('subagent-handback', scout_handback(agent_type))
+
+        assert (code, out, err) == (0, '', '')
+        assert not spool.exists()
+
+    @pytest.mark.parametrize(
+        'tool_input',
+        [
+            pytest.param({}, id='no-message'),
+            pytest.param({'message': None}, id='null'),
+            pytest.param({'message': ''}, id='empty'),
+            pytest.param({'message': '  \n'}, id='blank'),
+            pytest.param({'message': 7}, id='number'),
+            pytest.param({'message': ['report']}, id='list'),
+            pytest.param('report', id='tool-input-is-text'),
+            pytest.param(None, id='tool-input-is-null'),
+        ],
+    )
+    def test_a_message_that_is_missing_blank_or_not_text_writes_nothing_and_says_why(
+        self, tool_input: object, hook: Hook, spool: Path
+    ) -> None:
+        code, out, err = hook.run('subagent-handback', scout_handback(tool_input=tool_input))
+
+        assert (code, out) == (0, '')
+        assert 'no report to keep' in err
+        assert not spool.exists()
+
+    @pytest.mark.parametrize('text', UNREADABLE_INPUTS)
+    def test_input_it_cannot_read_writes_nothing_and_says_why(
+        self, text: str, hook: Hook, spool: Path
+    ) -> None:
+        code, out, err = hook.run('subagent-handback', text)
+
+        assert (code, out) == (0, '')
+        assert err.startswith(f'{SKIPPED}the hook input is not a JSON object')
+        assert not spool.exists()
+
+    def test_a_message_too_long_for_the_server_is_not_written(
+        self, hook: Hook, spool: Path
+    ) -> None:
+        text = scout_handback(tool_input={'message': 'x' * SPOOL_FILE_BYTES})
+
+        code, out, err = hook.run('subagent-handback', text)
+
+        assert (code, out) == (0, '')
+        assert str(SPOOL_FILE_BYTES) in err
+        assert not spool.exists()
+
+    @pytest.mark.parametrize(
+        'shape', ['a\n"', '\U0001f600'], ids=['newlines-and-quotes', 'four-byte-characters']
+    )
+    def test_a_message_of_the_report_limit_is_written_whatever_its_characters(
+        self, shape: str, hook: Hook, spool: Path
+    ) -> None:
+        message = (shape * REPORT_LIMIT)[:REPORT_LIMIT]
+
+        code, _, err = hook.run(
+            'subagent-handback', scout_handback(tool_input={'message': message})
+        )
+        (file,) = spool.iterdir()
+
+        assert (code, err) == (0, '')
+        assert json.loads(file.read_text(encoding='utf-8'))['report'] == message
 
 
 class TestTheStateOfATicket:

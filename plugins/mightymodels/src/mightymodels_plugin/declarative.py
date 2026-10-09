@@ -24,8 +24,8 @@ edited by hand. Text that redaction has lengthened past its column is refused, s
 replaces a secret can be longer than the secret.
 
 `ReportProse` is the column of a scout report and of a similarity row's text, with a limit of
-its own, `REPORT_LIMIT`, sized to the spool's file cap (`SPOOL_FILE_BYTES` in
-`tools/similarity/spool.py`) so that a long report is stored whole.
+its own, `REPORT_LIMIT`, which the spool's file cap (`SPOOL_FILE_BYTES` in
+`tools/similarity/spool.py`) is sized from, so that a long report is stored whole.
 
 A column the plugin has a default for carries it as a server default, so a row written without the
 column reads as one the plugin wrote. A `Timestamp` left out is the time of the write, in the

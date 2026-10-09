@@ -28,7 +28,9 @@ SECRET_PATTERNS: Mapping[str, re.Pattern[str]] = MappingProxyType(
         'bearer': re.compile(r'\bBearer [A-Za-z0-9._~+/-]{12,}=*'),
         'url-credentials': re.compile(r'(?<=://)[^/\s:@]+:[^@\s]+(?=@)'),
         'assignment': re.compile(
-            r'(?i)[A-Z0-9_]*(?:password|passwd|secret|token|api[_-]?key)[A-Z0-9_]*'
+            r'(?i)(?<![A-Z0-9_])'
+            r'(?:(?>[A-Z0-9_]*?(?:password|passwd|secret|token|api_?key))[A-Z0-9_]*+'
+            r'|[A-Z0-9_]*+(?<=api)-key[A-Z0-9_]*+)'
             r'["\']?\s*[:=]\s*["\']?[^\s,;"\']+'
         ),
     }

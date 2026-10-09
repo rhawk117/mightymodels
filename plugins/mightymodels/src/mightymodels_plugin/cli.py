@@ -16,6 +16,7 @@ SERVE_COMMAND = 'serve'
 SESSION_START_COMMAND = 'session-start'
 DISPATCH_HOOK_COMMAND = 'dispatch-hook'
 SUBAGENT_RECORD_COMMAND = 'subagent-record'
+SUBAGENT_HANDBACK_COMMAND = 'subagent-handback'
 COMPLETION_GATE_COMMAND = 'completion-gate'
 PRE_COMPACT_COMMAND = 'pre-compact'
 VERIFY_COMMAND = 'verify'
@@ -25,6 +26,7 @@ DEFAULT_PHASE = 'task'
 HOOK_MODULES = MappingProxyType(
     {
         SUBAGENT_RECORD_COMMAND: 'mightymodels_plugin.commands.subagent_record',
+        SUBAGENT_HANDBACK_COMMAND: 'mightymodels_plugin.commands.subagent_handback',
         COMPLETION_GATE_COMMAND: 'mightymodels_plugin.commands.completion_gate',
         PRE_COMPACT_COMMAND: 'mightymodels_plugin.commands.pre_compact',
     }
@@ -59,6 +61,10 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         SUBAGENT_RECORD_COMMAND,
         help="leave a scout's report in the spool for the state server; the SubagentStop hook",
+    )
+    commands.add_parser(
+        SUBAGENT_HANDBACK_COMMAND,
+        help='leave the report a scout handed back in the spool; the PostToolUse hook on it',
     )
     commands.add_parser(
         COMPLETION_GATE_COMMAND,

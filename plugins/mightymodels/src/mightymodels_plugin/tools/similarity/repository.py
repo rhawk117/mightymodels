@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.declarative import NAME_LIMIT, REPORT_LIMIT
-from mightymodels_plugin.redaction import redact_within
+from mightymodels_plugin.redaction import redact, redact_within
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.tools.similarity.matching import (
     CANDIDATE_CAP,
@@ -129,6 +129,14 @@ class SimilarityRepository:
     def record_all(self, writes: Iterable[Written]) -> list[Duplicate]:
         duplicates = [self.record(written) for written in writes]
         return [duplicate for duplicate in duplicates if duplicate is not None]
+
+    def has_scout_report(self, report: SpooledReport) -> bool:
+        query = select(ScoutReportRow.id).where(
+            ScoutReportRow.repository_key == self.repository_key.root,
+            ScoutReportRow.scout == report.scout,
+            ScoutReportRow.target == redact(report.target),
+        )
+        return self.session.scalars(query.limit(1)).first() is not None
 
     def add_scout_report(self, report: SpooledReport) -> list[Duplicate]:
         row = ScoutReportRow(

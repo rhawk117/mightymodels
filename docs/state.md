@@ -98,19 +98,26 @@ JSON object with exactly these keys:
 
 `repository_key` is the key described above (`owner/name`, or `local:` and 64 hex digits),
 `scout` is `code-scout` or `web-scout`, `target` is at most 255 characters and `report` is
-non-blank text of at most `REPORT_LIMIT` = 60000 characters, and the file is at most 64 KiB
-(`SPOOL_FILE_BYTES`). `REPORT_LIMIT` is the limit of a scout report and of the text of every
-similarity row, in `declarative.py`: it leaves 5,536 bytes of the file cap for the keys and the
-target, so a report at the limit is stored whole, never cut, and one over it is set aside. A report
-whose JSON form (escapes and multibyte characters take more than one byte) passes the file cap is
-set aside the same way. A writer creates the file under a name that does not end in `.json` and
+non-blank text of at most `REPORT_LIMIT` = 60000 characters, and the file is at most
+`SPOOL_FILE_BYTES` = 724,996 bytes. `REPORT_LIMIT` is the limit of a scout report and of the text of
+every similarity row, in `declarative.py`, and the byte cap follows from it: the writer escapes
+non-ASCII text in JSON, so a character takes at most 12 bytes (a four-byte character is a surrogate
+pair of two six-byte escapes), and the cap is (`REPORT_LIMIT` + 255 for the target + 140 for the
+key) x 12 bytes plus 256 for the keys and braces. A report at the limit is therefore stored whole,
+never cut, whatever its characters, and one over it is set aside. A file over the cap is set aside
+the same way. A writer creates the file under a name that does not end in `.json` and
 renames it, so a half-written file is never read. `<digest>` is the SHA-256 hex digest of the repository key's text in UTF-8 and the
 `spool_file_prefix(key)` function in `repository_key.py` gives `<digest>-`. The directory is
 shared by every repository, so the server lists only the names that begin with its own digest
 and a file under any other name is never opened, read or moved: other repositories' files cannot
 keep it from its own. It takes in those files on its next tool call, stores each as a scout report
 with a similarity row, and deletes the file; a file under its digest whose content names another
-key is set aside. It ignores symlinks and directories, and takes in at most 100 files per call. A file that is not valid, or whose text
+key is set aside. It ignores symlinks and directories, and takes in at most 100 files per call. A scout that hands
+its report back leaves two files, the `handback-` one (the `PostToolUse` hook on
+`SubagentHandback`) and a `stop-` one (its closing text, from the `SubagentStop` hook). They wait in
+name order, so the hand-back is listed first, and the server drops a `stop-` file when a report of
+the same scout and target is stored: one report per agent, the handed-back one. A file under any
+other part of the name is stored as it is. A file that is not valid, or whose text
 redaction lengthens past its column, is moved to `scout-spool/rejected/` under a new name and kept;
 the call goes on. A path holds the digest and never the key.
 

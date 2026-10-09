@@ -16,6 +16,8 @@ from mightymodels_plugin.repository_key import (
 )
 from mightymodels_plugin.tools.similarity.schema import SimilarityKind
 from mightymodels_plugin.tools.similarity.spool import (
+    CLOSING_PART,
+    HANDBACK_PART,
     REJECTED_DIRECTORY,
     SPOOL_DIRECTORY,
     SPOOL_FILE_BYTES,
@@ -438,6 +440,10 @@ class TestFilesOfAnotherRepositoryWaitingBeyondTheBound:
 
 
 class TestALongReport:
+    @pytest.fixture(params=['a\n"', '\U0001f600', '\u20ac', '\x01'], ids=ascii)
+    def shape(self, request: pytest.FixtureRequest) -> str:
+        return request.param
+
     @pytest.fixture
     def at_the_limit(
         self, own_key: str, spool: Path, state_server: StateServer
@@ -455,10 +461,31 @@ class TestALongReport:
         state_server.call(SEARCH)
         return file
 
-    def test_the_limit_leaves_room_in_the_file_for_the_longest_key_and_target(self) -> None:
-        envelope = report_for('a' * REPOSITORY_KEY_LIMIT, target='t' * NAME_LIMIT, report='')
+    def test_the_cap_leaves_room_in_the_file_for_the_longest_key_and_target_and_report(
+        self, shape: str
+    ) -> None:
+        longest = report_for(
+            'a' * REPOSITORY_KEY_LIMIT, target='t' * NAME_LIMIT, report=shape * REPORT_LIMIT
+        )
 
-        assert REPORT_LIMIT + len(json.dumps(envelope)) <= SPOOL_FILE_BYTES
+        assert len(json.dumps(longest)) <= SPOOL_FILE_BYTES
+
+    def test_a_report_of_the_limit_in_the_shape_is_stored_whole(
+        self,
+        shape: str,
+        own_key: str,
+        spool: Path,
+        state_server: StateServer,
+        repository_database: Database,
+    ) -> None:
+        report = (shape * REPORT_LIMIT)[:REPORT_LIMIT]
+        file = spooled(spool, named(own_key, 'shaped'), report_for(own_key, report=report))
+
+        state_server.call(SEARCH)
+        (stored,) = scout_reports(repository_database)
+
+        assert not file.exists()
+        assert stored.report == report
 
     def test_at_the_limit_it_is_stored_whole(
         self, at_the_limit: tuple[Path, Report], repository_database: Database
@@ -518,3 +545,91 @@ class TestAFileOfAnotherSchemaVersion:
 
         assert refused.is_error
         assert tree(data_directory) == refused_with_a_report_waiting
+
+
+class TestAScoutThatHandedBackAndThenStopped:
+    CLOSING = 'All done, the report is above.'
+
+    def hand_back(self, own_key: str, spool: Path, unique: str = 'one') -> Path:
+        return spooled(
+            spool,
+            named(own_key, f'{HANDBACK_PART}{unique}'),
+            report_for(own_key, target='code-scout a1', report=REPORT_TEXT),
+        )
+
+    def stop(
+        self, own_key: str, spool: Path, unique: str = 'one', target: str = 'code-scout a1'
+    ) -> Path:
+        return spooled(
+            spool,
+            named(own_key, f'{CLOSING_PART}{unique}'),
+            report_for(own_key, target=target, report=self.CLOSING),
+        )
+
+    def test_waiting_together_one_report_is_stored_and_it_is_the_handed_back_one(
+        self,
+        own_key: str,
+        spool: Path,
+        state_server: StateServer,
+        repository_database: Database,
+    ) -> None:
+        stopped = self.stop(own_key, spool, unique='0')
+        handed_back = self.hand_back(own_key, spool, unique='9')
+
+        state_server.call(SEARCH)
+        (stored,) = scout_reports(repository_database)
+
+        assert min(stopped, handed_back) == handed_back
+        assert stored.report == REPORT_TEXT
+        assert list(spool.glob('*.json')) == []
+        assert rejected_files(spool) == []
+
+    def test_taken_in_before_the_stop_arrives_it_is_the_one_report(
+        self,
+        own_key: str,
+        spool: Path,
+        state_server: StateServer,
+        repository_database: Database,
+    ) -> None:
+        self.hand_back(own_key, spool)
+        state_server.call(SEARCH)
+        self.stop(own_key, spool)
+
+        state_server.call(SEARCH)
+        (stored,) = scout_reports(repository_database)
+
+        assert stored.report == REPORT_TEXT
+        assert list(spool.glob('*.json')) == []
+        assert similarity_kinds(repository_database) == [SimilarityKind.SCOUT_REPORT]
+
+    def test_a_stop_with_no_hand_back_is_stored(
+        self,
+        own_key: str,
+        spool: Path,
+        state_server: StateServer,
+        repository_database: Database,
+    ) -> None:
+        self.stop(own_key, spool)
+
+        state_server.call(SEARCH)
+        (stored,) = scout_reports(repository_database)
+
+        assert stored.report == self.CLOSING
+
+    def test_two_agents_give_two_reports(
+        self,
+        own_key: str,
+        spool: Path,
+        state_server: StateServer,
+        repository_database: Database,
+    ) -> None:
+        self.hand_back(own_key, spool)
+        self.stop(own_key, spool)
+        self.stop(own_key, spool, unique='two', target='code-scout b2')
+
+        state_server.call(SEARCH)
+
+        assert sorted(row.target for row in scout_reports(repository_database)) == [
+            'code-scout a1',
+            'code-scout b2',
+        ]

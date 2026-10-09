@@ -8,7 +8,9 @@ It applies no threshold: a query is usually a part of what it looks for.
 similarity row in one transaction, and removes the file. Only the files named with this
 repository's digest are listed, so a file for another repository is never opened. A file that is
 not a report, that names another repository, or that redaction lengthens past its column, is set
-aside and the call goes on. The spool and its file format are in `spool.py`.
+aside and the call goes on. A scout's closing text is dropped when the report of that scout and
+target is already stored, so a handed-back report wins. The spool and its file format are in
+`spool.py`.
 
 The service reads and writes the database and the spool and nothing else.
 """
@@ -28,6 +30,7 @@ from mightymodels_plugin.tools.similarity.schema import (
     SpooledReport,
 )
 from mightymodels_plugin.tools.similarity.spool import (
+    is_closing_text,
     set_aside,
     spooled_report,
     waiting_files,
@@ -52,10 +55,18 @@ class SimilarityService:
             return error
         return None
 
+    def has_report_of(self, report: SpooledReport) -> bool:
+        with similarity_transaction(self.database) as repository:
+            return repository.has_scout_report(report)
+
     def take_in(self, file: Path) -> None:
         report = spooled_report(file)
         if report is None or report.repository_key != self.database.repository_key:
             set_aside(file, self.spool)
+            return
+        prefix = spool_file_prefix(self.database.repository_key)
+        if is_closing_text(file, prefix) and self.has_report_of(report):
+            file.unlink()
             return
         if self.store(report) is not None:
             set_aside(file, self.spool)
