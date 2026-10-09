@@ -9,6 +9,10 @@ reads and writes rows under that key only.
 A read returns every command of a ticket, or the latest receipt of every command, and is refused
 once a ticket holds more than `COMMANDS`. The latest receipt of each command is chosen by the
 database, so a read fetches one row per command however often each was run.
+
+`approve` is refused with `WriteLimitError` when the ticket would hold more than `COMMANDS`, and
+then stores none of the commands it was given. A receipt belongs to a command, so the latest
+receipts of a ticket are never more than its commands.
 """
 
 import re
@@ -120,6 +124,18 @@ class ContractRepository:
             command_row(slug, command, approval, repository_key=self.repository_key)
             for command in commands
         )
+        self.session.flush()
+        held = (
+            select(func.count())
+            .select_from(CommandRow)
+            .where(
+                CommandRow.repository_key == self.repository_key.root,
+                CommandRow.slug == slug.root,
+            )
+        )
+        error = COMMANDS.write_error(self.session.scalars(held).one(), owner=f'ticket {slug}')
+        if error is not None:
+            raise error
 
     def record(self, slug: Slug, receipts: Iterable[Receipt]) -> None:
         self.session.add_all(

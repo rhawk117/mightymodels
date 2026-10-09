@@ -10,6 +10,8 @@ A method that changes a task takes the transition the change is part of and stor
 transition's row with it, so no task moves without its record.
 
 A ticket's tasks are read whole, and the read is refused once a ticket holds more than `TASKS`.
+`record_start` is the only write that adds a task, and it is refused with `WriteLimitError` when
+the ticket would hold more than `TASKS`: the task, its attempt and its transition are not stored.
 The attempts are counted by the database, so a read fetches one row per task and worker however
 many attempts there were, and `latest_transitions_into` fetches only the transitions it is asked
 for.
@@ -166,6 +168,15 @@ class TaskRepository:
             )
         )
         self.session.add(transition_row(slug, transition, repository_key=self.repository_key))
+        self.session.flush()
+        held = (
+            select(func.count())
+            .select_from(TaskRow)
+            .where(TaskRow.repository_key == self.repository_key.root, TaskRow.slug == slug.root)
+        )
+        error = TASKS.write_error(self.session.scalars(held).one(), owner=f'ticket {slug}')
+        if error is not None:
+            raise error
 
     def record_verification(self, slug: Slug, transition: Transition, commit: str) -> None:
         row = self.session.get_one(

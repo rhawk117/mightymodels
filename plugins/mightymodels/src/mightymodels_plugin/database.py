@@ -35,6 +35,14 @@ it was asked for without saying so. A `ReadLimit` is the most rows one read retu
 asks for one row more to learn whether there were more. A read of everything a ticket, a run or an
 investigation holds is refused with `ReadLimitError` once there are more. A read of a repository's
 history returns its newest rows as a `Latest`, which says whether older ones were left out.
+
+A write is held to the limit of the read that returns its rows, so nothing the plugin stores makes
+a ticket, a run or an investigation unreadable. A repository writes its rows, counts what the
+owner then holds and raises `WriteLimitError` when that is past the limit, which rolls the
+transaction back: a refused batch stores none of its rows. The count is read after the write on
+purpose. The driver begins SQLite's transaction at a session's first write and not at a read
+before it, so only a count taken after the write is read under the write lock, where no other
+session can add a row between the count and the commit.
 """
 
 from collections.abc import Generator, Sequence, Sized
@@ -112,6 +120,17 @@ class ReadLimitError(StateError):
         self.kept = kept
 
 
+class WriteLimitError(StateError):
+    def __init__(self, owner: str, *, rows: int, kept: str) -> None:
+        super().__init__(
+            f'{owner} would hold more than {rows} {kept}, the most one read returns; the write '
+            'is refused and none of it is stored, so what is held stays readable'
+        )
+        self.owner = owner
+        self.rows = rows
+        self.kept = kept
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Latest[Row]:
     rows: tuple[Row, ...]
@@ -131,6 +150,11 @@ class ReadLimit:
         if len(fetched) <= self.rows:
             return None
         return ReadLimitError(owner, rows=self.rows, kept=self.kept)
+
+    def write_error(self, held: int, *, owner: str) -> WriteLimitError | None:
+        if held <= self.rows:
+            return None
+        return WriteLimitError(owner, rows=self.rows, kept=self.kept)
 
     def latest[Row](self, newest_first: Sequence[Row]) -> Latest[Row]:
         return Latest(

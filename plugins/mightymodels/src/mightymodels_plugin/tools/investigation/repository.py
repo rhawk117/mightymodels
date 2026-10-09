@@ -11,6 +11,8 @@ its ledger, so `has_entries` asks for that row. `append` is the only write and n
 deletes an entry: a later entry retires an earlier one by naming it in `supersedes`.
 
 A ledger is read whole, and the read is refused once an investigation holds more than `ENTRIES`.
+`append` is refused with `WriteLimitError` when the investigation would hold more than `ENTRIES`,
+and then stores none of the entries it was given.
 `latest_rounds` lists the newest investigations by id, which starts with the day, and no more than
 `INVESTIGATIONS_LISTED` of them. `unrecorded` asks for the targets of all the investigations it
 is given in one read.
@@ -124,6 +126,20 @@ class InvestigationRepository:
             entry_row(investigation, record, repository_key=self.repository_key)
             for record in records
         )
+        self.session.flush()
+        held = (
+            select(func.count())
+            .select_from(LedgerEntryRow)
+            .where(
+                LedgerEntryRow.repository_key == self.repository_key.root,
+                LedgerEntryRow.investigation_id == investigation.root,
+            )
+        )
+        error = ENTRIES.write_error(
+            self.session.scalars(held).one(), owner=f'investigation {investigation}'
+        )
+        if error is not None:
+            raise error
 
 
 @contextmanager

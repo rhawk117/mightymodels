@@ -14,6 +14,10 @@ A run's findings, decisions and outcomes are each read whole, the findings in th
 numbers, and a read is refused once a run holds more than `FINDINGS`. `latest_run_rows` lists the
 newest runs, oldest first, and no more than `RUNS_LISTED` of them.
 
+A write of findings, decisions or an outcome is refused with `WriteLimitError` when the run would
+hold more than `FINDINGS` of them, and then stores none of what it was given. `write_error` counts
+what the run holds of one row type once the write is flushed.
+
 A method that writes takes values and builds the rows itself. `DecidedFinding` and
 `ResolvedFinding` are what the user decided and what a fix came to, as they are stored.
 """
@@ -25,7 +29,7 @@ from dataclasses import dataclass
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from mightymodels_plugin.database import Database, Latest, ReadLimit
+from mightymodels_plugin.database import Database, Latest, ReadLimit, WriteLimitError
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
@@ -38,6 +42,8 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewRunRow,
 )
 from mightymodels_plugin.tools.ticket.repository import TicketRepository
+
+type RowOfARun = ReviewFindingRow | ReviewDispositionRow | ReviewOutcomeRow
 
 FINDINGS = ReadLimit(rows=1000, kept='findings')
 RUNS_LISTED = ReadLimit(rows=50, kept='review runs')
@@ -128,6 +134,18 @@ def outcome_row_of(
     )
 
 
+def write_error(
+    session: Session, row_type: type[RowOfARun], run: RunId, *, repository_key: RepositoryKey
+) -> WriteLimitError | None:
+    session.flush()
+    held = (
+        select(func.count())
+        .select_from(row_type)
+        .where(row_type.repository_key == repository_key.root, row_type.run_id == run.root)
+    )
+    return FINDINGS.write_error(session.scalars(held).one(), owner=f'run {run}')
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class DecisionRepository:
     session: Session
@@ -166,9 +184,17 @@ class DecisionRepository:
             self.session.merge(
                 disposition_row_of(run, decision, repository_key=self.repository_key)
             )
+        error = write_error(
+            self.session, ReviewDispositionRow, run, repository_key=self.repository_key
+        )
+        if error is not None:
+            raise error
 
     def record_outcome(self, run: RunId, resolved: ResolvedFinding) -> None:
         self.session.merge(outcome_row_of(run, resolved, repository_key=self.repository_key))
+        error = write_error(self.session, ReviewOutcomeRow, run, repository_key=self.repository_key)
+        if error is not None:
+            raise error
 
     def reopen(self, run: RunId, finding_ids: Collection[str]) -> None:
         for row_type in (ReviewDispositionRow, ReviewOutcomeRow):
@@ -238,6 +264,9 @@ class ReviewRepository:
     def record_findings(self, run: RunId, findings: Iterable[Finding]) -> None:
         for finding in findings:
             self.session.merge(finding_row_of(run, finding, repository_key=self.repository_key))
+        error = write_error(self.session, ReviewFindingRow, run, repository_key=self.repository_key)
+        if error is not None:
+            raise error
 
 
 @contextmanager
