@@ -6,10 +6,11 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from mightymodels_plugin.task_id import TASK_ID_PATTERN
+from mightymodels_plugin.tools.request import NameText, ProseText, RequestModel
 
 type TaskId = Annotated[str, StringConstraints(pattern=TASK_ID_PATTERN)]
-type OwnedFiles = Annotated[tuple[str, ...], Field(min_length=1)]
-type Assertions = dict[str, str]
+type OwnedFiles = Annotated[tuple[ProseText, ...], Field(min_length=1)]
+type Assertions = dict[ProseText, ProseText]
 
 
 class TaskAction(StrEnum):
@@ -43,34 +44,26 @@ class ArchitectMode(StrEnum):
 type Markable = Literal[Status.FAILED, Status.BLOCKED, Status.SUPERSEDED]
 
 
-class TaskStart(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class TaskStart(RequestModel):
     by: Implementer
     owned: OwnedFiles
     mode: ArchitectMode | None = None
 
 
-class TaskVerification(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
-    commit: str
+class TaskVerification(RequestModel):
+    commit: NameText
     assertions: Assertions = Field(default_factory=dict)
 
 
-class TaskMark(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class TaskMark(RequestModel):
     to: Markable
-    reason: str
+    reason: ProseText
 
 
 type TaskChange = TaskStart | TaskVerification | TaskMark
 
 
-class TaskPayload(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class TaskPayload(RequestModel):
     task_id: TaskId | None = None
     change: TaskChange | None = None
 

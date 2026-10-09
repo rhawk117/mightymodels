@@ -10,6 +10,9 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
+from mightymodels_plugin.declarative import NAME_LIMIT
+from mightymodels_plugin.tools.request import NameText, ProseText, RequestModel
+
 COMMAND_ID_PATTERN = r'^[A-Za-z0-9._-]+$'
 DEFAULT_TIMEOUT = 300
 MAX_TIMEOUT = 3600
@@ -27,8 +30,10 @@ def checked_argv(value: object) -> object:
     return value
 
 
-type CommandId = Annotated[str, StringConstraints(pattern=COMMAND_ID_PATTERN)]
-type Argv = Annotated[tuple[str, ...], BeforeValidator(checked_argv)]
+type CommandId = Annotated[
+    str, StringConstraints(pattern=COMMAND_ID_PATTERN, max_length=NAME_LIMIT)
+]
+type Argv = Annotated[tuple[ProseText, ...], BeforeValidator(checked_argv)]
 type Timeout = Annotated[int, Field(ge=1, le=MAX_TIMEOUT)]
 
 
@@ -51,14 +56,12 @@ class Outcome(StrEnum):
     NOT_FOUND = 'not-found'
 
 
-class ContractCommand(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class ContractCommand(RequestModel):
     id: CommandId
     argv: Argv
     expect_exit: int = 0
     timeout: Timeout = DEFAULT_TIMEOUT
-    approved_by: str = ''
+    approved_by: NameText = ''
 
 
 class CommandState(BaseModel):

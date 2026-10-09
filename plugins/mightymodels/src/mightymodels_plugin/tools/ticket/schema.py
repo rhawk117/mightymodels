@@ -1,11 +1,19 @@
-"""Arguments and results of the `ticket` tool."""
+"""Arguments and results of the `ticket` tool.
+
+A `LinkedInvestigation` is the id of an investigation as a caller names it. It is held to a slug's
+length here, and `validate` refuses one that is not a slug.
+"""
 
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from mightymodels_plugin.routing import Scope
-from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.slug import SLUG_LIMIT, Slug
+from mightymodels_plugin.tools.request import NameText, ProseText, RequestModel
+
+type LinkedInvestigation = Annotated[str, StringConstraints(max_length=SLUG_LIMIT)]
 
 
 class TicketAction(StrEnum):
@@ -21,24 +29,20 @@ class TicketStatus(StrEnum):
     CLOSED = 'closed'
 
 
-class TicketAnswers(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
-    summary: str
+class TicketAnswers(RequestModel):
+    summary: ProseText
     scope: Scope
     compaction: bool
-    branch: str
-    context: tuple[str, ...]
+    branch: NameText
+    context: tuple[ProseText, ...]
     issue: int | None = None
-    jira: str | None = None
-    reference_urls: tuple[str, ...] = ()
-    investigations: tuple[str, ...] = ()
+    jira: NameText | None = None
+    reference_urls: tuple[ProseText, ...] = ()
+    investigations: tuple[LinkedInvestigation, ...] = ()
 
 
-class TicketContext(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
-    context: tuple[str, ...]
+class TicketContext(RequestModel):
+    context: tuple[ProseText, ...]
 
 
 type TicketFields = TicketAnswers | TicketContext

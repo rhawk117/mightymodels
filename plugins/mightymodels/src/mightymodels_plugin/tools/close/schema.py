@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from mightymodels_plugin.routing import Depth
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.request import ProseText, RequestModel
 from mightymodels_plugin.tools.snapshot.schema import NotYetRecorded
 from mightymodels_plugin.tools.task.schema import Status
 from mightymodels_plugin.tools.ticket.schema import Tracker
@@ -23,12 +24,10 @@ class CloseAction(StrEnum):
     CLOSE = auto()
 
 
-class Closing(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
-    shipped: str = ''
-    pr: str | None = None
-    gotchas: tuple[str, ...] = ()
+class Closing(RequestModel):
+    shipped: ProseText = ''
+    pr: ProseText | None = None
+    gotchas: tuple[ProseText, ...] = ()
 
 
 class ArchivedTask(BaseModel):

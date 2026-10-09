@@ -14,9 +14,14 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from mightymodels_plugin.declarative import PROSE_LIMIT
+from mightymodels_plugin.tools.request import ProseText, RequestModel
+
 DEFAULT_KNOWNS_LIMIT = 40
 
-type Cite = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+type Cite = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=PROSE_LIMIT)
+]
 type KnownsLimit = Annotated[int, Field(ge=1)]
 
 
@@ -62,32 +67,24 @@ TABLE_KINDS: tuple[TableKind, ...] = (
 )
 
 
-class LedgerEntry(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class LedgerEntry(RequestModel):
     kind: EntryKind
-    text: str
+    text: ProseText
     source: Source
     cite: Cite | None = None
     supersedes: tuple[int, ...] = ()
 
 
-class InvestigationStart(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
-    target: str
+class InvestigationStart(RequestModel):
+    target: ProseText
     kind: TargetKind
 
 
-class LedgerRound(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class LedgerRound(RequestModel):
     round: int
 
 
-class KnownsFilter(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class KnownsFilter(RequestModel):
     kinds: TableKinds = TABLE_KINDS
     limit: KnownsLimit = DEFAULT_KNOWNS_LIMIT
 
@@ -95,9 +92,7 @@ class KnownsFilter(BaseModel):
 type InvestigationRequest = InvestigationStart | LedgerRound | KnownsFilter
 
 
-class InvestigationPayload(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class InvestigationPayload(RequestModel):
     entries: tuple[LedgerEntry, ...] | None = None
     request: InvestigationRequest | None = None
 

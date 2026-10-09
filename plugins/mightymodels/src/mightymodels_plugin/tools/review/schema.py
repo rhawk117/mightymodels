@@ -14,16 +14,20 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from mightymodels_plugin.declarative import NAME_LIMIT
 from mightymodels_plugin.routing import Depth
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.request import NameText, ProseText, RequestModel
 
 SOURCE_ID_PATTERN = r'^(MV|UB)-\d+$'
 FINDING_ID_PATTERN = r'^F[0-9]+$'
 
 type SourceId = Annotated[str, StringConstraints(pattern=SOURCE_ID_PATTERN)]
 type FindingId = Annotated[str, StringConstraints(pattern=FINDING_ID_PATTERN)]
-type Approver = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+type Approver = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NAME_LIMIT)
+]
 type Sources = Annotated[tuple[SourceId, ...], Field(min_length=1)]
 
 
@@ -106,22 +110,18 @@ class Verdict(StrEnum):
     CLEAR = 'CLEAR'
 
 
-class Evidence(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class Evidence(RequestModel):
     kind: EvidenceKind
-    cite: str
+    cite: ProseText
 
 
-class FindingInput(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class FindingInput(RequestModel):
     sources: Sources
     severity: ReportedSeverity
-    title: str
-    location: str
-    fix: str
-    verify: str
+    title: ProseText
+    location: ProseText
+    fix: ProseText
+    verify: ProseText
     kind: Kind = Kind.DEFECT
     security: bool = False
     evidence: Evidence | None = None
@@ -143,50 +143,38 @@ class Finding(BaseModel):
     conflict: str | None = None
 
 
-class StartPayload(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class StartPayload(RequestModel):
     scope: ReviewScope
     depth: Depth
     emphasis: Emphasis
     slug: Slug | None = None
-    base: str | None = None
+    base: NameText | None = None
     weights: dict[Persona, float] | None = None
     persona: Persona | None = None
 
 
-class AddPayload(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class AddPayload(RequestModel):
     persona: Persona
 
 
-class Disposition(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class Disposition(RequestModel):
     decision: Decision
-    reason: str = ''
+    reason: ProseText = ''
 
 
-class DisposePayload(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class DisposePayload(RequestModel):
     by: Approver
     decisions: dict[FindingId, Disposition]
 
 
-class ResolvePayload(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class ResolvePayload(RequestModel):
     finding: FindingId
     result: Result
-    commit: str | None = None
-    reason: str | None = None
+    commit: NameText | None = None
+    reason: ProseText | None = None
 
 
-class ReportPayload(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class ReportPayload(RequestModel):
     shape: Shape = Shape.FULL
 
 

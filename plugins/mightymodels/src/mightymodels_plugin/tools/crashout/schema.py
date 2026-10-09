@@ -10,10 +10,14 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from mightymodels_plugin.declarative import PROSE_LIMIT
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.request import NameText, RequestModel
 
-type NotBlank = Annotated[str, StringConstraints(pattern=r'\S')]
-type Stripped = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+type NotBlank = Annotated[str, StringConstraints(pattern=r'\S', max_length=PROSE_LIMIT)]
+type Stripped = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=PROSE_LIMIT)
+]
 type Failures = Annotated[tuple[NotBlank, ...], Field(min_length=1)]
 
 
@@ -36,11 +40,9 @@ class Verdict(StrEnum):
     UNREASONABLE = auto()
 
 
-class CrashoutEntry(BaseModel):
-    model_config = ConfigDict(frozen=True, extra='forbid')
-
+class CrashoutEntry(RequestModel):
     ticket: Slug | None = None
-    branch: str | None = None
+    branch: NameText | None = None
     severity: Severity
     verdict: Verdict
     rant: NotBlank

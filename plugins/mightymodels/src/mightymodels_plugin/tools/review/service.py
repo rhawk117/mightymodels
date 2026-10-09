@@ -14,6 +14,10 @@ lifespan, and holds both. Each action opens one transaction through `review_tran
 hands it the review repository and, on that repository, the ticket's row. Rows are read inside
 that transaction and mapped to values there, so what the rendering takes and what an action
 returns holds no row. Everything above the class reads no service state.
+
+A stored decision and a stored evidence are read back as they are and not validated as requests,
+so text longer than a request may carry, stored before the lengths were enforced or lengthened by
+redaction, does not make its run unreadable.
 """
 
 from collections.abc import Collection, Mapping, Sequence
@@ -126,7 +130,7 @@ def evidence_of(row: ReviewFindingRow) -> Evidence | None:
     if row.evidence_kind is None:
         return None
     cite = '' if row.evidence_cite is None else row.evidence_cite
-    return Evidence(kind=EvidenceKind(row.evidence_kind), cite=cite)
+    return Evidence.model_construct(kind=EvidenceKind(row.evidence_kind), cite=cite)
 
 
 def finding_of(row: ReviewFindingRow) -> Finding:
@@ -151,7 +155,9 @@ def findings_of(repository: ReviewRepository, run: RunId) -> dict[str, Finding]:
 
 def dispositions_of(repository: ReviewRepository, run: RunId) -> dict[str, Disposition]:
     return {
-        row.finding_id: Disposition(decision=Decision(row.decision), reason=row.reason)
+        row.finding_id: Disposition.model_construct(
+            decision=Decision(row.decision), reason=row.reason
+        )
         for row in repository.decisions.disposition_rows(run)
     }
 
