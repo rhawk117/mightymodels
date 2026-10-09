@@ -1,0 +1,19 @@
+#!/bin/sh
+set -u
+
+here=$(cd -- "$(dirname -- "$0")" && pwd -P)
+launcher=${MIGHTYMODELS_DISPATCH_LAUNCHER:-${here}/mightymodels}
+input=$(cat)
+
+if output=$({ printf '%s' "${input}" | "${launcher}" dispatch-hook; } 2>/dev/null); then
+  test -z "${output}" || printf '%s\n' "${output}"
+  exit 0
+fi
+
+case ${input} in
+  *'"agent_type"'*)
+    printf '%s\n' 'mightymodels: the dispatch hook could not run, so this subagent dispatch is refused' >&2
+    exit 2
+    ;;
+esac
+exit 0

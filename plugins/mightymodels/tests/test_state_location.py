@@ -583,6 +583,6 @@ class TestTheSessionStartHook:
         (hook,) = matched['hooks']
         launcher, *arguments = shlex.split(hook['command'])
 
-        assert list(hooks) == ['SessionStart']
+        assert set(hooks) == {'SessionStart', 'PreToolUse'}
         assert (hook['type'], launcher) == ('command', '${CLAUDE_PLUGIN_ROOT}/bin/mightymodels')
         assert build_parser().parse_args(arguments).command == 'session-start'
