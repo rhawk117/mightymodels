@@ -128,6 +128,13 @@ class EvidenceKindError(FindingError):
         self.kind = kind
 
 
+class InvalidFieldError(FindingError):
+    def __init__(self, index: int, sources: Sequence[str], *, field: str, reason: str) -> None:
+        super().__init__(index, sources, f'{field}: {reason}')
+        self.field = field
+        self.reason = reason
+
+
 class UnknownDimensionError(FindingError):
     def __init__(self, index: int, sources: Sequence[str], dimension: str) -> None:
         super().__init__(

@@ -30,10 +30,9 @@ from mightymodels_plugin.declarative import (
     Word,
     child_of,
 )
-from mightymodels_plugin.tools.review.schema import Kind
+from mightymodels_plugin.tools.review.schema import FINDING_ID_LIMIT, Kind
 
 RUN_ID_LIMIT = 15
-FINDING_ID_LIMIT = 20
 
 type RunKeyPart = Annotated[str, mapped_column(String(RUN_ID_LIMIT), primary_key=True)]
 type FindingKeyPart = Annotated[str, mapped_column(String(FINDING_ID_LIMIT), primary_key=True)]

@@ -7,6 +7,9 @@ from anything the reviewer labels it, so a reviewer cannot call a preference a d
 dodge the evidence rule. merge-vader gives the location in its untyped `Evidence` bullet and
 uncle-bob after the dash in the heading; the typed evidence of both is the bullet
 `Evidence (metric|idiom|convention): <cite>`.
+
+A finding is built as the request model a caller would send, so text over its length is refused
+there, and the refusal names the finding and the field.
 """
 
 import re
@@ -14,9 +17,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from pydantic import ValidationError
+
 from mightymodels_plugin.tools.review.errors import (
     EvidenceKindError,
     ForeignSourceError,
+    InvalidFieldError,
     NoFindingsSectionError,
     UnknownDimensionError,
     UnknownSeverityHeadingError,
@@ -181,9 +187,17 @@ def typed_evidence(at: Pointer, bullets: Bullets) -> Evidence | None:
         return None
     kind, cite = typed
     try:
-        return Evidence(kind=EvidenceKind(kind.strip().lower()), cite=cite)
+        named = EvidenceKind(kind.strip().lower())
     except ValueError as error:
         raise EvidenceKindError(index, [source], kind) from error
+    return Evidence(kind=named, cite=cite)
+
+
+def invalid_field_error(at: Pointer, refused: ValidationError) -> InvalidFieldError:
+    index, source = at
+    first = refused.errors()[0]
+    field = '.'.join(map(str, first['loc']))
+    return InvalidFieldError(index, [source], field=field, reason=first['msg'])
 
 
 def finding_of(index: int, block: Block, persona: Persona) -> FindingInput:
@@ -195,17 +209,20 @@ def finding_of(index: int, block: Block, persona: Persona) -> FindingInput:
         raise ForeignSourceError(index, [named['id']], persona)
     bullets = bullets_of(block.body)
     basis = BASES[persona](at, named['rest'], bullets)
-    return FindingInput(
-        sources=(named['id'],),
-        severity=block.severity,
-        title=basis.title,
-        location=basis.location,
-        fix=bullets.get(FIX_KEY, ''),
-        verify=bullets.get(VERIFY_KEY, ''),
-        kind=basis.kind,
-        security=basis.security,
-        evidence=typed_evidence(at, bullets),
-    )
+    try:
+        return FindingInput(
+            sources=(named['id'],),
+            severity=block.severity,
+            title=basis.title,
+            location=basis.location,
+            fix=bullets.get(FIX_KEY, ''),
+            verify=bullets.get(VERIFY_KEY, ''),
+            kind=basis.kind,
+            security=basis.security,
+            evidence=typed_evidence(at, bullets),
+        )
+    except ValidationError as error:
+        raise invalid_field_error(at, error) from error
 
 
 def parse_report(text: str, persona: Persona) -> list[FindingInput]:

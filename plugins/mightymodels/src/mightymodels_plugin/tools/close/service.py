@@ -6,7 +6,8 @@ branch with commits on no remote or checked out with uncommitted changes. `check
 result that says blocked, never as an error, and answers for a closed ticket too.
 
 `close` refuses while live work remains and then needs what the ticket shipped. The closing lines
-are redacted and held to one line each. The ticket's closed status and its closing are stored in
+are redacted and held to one line each, and a line that redaction lengthens past its limit is
+refused. The ticket's closed status and its closing are stored in
 one transaction, and the archive goes back as text with its paths: the service writes no file
 and the agent writes both.
 
@@ -25,8 +26,9 @@ from itertools import count
 
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.declarative import PROSE_LIMIT
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.redaction import redact
+from mightymodels_plugin.redaction import redact, redact_within
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.close.rendering import DECISION_LIMIT, archive_markdown
 from mightymodels_plugin.tools.close.repository import CloseRepository, close_transaction
@@ -82,12 +84,18 @@ def one_line(text: str) -> str:
     return redact(' '.join(text.split()))
 
 
+def closing_line(text: str, field: str) -> str:
+    return redact_within(' '.join(text.split()), field, PROSE_LIMIT)
+
+
 def one_lined(closing: Closing) -> Closing:
-    pr = '' if closing.pr is None else one_line(closing.pr)
+    pr = '' if closing.pr is None else closing_line(closing.pr, 'pr')
     return Closing(
-        shipped=one_line(closing.shipped),
+        shipped=closing_line(closing.shipped, 'shipped'),
         pr=pr or None,
-        gotchas=tuple(one_line(gotcha) for gotcha in closing.gotchas if gotcha.strip()),
+        gotchas=tuple(
+            closing_line(gotcha, 'gotchas') for gotcha in closing.gotchas if gotcha.strip()
+        ),
     )
 
 

@@ -3,13 +3,16 @@
 Every reported severity is stored on the one ladder (a Blocker is High). An incoming finding
 whose location overlaps a recorded one on the same file merges into it: the sources join, the
 higher severity wins, and a gap of two levels or more records a conflict for the user to decide.
+
+A text that redaction lengthens past its limit refuses the batch.
 """
 
 import re
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
-from mightymodels_plugin.redaction import redact
+from mightymodels_plugin.declarative import PROSE_LIMIT
+from mightymodels_plugin.redaction import redact_within
 from mightymodels_plugin.tools.review.errors import (
     FieldRequiredError,
     LocationShapeError,
@@ -65,7 +68,7 @@ def required_text(index: int, sources: Sequence[str], field: str, *, value: str)
     text = value.strip()
     if not text:
         raise FieldRequiredError(index, sources, field)
-    return redact(text)
+    return redact_within(text, field, PROSE_LIMIT)
 
 
 def evidence_of(index: int, sources: Sequence[str], evidence: Evidence | None) -> Evidence | None:

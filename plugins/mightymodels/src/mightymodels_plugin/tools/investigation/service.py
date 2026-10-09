@@ -8,6 +8,7 @@ newest investigations with the latest round of each, and says so when older ones
 
 The target and every entry's text and cite are redacted before they are stored, and the
 investigation is named after the redacted target, so a secret reaches neither a row nor an id.
+A text that redaction lengthens past its limit is refused, and in `add` it refuses the batch.
 
 HEAD is read from git when an entry is stored and when the knowns are asked for. Outside a
 repository, or with no git binary, it is absent and every entry reads as a lead.
@@ -24,8 +25,9 @@ from types import MappingProxyType
 
 from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.declarative import PROSE_LIMIT
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.redaction import redact, redaction_of
+from mightymodels_plugin.redaction import redact_within, redaction_within
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.investigation.errors import (
     CiteRequiredError,
@@ -140,8 +142,8 @@ def batch_error(ledger: Ledger, given: int, entries: Sequence[LedgerEntry]) -> S
 
 
 def redacted_record(entry: LedgerEntry, seq: int, stamp: EntryStamp) -> RedactedRecord:
-    text = redaction_of(entry.text)
-    cite = None if entry.cite is None else redaction_of(entry.cite)
+    text = redaction_within(entry.text, 'text', PROSE_LIMIT)
+    cite = None if entry.cite is None else redaction_within(entry.cite, 'cite', PROSE_LIMIT)
     record = LedgerRecord(
         seq=seq,
         round=stamp.round,
@@ -168,7 +170,7 @@ class InvestigationService:
     database: Database
 
     def start(self, request: InvestigationStart, *, started: datetime) -> InvestigationView:
-        target = redact(request.target)
+        target = redact_within(request.target, 'target', PROSE_LIMIT)
         record = LedgerRecord(
             seq=TARGET_SEQ,
             round=0,

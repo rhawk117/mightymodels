@@ -4,7 +4,8 @@
 `ReviewRun` is a run as it is recorded and read back.
 
 The finding id pattern is published in the tool's schema and names its digits as `[0-9]`, so the
-schema and the server accept the same ASCII digits and no others.
+schema and the server accept the same ASCII digits and no others. Its maximum is the length of the
+column a finding id is stored in, `FINDING_ID_LIMIT`.
 """
 
 from collections.abc import Mapping
@@ -22,9 +23,12 @@ from mightymodels_plugin.tools.request import NameText, ProseText, RequestModel
 
 SOURCE_ID_PATTERN = r'^(MV|UB)-\d+$'
 FINDING_ID_PATTERN = r'^F[0-9]+$'
+FINDING_ID_LIMIT = 20
 
 type SourceId = Annotated[str, StringConstraints(pattern=SOURCE_ID_PATTERN)]
-type FindingId = Annotated[str, StringConstraints(pattern=FINDING_ID_PATTERN)]
+type FindingId = Annotated[
+    str, StringConstraints(pattern=FINDING_ID_PATTERN, max_length=FINDING_ID_LIMIT)
+]
 type Approver = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NAME_LIMIT)
 ]

@@ -255,6 +255,7 @@
           "type": "string"
         },
         "FindingId": {
+          "maxLength": 20,
           "pattern": "^F[0-9]+$",
           "type": "string"
         },
