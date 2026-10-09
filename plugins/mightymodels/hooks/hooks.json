@@ -1,5 +1,5 @@
 {
-  "description": "mightymodels: export the plugin data directory to the session's commands, so `mightymodels verify run` opens the database the state server keeps, and deny a dispatch by one of this plugin's workers (agent_type mightymodels:<worker>) outside the workers its agent file allows, and leave every other caller alone.",
+  "description": "mightymodels: export the plugin data directory to the session's commands, so `mightymodels verify run` opens the database the state server keeps; deny a dispatch by one of this plugin's workers (agent_type mightymodels:<worker>) outside the workers its agent file allows, and leave every other caller alone; keep a scout's report for search; hold an implementer's stop once while its task has no DONE brief; and write the snapshot of the ticket on the checked-out branch before a compaction.",
   "hooks": {
     "SessionStart": [
       {
@@ -18,6 +18,36 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-dispatch-hook\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^mightymodels:(code-scout|web-scout)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-hook\" subagent-record"
+          }
+        ]
+      },
+      {
+        "matcher": "^mightymodels:(engineer|architect)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-hook\" completion-gate"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-hook\" pre-compact"
           }
         ]
       }

@@ -85,6 +85,7 @@ OLD_TABLES = (
     'CREATE TABLE contract_commands (slug VARCHAR NOT NULL, command_id VARCHAR NOT NULL)',
     "INSERT INTO contract_commands VALUES ('retry-queue', 'I1')",
 )
+SKIPPED = 'mightymodels hook did nothing: '
 NOT_SET = 'is not set, so there is no plugin data directory'
 NOT_A_REPOSITORY = 'is not inside a git repository'
 NEEDS_GIT = 'this needs git and no git executable is on PATH'
@@ -512,6 +513,18 @@ class TestSessionStartExport:
         assert kept_line == self.OTHER_EXPORT
         assert shlex.split(exported) == ['export', f'{SESSION_DATA_VARIABLE}={data_directory}']
 
+    def test_run_twice_it_appends_the_export_once(
+        self, data_directory: Path, hook_env_file_with_another_export: Path
+    ) -> None:
+        main(SESSION_START)
+        main(SESSION_START)
+        exports = hook_env_file_with_another_export.read_text(encoding='utf-8').splitlines()
+
+        assert exports[0] == self.OTHER_EXPORT.strip()
+        assert [shlex.split(line) for line in exports[1:]] == [
+            ['export', f'{SESSION_DATA_VARIABLE}={data_directory}']
+        ]
+
     @pytest.mark.usefixtures('hook_env_file')
     def test_it_prints_nothing(self, capsys: pytest.CaptureFixture[str]) -> None:
         main(SESSION_START)
@@ -531,23 +544,23 @@ class TestSessionStartWithAVariableMissing:
         monkeypatch.delenv(ENV_FILE_VARIABLE, raising=False)
 
     @pytest.mark.usefixtures('without_a_data_directory')
-    def test_without_a_data_directory_it_refuses_naming_the_variable_and_writes_nothing(
+    def test_without_a_data_directory_it_skips_naming_the_variable_and_writes_nothing(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         code = main(SESSION_START)
 
-        assert code == REJECTED
-        assert f'error: {PLUGIN_DATA_VARIABLE} {NOT_SET}' in capsys.readouterr().err
+        assert code == PASSED
+        assert f'{SKIPPED}{PLUGIN_DATA_VARIABLE} {NOT_SET}' in capsys.readouterr().err
         assert tree(tmp_path) == {}
 
     @pytest.mark.usefixtures('without_an_env_file')
-    def test_without_an_env_file_it_refuses_naming_the_variable_and_writes_nothing(
+    def test_without_an_env_file_it_skips_naming_the_variable_and_writes_nothing(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         code = main(SESSION_START)
 
-        assert code == REJECTED
-        assert f'error: {ENV_FILE_VARIABLE} is not set' in capsys.readouterr().err
+        assert code == PASSED
+        assert f'{SKIPPED}{ENV_FILE_VARIABLE} is not set' in capsys.readouterr().err
         assert tree(tmp_path) == {}
 
 
@@ -584,6 +597,11 @@ class TestTheSessionStartHook:
         (hook,) = matched['hooks']
         launcher, *arguments = shlex.split(hook['command'])
 
-        assert set(hooks) == {'SessionStart', 'PreToolUse'}
+        assert set(hooks) == {
+            'SessionStart',
+            'PreToolUse',
+            'SubagentStop',
+            'PreCompact',
+        }
         assert (hook['type'], launcher) == ('command', '${CLAUDE_PLUGIN_ROOT}/bin/mightymodels')
         assert build_parser().parse_args(arguments).command == 'session-start'

@@ -49,14 +49,19 @@ def commit_problems(git: Git, base: str | None, commit: str) -> list[str]:
     return []
 
 
+def done_commit(brief_text: str) -> str | None:
+    _, separator, done = brief_text.partition(DONE_HEADING)
+    named = DONE_COMMIT.search(done)
+    return str(named[1]) if separator and named is not None else None
+
+
 def brief_problems(git: Git, evidence: Evidence) -> list[str]:
     if evidence.brief is None:
         return []
     if not evidence.brief.is_file():
         return ['the task brief is missing']
-    _, separator, done = evidence.brief.read_text(encoding='utf-8').partition(DONE_HEADING)
-    named = DONE_COMMIT.search(done)
-    if not separator or named is None or git.resolve_commit(named[1]) != evidence.commit:
+    named = done_commit(evidence.brief.read_text(encoding='utf-8'))
+    if named is None or git.resolve_commit(named) != evidence.commit:
         return ['the DONE brief must name the reported HEAD commit']
     return []
 

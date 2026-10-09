@@ -18,6 +18,9 @@ for.
 
 A task's failed fixes are read whole, up to `FAILED_FIX_LIMIT`, the most the service lets it hold.
 
+`in_progress_started_by` answers the in-progress tasks whose latest attempt was a worker's, so a
+hook that sees a worker stop can tell which tasks it left open.
+
 A task's base is the HEAD of its first start that had one. A restart keeps it, so what the task
 changed is measured from where its first attempt began.
 """
@@ -26,7 +29,7 @@ from collections.abc import Collection, Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database, ReadLimit
@@ -228,6 +231,40 @@ class TaskRepository:
         row.reasons = list(transition.reasons)
         row.updated_at = transition.at
         self.session.add(transition_row(slug, transition, repository_key=self.repository_key))
+
+
+def in_progress_started_by(
+    repository: TaskRepository, slug: Slug, worker: Implementer
+) -> list[str]:
+    latest_attempts = (
+        select(func.max(AttemptRow.id))
+        .where(
+            AttemptRow.repository_key == repository.repository_key.root,
+            AttemptRow.slug == slug.root,
+        )
+        .group_by(AttemptRow.task_id)
+    )
+    query = (
+        select(TaskRow.task_id)
+        .join(
+            AttemptRow,
+            and_(
+                AttemptRow.repository_key == TaskRow.repository_key,
+                AttemptRow.slug == TaskRow.slug,
+                AttemptRow.task_id == TaskRow.task_id,
+            ),
+        )
+        .where(
+            TaskRow.repository_key == repository.repository_key.root,
+            TaskRow.slug == slug.root,
+            TaskRow.status == Status.IN_PROGRESS,
+            AttemptRow.worker == worker,
+            AttemptRow.id.in_(latest_attempts),
+        )
+        .order_by(TaskRow.task_id)
+        .limit(TASKS.fetched)
+    )
+    return list(repository.session.scalars(query))
 
 
 @contextmanager

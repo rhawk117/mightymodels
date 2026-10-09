@@ -87,11 +87,16 @@ pattern in anyone else's code. Approve tools per session like you would for any 
 
 ## Hooks
 
-Not shipped yet. The designed hook layer (session covenant injection, verification gates at
-Stop, PreCompact ticket snapshots) will land as a `hooks/hooks.json` at the plugin root plus
-scripts; Claude Code merges plugin hooks with the ones in your settings files. Until then, the
-loop runs on skills and agents alone, and `create-hooks` can build repo-specific Claude Code hooks
-independently.
+`plugins/mightymodels/hooks/hooks.json` registers five hooks, each a command that runs the plugin's
+CLI against the state database; Claude Code merges them with the ones in your settings files.
+`SessionStart` exports the plugin data directory to the session's commands. `PreToolUse` on `Agent`
+denies a dispatch by one of the plugin's workers outside the workers its agent file allows.
+`SubagentStop` on the scouts leaves the scout's report in the spool for search, and on the
+implementers holds a stop once while the task they started has no DONE brief naming a commit.
+`PreCompact` writes the snapshot of the ticket on the checked-out branch before a compaction. The dispatch
+guard refuses a worker's dispatch when it cannot run; every other hook then does nothing but say
+why on standard error. `plugins/mightymodels/references/state/runtime-layout.md` has what each reads and
+writes. `create-hooks` can still build repo-specific Claude Code hooks independently.
 
 ## The vibe-code plugin
 

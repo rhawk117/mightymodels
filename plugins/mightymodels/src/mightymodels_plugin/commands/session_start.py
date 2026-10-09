@@ -3,15 +3,16 @@
 A command run through the Bash tool has none of the plugin's variables, so `verify run` could not
 find the state database the server opened. The hook has the data directory and the session's env
 file, and Claude Code sets what that file exports in every later Bash command of the session, a
-subagent's included. The command appends one line there, the export of the data directory, and
-does nothing else: it creates no directory, prints nothing and loads no database or server
-package.
+subagent's included. The command appends one line there, the export of the data directory, unless
+the file already holds that line, and does nothing else: it creates no directory, prints nothing
+and loads no database or server package. When the variable or the env file is missing it says so on
+standard error and exits 0.
 """
 
 from collections.abc import Mapping
 from pathlib import Path
 
-from mightymodels_plugin.commands.rejection import rejected
+from mightymodels_plugin.commands.rejection import skipped
 from mightymodels_plugin.data_directory import (
     PLUGIN_DATA_VARIABLE,
     DataDirectoryMissingError,
@@ -34,10 +35,14 @@ class EnvFileMissingError(StateError):
 def export_data_directory(environ: Mapping[str, str]) -> int:
     data_directory = data_directory_from(environ, PLUGIN_DATA_VARIABLE)
     if isinstance(data_directory, DataDirectoryMissingError):
-        return rejected(data_directory)
+        return skipped(data_directory)
     env_file = environ.get(ENV_FILE_VARIABLE, '')
     if not env_file:
-        return rejected(EnvFileMissingError())
-    with Path(env_file).open('a', encoding='utf-8') as exports:
-        exports.write(export_line(data_directory))
+        return skipped(EnvFileMissingError())
+    line = export_line(data_directory)
+    exports = Path(env_file)
+    if exports.is_file() and line in exports.read_text(encoding='utf-8').splitlines(keepends=True):
+        return 0
+    with exports.open('a', encoding='utf-8') as file:
+        file.write(line)
     return 0

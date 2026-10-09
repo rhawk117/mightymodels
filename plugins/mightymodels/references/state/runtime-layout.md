@@ -1,6 +1,6 @@
 # Runtime layout for hooks
 
-Read before changing a hook, a receipt struct, or any skill script whose files a hook reads. The hooks in `src/mightymodels_plugin/hooks.py` adapt the skill scripts' file contracts; they never define a second state model.
+Read before changing a hook. A hook is a CLI subcommand of `mightymodels` that `hooks/hooks.json` runs, and it works from the state database below and from git. It never defines a second state model, and it keeps no file of its own to remember what it did.
 
 ## Where the state database is
 
@@ -10,36 +10,32 @@ Every session of every repository writes that one file. It is kept in SQLite's w
 
 This breaks with earlier versions, which kept the database inside the repository under `.mightymodels/`. That file is not read, imported or changed, so state recorded in it does not carry over, and it can be deleted. The new file carries a schema version stamp, and a file with another stamp is refused by name instead of read, and nothing is written to it.
 
-## What hooks read
+## The hooks
 
-| File                                   | Owner                                                          | Read by                                                               |
-| -------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `.mightymodels/SLUG/work-unit.json`    | open-ticket's ticket_state.py, agents-assemble's task_state.py | every hook, to find the ticket whose `ticket.branch` is checked out   |
-| `.mightymodels/SLUG/transitions.jsonl` | task_state.py                                                  | completion-gate, to find who started an in-progress task              |
-| `.mightymodels/SLUG/briefs/task-NN.md` | agents-assemble and the engineer                               | completion-gate, for the DONE half and its commit                     |
-| the git repository                     | git, read through pygit2                                       | every hook, for branch, HEAD, status, ignore rules, and commit ranges |
+Under GitHub Copilot the plugin ran five hooks. Each has a counterpart now. A hook command exits 0 whatever happens and says on standard error why it did nothing (no data directory, not a git work tree, a database it refuses); only the completion gate ever answers a block, and only as below. The three that can stop something go through `bin/mightymodels-hook`, a `sh` wrapper that turns any failure of the Python process into exit 0 with one line on standard error, because exit 2 from a `SubagentStop` or `PreCompact` hook blocks.
 
-## What hooks write
+| Former behaviour    | Claude Code event (matcher)                                   | Command (script)                                  | Reads                                                                                                                      | Writes                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| session bootstrap   | `SessionStart`                                                | `session-start` (`bin/mightymodels`)              | `CLAUDE_PLUGIN_DATA`, `CLAUDE_ENV_FILE`, the env file                                                                      | one `export MIGHTYMODELS_DATA_DIR=...` line to the env file, unless it is already there                                                                 |
+| decision recorder   | none: elicitation persistence (T11) replaces it                | none                                              | not applicable                                                                                                             | not applicable                                         |
+| subagent recorder   | `SubagentStop` (`^mightymodels:(code-scout\|web-scout)$`)       | `subagent-record` (`bin/mightymodels-hook`)       | the hook input (`agent_type`, `agent_id`, `last_assistant_message`), the data directory, git for the repository key        | one file in `scout-spool/` in the data directory, named `spool_file_prefix(key)`, a unique part and `.json`, written as `.part` and renamed             |
+| completion gate     | `SubagentStop` (`^mightymodels:(engineer\|architect)$`)        | `completion-gate` (`bin/mightymodels-hook`)       | the hook input (`agent_type`, `stop_hook_active`), the ticket on the checked-out branch, its in-progress tasks, the briefs | on standard output `{"decision": "block", "reason": ...}` when a task the worker started has no brief DONE half naming a commit; no file, no row        |
+| pre-compact snapshot | `PreCompact` (any trigger)                                    | `pre-compact` (`bin/mightymodels-hook`)           | the ticket on the checked-out branch, its tasks, contract receipts, ledgers and review, and git                            | `.mightymodels/SLUG/handoffs/snapshot.json` and `snapshot.md`, the record and Markdown the `snapshot` tool serves                                       |
 
-| File                                              | Writer                                                                                                            |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `.mightymodels/.runtime/decisions/receipts.jsonl` | decision-recorder                                                                                                 |
-| `.mightymodels/.runtime/subagents/receipts.jsonl` | subagent-recorder                                                                                                 |
-| `.mightymodels/.runtime/gate/SHA256`              | completion-gate, an empty marker named by the SHA-256 of session, worker, and tasks that makes its block one-shot |
-| `.mightymodels/SLUG/handoffs/snapshot.{json,md}`  | baton-pass's snapshot.py, run by workflow-state-snapshot                                                          |
+The plugin also has a `PreToolUse` hook on `Agent`, `dispatch-hook` (`bin/mightymodels-dispatch-hook`), which has no Copilot counterpart: it denies a plugin worker's dispatch outside the workers its agent file allows, and fails closed for a worker.
 
-Receipt shapes are [`receipt.schema.json`](./receipt.schema.json). Hooks never create `.mightymodels/` and never edit git's exclude file: the skill scripts that create the directory add `.mightymodels/` to `info/exclude`, and a hook refuses to write unless git reports the directory ignored.
+### The branch ticket
 
-Each receipt writer holds an exclusive `receipts.jsonl.lock` sidecar lock until its append
-is flushed and closed. The standalone prune script uses the same lock around reading and
-atomically replacing the receipt stream. Lock files remain in place; deleting one could
-let writers lock different inodes. The protocol uses `flock` on POSIX and byte locking on
-Windows. Both implementations must stay in sync and require no additional dependency.
+A hook's ticket is the one ticket of the repository, not closed, whose `branch` is the checked-out branch. A detached HEAD, no match, or two matches mean no ticket: the completion gate and the snapshot do nothing.
 
-## The branch ticket
+### The completion gate
 
-A hook's ticket is the one whose `work-unit.json` names the checked-out branch and is not `closed`. A detached HEAD, no match, or two matches mean no ticket: receipts are written with `ticket: null`, and the gate and the snapshot do nothing. Outside a git repository every hook except session-bootstrap does nothing.
+When `mightymodels:engineer` or `mightymodels:architect` stops, the gate looks for in-progress tasks whose latest attempt was that worker's. A plan task (`T` id) whose brief `.mightymodels/SLUG/briefs/task-NN.md` is missing, or has no `## DONE` half with a `commit: <hash>` line, blocks the stop; the reason names the task and what is missing. A `C` or `R` task has no brief and is not held. The gate keeps no marker of its own: Claude Code sets `stop_hook_active` on the stop that follows a block, and the gate lets that stop through, so a worker that cannot finish is never trapped. A worker with nothing in progress, any other agent type and a stop with no ticket pass untouched.
 
-## Launch
+### The subagent recorder
 
-Each hooks.json entry sets `cwd` to `${PLUGIN_ROOT}`, `UV_CACHE_DIR=${PLUGIN_DATA}/uv-cache`, `PYTHONSAFEPATH=1`, and `PYTHONUNBUFFERED=1`, then runs `uv run --frozen --no-dev --quiet mightymodels_plugin HOOK_NAME --plugin-root "${PLUGIN_ROOT}"`. uv discovers and creates or reuses the project environment from the hook cwd; the safe Python path keeps repository packages from shadowing the plugin's code, and `tests/test_launch.py` proves this with decoys. `--plugin-root` lets the snapshot hook reach `skills/baton-pass/scripts/snapshot.py`. A warm launch costs about 0.2 seconds, most of it importing pygit2.
+The scout's report is the `last_assistant_message` of the `SubagentStop` input. Its target is the scout and the `agent_id`, since the input carries no dispatch. The recorder opens no database: the state server takes the file in on its next tool call. A report whose file would pass the spool's 64 KiB cap is not written; one over `REPORT_LIMIT` characters is written and set aside by the server. `docs/state.md` has the spool's name and format.
+
+### Snapshot files
+
+The pre-compact hook writes the two files the `snapshot` tool describes under the ticket's `handoffs/`, limit 20 per list. `.mightymodels/` is excluded from git by the same call that opens the database, before anything is written there.
