@@ -183,10 +183,11 @@ class TestCallExamples:
     def test_each_call_example_fits_the_schema_its_tool_publishes(
         self, example: CallExample, published_schemas: dict[str, dict[str, object]]
     ) -> None:
-        published = published_schemas[example.tool]
-        closed = Draft202012Validator({**published, 'additionalProperties': False})
+        published = Draft202012Validator(published_schemas[example.tool])
 
-        assert [error.message for error in closed.iter_errors(json.loads(example.arguments))] == []
+        assert [
+            error.message for error in published.iter_errors(json.loads(example.arguments))
+        ] == []
 
 
 class TestToolProtocol:
@@ -294,6 +295,7 @@ class TestToolCalls:
         ('investigation', {'action': 'list'}),
         ('crashout', {'action': 'stats'}),
     )
+    UNNAMED_ARGUMENT = 'not_in_the_schema'
 
     @pytest.fixture
     def server_with_a_staged_ticket(
@@ -470,5 +472,24 @@ class TestToolCalls:
         (result,) = ticket_results(connected_server, (name, arguments))
 
         assert result.is_error
+        assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
+        assert tree(connected_server.root) == tree_after_the_connect
+
+    @pytest.mark.parametrize(
+        ('name', 'arguments'),
+        [pytest.param(name, arguments, id=name) for name, arguments in ONE_CALL_OF_EACH_TOOL],
+    )
+    def test_a_top_level_argument_the_schema_does_not_name_is_refused_by_name(
+        self,
+        name: str,
+        arguments: dict[str, object],
+        connected_server: StateServer,
+        tree_after_the_connect: dict[str, bytes],
+        database_activity: DatabaseActivity,
+    ) -> None:
+        (result,) = connected_server.call((name, {**arguments, self.UNNAMED_ARGUMENT: True}))
+
+        assert result.is_error
+        assert self.UNNAMED_ARGUMENT in text_of(result)
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
         assert tree(connected_server.root) == tree_after_the_connect

@@ -7,15 +7,22 @@ no git binary, the server starts all the same.
 
 `AppState` holds one service per tool and nothing else: the workspace and the database are
 reached only through the services built over them.
+
+The SDK builds each tool's argument model open, so an argument the tool does not name would be
+dropped and the call answered as if it were absent. `tool_refusing_unknown_arguments` gives the
+tool that model again with extra arguments forbidden, which refuses such a call by the argument's
+name before the tool runs and publishes the closed top level in the served schema.
 """
 
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.tools import Tool
+from pydantic import create_model
 
 from mightymodels_plugin.database import open_database
 from mightymodels_plugin.tools.close.service import CloseService
@@ -61,6 +68,20 @@ class AppState:
     crashouts: CrashoutService
 
 
+def tool_refusing_unknown_arguments(served: Callable[..., object]) -> Tool:
+    tool = Tool.from_function(served)
+    open_arguments = tool.fn_metadata.arg_model
+    closed_arguments = create_model(
+        open_arguments.__name__, __base__=open_arguments, __cls_kwargs__={'extra': 'forbid'}
+    )
+    return tool.model_copy(
+        update={
+            'parameters': closed_arguments.model_json_schema(by_alias=True),
+            'fn_metadata': tool.fn_metadata.model_copy(update={'arg_model': closed_arguments}),
+        }
+    )
+
+
 def build_server(root: Path) -> MCPServer[AppState]:
     @asynccontextmanager
     async def lifespan(_: MCPServer[AppState]) -> AsyncGenerator[AppState]:
@@ -78,10 +99,8 @@ def build_server(root: Path) -> MCPServer[AppState]:
                 crashouts=CrashoutService(database=database),
             )
 
-    server = MCPServer(SERVER_NAME, lifespan=lifespan)
-    for tool in TOOLS:
-        server.add_tool(tool)
-    return server
+    tools = list(map(tool_refusing_unknown_arguments, TOOLS))
+    return MCPServer(SERVER_NAME, lifespan=lifespan, tools=tools)
 
 
 def serve() -> None:
