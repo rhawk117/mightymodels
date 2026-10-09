@@ -6,8 +6,8 @@ disposes the engine when the client closes.
 
 The server needs a plugin data directory and a git work tree, and with either missing it creates
 nothing and still starts: its lifespan state is then a `StartRefusal`, and every tool call is
-answered with the reason, which names what is missing. An origin remote that names no repository
-and a database file of another schema version are refused the same way.
+answered with the reason, which names what is missing. A database file of another schema
+version is refused the same way.
 
 `AppState` holds one service per tool and nothing else: the workspace and the database are
 reached only through the services built over them.

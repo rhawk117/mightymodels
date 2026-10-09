@@ -2,7 +2,7 @@
 
 Per-ticket files, sparse, organized by unit of work, at the git toplevel whichever directory the session started in. The unit of deletion for files is the unit of work: `/prune-ticket` removes a whole ticket directory, so file rot cannot outlive its ticket. The ticket's rows stay in the database.
 
-The state itself is rows in one SQLite database, `mightymodels.db`, and that file is not in this directory. It is in the plugin data directory, the one Claude Code names in `CLAUDE_PLUGIN_DATA`, it serves every repository, and each row carries the key of the repository it belongs to: the origin remote's `owner/name`, or a hash of the toplevel path when there is no origin. The database holds tickets, tasks, the contract, ledgers, reviews, crashouts and closings. A database an earlier version left inside this directory is not read, imported or changed, and can be deleted.
+The state itself is rows in one SQLite database, `mightymodels.db`, and that file is not in this directory. It is in the plugin data directory, the one Claude Code names in `CLAUDE_PLUGIN_DATA`, it serves every repository, and each row carries the key of the repository it belongs to: the origin remote's `owner/name`, or a hash of the toplevel path when there is no origin or the origin is not exactly `owner/name` on a host. The database holds tickets, tasks, the contract, ledgers, reviews, crashouts and closings. A database an earlier version left inside this directory is not read, imported or changed, and can be deleted.
 
 ```
 .mightymodels/
