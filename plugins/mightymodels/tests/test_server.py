@@ -43,7 +43,7 @@ ANSWERS = {
 }
 COMMAND = {'id': 'T1.AC-1', 'argv': ['true'], 'approved_by': 'user'}
 START = {'by': 'engineer', 'owned': ['src/queue.py']}
-FAILED_FIX = {
+FAILED_FIX: dict[str, object] = {
     'action': 'record',
     'slug': SLUG,
     'payload': {'task_id': 'T1', 'change': {'hypothesis': 'the drain loop sleeps'}},
