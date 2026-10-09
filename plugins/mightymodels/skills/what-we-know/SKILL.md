@@ -56,7 +56,7 @@ carries a citation is waste.
   change being the SWOT target) so the verdicts have somewhere to persist:
 
   ```json
-  {"action": "start", "request": {"target": "<target line>", "kind": "change"}}
+  {"action": "start", "payload": {"request": {"target": "<target line>", "kind": "change"}}}
   ```
 
   Then bootstrap with one scout wave of
@@ -91,12 +91,12 @@ would ask, state a working assumption for each, and proceed on the assumptions l
 assumptions.
 
 **Persist before analysing.** Write the session's verdicts in one batch with
-`mcp__plugin_mightymodels_state__investigation`, action `add`, `request` `{"round": N}` (the
-next round after the ledger's latest):
+`mcp__plugin_mightymodels_state__investigation`, action `add`, `payload` `request`
+`{"round": N}` (the next round after the ledger's latest):
 
 ```json
-{"action": "add", "investigation_id": "ID", "request": {"round": 2},
- "entries": [{"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout", "supersedes": [4]}]}
+{"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 2},
+ "entries": [{"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout", "supersedes": [4]}]}}
 ```
 
 The batch

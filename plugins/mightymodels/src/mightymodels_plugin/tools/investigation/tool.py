@@ -19,11 +19,10 @@ from mcp.server.mcpserver import Context, Resolve
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.investigation.schema import (
     InvestigationAction,
-    InvestigationRequest,
+    InvestigationPayload,
     InvestigationStart,
     InvestigationView,
     KnownsFilter,
-    LedgerEntry,
     LedgerRound,
 )
 from mightymodels_plugin.tools.investigation.service import InvestigationService
@@ -41,8 +40,7 @@ INVESTIGATION_ARGUMENT = 'investigation_id'
 @dataclass(slots=True, kw_only=True, frozen=True)
 class InvestigationCall:
     investigation_id: Slug | None
-    entries: list[LedgerEntry] | None
-    request: InvestigationRequest | None
+    payload: InvestigationPayload
 
 
 def investigation_for(action: InvestigationAction, call: InvestigationCall) -> Slug:
@@ -54,16 +52,16 @@ def investigation_for(action: InvestigationAction, call: InvestigationCall) -> S
 def start_investigation(
     investigations: InvestigationService, call: InvestigationCall
 ) -> InvestigationView:
-    if not isinstance(call.request, InvestigationStart):
+    if not isinstance(call.payload.request, InvestigationStart):
         raise MissingArgumentsError(InvestigationAction.START, 'a request holding target and kind')
-    return investigations.start(call.request, started=datetime.now(tz=UTC))
+    return investigations.start(call.payload.request, started=datetime.now(tz=UTC))
 
 
 def add_entries(investigations: InvestigationService, call: InvestigationCall) -> InvestigationView:
     investigation = investigation_for(InvestigationAction.ADD, call)
-    if call.entries is None or not isinstance(call.request, LedgerRound):
+    if call.payload.entries is None or not isinstance(call.payload.request, LedgerRound):
         raise MissingArgumentsError(InvestigationAction.ADD, 'entries and a request holding round')
-    return investigations.add(investigation, call.request.round, call.entries)
+    return investigations.add(investigation, call.payload.request.round, call.payload.entries)
 
 
 def render_ledger(
@@ -76,7 +74,7 @@ def render_knowns(
     investigations: InvestigationService, call: InvestigationCall
 ) -> InvestigationView:
     investigation = investigation_for(InvestigationAction.KNOWNS, call)
-    selection = KnownsFilter() if call.request is None else call.request
+    selection = KnownsFilter() if call.payload.request is None else call.payload.request
     if not isinstance(selection, KnownsFilter):
         raise MissingArgumentsError(
             InvestigationAction.KNOWNS, 'no request, or a request holding only kinds and limit'
@@ -104,18 +102,18 @@ class InvestigationTool:
         ServiceHandler[InvestigationService, InvestigationCall, InvestigationView],
     ]
 
-    def investigation(  # noqa: PLR0913 - four arguments are the schema the model sees and the SDK injects the fifth
+    def investigation(
         self,
         action: InvestigationAction,
-        *,
         investigation_id: Slug | None = None,
-        entries: list[LedgerEntry] | None = None,
-        request: InvestigationRequest | None = None,
+        payload: InvestigationPayload | None = None,
+        *,
         investigations: ResolvedInvestigations,
     ) -> InvestigationView:
         """Open an investigation, append ledger entries, or render the ledger or its knowns."""
         call = InvestigationCall(
-            investigation_id=investigation_id, entries=entries, request=request
+            investigation_id=investigation_id,
+            payload=InvestigationPayload() if payload is None else payload,
         )
         return dispatch_to_service(self.handlers, action, call, service=investigations)
 

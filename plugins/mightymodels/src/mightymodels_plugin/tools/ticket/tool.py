@@ -76,7 +76,7 @@ class TicketTool:
         *,
         tickets: ResolvedTickets,
     ) -> TicketView:
-        """Create, validate, read or update a ticket's context lines; derives model routing by scope."""  # noqa: E501 - the SDK serves this line as the tool description and the schema snapshot pins its text
+        """Create, validate, read or update a ticket's context lines; routes models by scope."""
         call = TicketCall(slug=slug, fields=fields)
         return dispatch_to_service(self.handlers, action, call, service=tickets)
 

@@ -87,7 +87,7 @@ tail alone?*
   Fix:/Verify: verbatim:
 
   ```json
-  {"action": "start", "slug": "SLUG", "task_id": "C1", "change": {"by": "engineer", "owned": ["<files the log tail names>"]}}
+  {"action": "start", "slug": "SLUG", "payload": {"task_id": "C1", "change": {"by": "engineer", "owned": ["<files the log tail names>"]}}}
   ```
 
   When a local command reproduces the check, it is the Verify line and becomes contract id
@@ -110,8 +110,8 @@ mightymodels verify run --slug SLUG --all --phase landing
 
 Then `task` `ready`, as in step 1. A C task still in progress does not block `ready`, since its
 proof is the CI run the push starts; a failing contract command does. When `run --all` fails on
-a `T` or `I` id, the CI fix broke verified work: `task` `mark` with `task_id` `C1`, `to`
-`failed` and `reason` `"<id> regressed"`, and climb (step 6). Never push past it.
+a `T` or `I` id, the CI fix broke verified work: `task` `mark` with `payload` `task_id` `C1` and
+`change` `to` `failed` and `reason` `"<id> regressed"`, and climb (step 6). Never push past it.
 
 Push, then gitty-up re-watches.
 
@@ -121,7 +121,7 @@ Push, then gitty-up re-watches.
   `mcp__plugin_mightymodels_state__task` and action `verify`:
 
   ```json
-  {"action": "verify", "slug": "SLUG", "task_id": "C1", "change": {"commit": "<fix commit>", "assertions": {"AC-1": "<check link from gitty-up>"}}}
+  {"action": "verify", "slug": "SLUG", "payload": {"task_id": "C1", "change": {"commit": "<fix commit>", "assertions": {"AC-1": "<check link from gitty-up>"}}}}
   ```
 
   Any `C1.*` contract command must also have passed at HEAD; the commit must stay inside the

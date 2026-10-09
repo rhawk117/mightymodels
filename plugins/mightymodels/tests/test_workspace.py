@@ -68,11 +68,14 @@ VALIDATE: ToolCall = ('ticket', {'action': 'validate'})
 SHOW: ToolCall = ('ticket', {'action': 'show'})
 START_TASK: ToolCall = (
     'task',
-    {'action': 'start', 'task_id': 'T1', 'change': {'by': 'engineer', 'owned': ['src/queue.py']}},
+    {
+        'action': 'start',
+        'payload': {'task_id': 'T1', 'change': {'by': 'engineer', 'owned': ['src/queue.py']}},
+    },
 )
 VERIFY_TASK: ToolCall = (
     'task',
-    {'action': 'verify', 'task_id': 'T1', 'change': {'commit': 'HEAD'}},
+    {'action': 'verify', 'payload': {'task_id': 'T1', 'change': {'commit': 'HEAD'}}},
 )
 READY: ToolCall = ('task', {'action': 'ready'})
 APPROVE: ToolCall = ('contract', {'action': 'approve', 'commands': [MARKER_COMMAND]})

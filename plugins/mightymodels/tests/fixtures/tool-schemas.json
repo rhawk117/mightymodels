@@ -153,7 +153,7 @@
     }
   },
   "review": {
-    "description": "Record a review run, its findings, dispositions and resolutions; render the report text.",
+    "description": "Record a review run, findings, dispositions and resolutions; render the report text.",
     "input_schema": {
       "type": "object",
       "$defs": {
@@ -637,6 +637,35 @@
           "title": "TaskMark",
           "type": "object"
         },
+        "TaskPayload": {
+          "additionalProperties": false,
+          "properties": {
+            "task_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TaskId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "change": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TaskChange"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "TaskPayload",
+          "type": "object"
+        },
         "TaskStart": {
           "additionalProperties": false,
           "properties": {
@@ -690,21 +719,10 @@
         "slug": {
           "$ref": "#/$defs/Slug"
         },
-        "task_id": {
+        "payload": {
           "anyOf": [
             {
-              "$ref": "#/$defs/TaskId"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
-        "change": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TaskChange"
+              "$ref": "#/$defs/TaskPayload"
             },
             {
               "type": "null"
@@ -825,7 +843,7 @@
     }
   },
   "ticket": {
-    "description": "Create, validate, read or update a ticket's context lines; derives model routing by scope.",
+    "description": "Create, validate, read or update a ticket's context lines; routes models by scope.",
     "input_schema": {
       "type": "object",
       "$defs": {
@@ -2251,6 +2269,39 @@
           "title": "InvestigationAction",
           "type": "string"
         },
+        "InvestigationPayload": {
+          "additionalProperties": false,
+          "properties": {
+            "entries": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/$defs/LedgerEntry"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Entries"
+            },
+            "request": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InvestigationRequest"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "title": "InvestigationPayload",
+          "type": "object"
+        },
         "InvestigationRequest": {
           "anyOf": [
             {
@@ -2422,25 +2473,10 @@
           ],
           "default": null
         },
-        "entries": {
+        "payload": {
           "anyOf": [
             {
-              "items": {
-                "$ref": "#/$defs/LedgerEntry"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Entries"
-        },
-        "request": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/InvestigationRequest"
+              "$ref": "#/$defs/InvestigationPayload"
             },
             {
               "type": "null"

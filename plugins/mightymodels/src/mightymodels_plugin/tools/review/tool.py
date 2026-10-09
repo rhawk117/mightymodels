@@ -118,7 +118,7 @@ class ReviewTool:
         *,
         reviews: ResolvedReviews,
     ) -> ReviewView:
-        """Record a review run, its findings, dispositions and resolutions; render the report text."""  # noqa: E501 - the SDK serves this line as the tool description and the schema snapshot pins its text
+        """Record a review run, findings, dispositions and resolutions; render the report text."""
         call = ReviewCall(run_id=run_id, payload=payload)
         return dispatch_to_service(self.handlers, action, call, service=reviews)
 

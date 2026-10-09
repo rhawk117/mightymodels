@@ -116,9 +116,16 @@ TOOL_CALLS = (
     (
         'task-start',
         'task',
-        {'action': 'start', 'task_id': 'T1', 'change': {'by': 'engineer', 'owned': ['a.py']}},
+        {
+            'action': 'start',
+            'payload': {'task_id': 'T1', 'change': {'by': 'engineer', 'owned': ['a.py']}},
+        },
     ),
-    ('task-verify', 'task', {'action': 'verify', 'task_id': 'T1', 'change': {'commit': 'HEAD'}}),
+    (
+        'task-verify',
+        'task',
+        {'action': 'verify', 'payload': {'task_id': 'T1', 'change': {'commit': 'HEAD'}}},
+    ),
     ('task-show', 'task', {'action': 'show'}),
     ('task-ready', 'task', {'action': 'ready'}),
     (

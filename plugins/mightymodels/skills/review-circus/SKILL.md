@@ -149,16 +149,16 @@ rollup, and stop.
 Order: Critical findings and High security findings first, then the rest in gate order. For
 each finding `Fn` chosen for fixing:
 
-1. `task` `start` with `task_id` `Rn`, `by` `engineer` and `owned` the files the Fix touches
-   (agents-assemble's call).
+1. `task` `start` with `payload` `task_id` `Rn` and `change` `by` `engineer` and `owned` the
+   files the Fix touches (agents-assemble's call).
 2. The finding's Verify command goes to the user as contract id `Rn.AC-1` in one
    `AskUserQuestion` dialog, then `contract` `approve` with it as a `commands` entry (game-plan's call).
 3. Dispatch an **engineer**: the residual variant for a single-concern merge-vader finding
    with usable Fix and Verify lines; the full template for uncle-bob findings, findings both
    personas raised, and anything Critical or High security.
 4. `mightymodels verify run --slug SLUG --phase review --id Rn.AC-1`, then `task` `verify` with
-   `task_id` `Rn` and `change` `commit`, then `review` `resolve` with `payload` `finding` `Fn`,
-   `result` `fixed` and `commit` (it takes only a finding the user chose to fix).
+   `payload` `task_id` `Rn` and `change` `commit`, then `review` `resolve` with `payload`
+   `finding` `Fn`, `result` `fixed` and `commit` (it takes only a finding the user chose to fix).
 5. Failed or blocked: `task` `mark` (a task the gate blocked already is `blocked`), then
    **architect** once, then whats-broken, as in agents-assemble. Record `resolve` with `result`
    `failed` or `blocked` and a `reason` when a finding stops.

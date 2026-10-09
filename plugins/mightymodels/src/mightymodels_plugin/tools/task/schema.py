@@ -68,6 +68,13 @@ class TaskMark(BaseModel):
 type TaskChange = TaskStart | TaskVerification | TaskMark
 
 
+class TaskPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra='forbid')
+
+    task_id: TaskId | None = None
+    change: TaskChange | None = None
+
+
 class TaskRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 

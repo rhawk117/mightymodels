@@ -555,7 +555,7 @@ class TestTheTool:
     @pytest.fixture
     def started_through_the_tool(self, state_server: StateServer) -> Slug:
         (started,) = state_server.call(
-            ('investigation', {'action': 'start', 'request': START_REQUEST})
+            ('investigation', {'action': 'start', 'payload': {'request': START_REQUEST}})
         )
         return Slug(started.structured_content['investigation_id'])
 
@@ -617,8 +617,7 @@ class TestTheTool:
                 {
                     'action': 'add',
                     'investigation_id': started_through_the_tool.root,
-                    'entries': [VALID_ENTRY, entry],
-                    'request': {'round': 1},
+                    'payload': {'entries': [VALID_ENTRY, entry], 'request': {'round': 1}},
                 },
             )
         )
@@ -638,8 +637,7 @@ class TestTheTool:
                 {
                     'action': 'add',
                     'investigation_id': investigation,
-                    'entries': [VALID_ENTRY],
-                    'request': {'round': 1},
+                    'payload': {'entries': [VALID_ENTRY], 'request': {'round': 1}},
                 },
             ),
             ('investigation', {'action': 'render', 'investigation_id': investigation}),
@@ -648,7 +646,7 @@ class TestTheTool:
                 {
                     'action': 'knowns',
                     'investigation_id': investigation,
-                    'request': {'kinds': ['open'], 'limit': 5},
+                    'payload': {'request': {'kinds': ['open'], 'limit': 5}},
                 },
             ),
             ('investigation', {'action': 'list'}),
@@ -675,8 +673,7 @@ class TestTheTool:
                 {
                     'action': 'add',
                     'investigation_id': investigation,
-                    'entries': [VALID_ENTRY],
-                    'request': {'round': 1},
+                    'payload': {'entries': [VALID_ENTRY], 'request': {'round': 1}},
                 },
             ),
             ('investigation', {'action': 'knowns', 'investigation_id': investigation}),
@@ -696,22 +693,22 @@ class TestTheTool:
                 id='start-without-a-request',
             ),
             pytest.param(
-                {'action': 'start', 'request': {'round': 1}},
+                {'action': 'start', 'payload': {'request': {'round': 1}}},
                 'start needs a request holding target and kind',
                 id='start-with-a-round',
             ),
             pytest.param(
-                {'action': 'add', 'entries': [], 'request': {'round': 1}},
+                {'action': 'add', 'payload': {'entries': [], 'request': {'round': 1}}},
                 'add needs investigation_id',
                 id='add-without-an-investigation',
             ),
             pytest.param(
-                {'action': 'add', 'investigation_id': 'a', 'request': {'round': 1}},
+                {'action': 'add', 'investigation_id': 'a', 'payload': {'request': {'round': 1}}},
                 'add needs entries and a request holding round',
                 id='add-without-entries',
             ),
             pytest.param(
-                {'action': 'add', 'investigation_id': 'a', 'entries': []},
+                {'action': 'add', 'investigation_id': 'a', 'payload': {'entries': []}},
                 'add needs entries and a request holding round',
                 id='add-without-a-round',
             ),
@@ -722,7 +719,7 @@ class TestTheTool:
                 {'action': 'knowns'}, 'knowns needs investigation_id', id='knowns-of-nothing'
             ),
             pytest.param(
-                {'action': 'knowns', 'investigation_id': 'a', 'request': {'round': 1}},
+                {'action': 'knowns', 'investigation_id': 'a', 'payload': {'request': {'round': 1}}},
                 'knowns needs no request, or a request holding only kinds and limit',
                 id='knowns-with-a-round',
             ),
@@ -749,31 +746,41 @@ class TestTheTool:
                 {'action': 'render', 'investigation_id': '../outside'}, id='path-shaped-id'
             ),
             pytest.param(
-                {'action': 'start', 'request': {'target': 'x', 'kind': 'hunch'}},
+                {'action': 'start', 'payload': {'request': {'target': 'x', 'kind': 'hunch'}}},
                 id='unknown-target-kind',
             ),
             pytest.param(
-                {'action': 'start', 'request': {**START_REQUEST, 'path': 'ledger.jsonl'}},
+                {
+                    'action': 'start',
+                    'payload': {'request': {**START_REQUEST, 'path': 'ledger.jsonl'}},
+                },
                 id='unknown-request-field',
             ),
             pytest.param(
-                {'action': 'knowns', 'investigation_id': 'a', 'request': {'limit': 0}},
+                {'action': 'knowns', 'investigation_id': 'a', 'payload': {'request': {'limit': 0}}},
                 id='knowns-limit-zero',
             ),
             pytest.param(
-                {'action': 'knowns', 'investigation_id': 'a', 'request': {'kinds': ['target']}},
+                {
+                    'action': 'knowns',
+                    'investigation_id': 'a',
+                    'payload': {'request': {'kinds': ['target']}},
+                },
                 id='knowns-of-the-target',
             ),
             pytest.param(
-                {'action': 'knowns', 'investigation_id': 'a', 'request': {'kinds': []}},
+                {
+                    'action': 'knowns',
+                    'investigation_id': 'a',
+                    'payload': {'request': {'kinds': []}},
+                },
                 id='knowns-of-no-kind',
             ),
             pytest.param(
                 {
                     'action': 'add',
                     'investigation_id': 'a',
-                    'request': {'round': 1},
-                    'entries': [{**VALID_ENTRY, 'seq': 7}],
+                    'payload': {'request': {'round': 1}, 'entries': [{**VALID_ENTRY, 'seq': 7}]},
                 },
                 id='entry-numbering-itself',
             ),
@@ -781,8 +788,10 @@ class TestTheTool:
                 {
                     'action': 'add',
                     'investigation_id': 'a',
-                    'request': {'round': 1},
-                    'entries': [{**VALID_ENTRY, 'cite': '  '}],
+                    'payload': {
+                        'request': {'round': 1},
+                        'entries': [{**VALID_ENTRY, 'cite': '  '}],
+                    },
                 },
                 id='blank-cite',
             ),

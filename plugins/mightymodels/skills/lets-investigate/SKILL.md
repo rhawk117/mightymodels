@@ -58,15 +58,15 @@ Call `mcp__plugin_mightymodels_state__investigation` with action `start`; `kind`
 `claim`, `research` or `change` (a proposed change to weigh, which what-we-know opens):
 
 ```json
-{"action": "start", "request": {"target": "<target line>", "kind": "behavior"}}
+{"action": "start", "payload": {"request": {"target": "<target line>", "kind": "behavior"}}}
 ```
 
 `start` returns the investigation id; every later call names it. Then the same tool with action
 `add` records the user's answers:
 
 ```json
-{"action": "add", "investigation_id": "ID", "request": {"round": 0},
- "entries": [{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]}
+{"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 0},
+ "entries": [{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]}}
 ```
 
 When the user is resuming an earlier investigation, action `list` shows the ids and action
@@ -109,12 +109,12 @@ is an entry `kind`:
 **4. Persist, then restate the whole ledger.** Write the round's entries in one `add` call:
 
 ```json
-{"action": "add", "investigation_id": "ID", "request": {"round": 1}, "entries": [
+{"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 1}, "entries": [
   {"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout"},
   {"kind": "open", "text": "... rests on ...", "cite": "CHANGELOG 3.x", "source": "web-scout"},
   {"kind": "known", "text": "...", "cite": "https://...#backoff", "source": "web-scout", "supersedes": [4]},
   {"kind": "next", "text": "<exact question>", "source": "code-scout"}
-]}
+]}}
 ```
 
 Then call `mcp__plugin_mightymodels_state__investigation` with action `render`:

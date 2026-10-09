@@ -79,7 +79,7 @@ a `decision` entry from `user` in the ticket's linked investigation. Call
 `mcp__plugin_mightymodels_state__investigation` with action `add`:
 
 ```json
-{"action": "add", "investigation_id": "ID", "request": {"round": 1}, "entries": [{"kind": "decision", "text": "<the decision>", "source": "user"}]}
+{"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 1}, "entries": [{"kind": "decision", "text": "<the decision>", "source": "user"}]}}
 ```
 
 `round` is the ledger's latest (`investigation` `render` shows it). A decision in the ledger

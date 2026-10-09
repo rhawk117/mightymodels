@@ -6,6 +6,7 @@ round, the time and HEAD, and stores it; the target is the first entry of every 
 
 `InvestigationRequest` is what an action needs beyond the investigation and the entries: the
 target and its kind for `start`, the round for `add`, the kinds and the limit for `knowns`.
+`InvestigationPayload` carries the entries and the request as the tool's one payload argument.
 """
 
 from enum import StrEnum, auto
@@ -92,6 +93,13 @@ class KnownsFilter(BaseModel):
 
 
 type InvestigationRequest = InvestigationStart | LedgerRound | KnownsFilter
+
+
+class InvestigationPayload(BaseModel):
+    model_config = ConfigDict(frozen=True, extra='forbid')
+
+    entries: tuple[LedgerEntry, ...] | None = None
+    request: InvestigationRequest | None = None
 
 
 class InvestigationView(BaseModel):
