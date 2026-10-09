@@ -11,7 +11,7 @@ if output=$({ printf '%s' "${input}" | "${launcher}" dispatch-hook; } 2>/dev/nul
 fi
 
 case ${input} in
-  *'"agent_type"'*)
+  *'"agent_type":"mightymodels:'* | *'"agent_type": "mightymodels:'*)
     printf '%s\n' 'mightymodels: the dispatch hook could not run, so this subagent dispatch is refused' >&2
     exit 2
     ;;

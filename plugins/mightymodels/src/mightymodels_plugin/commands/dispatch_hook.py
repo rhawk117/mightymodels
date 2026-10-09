@@ -3,12 +3,15 @@
 Claude Code lets a subagent dispatch any subagent type and ignores an allow-list in a subagent's
 definition, so the plugin enforces the "delegate only to" lines of its agent files here. The hook
 input is JSON on standard input; a call made inside a subagent carries `agent_type`, and the main
-conversation's does not. A worker's dispatch outside its row is denied, a caller that is not one
-of this plugin's workers has no row, and a worker whose input cannot be read is denied. Input
-without `agent_type` is the main conversation's and gets no decision.
+conversation's does not. The hook polices only this plugin's workers, whose `agent_type` begins
+`mightymodels:`: a worker's dispatch outside its row is denied, a name under that prefix that is
+no worker has no row, and unreadable input that names such an `agent_type` is denied. Every other
+caller (a built-in subagent, another plugin's agent, a main thread started with `--agent`) and
+input without `agent_type` get no decision, as if the plugin were not installed.
 """
 
 import json
+import re
 from collections.abc import Mapping
 from types import MappingProxyType
 from typing import TextIO
@@ -17,7 +20,7 @@ from mightymodels_plugin.routing import Worker
 
 PLUGIN_PREFIX = 'mightymodels:'
 AGENT_TYPE_KEY = 'agent_type'
-QUOTED_AGENT_TYPE = f'"{AGENT_TYPE_KEY}"'
+PLUGIN_CALLER = re.compile(rf'"{AGENT_TYPE_KEY}"\s*:\s*"{re.escape(PLUGIN_PREFIX)}')
 UNREADABLE = 'a dispatch was refused: the hook input is not the expected JSON'
 HOOK_EVENT = 'PreToolUse'
 DENY = 'deny'
@@ -68,9 +71,7 @@ def allowed_for(caller: str) -> frozenset[Worker]:
     return NO_TARGETS if worker is None else DISPATCH_RULES[worker]
 
 
-def denial_for_worker(caller: object, target: object) -> str | None:
-    if not isinstance(caller, str):
-        return 'a dispatch was refused: the hook input names a caller that is not a string'
+def denial_for_worker(caller: str, target: object) -> str | None:
     if not isinstance(target, str):
         return f'{caller} was refused a dispatch: the hook input names no target type'
     allowed = allowed_for(caller)
@@ -83,10 +84,11 @@ def denial_for_worker(caller: object, target: object) -> str | None:
 def dispatch_denial(text: str) -> str | None:
     fields = decoded_object(text)
     if fields is None:
-        return UNREADABLE if QUOTED_AGENT_TYPE in text else None
-    if AGENT_TYPE_KEY not in fields:
+        return UNREADABLE if PLUGIN_CALLER.search(text) else None
+    caller = fields.get(AGENT_TYPE_KEY)
+    if not isinstance(caller, str) or not caller.startswith(PLUGIN_PREFIX):
         return None
-    return denial_for_worker(fields[AGENT_TYPE_KEY], target_of(fields))
+    return denial_for_worker(caller, target_of(fields))
 
 
 def check_dispatch(stdin: TextIO, stdout: TextIO) -> int:

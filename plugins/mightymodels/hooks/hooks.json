@@ -1,5 +1,5 @@
 {
-  "description": "mightymodels: export the plugin data directory to the session's commands, so `mightymodels verify run` opens the database the state server keeps, and deny a worker's dispatch outside the workers its agent file allows.",
+  "description": "mightymodels: export the plugin data directory to the session's commands, so `mightymodels verify run` opens the database the state server keeps, and deny a dispatch by one of this plugin's workers (agent_type mightymodels:<worker>) outside the workers its agent file allows, and leave every other caller alone.",
   "hooks": {
     "SessionStart": [
       {
