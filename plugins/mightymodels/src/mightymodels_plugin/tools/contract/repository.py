@@ -3,7 +3,8 @@
 `contract_transaction` opens a transaction on the database and hands out the repository, which
 holds that transaction's session, so the contract service never sees a session. A domain that reads
 commands or receipts inside its own transaction builds a `ContractRepository` on that transaction's
-session.
+session. The repository holds the key of the git repository the database was opened for, and
+reads and writes rows under that key only.
 """
 
 import re
@@ -15,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.task_id import TASK_ID_PATTERN
 from mightymodels_plugin.tools.contract.schema import ContractCommand, Receipt
@@ -34,8 +36,11 @@ def owning_task(command_id: str) -> str | None:
     return task_id if separator and TASK_ID.match(task_id) else None
 
 
-def command_row(slug: Slug, command: ContractCommand, approval: Approval) -> CommandRow:
+def command_row(
+    slug: Slug, command: ContractCommand, approval: Approval, *, repository_key: RepositoryKey
+) -> CommandRow:
     return CommandRow(
+        repository_key=repository_key.root,
         slug=slug.root,
         command_id=command.id,
         task_id=owning_task(command.id),
@@ -48,8 +53,9 @@ def command_row(slug: Slug, command: ContractCommand, approval: Approval) -> Com
     )
 
 
-def receipt_row(slug: Slug, receipt: Receipt) -> ReceiptRow:
+def receipt_row(slug: Slug, receipt: Receipt, *, repository_key: RepositoryKey) -> ReceiptRow:
     return ReceiptRow(
+        repository_key=repository_key.root,
         slug=slug.root,
         command_id=receipt.id,
         argv=list(receipt.argv),
@@ -68,25 +74,43 @@ def receipt_row(slug: Slug, receipt: Receipt) -> ReceiptRow:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ContractRepository:
     session: Session
+    repository_key: RepositoryKey
 
     def commands(self, slug: Slug) -> list[CommandRow]:
         query = (
-            select(CommandRow).where(CommandRow.slug == slug.root).order_by(CommandRow.command_id)
+            select(CommandRow)
+            .where(
+                CommandRow.repository_key == self.repository_key.root,
+                CommandRow.slug == slug.root,
+            )
+            .order_by(CommandRow.command_id)
         )
         return list(self.session.scalars(query))
 
     def latest_receipts(self, slug: Slug) -> dict[str, ReceiptRow]:
-        query = select(ReceiptRow).where(ReceiptRow.slug == slug.root).order_by(ReceiptRow.id)
+        query = (
+            select(ReceiptRow)
+            .where(
+                ReceiptRow.repository_key == self.repository_key.root,
+                ReceiptRow.slug == slug.root,
+            )
+            .order_by(ReceiptRow.id)
+        )
         return {receipt.command_id: receipt for receipt in self.session.scalars(query)}
 
     def approve(self, slug: Slug, commands: Iterable[ContractCommand], approval: Approval) -> None:
-        self.session.add_all(command_row(slug, command, approval) for command in commands)
+        self.session.add_all(
+            command_row(slug, command, approval, repository_key=self.repository_key)
+            for command in commands
+        )
 
     def record(self, slug: Slug, receipts: Iterable[Receipt]) -> None:
-        self.session.add_all(receipt_row(slug, receipt) for receipt in receipts)
+        self.session.add_all(
+            receipt_row(slug, receipt, repository_key=self.repository_key) for receipt in receipts
+        )
 
 
 @contextmanager
 def contract_transaction(database: Database) -> Generator[ContractRepository]:
     with database.transaction() as session:
-        yield ContractRepository(session=session)
+        yield ContractRepository(session=session, repository_key=database.repository_key)

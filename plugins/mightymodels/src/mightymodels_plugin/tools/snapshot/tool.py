@@ -18,9 +18,10 @@ from mcp.server.mcpserver import Context, Resolve
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 from mightymodels_plugin.tools.snapshot.schema import (
     DEFAULT_LIMIT,
@@ -41,8 +42,8 @@ def take_snapshot(snapshots: SnapshotService, call: SnapshotCall) -> SnapshotVie
     return snapshots.take(call.slug, call.limit)
 
 
-def lifespan_snapshots(ctx: Context[LifespanState]) -> SnapshotService:
-    return ctx.request_context.lifespan_context.snapshots
+def lifespan_snapshots(ctx: Context[ServedState]) -> SnapshotService:
+    return served_services(ctx).snapshots
 
 
 ResolvedSnapshots = Annotated[SnapshotService, Resolve(lifespan_snapshots)]

@@ -18,10 +18,11 @@ from mcp.server.mcpserver import Context, Resolve
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
     MissingArgumentsError,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 from mightymodels_plugin.tools.review.schema import (
     AddPayload,
@@ -99,8 +100,8 @@ def list_runs(reviews: ReviewService, _call: ReviewCall) -> ReviewView:
     return reviews.listing()
 
 
-def lifespan_reviews(ctx: Context[LifespanState]) -> ReviewService:
-    return ctx.request_context.lifespan_context.reviews
+def lifespan_reviews(ctx: Context[ServedState]) -> ReviewService:
+    return served_services(ctx).reviews
 
 
 ResolvedReviews = Annotated[ReviewService, Resolve(lifespan_reviews)]

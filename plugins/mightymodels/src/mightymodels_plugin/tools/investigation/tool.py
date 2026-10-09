@@ -28,10 +28,11 @@ from mightymodels_plugin.tools.investigation.schema import (
 from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
     MissingArgumentsError,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 
 INVESTIGATION_ARGUMENT = 'investigation_id'
@@ -88,8 +89,8 @@ def list_investigations(
     return investigations.listing()
 
 
-def lifespan_investigations(ctx: Context[LifespanState]) -> InvestigationService:
-    return ctx.request_context.lifespan_context.investigations
+def lifespan_investigations(ctx: Context[ServedState]) -> InvestigationService:
+    return served_services(ctx).investigations
 
 
 ResolvedInvestigations = Annotated[InvestigationService, Resolve(lifespan_investigations)]

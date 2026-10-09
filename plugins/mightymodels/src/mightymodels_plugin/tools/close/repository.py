@@ -7,7 +7,8 @@ contract, review and investigation domains recorded, and it reads those rows in 
 writes in.
 
 `record_closing` is the only write. It marks the ticket closed and stores the closing's row
-together, so no ticket reads closed without its closing.
+together, so no ticket reads closed without its closing. The closing is stored under the key of
+the git repository the database was opened for, as the ticket's own row is.
 """
 
 from collections.abc import Generator
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.tools.close.schema import ArchiveRecord
 from mightymodels_plugin.tools.close.tables import ClosingRow
 from mightymodels_plugin.tools.snapshot.repository import SnapshotRepository, snapshot_transaction
@@ -25,12 +27,14 @@ from mightymodels_plugin.tools.snapshot.repository import SnapshotRepository, sn
 @dataclass(slots=True, kw_only=True, frozen=True)
 class CloseRepository:
     session: Session
+    repository_key: RepositoryKey
     recorded: SnapshotRepository
 
     def record_closing(self, record: ArchiveRecord, *, archive: str) -> None:
         self.recorded.tickets.mark_closed(record.slug)
         self.session.merge(
             ClosingRow(
+                repository_key=self.repository_key.root,
                 slug=record.slug.root,
                 closed_at=record.closed_at,
                 head=record.head,
@@ -45,4 +49,6 @@ class CloseRepository:
 @contextmanager
 def close_transaction(database: Database) -> Generator[CloseRepository]:
     with snapshot_transaction(database) as recorded:
-        yield CloseRepository(session=recorded.session, recorded=recorded)
+        yield CloseRepository(
+            session=recorded.session, repository_key=database.repository_key, recorded=recorded
+        )

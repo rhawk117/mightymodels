@@ -1,12 +1,21 @@
-"""The state database under `.mightymodels/`: one engine and one session factory per owner.
+"""The state database in the plugin data directory: one engine and one session factory per owner.
 
 Whoever opens it holds it for as long as it runs, the server for its lifespan and `verify run`
-for its one command, and the engine is disposed when that owner lets go. The owner's workspace
-says where the file is. Deleting the file resets the state.
+for its one command, and the engine is disposed when that owner lets go. The file is
+`DATABASE_NAME` in the plugin data directory, outside every repository, and it holds the rows of
+all of them. A `Database` is that file as one repository sees it: it carries the repository's key,
+and each domain's repository writes and reads rows under that key and no other. Deleting the file
+resets the state of every repository.
 
 `open_database` is the only way to a `Database`, and it creates the table of every row type in
 `ROW_TYPES` by name, whatever else the owner has imported. So no owner opens a database with a
 table missing, and a domain's `tables.py` adds a table only by adding its row type here.
+
+The file is stamped with `SCHEMA_VERSION`, kept in SQLite's `user_version`. A file that holds
+nothing is stamped before its tables are created. A file with any other stamp is refused by name
+and left as it was: there is no migration, and tables of another shape would be read wrong. An
+unstamped file that already holds tables is such a file, and a database an earlier version kept
+inside a repository is one.
 """
 
 from collections.abc import Generator
@@ -14,10 +23,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import URL, Engine, create_engine
+from sqlalchemy import URL, Connection, Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from mightymodels_plugin.declarative import Base
+from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.tools.close.tables import ClosingRow
 from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
 from mightymodels_plugin.tools.crashout.tables import CrashoutRow
@@ -31,6 +42,12 @@ from mightymodels_plugin.tools.review.tables import (
 from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, TransitionRow
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 
+DATABASE_NAME = 'mightymodels.db'
+SCHEMA_VERSION = 1
+UNSTAMPED = 0
+STORED_VERSION = 'PRAGMA user_version'
+STAMP = f'{STORED_VERSION} = {SCHEMA_VERSION}'
+STORED_OBJECTS = 'SELECT count(*) FROM sqlite_master'
 ROW_TYPES: tuple[type[Base], ...] = (
     TicketRow,
     TaskRow,
@@ -48,10 +65,22 @@ ROW_TYPES: tuple[type[Base], ...] = (
 )
 
 
+class SchemaVersionError(StateError):
+    def __init__(self, database_file: Path, found: int) -> None:
+        super().__init__(
+            f'{database_file} holds schema version {found} and this plugin reads version '
+            f'{SCHEMA_VERSION}; the file is left as it is, and moving it away lets the plugin '
+            'start an empty database'
+        )
+        self.database_file = database_file
+        self.found = found
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Database:
     engine: Engine
     sessions: sessionmaker[Session]
+    repository_key: RepositoryKey
 
     @contextmanager
     def transaction(self) -> Generator[Session]:
@@ -59,13 +88,31 @@ class Database:
             yield session
 
 
+def stamp_a_file_that_holds_nothing(connection: Connection) -> None:
+    is_stamped = connection.exec_driver_sql(STORED_VERSION).scalar_one() != UNSTAMPED
+    holds_something = connection.exec_driver_sql(STORED_OBJECTS).scalar_one() > 0
+    if is_stamped or holds_something:
+        return
+    connection.exec_driver_sql(STAMP)
+
+
+def schema_version_error(connection: Connection, database_file: Path) -> SchemaVersionError | None:
+    found = connection.exec_driver_sql(STORED_VERSION).scalar_one()
+    return None if found == SCHEMA_VERSION else SchemaVersionError(database_file, found)
+
+
 @contextmanager
-def open_database(database_file: Path) -> Generator[Database]:
+def open_database(database_file: Path, repository_key: RepositoryKey) -> Generator[Database]:
     database_file.parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(URL.create('sqlite', database=str(database_file)))
     tables = [Base.metadata.tables[row_type.__tablename__] for row_type in ROW_TYPES]
     try:
+        with engine.begin() as connection:
+            stamp_a_file_that_holds_nothing(connection)
+            error = schema_version_error(connection, database_file)
+        if error is not None:
+            raise error
         Base.metadata.create_all(engine, tables=tables)
-        yield Database(engine=engine, sessions=sessionmaker(engine))
+        yield Database(engine=engine, sessions=sessionmaker(engine), repository_key=repository_key)
     finally:
         engine.dispose()

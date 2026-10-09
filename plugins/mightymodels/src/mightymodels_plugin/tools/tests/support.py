@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from pathlib import Path
@@ -10,9 +11,11 @@ from mcp.types import CallToolResult, TextContent, Tool
 from sqlalchemy import Engine, event
 from sqlalchemy.orm import Session, SessionTransaction
 
-from mightymodels_plugin.database import Database, open_database
+from mightymodels_plugin.data_directory import SESSION_DATA_VARIABLE, DataDirectory
+from mightymodels_plugin.database import DATABASE_NAME, Database, open_database
+from mightymodels_plugin.repository_key import RepositoryKey, local_key
 from mightymodels_plugin.server import build_server
-from mightymodels_plugin.workspace import Workspace, workspace_at
+from mightymodels_plugin.workspace import PROJECT_DIR_VARIABLE, Checkout, Workspace, workspace_at
 
 type ToolCall = tuple[str, dict[str, object]]
 
@@ -57,37 +60,60 @@ def text_of(result: CallToolResult) -> str:
     return ''.join(block.text for block in result.content if isinstance(block, TextContent))
 
 
-async def served_name(root: Path) -> str | None:
-    async with Client(build_server(root)) as client:
-        return client.server_info.name if client.server_info else None
-
-
-async def served_tools(root: Path) -> dict[str, Tool]:
-    async with Client(build_server(root)) as client:
-        listed = await client.list_tools()
-    return {tool.name: tool for tool in listed.tools}
-
-
-async def call_results(root: Path, calls: Sequence[ToolCall]) -> list[CallToolResult]:
-    async with Client(build_server(root)) as client:
-        return [await client.call_tool(name, arguments) for name, arguments in calls]
-
-
 @dataclass(slots=True, kw_only=True, frozen=True)
 class StateServer:
     root: Path
+    data_directory: DataDirectory
+
+    async def served_name(self) -> str | None:
+        async with Client(build_server(self.root, self.data_directory)) as client:
+            return client.server_info.name if client.server_info else None
+
+    async def served_tools(self) -> dict[str, Tool]:
+        async with Client(build_server(self.root, self.data_directory)) as client:
+            listed = await client.list_tools()
+        return {tool.name: tool for tool in listed.tools}
+
+    async def call_results(self, calls: Sequence[ToolCall]) -> list[CallToolResult]:
+        async with Client(build_server(self.root, self.data_directory)) as client:
+            return [await client.call_tool(name, arguments) for name, arguments in calls]
 
     def name(self) -> str | None:
-        return asyncio.run(served_name(self.root))
+        return asyncio.run(self.served_name())
 
     def tools(self) -> dict[str, Tool]:
-        return asyncio.run(served_tools(self.root))
+        return asyncio.run(self.served_tools())
 
     def call(self, *calls: ToolCall) -> list[CallToolResult]:
-        return asyncio.run(call_results(self.root, calls))
+        return asyncio.run(self.call_results(calls))
 
     def connect(self) -> None:
         self.call()
+
+    def files_on_disk(self) -> dict[str, bytes]:
+        if not isinstance(self.data_directory, Path):
+            return tree(self.root)
+        kept = tree(self.data_directory)
+        return tree(self.root) | {f'{self.data_directory}/{name}': kept[name] for name in kept}
+
+
+def repository_key_of(workspace: Workspace) -> RepositoryKey:
+    checkout = workspace.git.checkout()
+    if not isinstance(checkout, Checkout):
+        return local_key(workspace.root)
+    return checkout.repository_key()
+
+
+@contextmanager
+def workspace_database(workspace: Workspace, data_directory: Path) -> Generator[Database]:
+    database_file = data_directory.joinpath(DATABASE_NAME)
+    with open_database(database_file, repository_key_of(workspace)) as database:
+        yield database
+
+
+@pytest.fixture
+def data_directory(tmp_path: Path) -> Path:
+    return tmp_path.joinpath('plugin-data')
 
 
 @pytest.fixture
@@ -98,14 +124,24 @@ def repository_workspace(repository: Path) -> Workspace:
 
 
 @pytest.fixture
-def repository_database(repository_workspace: Workspace) -> Generator[Database]:
-    with open_database(repository_workspace.database_file()) as database:
+def repository_database(
+    repository_workspace: Workspace, data_directory: Path
+) -> Generator[Database]:
+    with workspace_database(repository_workspace, data_directory) as database:
         yield database
 
 
 @pytest.fixture
-def state_server(repository: Path) -> StateServer:
-    return StateServer(root=repository)
+def session_in_the_repository(
+    repository: Path, data_directory: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(PROJECT_DIR_VARIABLE, str(repository))
+    monkeypatch.setenv(SESSION_DATA_VARIABLE, str(data_directory))
+
+
+@pytest.fixture
+def state_server(repository: Path, data_directory: Path) -> StateServer:
+    return StateServer(root=repository, data_directory=data_directory)
 
 
 @pytest.fixture
@@ -116,7 +152,7 @@ def connected_server(state_server: StateServer) -> StateServer:
 
 @pytest.fixture
 def tree_after_the_connect(connected_server: StateServer) -> dict[str, bytes]:
-    return tree(connected_server.root)
+    return connected_server.files_on_disk()
 
 
 @pytest.fixture

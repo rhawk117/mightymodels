@@ -9,7 +9,7 @@ description: >-
   "look into this claim", "triage this bug report", "why would Y be happening", "dig into this
   error", "how does library Z actually handle this, check the docs and our usage". Also for
   research questions about a dependency, API, protocol, or tool the repository relies on. Persists its ledger as rows
-  in .mightymodels/mightymodels.db and changes nothing else. Not for reviewing a branch or grading a codebase (review-circus), debugging
+  in the state database and changes nothing else. Not for reviewing a branch or grading a codebase (review-circus), debugging
   with a known reproduction (whats-broken), or non-engineering research such as market or
   vendor comparisons.
 ---

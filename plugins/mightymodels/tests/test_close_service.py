@@ -1,7 +1,7 @@
 """The close service against a real git repository, with archive_ticket.py's tests moved here."""
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
@@ -47,10 +47,11 @@ from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.task.repository import Attempt, Transition, task_transaction
 from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskStart
 from mightymodels_plugin.tools.task.service import TaskService
-from mightymodels_plugin.tools.tests.support import StateServer, tree
+from mightymodels_plugin.tools.tests.support import StateServer
 from mightymodels_plugin.tools.ticket.repository import ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService, unit_of
+from mightymodels_plugin.workspace import workspace_at
 
 type GitRunner = Callable[..., str]
 
@@ -170,7 +171,8 @@ class Repo:
 
     def recorded_archive(self) -> str | None:
         with self.closings.database.transaction() as session:
-            closing = session.get(ClosingRow, SLUG)
+            key = (self.closings.database.repository_key.root, SLUG)
+            closing = session.get(ClosingRow, key)
             return None if closing is None else closing.archive
 
 
@@ -442,7 +444,7 @@ class TestWhenGitIsMissing:
     @pytest.fixture
     def repo_without_git(self, repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Repo:
         monkeypatch.setenv('PATH', str(tmp_path.joinpath('no-binaries')))
-        return repo
+        return replace(repo, closings=replace(repo.closings, workspace=workspace_at(repo.root)))
 
     def test_when_git_is_missing_the_branch_is_not_asked_about_and_the_text_says_so(
         self, repo_without_git: Repo
@@ -611,7 +613,7 @@ class TestClose:
         (refused,) = connected_server.call(('close', {'action': 'check', 'slug': '..'}))
 
         assert refused.is_error
-        assert tree(connected_server.root) == tree_after_the_connect
+        assert connected_server.files_on_disk() == tree_after_the_connect
 
 
 class TestAClosedTicket:

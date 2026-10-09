@@ -8,6 +8,7 @@ from mightymodels_plugin.declarative import Base, Key, Models, Texts
 class TicketRow(Base):
     __tablename__ = 'tickets'
 
+    repository_key: Mapped[Key]
     slug: Mapped[Key]
     status: Mapped[str]
     ticket: Mapped[str]

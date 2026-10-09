@@ -4,7 +4,7 @@ Read before the first `review` call in a session, and before another skill reads
 
 ## What a run keeps
 
-A run is rows in `.mightymodels/mightymodels.db` and a directory of files. `start` writes the run's row and creates the directory. The server and `mightymodels verify run` add `.mightymodels/` to the repository's local exclude file, so nothing here is ever tracked.
+A run is rows in the state database, `mightymodels.db` in the plugin data directory, and a directory of files under `.mightymodels/`. `start` writes the run's row and creates the directory. The server and `mightymodels verify run` add `.mightymodels/` to the repository's local exclude file, so the files are never tracked, and the database is outside the repository.
 
 With a ticket: `.mightymodels/SLUG/review/RUN/`. Without one: `.mightymodels/.runtime/reviews/RUN/`. `RUN` is the UTC start time, `YYYYMMDD-HHMMSS`; a second `start` in the same second is refused.
 

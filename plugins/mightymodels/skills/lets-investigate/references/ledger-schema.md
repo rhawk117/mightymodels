@@ -4,7 +4,7 @@ Read when an entry is rejected, when another skill needs to read an investigatio
 
 ## Storage
 
-One investigation is the rows of the `ledger_entries` table in `.mightymodels/mightymodels.db`, under the repository root, keyed by `investigation_id` and `seq`. An investigation has no row of its own: it exists once `start` stores its target as entry 1. Nothing is stored outside the repository, and no row is updated or deleted; an entry is retired by a later entry that names it. `ID` is `YYYYMMDD-slug-of-the-target`: the UTC date, then the redacted target in lowercase letters and digits separated by `-`, shortened to about 40 characters (`investigation` when nothing is left), with `-2`, `-3` appended on collision.
+One investigation is the rows of the `ledger_entries` table in the state database, `mightymodels.db` in the plugin data directory, keyed by the repository, `investigation_id` and `seq`. An investigation has no row of its own: it exists once `start` stores its target as entry 1. No file is written for an investigation, and no row is updated or deleted; an entry is retired by a later entry that names it. `ID` is `YYYYMMDD-slug-of-the-target`: the UTC date, then the redacted target in lowercase letters and digits separated by `-`, shortened to about 40 characters (`investigation` when nothing is left), with `-2`, `-3` appended on collision.
 
 ## Record
 

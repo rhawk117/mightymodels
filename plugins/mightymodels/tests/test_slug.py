@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import main
+from mightymodels_plugin.data_directory import SESSION_DATA_VARIABLE
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.server import TOOLS
 from mightymodels_plugin.slug import (
@@ -151,8 +152,9 @@ LEAKING_REPORT = """## Findings
 
 
 @pytest.fixture
-def project(repository: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def project(repository: Path, data_directory: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(repository))
+    monkeypatch.setenv(SESSION_DATA_VARIABLE, str(data_directory))
     repository.joinpath('outside.jsonl').write_text('', encoding='utf-8')
     return repository
 
@@ -437,7 +439,7 @@ class TestReviewConfinement:
         state = project.joinpath('.mightymodels')
         assert not result.is_error
         assert state.joinpath('.runtime', 'reviews', run).is_dir()
-        assert {path.name for path in state.iterdir()} == {'.runtime', 'mightymodels.db'}
+        assert {path.name for path in state.iterdir()} == {'.runtime'}
 
     def test_slug_confinement_a_run_with_a_ticket_keeps_its_directory_under_the_ticket(
         self, project: Path, state_server: StateServer
@@ -449,7 +451,7 @@ class TestReviewConfinement:
         state = project.joinpath('.mightymodels')
         assert not result.is_error
         assert state.joinpath('retry-queue', 'review', run).is_dir()
-        assert {path.name for path in state.iterdir()} == {'retry-queue', 'mightymodels.db'}
+        assert {path.name for path in state.iterdir()} == {'retry-queue'}
 
     def test_slug_confinement_a_report_with_secrets_is_redacted_in_the_stored_rows(
         self,

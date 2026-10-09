@@ -1,9 +1,13 @@
 """The `state` MCP server the plugin registers in `.mcp.json`: its lifespan state and its tools.
 
-The lifespan builds one workspace, opens the database once and builds each service over what it
-needs of the two when a client connects, and disposes the engine when the client closes. Git is
-optional: inside a repository the state directory is excluded from it, and outside one, or with
-no git binary, the server starts all the same.
+The lifespan opens the state once when a client connects, the workspace at the git toplevel and
+the database in the plugin data directory, builds each service over what it needs of the two, and
+disposes the engine when the client closes.
+
+The server needs a plugin data directory and a git work tree, and with either missing it creates
+nothing and still starts: its lifespan state is then a `StartRefusal`, and every tool call is
+answered with the reason, which names what is missing. An origin remote that names no repository
+and a database file of another schema version are refused the same way.
 
 `AppState` holds one service per tool and nothing else: the workspace and the database are
 reached only through the services built over them.
@@ -16,7 +20,7 @@ name before the tool runs and publishes the closed top level in the served schem
 
 import os
 from collections.abc import AsyncGenerator, Callable
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,7 +28,13 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.tools import Tool
 from pydantic import create_model
 
-from mightymodels_plugin.database import open_database
+from mightymodels_plugin.data_directory import (
+    PLUGIN_DATA_VARIABLE,
+    DataDirectory,
+    data_directory_from,
+)
+from mightymodels_plugin.edge import open_state
+from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.tools.close.service import CloseService
 from mightymodels_plugin.tools.close.tool import close_tool
 from mightymodels_plugin.tools.contract.service import ContractService
@@ -33,6 +43,7 @@ from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.crashout.tool import crashout_tool
 from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.investigation.tool import investigation_tool
+from mightymodels_plugin.tools.protocol import ServedState, StartRefusal
 from mightymodels_plugin.tools.review.service import ReviewService
 from mightymodels_plugin.tools.review.tool import review_tool
 from mightymodels_plugin.tools.snapshot.service import SnapshotService
@@ -41,7 +52,7 @@ from mightymodels_plugin.tools.task.service import TaskService
 from mightymodels_plugin.tools.task.tool import task_tool
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tool import ticket_tool
-from mightymodels_plugin.workspace import find_root, workspace_at
+from mightymodels_plugin.workspace import find_root
 
 SERVER_NAME = 'state'
 TOOLS = (
@@ -82,12 +93,16 @@ def tool_refusing_unknown_arguments(served: Callable[..., object]) -> Tool:
     )
 
 
-def build_server(root: Path) -> MCPServer[AppState]:
+def build_server(start: Path, data_directory: DataDirectory) -> MCPServer[ServedState]:
     @asynccontextmanager
-    async def lifespan(_: MCPServer[AppState]) -> AsyncGenerator[AppState]:
-        workspace = workspace_at(root)
-        workspace.exclude_state_from_git()
-        with open_database(workspace.database_file()) as database:
+    async def lifespan(_: MCPServer[ServedState]) -> AsyncGenerator[ServedState]:
+        with ExitStack() as opened:
+            try:
+                state = opened.enter_context(open_state(start, data_directory))
+            except StateError as error:
+                yield StartRefusal(error=error)
+                return
+            workspace, database = state.workspace, state.database
             yield AppState(
                 tickets=TicketService(workspace=workspace, database=database),
                 tasks=TaskService(workspace=workspace, database=database),
@@ -104,4 +119,5 @@ def build_server(root: Path) -> MCPServer[AppState]:
 
 
 def serve() -> None:
-    build_server(find_root(os.environ, Path.cwd())).run()
+    start = find_root(os.environ, Path.cwd())
+    build_server(start, data_directory_from(os.environ, PLUGIN_DATA_VARIABLE)).run()

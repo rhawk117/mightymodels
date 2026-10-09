@@ -2,6 +2,12 @@
 
 Read before changing a hook, a receipt struct, or any skill script whose files a hook reads. The hooks in `src/mightymodels_plugin/hooks.py` adapt the skill scripts' file contracts; they never define a second state model.
 
+## Where the state database is
+
+The state database is `mightymodels.db` in the plugin data directory, the directory Claude Code names in `CLAUDE_PLUGIN_DATA` for the state server and for hook commands. It is outside every repository and serves all of them: each row carries a repository key, the origin remote's `owner/name` or, with no origin, a hash of the toplevel path. A command run through the Bash tool gets none of the plugin's variables, so the SessionStart hook, `mightymodels session-start`, appends one line to the session's env file (`CLAUDE_ENV_FILE`) that exports the same directory as `MIGHTYMODELS_DATA_DIR`, and `mightymodels verify run` reads that to open the file the server opened. Without the variable, or outside a git work tree, the server answers every tool call with what is missing and `verify run` exits 2 with the same on standard error.
+
+This breaks with earlier versions, which kept the database inside the repository under `.mightymodels/`. That file is not read, imported or changed, so state recorded in it does not carry over, and it can be deleted. The new file carries a schema version stamp, and a file with another stamp is refused by name instead of read.
+
 ## What hooks read
 
 | File                                   | Owner                                                          | Read by                                                               |

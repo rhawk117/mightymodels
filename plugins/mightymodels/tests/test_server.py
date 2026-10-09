@@ -83,7 +83,10 @@ def call_examples(document: Path) -> Generator[CallExample]:
 
 @pytest.fixture(scope='module')
 def published_schemas(tmp_path_factory: pytest.TempPathFactory) -> dict[str, dict[str, object]]:
-    server = StateServer(root=tmp_path_factory.mktemp('plain-directory'))
+    server = StateServer(
+        root=tmp_path_factory.mktemp('plain-directory'),
+        data_directory=tmp_path_factory.mktemp('plugin-data'),
+    )
     return {name: tool.input_schema for name, tool in server.tools().items()}
 
 
@@ -262,26 +265,25 @@ class TestLifespanState:
 
 class TestOutsideARepository:
     @pytest.fixture
-    def state_server(self, tmp_path: Path) -> StateServer:
+    def state_server(self, tmp_path: Path, data_directory: Path) -> StateServer:
         directory = tmp_path.joinpath('plain-directory')
         directory.mkdir()
-        return StateServer(root=directory)
+        return StateServer(root=directory, data_directory=data_directory)
 
-    def test_the_server_lists_its_tools_and_a_ticket_is_written_then_shown(
+    def test_the_server_lists_its_tools_and_refuses_a_ticket_naming_the_missing_repository(
         self, state_server: StateServer
     ) -> None:
         listed = state_server.tools()
-        written, _, shown = ticket_results(
+        written, shown = ticket_results(
             state_server,
             ('ticket', {'action': 'write', 'fields': ANSWERS}),
-            ('ticket', {'action': 'validate'}),
             ('ticket', {'action': 'show'}),
         )
 
         assert sorted(listed) == TOOL_NAMES
-        assert (written.is_error, shown.is_error) == (False, False)
-        assert shown.structured_content['unit']['slug'] == SLUG
-        assert not state_server.root.joinpath('.git').exists()
+        assert (written.is_error, shown.is_error) == (True, True)
+        assert f'{state_server.root} is not inside a git repository' in text_of(written)
+        assert tree(state_server.root) == {}
 
 
 class TestToolCalls:
@@ -473,7 +475,7 @@ class TestToolCalls:
 
         assert result.is_error
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(connected_server.root) == tree_after_the_connect
+        assert connected_server.files_on_disk() == tree_after_the_connect
 
     @pytest.mark.parametrize(
         ('name', 'arguments'),
@@ -492,4 +494,4 @@ class TestToolCalls:
         assert result.is_error
         assert self.UNNAMED_ARGUMENT in text_of(result)
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(connected_server.root) == tree_after_the_connect
+        assert connected_server.files_on_disk() == tree_after_the_connect

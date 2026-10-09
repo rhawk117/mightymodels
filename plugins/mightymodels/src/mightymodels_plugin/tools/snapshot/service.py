@@ -8,8 +8,9 @@ questions are the live entries of the investigations the ticket links, the lates
 and a linked investigation with no ledger is a warning. The answer and subagent sections are in
 the record and read empty: the database holds no row for them yet.
 
-Git is optional. With no git binary, or outside a repository, the repository section is empty and
-a warning says why.
+Git is optional to the service. With no git binary, or outside a repository, the repository
+section is empty and a warning says why. The server refuses sooner: it opens no state without a
+git work tree to key the database by.
 
 The service writes no file. It returns the record, its Markdown and the two paths under the
 ticket's handoffs directory, and the agent writes them. Everything above the class reads no

@@ -9,6 +9,7 @@ class CrashoutRow(Base):
     __tablename__ = 'crashouts'
 
     id: Mapped[Serial]
+    repository_key: Mapped[str]
     at: Mapped[str]
     ticket: Mapped[str | None]
     branch: Mapped[str | None]

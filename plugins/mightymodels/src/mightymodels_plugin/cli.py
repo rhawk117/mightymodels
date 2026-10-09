@@ -1,9 +1,13 @@
 """Command line entry point shared by the MCP server start mode, the hooks and `verify run`."""
 
 import argparse
+import os
 from collections.abc import Sequence
 
+from mightymodels_plugin.commands.session_start import export_data_directory
+
 SERVE_COMMAND = 'serve'
+SESSION_START_COMMAND = 'session-start'
 VERIFY_COMMAND = 'verify'
 RUN_COMMAND = 'run'
 PHASES = ('planning', 'task', 'review', 'landing')
@@ -27,12 +31,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser(SERVE_COMMAND, help='run the state MCP server on standard input and output')
+    commands.add_parser(
+        SESSION_START_COMMAND,
+        help="export the plugin data directory to the session's commands; the SessionStart hook",
+    )
     add_verify_run(commands)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
+    if arguments.command == SESSION_START_COMMAND:
+        return export_data_directory(os.environ)
     if arguments.command == VERIFY_COMMAND:
         from mightymodels_plugin.commands.verify import verify_run  # noqa: PLC0415 - SQLAlchemy and Pydantic cost up to a second to import and `--help` must not pay it
 

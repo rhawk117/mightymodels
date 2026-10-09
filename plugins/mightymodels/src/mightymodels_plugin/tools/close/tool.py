@@ -19,10 +19,11 @@ from mightymodels_plugin.tools.close.schema import CloseAction, CloseView, Closi
 from mightymodels_plugin.tools.close.service import CloseService
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
     MissingArgumentsError,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 
 
@@ -42,8 +43,8 @@ def close_ticket(closings: CloseService, call: CloseCall) -> CloseView:
     return closings.close(call.slug, call.closing)
 
 
-def lifespan_closings(ctx: Context[LifespanState]) -> CloseService:
-    return ctx.request_context.lifespan_context.closings
+def lifespan_closings(ctx: Context[ServedState]) -> CloseService:
+    return served_services(ctx).closings
 
 
 ResolvedClosings = Annotated[CloseService, Resolve(lifespan_closings)]

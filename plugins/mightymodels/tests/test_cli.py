@@ -5,9 +5,11 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import build_parser, main
+from mightymodels_plugin.data_directory import SESSION_DATA_VARIABLE
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.schema import ContractCommand
 from mightymodels_plugin.tools.contract.service import ContractService
+from mightymodels_plugin.workspace import PROJECT_DIR_VARIABLE
 from pytest_mock import MockerFixture
 
 SLUG = 'retry-queue'
@@ -23,14 +25,18 @@ LOADED_PACKAGES = (
 )
 
 
-def loaded_packages(root: Path, *arguments: str) -> str:
+def loaded_packages(root: Path, data_directory: Path, *arguments: str) -> str:
     completed = subprocess.run(  # noqa: S603 - this interpreter runs the package's own entry point with fixed arguments
         [sys.executable, '-c', LOADED_PACKAGES, *arguments],
         check=False,
         capture_output=True,
         text=True,
         cwd=root,
-        env={**os.environ, 'CLAUDE_PROJECT_DIR': str(root)},
+        env={
+            **os.environ,
+            PROJECT_DIR_VARIABLE: str(root),
+            SESSION_DATA_VARIABLE: str(data_directory),
+        },
     )
     return completed.stdout.splitlines()[-1]
 
@@ -89,11 +95,14 @@ class TestVerifyRun:
         assert exit_info.value.code == 2
         assert 'usage: mightymodels verify run' in capsys.readouterr().err
 
-    def test_help_loads_no_database_or_server_package(self, repository: Path) -> None:
-        assert loaded_packages(repository, 'verify', 'run', '--help') == '0 []'
+    def test_help_loads_no_database_or_server_package(
+        self, repository: Path, data_directory: Path
+    ) -> None:
+        assert loaded_packages(repository, data_directory, 'verify', 'run', '--help') == '0 []'
 
     @pytest.mark.usefixtures('approved_command')
-    def test_verify_run_does_not_import_mcp(self, repository: Path) -> None:
-        loaded = loaded_packages(repository, 'verify', 'run', '--slug', SLUG, '--id', 'I1')
+    def test_verify_run_does_not_import_mcp(self, repository: Path, data_directory: Path) -> None:
+        arguments = ('verify', 'run', '--slug', SLUG, '--id', 'I1')
+        loaded = loaded_packages(repository, data_directory, *arguments)
 
         assert loaded == "0 ['pydantic', 'sqlalchemy']"

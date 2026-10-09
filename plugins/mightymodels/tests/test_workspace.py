@@ -9,12 +9,20 @@ from pathlib import Path
 import pytest
 from mcp.types import CallToolResult
 from mightymodels_plugin.cli import main
-from mightymodels_plugin.database import open_database
+from mightymodels_plugin.data_directory import SESSION_DATA_VARIABLE
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.task.tables import TransitionRow
-from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
+from mightymodels_plugin.tools.tests.support import (
+    StateServer,
+    ToolCall,
+    text_of,
+    tree,
+    workspace_database,
+)
 from mightymodels_plugin.workspace import (
+    PROJECT_DIR_VARIABLE,
     OutsideStateDirectoryError,
     RecordFiles,
     UnsafeRevisionError,
@@ -110,6 +118,7 @@ class Escape:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Project:
     server: StateServer
+    data_directory: Path
     marker: Path
 
     def verify_a_started_task(self) -> CallToolResult:
@@ -118,13 +127,21 @@ class Project:
 
     def transitions(self) -> list[tuple[str, str]]:
         query = select(TransitionRow).order_by(TransitionRow.id)
-        database_file = workspace_at(self.server.root).database_file()
-        with open_database(database_file) as database, database.transaction() as session:
+        workspace = workspace_at(self.server.root)
+        with (
+            workspace_database(workspace, self.data_directory) as database,
+            database.transaction() as session,
+        ):
             return [(row.before, row.after) for row in session.scalars(query)]
 
     def command_states(self) -> list[str]:
-        (status,) = slug_results(self.server, STATUS)
-        return [command['state'] for command in status.structured_content['commands']]
+        workspace = workspace_at(self.server.root)
+        with workspace_database(workspace, self.data_directory) as database:
+            status = ContractService(workspace=workspace, database=database).status(TICKET)
+        return [command.state for command in status.commands]
+
+    def created_files(self) -> dict[str, bytes]:
+        return tree(self.server.root) | tree(self.data_directory)
 
     def results_of_the_other_actions(self) -> list[CallToolResult]:
         staged_then_asked = slug_results(self.server, WRITE, VALIDATE, START_TASK, READY, STATUS)
@@ -139,10 +156,17 @@ def outside(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def project(state_server: StateServer, monkeypatch: pytest.MonkeyPatch) -> Project:
-    monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(state_server.root))
+def project(
+    state_server: StateServer, data_directory: Path, monkeypatch: pytest.MonkeyPatch
+) -> Project:
+    monkeypatch.setenv(PROJECT_DIR_VARIABLE, str(state_server.root))
+    monkeypatch.setenv(SESSION_DATA_VARIABLE, str(data_directory))
     slug_results(state_server, APPROVE)
-    return Project(server=state_server, marker=state_server.root.joinpath(MARKER))
+    return Project(
+        server=state_server,
+        data_directory=data_directory,
+        marker=state_server.root.joinpath(MARKER),
+    )
 
 
 class TestSafeRevision:
@@ -222,7 +246,6 @@ class TestSymlinkBelowTheStateDirectory:
             methodcaller('persona_report', None, RUN, name='UNCLE-BOB-REPORT.md'),
             id='run-directory',
         ),
-        pytest.param(('mightymodels.db',), methodcaller('database_file'), id='database'),
         pytest.param((SLUG, 'handoffs'), snapshot_files, id='handoffs'),
         pytest.param(('archives',), first_archive_files, id='archives'),
         pytest.param((SLUG, 'whats-broken.md'), live_debug_note, id='debug-note'),
@@ -363,7 +386,9 @@ class TestHandoffFiles:
 class TestSymlinkedTicket:
     @pytest.fixture
     def ticket_directory(self, connected_server: StateServer) -> Path:
-        return connected_server.root.joinpath('.mightymodels', SLUG)
+        state = connected_server.root.joinpath('.mightymodels')
+        state.mkdir()
+        return state.joinpath(SLUG)
 
     @pytest.fixture
     def empty_directory_outside(
@@ -424,7 +449,7 @@ class TestSymlinkedReviewDirectory:
     @pytest.fixture
     def reviews_directory_outside(self, connected_server: StateServer, outside: Path) -> Escape:
         runtime = connected_server.root.joinpath('.mightymodels', '.runtime')
-        runtime.mkdir()
+        runtime.mkdir(parents=True)
         runtime.joinpath('reviews').symlink_to(outside, target_is_directory=True)
         return Escape(server=connected_server, outside=outside, untouched=tree(outside))
 
@@ -493,15 +518,15 @@ class TestWhenGitIsMissing:
         monkeypatch.setenv('PATH', str(tmp_path.joinpath('no-binaries')))
         return project
 
-    def test_when_git_is_missing_the_server_connects_and_a_ticket_is_written_then_shown(
+    def test_when_git_is_missing_the_server_lists_its_tools_and_refuses_every_ticket_call(
         self, project_without_git: Project
     ) -> None:
         listed = project_without_git.server.tools()
-        written, validated, shown = slug_results(project_without_git.server, WRITE, VALIDATE, SHOW)
+        refused = slug_results(project_without_git.server, WRITE, VALIDATE, SHOW)
 
         assert sorted(listed) == TOOL_NAMES
-        assert [written.is_error, validated.is_error, shown.is_error] == [False, False, False]
-        assert shown.structured_content['unit']['slug'] == SLUG
+        assert [result.is_error for result in refused] == [True, True, True]
+        assert [NEEDS_GIT in text_of(result) for result in refused] == [True, True, True]
 
     def test_when_git_is_missing_task_verify_is_refused_and_records_no_transition(
         self, project_without_git: Project
@@ -510,7 +535,7 @@ class TestWhenGitIsMissing:
 
         assert verified.is_error
         assert NEEDS_GIT in text_of(verified)
-        assert project_without_git.transitions() == [('pending', 'in-progress')]
+        assert project_without_git.transitions() == []
 
     def test_when_git_is_missing_verify_run_is_refused_before_any_command_runs(
         self, project_without_git: Project, capsys: pytest.CaptureFixture[str]
@@ -522,31 +547,30 @@ class TestWhenGitIsMissing:
         assert not project_without_git.marker.exists()
         assert project_without_git.command_states() == ['never-run']
 
-    def test_when_git_is_missing_every_other_action_sees_an_absent_head(
+    def test_when_git_is_missing_every_other_action_is_refused_the_same_way(
         self, project_without_git: Project
     ) -> None:
-        started, ready, status, review = project_without_git.results_of_the_other_actions()
+        refused = project_without_git.results_of_the_other_actions()
 
-        assert [started.is_error, ready.is_error, status.is_error, review.is_error] == [False] * 4
-        assert 'from unknown' in started.structured_content['text']
-        assert status.structured_content['text'].startswith('HEAD unknown\n')
+        assert [result.is_error for result in refused] == [True] * 4
+        assert [NEEDS_GIT in text_of(result) for result in refused] == [True] * 4
 
 
 class TestOutsideARepository:
     @pytest.fixture
-    def state_server(self, tmp_path: Path) -> StateServer:
+    def state_server(self, tmp_path: Path, data_directory: Path) -> StateServer:
         directory = tmp_path.joinpath('plain-directory')
         directory.mkdir()
-        return StateServer(root=directory)
+        return StateServer(root=directory, data_directory=data_directory)
 
-    def test_outside_a_repository_task_verify_is_refused_and_records_no_transition(
+    def test_outside_a_repository_task_verify_is_refused_and_nothing_is_created(
         self, project: Project
     ) -> None:
         verified = project.verify_a_started_task()
 
         assert verified.is_error
         assert NOT_A_REPOSITORY in text_of(verified)
-        assert project.transitions() == [('pending', 'in-progress')]
+        assert project.created_files() == {}
 
     def test_outside_a_repository_verify_run_is_refused_before_any_command_runs(
         self, project: Project, capsys: pytest.CaptureFixture[str]
@@ -555,14 +579,12 @@ class TestOutsideARepository:
 
         assert code == REJECTED
         assert NOT_A_REPOSITORY in capsys.readouterr().err
-        assert not project.marker.exists()
-        assert project.command_states() == ['never-run']
+        assert project.created_files() == {}
 
-    def test_outside_a_repository_every_other_action_sees_an_absent_head(
+    def test_outside_a_repository_every_other_action_is_refused_the_same_way(
         self, project: Project
     ) -> None:
-        started, ready, status, review = project.results_of_the_other_actions()
+        refused = project.results_of_the_other_actions()
 
-        assert [started.is_error, ready.is_error, status.is_error, review.is_error] == [False] * 4
-        assert 'from unknown' in started.structured_content['text']
-        assert status.structured_content['text'].startswith('HEAD unknown\n')
+        assert [result.is_error for result in refused] == [True] * 4
+        assert [NOT_A_REPOSITORY in text_of(result) for result in refused] == [True] * 4

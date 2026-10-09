@@ -3,22 +3,28 @@
 `crashout_transaction` opens a transaction on the database and hands out the repository, which
 holds that transaction's session, so the crashout service never sees a session. `journal` is the
 only write: it adds one row and answers its number, and nothing updates or deletes a crashout.
+
+The repository holds the key of the git repository the database was opened for, and reads and
+writes the journal under that key only. A crashout's number is its place in that repository's
+journal, so each repository counts from 1 whatever the others journaled.
 """
 
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
+from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.tools.crashout.schema import JournaledCrashout
 from mightymodels_plugin.tools.crashout.tables import CrashoutRow
 
 
-def crashout_row(crashout: JournaledCrashout) -> CrashoutRow:
+def crashout_row(crashout: JournaledCrashout, *, repository_key: RepositoryKey) -> CrashoutRow:
     return CrashoutRow(
+        repository_key=repository_key.root,
         at=crashout.at,
         ticket=crashout.ticket,
         branch=crashout.branch,
@@ -35,21 +41,35 @@ def crashout_row(crashout: JournaledCrashout) -> CrashoutRow:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class CrashoutRepository:
     session: Session
+    repository_key: RepositoryKey
 
     def rows(self) -> list[CrashoutRow]:
-        return list(self.session.scalars(select(CrashoutRow).order_by(CrashoutRow.id)))
+        query = (
+            select(CrashoutRow)
+            .where(CrashoutRow.repository_key == self.repository_key.root)
+            .order_by(CrashoutRow.id)
+        )
+        return list(self.session.scalars(query))
 
     def latest_row(self) -> CrashoutRow | None:
-        return self.session.scalars(select(CrashoutRow).order_by(CrashoutRow.id.desc())).first()
+        query = (
+            select(CrashoutRow)
+            .where(CrashoutRow.repository_key == self.repository_key.root)
+            .order_by(CrashoutRow.id.desc())
+        )
+        return self.session.scalars(query).first()
 
     def journal(self, crashout: JournaledCrashout) -> int:
-        row = crashout_row(crashout)
-        self.session.add(row)
-        self.session.flush()
-        return row.id
+        self.session.add(crashout_row(crashout, repository_key=self.repository_key))
+        journaled = (
+            select(func.count())
+            .select_from(CrashoutRow)
+            .where(CrashoutRow.repository_key == self.repository_key.root)
+        )
+        return self.session.scalars(journaled).one()
 
 
 @contextmanager
 def crashout_transaction(database: Database) -> Generator[CrashoutRepository]:
     with database.transaction() as session:
-        yield CrashoutRepository(session=session)
+        yield CrashoutRepository(session=session, repository_key=database.repository_key)

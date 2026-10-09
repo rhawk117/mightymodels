@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from mightymodels_plugin.database import DATABASE_NAME
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.crashout.repository import crashout_transaction
 from mightymodels_plugin.tools.crashout.schema import (
@@ -20,7 +21,7 @@ from mightymodels_plugin.tools.tests.support import (
     text_of,
     tree,
 )
-from mightymodels_plugin.workspace import DATABASE_NAME, STATE_DIRECTORY
+from mightymodels_plugin.workspace import STATE_DIRECTORY
 from pydantic import ValidationError
 
 FAKE_TOKEN = 'ghp_' + 'a' * 36
@@ -137,10 +138,10 @@ class TestAdd:
         assert journaled.corrective_action == 'run the gate  before reporting'
 
     def test_every_free_text_field_is_redacted_before_it_is_stored(
-        self, journal_of_a_leaking_crashout: CrashoutService, repository: Path
+        self, journal_of_a_leaking_crashout: CrashoutService, data_directory: Path
     ) -> None:
         journaled = last_entry(journal_of_a_leaking_crashout)
-        stored = repository.joinpath(STATE_DIRECTORY, DATABASE_NAME).read_bytes()
+        stored = data_directory.joinpath(DATABASE_NAME).read_bytes()
 
         assert journaled.branch == 'fix/[REDACTED:github-token]'
         assert journaled.corrective_action == 'never echo [REDACTED:github-token]'
@@ -148,13 +149,14 @@ class TestAdd:
         assert [secret for secret in self.SECRETS if secret.encode() in stored] == []
 
     def test_a_call_writes_nothing_outside_the_database(
-        self, journal_of_three: CrashoutService, repository: Path
+        self, journal_of_three: CrashoutService, repository: Path, data_directory: Path
     ) -> None:
         journal_of_three.stats()
         journal_of_three.last()
 
         written = {name for name in tree(repository) if not name.startswith('.git/')}
-        assert written == {f'{STATE_DIRECTORY}/{DATABASE_NAME}'}
+        assert written == set()
+        assert set(tree(data_directory)) == {DATABASE_NAME}
         assert not repository.joinpath('.gitignore').exists()
         assert not repository.joinpath(STATE_DIRECTORY, 'crashouts.yml').exists()
 
@@ -266,7 +268,7 @@ class TestRefusals:
             CrashoutEntry.model_validate(entry)
         assert refused.is_error
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(connected_server.root) == tree_after_the_connect
+        assert connected_server.files_on_disk() == tree_after_the_connect
 
     def test_add_without_an_entry_says_what_it_needs(
         self, connected_server: StateServer, database_activity: DatabaseActivity

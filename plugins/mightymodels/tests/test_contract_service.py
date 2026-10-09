@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from mightymodels_plugin.cli import main
+from mightymodels_plugin.data_directory import SESSION_DATA_VARIABLE
 from mightymodels_plugin.errors import StateError
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.schema import ContractCommand
@@ -110,10 +111,12 @@ class Workspace:
 @pytest.fixture
 def workspace(
     contract_service: ContractService,
+    data_directory: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> Workspace:
     monkeypatch.setenv('CLAUDE_PROJECT_DIR', str(contract_service.workspace.root))
+    monkeypatch.setenv(SESSION_DATA_VARIABLE, str(data_directory))
     space = Workspace(contracts=contract_service, capsys=capsys)
     space.point_head(SHA_A)
     return space

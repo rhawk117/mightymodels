@@ -4,7 +4,7 @@ Read when recording or extending a contract, when a run is refused, or before an
 
 ## Storage
 
-Rows in `.mightymodels/mightymodels.db`, in two tables: `contract_commands` and `receipts`. Like everything under `.mightymodels/`, never tracked by git: the state server and `verify run` add the directory to the repository's local exclude file. The task, snapshot and close tools read both tables; the closing archive lists each command with its latest outcome, HEAD and digest.
+Rows in the state database, `mightymodels.db` in the plugin data directory, in two tables: `contract_commands` and `receipts`. The database is outside the repository, so git never sees it, and its rows are keyed by repository. The task, snapshot and close tools read both tables; the closing archive lists each command with its latest outcome, HEAD and digest.
 
 ## Approved commands
 

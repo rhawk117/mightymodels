@@ -14,10 +14,11 @@ from mcp.server.mcpserver import Context, Resolve
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
     MissingArgumentsError,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 from mightymodels_plugin.tools.task.schema import (
     TaskAction,
@@ -62,8 +63,8 @@ def gate_readiness(tasks: TaskService, call: TaskCall) -> TaskView:
     return tasks.ready(call.slug)
 
 
-def lifespan_tasks(ctx: Context[LifespanState]) -> TaskService:
-    return ctx.request_context.lifespan_context.tasks
+def lifespan_tasks(ctx: Context[ServedState]) -> TaskService:
+    return served_services(ctx).tasks
 
 
 ResolvedTasks = Annotated[TaskService, Resolve(lifespan_tasks)]

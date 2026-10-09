@@ -1,6 +1,6 @@
 # ticket.yml schema
 
-The per-ticket source of truth, written once by open-ticket (the `ticket` tool's `write`) from the interview answers, then hand-tweaked by the user and checked by the `ticket` tool's `validate`, which stages the ticket as a row in `.mightymodels/mightymodels.db`. Every later session reads it before doing anything else; agent-file model pins are only the fallback for headless runs where nobody answered.
+The per-ticket source of truth, written once by open-ticket (the `ticket` tool's `write`) from the interview answers, then hand-tweaked by the user and checked by the `ticket` tool's `validate`, which stages the ticket as a row in the state database. Every later session reads it before doing anything else; agent-file model pins are only the fallback for headless runs where nobody answered.
 
 ```yaml
 task: "<slug>"                   # directory name under .mightymodels/

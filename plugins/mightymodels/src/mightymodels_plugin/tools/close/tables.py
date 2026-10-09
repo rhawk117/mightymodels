@@ -8,6 +8,7 @@ from mightymodels_plugin.declarative import Base, Key, Texts
 class ClosingRow(Base):
     __tablename__ = 'closings'
 
+    repository_key: Mapped[Key]
     slug: Mapped[Key]
     closed_at: Mapped[str]
     head: Mapped[str | None]

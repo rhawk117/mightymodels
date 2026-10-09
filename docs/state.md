@@ -23,6 +23,27 @@ unit of work, which is what stops working state from turning into a landfill of 
 └── archives/<task-slug>.md       at most 30 lines, written by prune-ticket
 ```
 
+## The state database
+
+The rows behind a ticket are not in this directory: the staged ticket, its tasks, the
+verification contract and its receipts, review runs, investigation ledgers, crashouts and
+closings. They are in one SQLite file, `mightymodels.db`, in the plugin data directory, the
+directory Claude Code names in `CLAUDE_PLUGIN_DATA` for the plugin's state server. One file
+serves every repository. Each row carries a repository key, the `owner/name` of the origin remote
+or, with no origin, a hash of the checkout's toplevel path, and a read finds only the rows of the
+repository it runs in. `.mightymodels/` itself sits at the git toplevel, whichever directory the
+session started in.
+
+A command run through the Bash tool does not get `CLAUDE_PLUGIN_DATA`. The plugin's SessionStart
+hook exports the same directory as `MIGHTYMODELS_DATA_DIR`, and `mightymodels verify run` reads
+that one. With its variable unset, or outside a git work tree, the server answers every tool call
+with what is missing, and `verify run` exits 2 with the same on standard error.
+
+This breaks with earlier versions, which kept the database inside the repository, under
+`.mightymodels/`. That file is not read, not imported and not changed, so state recorded in it
+does not carry over: stage the ticket again. The old file can be deleted. The new file is stamped
+with a schema version, and a file with another stamp is refused by name instead of read.
+
 ## ticket.yml
 
 Written once by open-ticket through the `ticket` tool's `write`, from the interview answers, then

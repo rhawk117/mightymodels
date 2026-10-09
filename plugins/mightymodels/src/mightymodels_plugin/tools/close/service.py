@@ -10,10 +10,11 @@ are redacted and held to one line each. The ticket's closed status and its closi
 one transaction, and the archive goes back as text with its paths: the service writes no file
 and the agent writes both.
 
-Git is optional. With no git binary, or outside a repository, the branch is not asked about and
-the text says git was not consulted. Inside a repository a branch that is not there has nothing to
-strand, and one git cannot be asked about, for its name or for a read that failed, is a blocker
-that says so.
+Git is optional to the service. With no git binary, or outside a repository, the branch is not
+asked about and the text says git was not consulted. Inside a repository a branch that is not
+there has nothing to strand, and one git cannot be asked about, for its name or for a read that
+failed, is a blocker that says so. The server and `verify run` refuse sooner: neither opens
+the state without a git work tree to key the database by.
 
 Everything above the class reads no service state.
 """

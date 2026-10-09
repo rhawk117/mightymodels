@@ -1,7 +1,12 @@
-"""What every table of `.mightymodels/mightymodels.db` is declared from.
+"""What every table of the state database is declared from.
 
 A domain declares its rows in its own `tables.py` from this base and these column types, and
 `database.py` names every row type it creates a table for.
+
+Every row type has a `repository_key` column, because one database holds the rows of every
+repository. It leads the primary key of a table keyed by names, so the same slug, task id, run id
+or investigation id is a different row in another repository. A table keyed by a serial number
+carries it as a plain column, and the number orders the rows of one repository.
 """
 
 from types import MappingProxyType

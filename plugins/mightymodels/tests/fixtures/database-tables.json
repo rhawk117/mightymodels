@@ -3,19 +3,19 @@
     "type": "table",
     "name": "closings",
     "tbl_name": "closings",
-    "sql": "CREATE TABLE closings (\n\tslug VARCHAR NOT NULL, \n\tclosed_at VARCHAR NOT NULL, \n\thead VARCHAR, \n\tshipped VARCHAR NOT NULL, \n\tpr VARCHAR, \n\tgotchas JSON NOT NULL, \n\tarchive VARCHAR NOT NULL, \n\tPRIMARY KEY (slug)\n)"
+    "sql": "CREATE TABLE closings (\n\trepository_key VARCHAR NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tclosed_at VARCHAR NOT NULL, \n\thead VARCHAR, \n\tshipped VARCHAR NOT NULL, \n\tpr VARCHAR, \n\tgotchas JSON NOT NULL, \n\tarchive VARCHAR NOT NULL, \n\tPRIMARY KEY (repository_key, slug)\n)"
   },
   {
     "type": "table",
     "name": "contract_commands",
     "tbl_name": "contract_commands",
-    "sql": "CREATE TABLE contract_commands (\n\tslug VARCHAR NOT NULL, \n\tcommand_id VARCHAR NOT NULL, \n\ttask_id VARCHAR, \n\targv JSON NOT NULL, \n\texpect_exit INTEGER NOT NULL, \n\ttimeout INTEGER NOT NULL, \n\tapproved_by VARCHAR NOT NULL, \n\tapproved_at VARCHAR NOT NULL, \n\thead VARCHAR, \n\tPRIMARY KEY (slug, command_id)\n)"
+    "sql": "CREATE TABLE contract_commands (\n\trepository_key VARCHAR NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tcommand_id VARCHAR NOT NULL, \n\ttask_id VARCHAR, \n\targv JSON NOT NULL, \n\texpect_exit INTEGER NOT NULL, \n\ttimeout INTEGER NOT NULL, \n\tapproved_by VARCHAR NOT NULL, \n\tapproved_at VARCHAR NOT NULL, \n\thead VARCHAR, \n\tPRIMARY KEY (repository_key, slug, command_id)\n)"
   },
   {
     "type": "table",
     "name": "crashouts",
     "tbl_name": "crashouts",
-    "sql": "CREATE TABLE crashouts (\n\tid INTEGER NOT NULL, \n\tat VARCHAR NOT NULL, \n\tticket VARCHAR, \n\tbranch VARCHAR, \n\tseverity VARCHAR NOT NULL, \n\tverdict VARCHAR NOT NULL, \n\trant VARCHAR NOT NULL, \n\tfailures JSON NOT NULL, \n\troot_cause VARCHAR NOT NULL, \n\tcorrective_action VARCHAR NOT NULL, \n\tbarked_back BOOLEAN NOT NULL, \n\tPRIMARY KEY (id)\n)"
+    "sql": "CREATE TABLE crashouts (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR NOT NULL, \n\tat VARCHAR NOT NULL, \n\tticket VARCHAR, \n\tbranch VARCHAR, \n\tseverity VARCHAR NOT NULL, \n\tverdict VARCHAR NOT NULL, \n\trant VARCHAR NOT NULL, \n\tfailures JSON NOT NULL, \n\troot_cause VARCHAR NOT NULL, \n\tcorrective_action VARCHAR NOT NULL, \n\tbarked_back BOOLEAN NOT NULL, \n\tPRIMARY KEY (id)\n)"
   },
   {
     "type": "index",
@@ -39,37 +39,37 @@
     "type": "table",
     "name": "ledger_entries",
     "tbl_name": "ledger_entries",
-    "sql": "CREATE TABLE ledger_entries (\n\tinvestigation_id VARCHAR NOT NULL, \n\tseq INTEGER NOT NULL, \n\tround INTEGER NOT NULL, \n\tkind VARCHAR NOT NULL, \n\ttext VARCHAR NOT NULL, \n\tsource VARCHAR NOT NULL, \n\tcite VARCHAR, \n\tsupersedes JSON NOT NULL, \n\tat VARCHAR NOT NULL, \n\thead VARCHAR, \n\tPRIMARY KEY (investigation_id, seq)\n)"
+    "sql": "CREATE TABLE ledger_entries (\n\trepository_key VARCHAR NOT NULL, \n\tinvestigation_id VARCHAR NOT NULL, \n\tseq INTEGER NOT NULL, \n\tround INTEGER NOT NULL, \n\tkind VARCHAR NOT NULL, \n\ttext VARCHAR NOT NULL, \n\tsource VARCHAR NOT NULL, \n\tcite VARCHAR, \n\tsupersedes JSON NOT NULL, \n\tat VARCHAR NOT NULL, \n\thead VARCHAR, \n\tPRIMARY KEY (repository_key, investigation_id, seq)\n)"
   },
   {
     "type": "table",
     "name": "receipts",
     "tbl_name": "receipts",
-    "sql": "CREATE TABLE receipts (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tcommand_id VARCHAR NOT NULL, \n\targv JSON NOT NULL, \n\toutcome VARCHAR NOT NULL, \n\texit INTEGER, \n\tduration_ms INTEGER NOT NULL, \n\tstdout_tail VARCHAR NOT NULL, \n\tstderr_tail VARCHAR NOT NULL, \n\tdigest VARCHAR NOT NULL, \n\thead VARCHAR, \n\tphase VARCHAR NOT NULL, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (id)\n)"
+    "sql": "CREATE TABLE receipts (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tcommand_id VARCHAR NOT NULL, \n\targv JSON NOT NULL, \n\toutcome VARCHAR NOT NULL, \n\texit INTEGER, \n\tduration_ms INTEGER NOT NULL, \n\tstdout_tail VARCHAR NOT NULL, \n\tstderr_tail VARCHAR NOT NULL, \n\tdigest VARCHAR NOT NULL, \n\thead VARCHAR, \n\tphase VARCHAR NOT NULL, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (id)\n)"
   },
   {
     "type": "table",
     "name": "review_dispositions",
     "tbl_name": "review_dispositions",
-    "sql": "CREATE TABLE review_dispositions (\n\trun_id VARCHAR NOT NULL, \n\tfinding_id VARCHAR NOT NULL, \n\tdecision VARCHAR NOT NULL, \n\treason VARCHAR NOT NULL, \n\t\"by\" VARCHAR NOT NULL, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (run_id, finding_id)\n)"
+    "sql": "CREATE TABLE review_dispositions (\n\trepository_key VARCHAR NOT NULL, \n\trun_id VARCHAR NOT NULL, \n\tfinding_id VARCHAR NOT NULL, \n\tdecision VARCHAR NOT NULL, \n\treason VARCHAR NOT NULL, \n\t\"by\" VARCHAR NOT NULL, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (repository_key, run_id, finding_id)\n)"
   },
   {
     "type": "table",
     "name": "review_findings",
     "tbl_name": "review_findings",
-    "sql": "CREATE TABLE review_findings (\n\trun_id VARCHAR NOT NULL, \n\tfinding_id VARCHAR NOT NULL, \n\tsources JSON NOT NULL, \n\tseverity VARCHAR NOT NULL, \n\tkind VARCHAR NOT NULL, \n\tsecurity BOOLEAN NOT NULL, \n\ttitle VARCHAR NOT NULL, \n\tlocation VARCHAR NOT NULL, \n\tfix VARCHAR NOT NULL, \n\tverify VARCHAR NOT NULL, \n\tevidence_kind VARCHAR, \n\tevidence_cite VARCHAR, \n\t\"conflict\" VARCHAR, \n\tPRIMARY KEY (run_id, finding_id)\n)"
+    "sql": "CREATE TABLE review_findings (\n\trepository_key VARCHAR NOT NULL, \n\trun_id VARCHAR NOT NULL, \n\tfinding_id VARCHAR NOT NULL, \n\tsources JSON NOT NULL, \n\tseverity VARCHAR NOT NULL, \n\tkind VARCHAR NOT NULL, \n\tsecurity BOOLEAN NOT NULL, \n\ttitle VARCHAR NOT NULL, \n\tlocation VARCHAR NOT NULL, \n\tfix VARCHAR NOT NULL, \n\tverify VARCHAR NOT NULL, \n\tevidence_kind VARCHAR, \n\tevidence_cite VARCHAR, \n\t\"conflict\" VARCHAR, \n\tPRIMARY KEY (repository_key, run_id, finding_id)\n)"
   },
   {
     "type": "table",
     "name": "review_outcomes",
     "tbl_name": "review_outcomes",
-    "sql": "CREATE TABLE review_outcomes (\n\trun_id VARCHAR NOT NULL, \n\tfinding_id VARCHAR NOT NULL, \n\tresult VARCHAR NOT NULL, \n\t\"commit\" VARCHAR NOT NULL, \n\treason VARCHAR NOT NULL, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (run_id, finding_id)\n)"
+    "sql": "CREATE TABLE review_outcomes (\n\trepository_key VARCHAR NOT NULL, \n\trun_id VARCHAR NOT NULL, \n\tfinding_id VARCHAR NOT NULL, \n\tresult VARCHAR NOT NULL, \n\t\"commit\" VARCHAR NOT NULL, \n\treason VARCHAR NOT NULL, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (repository_key, run_id, finding_id)\n)"
   },
   {
     "type": "table",
     "name": "review_runs",
     "tbl_name": "review_runs",
-    "sql": "CREATE TABLE review_runs (\n\trun_id VARCHAR NOT NULL, \n\tslug VARCHAR, \n\tscope VARCHAR NOT NULL, \n\tbase VARCHAR, \n\thead VARCHAR, \n\tdepth VARCHAR NOT NULL, \n\temphasis VARCHAR NOT NULL, \n\tweights JSON NOT NULL, \n\tpersonas JSON NOT NULL, \n\tmodels JSON NOT NULL, \n\tcreated_at VARCHAR NOT NULL, \n\tPRIMARY KEY (run_id)\n)"
+    "sql": "CREATE TABLE review_runs (\n\trepository_key VARCHAR NOT NULL, \n\trun_id VARCHAR NOT NULL, \n\tslug VARCHAR, \n\tscope VARCHAR NOT NULL, \n\tbase VARCHAR, \n\thead VARCHAR, \n\tdepth VARCHAR NOT NULL, \n\temphasis VARCHAR NOT NULL, \n\tweights JSON NOT NULL, \n\tpersonas JSON NOT NULL, \n\tmodels JSON NOT NULL, \n\tcreated_at VARCHAR NOT NULL, \n\tPRIMARY KEY (repository_key, run_id)\n)"
   },
   {
     "type": "index",
@@ -129,24 +129,24 @@
     "type": "table",
     "name": "task_attempts",
     "tbl_name": "task_attempts",
-    "sql": "CREATE TABLE task_attempts (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\ttask_id VARCHAR NOT NULL, \n\tworker VARCHAR NOT NULL, \n\tmode VARCHAR, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (id)\n)"
+    "sql": "CREATE TABLE task_attempts (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR NOT NULL, \n\tslug VARCHAR NOT NULL, \n\ttask_id VARCHAR NOT NULL, \n\tworker VARCHAR NOT NULL, \n\tmode VARCHAR, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (id)\n)"
   },
   {
     "type": "table",
     "name": "task_transitions",
     "tbl_name": "task_transitions",
-    "sql": "CREATE TABLE task_transitions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\ttask_id VARCHAR NOT NULL, \n\t\"before\" VARCHAR NOT NULL, \n\t\"after\" VARCHAR NOT NULL, \n\treasons JSON NOT NULL, \n\thead VARCHAR, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (id)\n)"
+    "sql": "CREATE TABLE task_transitions (\n\tid INTEGER NOT NULL, \n\trepository_key VARCHAR NOT NULL, \n\tslug VARCHAR NOT NULL, \n\ttask_id VARCHAR NOT NULL, \n\t\"before\" VARCHAR NOT NULL, \n\t\"after\" VARCHAR NOT NULL, \n\treasons JSON NOT NULL, \n\thead VARCHAR, \n\tat VARCHAR NOT NULL, \n\tPRIMARY KEY (id)\n)"
   },
   {
     "type": "table",
     "name": "tasks",
     "tbl_name": "tasks",
-    "sql": "CREATE TABLE tasks (\n\tslug VARCHAR NOT NULL, \n\ttask_id VARCHAR NOT NULL, \n\tstatus VARCHAR NOT NULL, \n\towned JSON NOT NULL, \n\tbase VARCHAR, \n\t\"commit\" VARCHAR, \n\treasons JSON NOT NULL, \n\tupdated_at VARCHAR NOT NULL, \n\tPRIMARY KEY (slug, task_id)\n)"
+    "sql": "CREATE TABLE tasks (\n\trepository_key VARCHAR NOT NULL, \n\tslug VARCHAR NOT NULL, \n\ttask_id VARCHAR NOT NULL, \n\tstatus VARCHAR NOT NULL, \n\towned JSON NOT NULL, \n\tbase VARCHAR, \n\t\"commit\" VARCHAR, \n\treasons JSON NOT NULL, \n\tupdated_at VARCHAR NOT NULL, \n\tPRIMARY KEY (repository_key, slug, task_id)\n)"
   },
   {
     "type": "table",
     "name": "tickets",
     "tbl_name": "tickets",
-    "sql": "CREATE TABLE tickets (\n\tslug VARCHAR NOT NULL, \n\tstatus VARCHAR NOT NULL, \n\tticket VARCHAR NOT NULL, \n\tsummary VARCHAR NOT NULL, \n\tbranch VARCHAR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tplan_first BOOLEAN NOT NULL, \n\tissue INTEGER, \n\tjira VARCHAR, \n\tmodels JSON NOT NULL, \n\tcontext JSON NOT NULL, \n\tinvestigations JSON NOT NULL, \n\tvalidated_at VARCHAR NOT NULL, \n\tPRIMARY KEY (slug)\n)"
+    "sql": "CREATE TABLE tickets (\n\trepository_key VARCHAR NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tstatus VARCHAR NOT NULL, \n\tticket VARCHAR NOT NULL, \n\tsummary VARCHAR NOT NULL, \n\tbranch VARCHAR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tplan_first BOOLEAN NOT NULL, \n\tissue INTEGER, \n\tjira VARCHAR, \n\tmodels JSON NOT NULL, \n\tcontext JSON NOT NULL, \n\tinvestigations JSON NOT NULL, \n\tvalidated_at VARCHAR NOT NULL, \n\tPRIMARY KEY (repository_key, slug)\n)"
   }
 ]

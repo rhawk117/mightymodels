@@ -13,6 +13,7 @@ type EntryNumbers = Annotated[list[int], mapped_column(JSON)]
 class LedgerEntryRow(Base):
     __tablename__ = 'ledger_entries'
 
+    repository_key: Mapped[Key]
     investigation_id: Mapped[Key]
     seq: Mapped[Serial]
     round: Mapped[int]

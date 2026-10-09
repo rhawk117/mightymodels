@@ -66,8 +66,8 @@ ticket through the `ticket` tool, as open-ticket does. Call
  "fields": {"summary": "...", "scope": "sm", "compaction": false, "branch": "...", "context": ["..."]}}
 ```
 
-Then call it again with action `validate`, which stages the ticket as a row in
-`.mightymodels/mightymodels.db`:
+Then call it again with action `validate`, which stages the ticket as a row in the state
+database:
 
 ```json
 {"action": "validate", "slug": "SLUG"}

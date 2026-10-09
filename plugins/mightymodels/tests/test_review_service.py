@@ -127,8 +127,9 @@ class Workspace:
 
 
 def run_state(workspace: Workspace, run: RunId) -> dict[str, object]:
-    with workspace.reviews.database.transaction() as session:
-        row = session.get(ReviewRunRow, run.root)
+    database = workspace.reviews.database
+    with database.transaction() as session:
+        row = session.get(ReviewRunRow, (database.repository_key.root, run.root))
         assert row is not None
         return {
             'personas': row.personas,
@@ -166,8 +167,9 @@ def commit(workspace: Workspace) -> str:
 def pin_models(workspace: Workspace, models: Mapping[str, str | None]) -> None:
     workspace.tickets.write(Slug(SLUG), ANSWERS)
     workspace.tickets.validate(Slug(SLUG))
-    with workspace.reviews.database.transaction() as session:
-        row = session.get(TicketRow, SLUG)
+    database = workspace.reviews.database
+    with database.transaction() as session:
+        row = session.get(TicketRow, (database.repository_key.root, SLUG))
         assert row is not None
         row.models = dict(models)
 
@@ -360,8 +362,10 @@ class TestDecidedBy:
         run = workspace.start(depth='deep')
         workspace.add(run, [finding('MV-1', 'High', 'a.py:1')])
         workspace.dispose(run, by=self.LEAKING_BY, decisions={'F1': {'decision': 'fix'}})
-        with workspace.reviews.database.transaction() as session:
-            row = session.get(ReviewDispositionRow, (run.root, 'F1'))
+        database = workspace.reviews.database
+        with database.transaction() as session:
+            key = (database.repository_key.root, run.root, 'F1')
+            row = session.get(ReviewDispositionRow, key)
             assert row is not None
             return row.by
 

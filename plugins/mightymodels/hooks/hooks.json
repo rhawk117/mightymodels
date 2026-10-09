@@ -1,0 +1,15 @@
+{
+  "description": "mightymodels: export the plugin data directory to the session's commands, so `mightymodels verify run` opens the database the state server keeps.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels\" session-start"
+          }
+        ]
+      }
+    ]
+  }
+}

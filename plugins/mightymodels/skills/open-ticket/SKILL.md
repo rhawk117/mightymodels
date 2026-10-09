@@ -16,8 +16,8 @@ description: >-
 # open-ticket
 
 Turn an understood problem into a unit of work that this session or a later one can pick up
-cold. Everything durable lands in `ticket.yml`, the ticket's row in `.mightymodels/mightymodels.db`,
-and the tracker; what happens next is the user's call, asked at the end.
+cold. Everything durable lands in `ticket.yml`, the ticket's row in the state database, and the
+tracker; what happens next is the user's call, asked at the end.
 
 Read `references/ticket-schema.md` and `references/mightymodels-dir.md` before the first run
 in a session; they are the contract this skill instantiates. State goes through the plugin's MCP
@@ -147,9 +147,9 @@ Call `mcp__plugin_mightymodels_state__ticket` with action `validate`:
 ```
 
 It parses ticket.yml in the canonical subset the schema describes, checks every field and every
-linked investigation, and stages the ticket as a row in `.mightymodels/mightymodels.db`. A hand
-edit outside the subset is reported with its line; fix it rather than working around it. The
-ticket is not staged until this passes.
+linked investigation, and stages the ticket as a row in the state database. A hand edit outside
+the subset is reported with its line; fix it rather than working around it. The ticket is not
+staged until this passes.
 
 ## What next
 

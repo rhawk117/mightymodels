@@ -14,10 +14,11 @@ from mcp.server.mcpserver import Context, Resolve
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
     MissingArgumentsError,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 from mightymodels_plugin.tools.ticket.schema import (
     TicketAction,
@@ -57,8 +58,8 @@ def update_ticket_context(tickets: TicketService, call: TicketCall) -> TicketVie
     return tickets.update_context(call.slug, call.fields)
 
 
-def lifespan_tickets(ctx: Context[LifespanState]) -> TicketService:
-    return ctx.request_context.lifespan_context.tickets
+def lifespan_tickets(ctx: Context[ServedState]) -> TicketService:
+    return served_services(ctx).tickets
 
 
 ResolvedTickets = Annotated[TicketService, Resolve(lifespan_tickets)]

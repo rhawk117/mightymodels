@@ -1,7 +1,7 @@
 """The snapshot service against a real git repository, with the tests moved from snapshot.py's."""
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
@@ -38,10 +38,11 @@ from mightymodels_plugin.tools.snapshot.service import SnapshotService
 from mightymodels_plugin.tools.task.repository import Attempt, Transition, task_transaction
 from mightymodels_plugin.tools.task.schema import Implementer, Status, TaskMark, TaskStart
 from mightymodels_plugin.tools.task.service import TaskService
-from mightymodels_plugin.tools.tests.support import StateServer, text_of, tree
+from mightymodels_plugin.tools.tests.support import StateServer, text_of
 from mightymodels_plugin.tools.ticket.repository import NotStagedError, ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import TicketAnswers
 from mightymodels_plugin.tools.ticket.service import TicketService, unit_of
+from mightymodels_plugin.workspace import workspace_at
 
 type GitRunner = Callable[..., str]
 
@@ -208,7 +209,7 @@ class TestAnUnstagedTicket:
 
         assert refused.is_error
         assert 'String should match pattern' in text_of(refused)
-        assert tree(connected_server.root) == tree_after_the_connect
+        assert connected_server.files_on_disk() == tree_after_the_connect
 
 
 class TestAStagedTicket:
@@ -496,7 +497,7 @@ class TestWhenGitIsMissing:
         self, repo: Handoff, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> Handoff:
         monkeypatch.setenv('PATH', str(tmp_path.joinpath('no-binaries')))
-        return repo
+        return replace(repo, snapshots=replace(repo.snapshots, workspace=workspace_at(repo.root)))
 
     def test_when_git_is_missing_the_repository_section_is_empty_and_a_warning_says_why(
         self, repo_without_git: Handoff

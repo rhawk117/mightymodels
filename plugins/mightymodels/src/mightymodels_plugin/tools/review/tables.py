@@ -11,6 +11,7 @@ from mightymodels_plugin.declarative import Base, Key, Models, Texts, Weights
 class ReviewRunRow(Base):
     __tablename__ = 'review_runs'
 
+    repository_key: Mapped[Key]
     run_id: Mapped[Key]
     slug: Mapped[str | None]
     scope: Mapped[str]
@@ -27,6 +28,7 @@ class ReviewRunRow(Base):
 class ReviewFindingRow(Base):
     __tablename__ = 'review_findings'
 
+    repository_key: Mapped[Key]
     run_id: Mapped[Key]
     finding_id: Mapped[Key]
     sources: Mapped[Texts]
@@ -45,6 +47,7 @@ class ReviewFindingRow(Base):
 class ReviewDispositionRow(Base):
     __tablename__ = 'review_dispositions'
 
+    repository_key: Mapped[Key]
     run_id: Mapped[Key]
     finding_id: Mapped[Key]
     decision: Mapped[str]
@@ -56,6 +59,7 @@ class ReviewDispositionRow(Base):
 class ReviewOutcomeRow(Base):
     __tablename__ = 'review_outcomes'
 
+    repository_key: Mapped[Key]
     run_id: Mapped[Key]
     finding_id: Mapped[Key]
     result: Mapped[str]

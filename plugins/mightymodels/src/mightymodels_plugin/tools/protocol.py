@@ -16,12 +16,19 @@ built and dispatches through `dispatch_to_service`, and the service opens its ow
 `LifespanState` is what the tools need from the server's lifespan state: one service per tool
 and nothing else. The server's `AppState` satisfies it, and it is declared here because the server
 imports the tools.
+
+A server that could not open its state still starts, so that the reason reaches whoever calls a
+tool. Its lifespan state is then a `StartRefusal` holding that reason. Every tool reaches its
+service through `served_services`, which is the one place that tells the two apart: it hands out
+the services, or raises the refusal as a `ToolError` before the tool does anything.
 """
 
 from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 
 from mightymodels_plugin.errors import StateError
@@ -75,6 +82,21 @@ class LifespanState(Protocol):
 
     @property
     def crashouts(self) -> CrashoutService: ...
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class StartRefusal:
+    error: StateError
+
+
+type ServedState = LifespanState | StartRefusal
+
+
+def served_services(ctx: Context[ServedState]) -> LifespanState:
+    served = ctx.request_context.lifespan_context
+    if isinstance(served, StartRefusal):
+        raise ToolError(str(served.error)) from served.error
+    return served
 
 
 @contextmanager

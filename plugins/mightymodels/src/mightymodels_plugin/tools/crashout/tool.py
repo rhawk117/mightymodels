@@ -18,10 +18,11 @@ from mightymodels_plugin.tools.crashout.schema import CrashoutAction, CrashoutEn
 from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
     MissingArgumentsError,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 
 
@@ -44,8 +45,8 @@ def show_last_crashout(crashouts: CrashoutService, _call: CrashoutCall) -> Crash
     return crashouts.last()
 
 
-def lifespan_crashouts(ctx: Context[LifespanState]) -> CrashoutService:
-    return ctx.request_context.lifespan_context.crashouts
+def lifespan_crashouts(ctx: Context[ServedState]) -> CrashoutService:
+    return served_services(ctx).crashouts
 
 
 ResolvedCrashouts = Annotated[CrashoutService, Resolve(lifespan_crashouts)]

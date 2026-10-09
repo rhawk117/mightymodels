@@ -32,9 +32,7 @@ from mightymodels_plugin.tools.tests.support import (
     DatabaseActivity,
     StateServer,
     text_of,
-    tree,
 )
-from mightymodels_plugin.workspace import DATABASE_NAME, STATE_DIRECTORY
 
 type GitRunner = Callable[..., str]
 
@@ -91,7 +89,7 @@ class Workspace:
             return recorded_ledger(repository, investigation).records
 
     def database_bytes(self) -> bytes:
-        return self.root.joinpath(STATE_DIRECTORY, DATABASE_NAME).read_bytes()
+        return Path(str(self.investigations.database.engine.url.database)).read_bytes()
 
 
 def added_empty_round(workspace: Workspace, investigation: Slug) -> str:
@@ -500,11 +498,11 @@ class TestWhereHeadIsRead:
 
     @pytest.fixture
     def in_a_worktree(
-        self, committed: Committed, tmp_path: Path, git: GitRunner
+        self, committed: Committed, tmp_path: Path, data_directory: Path, git: GitRunner
     ) -> Generator[Committed]:
         linked = tmp_path.joinpath('feature')
         committed.workspace.git('worktree', 'add', '--quiet', str(linked), '-b', 'feature')
-        with investigation_service_at(linked) as investigations:
+        with investigation_service_at(linked, data_directory) as investigations:
             yield Committed(
                 workspace=Workspace(investigations=investigations, runner=git), head=committed.head
             )
@@ -808,4 +806,4 @@ class TestTheTool:
 
         assert refused.is_error
         assert ActivityKind.TRANSACTION_OPENED not in database_activity.kinds()
-        assert tree(connected_server.root) == tree_after_the_connect
+        assert connected_server.files_on_disk() == tree_after_the_connect

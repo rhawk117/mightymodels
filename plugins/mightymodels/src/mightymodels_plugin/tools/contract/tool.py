@@ -16,10 +16,11 @@ from mightymodels_plugin.tools.contract.schema import ContractAction, ContractCo
 from mightymodels_plugin.tools.contract.service import ContractService
 from mightymodels_plugin.tools.protocol import (
     ActionTool,
-    LifespanState,
     MissingArgumentsError,
+    ServedState,
     ServiceHandler,
     dispatch_to_service,
+    served_services,
 )
 
 
@@ -39,8 +40,8 @@ def report_status(contracts: ContractService, call: ContractCall) -> ContractVie
     return contracts.status(call.slug)
 
 
-def lifespan_contracts(ctx: Context[LifespanState]) -> ContractService:
-    return ctx.request_context.lifespan_context.contracts
+def lifespan_contracts(ctx: Context[ServedState]) -> ContractService:
+    return served_services(ctx).contracts
 
 
 ResolvedContracts = Annotated[ContractService, Resolve(lifespan_contracts)]

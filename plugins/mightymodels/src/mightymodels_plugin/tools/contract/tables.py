@@ -8,6 +8,7 @@ from mightymodels_plugin.declarative import Base, Indexed, Key, Serial, Texts
 class CommandRow(Base):
     __tablename__ = 'contract_commands'
 
+    repository_key: Mapped[Key]
     slug: Mapped[Key]
     command_id: Mapped[Key]
     task_id: Mapped[str | None]
@@ -23,6 +24,7 @@ class ReceiptRow(Base):
     __tablename__ = 'receipts'
 
     id: Mapped[Serial]
+    repository_key: Mapped[str]
     slug: Mapped[Indexed]
     command_id: Mapped[str]
     argv: Mapped[Texts]

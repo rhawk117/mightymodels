@@ -128,21 +128,23 @@ def started_investigation(investigation_service: InvestigationService) -> None:
 
 
 @pytest.fixture
-def worktree_workspace(repository: Path, tmp_path: Path, git: GitRunner) -> Generator[Workspace]:
+def worktree_workspace(
+    repository: Path, tmp_path: Path, data_directory: Path, git: GitRunner
+) -> Generator[Workspace]:
     identity = ('-c', 'user.name=test', '-c', 'user.email=test@example.com')
     git(repository, *identity, 'commit', '--quiet', '--allow-empty', '-m', 'base')
     worktree = tmp_path.joinpath('feature')
     git(repository, 'worktree', 'add', '--quiet', str(worktree), '-b', 'feature')
     repository.joinpath('.git', 'info', 'exclude').unlink(missing_ok=True)
-    with ticket_service_at(worktree) as tickets:
+    with ticket_service_at(worktree, data_directory) as tickets:
         yield Workspace(tickets=tickets)
 
 
 @pytest.fixture
-def workspace_outside_a_repository(tmp_path: Path) -> Generator[Workspace]:
+def workspace_outside_a_repository(tmp_path: Path, data_directory: Path) -> Generator[Workspace]:
     directory = tmp_path.joinpath('plain-directory')
     directory.mkdir()
-    with ticket_service_at(directory) as tickets:
+    with ticket_service_at(directory, data_directory) as tickets:
         yield Workspace(tickets=tickets)
 
 

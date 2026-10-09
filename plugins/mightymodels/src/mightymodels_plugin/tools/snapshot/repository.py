@@ -2,7 +2,8 @@
 
 A snapshot stores nothing and has no table. `snapshot_transaction` opens one transaction on the
 database and hands out the five domains' repositories, all built here on that transaction's
-session, so the snapshot service never sees a session and one transaction serves every read.
+session, so the snapshot service never sees a session and one transaction serves every read. Each
+of the five holds the key of the git repository the database was opened for.
 
 The repository holds that session because the close domain builds its own repository over it:
 closing a ticket reads the same rows and writes in the same transaction.
@@ -35,15 +36,24 @@ class SnapshotRepository:
 @contextmanager
 def snapshot_transaction(database: Database) -> Generator[SnapshotRepository]:
     with database.transaction() as session:
-        tickets = TicketRepository(session=session)
-        contracts = ContractRepository(session=session)
+        repository_key = database.repository_key
+        tickets = TicketRepository(session=session, repository_key=repository_key)
+        contracts = ContractRepository(session=session, repository_key=repository_key)
         yield SnapshotRepository(
             session=session,
             tickets=tickets,
-            tasks=TaskRepository(session=session, tickets=tickets, contracts=contracts),
+            tasks=TaskRepository(
+                session=session,
+                repository_key=repository_key,
+                tickets=tickets,
+                contracts=contracts,
+            ),
             contracts=contracts,
             reviews=ReviewRepository(
-                session=session, tickets=tickets, decisions=DecisionRepository(session=session)
+                session=session,
+                repository_key=repository_key,
+                tickets=tickets,
+                decisions=DecisionRepository(session=session, repository_key=repository_key),
             ),
-            investigations=InvestigationRepository(session=session),
+            investigations=InvestigationRepository(session=session, repository_key=repository_key),
         )

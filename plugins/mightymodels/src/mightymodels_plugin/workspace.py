@@ -1,6 +1,12 @@
 """The repository the plugin works in: where it is, its paths under `.mightymodels/`, and git.
 
 Each edge builds one workspace, the server in its lifespan and `verify run` for its one command.
+An edge starts wherever the session did, which may be a subdirectory, so it asks `Git.checkout`
+where it is and builds the workspace at the toplevel: `.mightymodels/` sits there whatever
+directory the edge started in. With no git executable, or outside a work tree, the answer is the
+refusal. A `Checkout` is the toplevel and the origin remote's URL, and its `repository_key` names
+the repository for the state database: from the origin when there is one, and from the toplevel
+path otherwise.
 
 Every path under the state directory comes whole from `contained_in`, which resolves it and
 refuses one that leaves the resolved state directory, so a symlink planted below it carries no
@@ -17,13 +23,16 @@ Resolving the report would hide that its last part is one, so `Workspace.persona
 the name as the reviewer wrote it before resolving it, and hands out a contained file only when
 that name is no symlink.
 
-Git runs in `Git._answer` and nowhere else. A missing git binary is an answer without an exit
-code, never an exception, so HEAD is absent there as it is outside a repository or before the
-first commit. An operation that cannot work without git asks `Git.refusal` first and raises what
-it returns, and one that can says in its result that git was not consulted.
+Git runs in `Git._answer` and nowhere else. `git_at` looks the executable up on PATH once, and
+every call of that `Git` and of the workspace built from it runs what was found. A missing git
+binary is an answer without an exit code, never an exception, so HEAD is absent there as it is
+outside a repository or before the first commit. An operation that cannot work without git asks
+`Git.refusal` first and raises what it returns, and one that can says in its result that git was
+not consulted.
 """
 
 import re
+import shutil
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -31,13 +40,20 @@ from enum import StrEnum, auto
 from pathlib import Path
 
 from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.repository_key import (
+    RepositoryKey,
+    UnusableOriginError,
+    local_key,
+    origin_key,
+)
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import ARCHIVES_DIRECTORY, Slug
 
 PROJECT_DIR_VARIABLE = 'CLAUDE_PROJECT_DIR'
 STATE_DIRECTORY = '.mightymodels'
 RUNTIME_DIRECTORY = '.runtime'
-DATABASE_NAME = 'mightymodels.db'
+GIT_EXECUTABLE = 'git'
+GIT_NOT_FOUND = 'no git executable is on PATH'
 TICKET_FILE = 'ticket.yml'
 TICKET_DRAFT = f'{TICKET_FILE}.tmp'
 EXCLUDE_LINE = f'{STATE_DIRECTORY}/'
@@ -96,6 +112,20 @@ class GitAnswer:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class Checkout:
+    toplevel: Path
+    origin_url: str | None
+
+    def repository_key(self) -> RepositoryKey:
+        if self.origin_url is None:
+            return local_key(self.toplevel)
+        key = origin_key(self.origin_url)
+        if isinstance(key, UnusableOriginError):
+            raise key
+        return key
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class PersonaReport:
     relative: str
     file: Path | None
@@ -145,17 +175,17 @@ def exclude_state(common_directory: Path) -> None:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Git:
     root: Path
+    executable: str | None
 
     def _answer(self, *arguments: str) -> GitAnswer:
-        try:
-            completed = subprocess.run(  # noqa: S603 - fixed git argv, every argument is a separate word and revisions are checked plain names
-                ['git', '-C', str(self.root), *arguments],  # noqa: S607 - git is resolved from PATH like every other tool the plugin runs
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except FileNotFoundError as error:
-            return GitAnswer(exit=None, stdout='', stderr=str(error))
+        if self.executable is None:
+            return GitAnswer(exit=None, stdout='', stderr=GIT_NOT_FOUND)
+        completed = subprocess.run(  # noqa: S603 - fixed git argv, every argument is a separate word and revisions are checked plain names
+            [self.executable, '-C', str(self.root), *arguments],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
         return GitAnswer(
             exit=completed.returncode, stdout=completed.stdout, stderr=completed.stderr
         )
@@ -167,6 +197,19 @@ class Git:
         if answer.exit != 0:
             return NotARepositoryError(self.root, answer.stderr.strip())
         return None
+
+    def checkout(self) -> Checkout | GitRefusal:
+        toplevel = self._answer('rev-parse', '--show-toplevel')
+        if toplevel.exit is None:
+            return GitMissingError()
+        if toplevel.exit != 0:
+            return NotARepositoryError(self.root, toplevel.stderr.strip())
+        origin = self._answer('config', '--get', 'remote.origin.url')
+        url = origin.stdout.removesuffix('\n')
+        return Checkout(
+            toplevel=Path(toplevel.stdout.removesuffix('\n')).resolve(),
+            origin_url=url if origin.exit == 0 and url else None,
+        )
 
     def common_directory(self) -> Path | None:
         answer = self._answer('rev-parse', '--path-format=absolute', '--git-common-dir')
@@ -254,9 +297,6 @@ class Workspace:
     def relative_to_root(self, contained: Path) -> str:
         return str(Path(STATE_DIRECTORY).joinpath(contained.relative_to(self._state_directory)))
 
-    def database_file(self) -> Path:
-        return self.contained(DATABASE_NAME)
-
     def ticket_file(self, slug: Slug) -> Path:
         return self.contained(slug.root, TICKET_FILE)
 
@@ -285,12 +325,19 @@ class Workspace:
         exclude_state(common_directory)
 
 
-def workspace_at(root: Path) -> Workspace:
-    resolved = root.resolve()
-    state_directory = resolved.joinpath(STATE_DIRECTORY).resolve()
+def git_at(root: Path) -> Git:
+    return Git(root=root.resolve(), executable=shutil.which(GIT_EXECUTABLE))
+
+
+def workspace_of(git: Git) -> Workspace:
+    state_directory = git.root.joinpath(STATE_DIRECTORY).resolve()
     return Workspace(
-        root=resolved,
+        root=git.root,
         _state_directory=state_directory,
-        git=Git(root=resolved),
+        git=git,
         handoffs=HandoffFiles(_state_directory=state_directory),
     )
+
+
+def workspace_at(root: Path) -> Workspace:
+    return workspace_of(git_at(root))

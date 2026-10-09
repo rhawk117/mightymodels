@@ -4,10 +4,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from mightymodels_plugin.database import open_database
+from mightymodels_plugin.database import DATABASE_NAME, open_database
+from mightymodels_plugin.repository_key import local_key
 from mightymodels_plugin.tools.tests.support import StateServer
 from mightymodels_plugin.workspace import (
-    DATABASE_NAME,
     EXCLUDE_LINE,
     STATE_DIRECTORY,
     NotARepositoryError,
@@ -78,10 +78,10 @@ class TestOpenRepository:
     def exclude_without_a_trailing_newline(self, repository: Path) -> None:
         repository.joinpath('.git', 'info', 'exclude').write_text('*.log', encoding='utf-8')
 
-    def test_creates_the_database(self, repository: Path, state_server: StateServer) -> None:
+    def test_creates_the_database(self, data_directory: Path, state_server: StateServer) -> None:
         state_server.connect()
 
-        assert repository.joinpath(STATE_DIRECTORY, DATABASE_NAME).is_file()
+        assert data_directory.joinpath(DATABASE_NAME).is_file()
 
     def test_excludes_the_state_directory_from_git(
         self, repository: Path, state_server: StateServer
@@ -112,12 +112,12 @@ class TestOpenRepository:
         assert self.exclude_lines(repository) == ['*.log', EXCLUDE_LINE]
 
     def test_linked_worktree_writes_to_the_common_git_dir(
-        self, repository: Path, worktree: Path
+        self, repository: Path, worktree: Path, data_directory: Path
     ) -> None:
-        StateServer(root=worktree).connect()
+        StateServer(root=worktree, data_directory=data_directory).connect()
 
         assert EXCLUDE_LINE in self.exclude_lines(repository)
-        assert worktree.joinpath(STATE_DIRECTORY, DATABASE_NAME).is_file()
+        assert data_directory.joinpath(DATABASE_NAME).is_file()
 
 
 class TestOpenDatabase:
@@ -127,29 +127,29 @@ class TestOpenDatabase:
     @pytest.fixture
     def master_rows_of_a_fresh_database(self, tmp_path: Path) -> list[MasterRow]:
         database_file = tmp_path.joinpath('fresh', DATABASE_NAME)
-        with open_database(database_file) as opened, opened.engine.connect() as connection:
+        opening = open_database(database_file, local_key(tmp_path))
+        with opening as opened, opened.engine.connect() as connection:
             return [dict(row) for row in connection.execute(self.MASTER_ROWS).mappings()]
 
     @pytest.fixture
-    def root_with_url_characters(self, tmp_path: Path, git: GitRunner) -> Path:
-        root = tmp_path.joinpath('odd?mode=memory#cache')
-        root.mkdir()
-        git(root, 'init', '--quiet')
-        return root
+    def data_directory_with_url_characters(self, tmp_path: Path) -> Path:
+        return tmp_path.joinpath('odd?mode=memory#cache')
 
-    def test_finds_the_database_in_a_repository_whose_path_has_url_characters(
-        self, root_with_url_characters: Path, tmp_path: Path
+    def test_finds_the_database_in_a_data_directory_whose_path_has_url_characters(
+        self, data_directory_with_url_characters: Path, tmp_path: Path
     ) -> None:
-        database = root_with_url_characters.joinpath(STATE_DIRECTORY, DATABASE_NAME)
+        database = data_directory_with_url_characters.joinpath(DATABASE_NAME)
 
-        with open_database(workspace_at(root_with_url_characters).database_file()) as opened:
+        with open_database(database, local_key(tmp_path)) as opened:
             located = opened.engine.url.database
 
         assert located == str(database)
         assert database.stat().st_size > 0
-        assert [path.name for path in tmp_path.iterdir()] == [root_with_url_characters.name]
+        assert [path.name for path in tmp_path.iterdir()] == [
+            data_directory_with_url_characters.name
+        ]
 
-    def test_database_tables_of_a_fresh_database_equal_the_snapshot_taken_before_the_rework(
+    def test_database_tables_of_a_fresh_database_equal_the_snapshot(
         self, master_rows_of_a_fresh_database: list[MasterRow]
     ) -> None:
         assert master_rows_of_a_fresh_database == json.loads(

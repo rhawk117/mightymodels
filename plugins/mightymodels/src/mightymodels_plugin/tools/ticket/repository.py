@@ -2,7 +2,8 @@
 
 `ticket_transaction` opens a transaction on the database and hands out the repository, so the
 ticket service never sees a session. A domain that reads ticket rows inside its own transaction
-builds a `TicketRepository` on that transaction's session.
+builds a `TicketRepository` on that transaction's session. The repository holds the key of the
+git repository the database was opened for, and reads and writes rows under that key only.
 
 A closed ticket is final. `unclosed_row` hands out the row of a ticket that still takes work and
 refuses a closed one, and `mark_in_progress` writes through it, so no closed ticket reads in
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.errors import StateError
+from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.investigation.repository import InvestigationRepository
 from mightymodels_plugin.tools.ticket.schema import TicketSection, TicketStatus
@@ -44,9 +46,10 @@ class ClosedTicketError(StateError):
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TicketRepository:
     session: Session
+    repository_key: RepositoryKey
 
     def row(self, slug: Slug) -> TicketRow | None:
-        return self.session.get(TicketRow, slug.root)
+        return self.session.get(TicketRow, (self.repository_key.root, slug.root))
 
     def staged_row(self, slug: Slug) -> TicketRow:
         row = self.row(slug)
@@ -65,6 +68,7 @@ class TicketRepository:
         previous = [] if existing is None else existing.investigations
         added = [investigation for investigation in declared if investigation not in previous]
         row = TicketRow(
+            repository_key=self.repository_key.root,
             slug=slug.root,
             status=TicketStatus.STAGED if existing is None else existing.status,
             ticket=section.ticket,
@@ -82,7 +86,9 @@ class TicketRepository:
         return self.session.merge(row)
 
     def unrecorded_investigations(self, linked: Iterable[Slug]) -> list[Slug]:
-        investigations = InvestigationRepository(session=self.session)
+        investigations = InvestigationRepository(
+            session=self.session, repository_key=self.repository_key
+        )
         return [slug for slug in linked if not investigations.has_entries(slug)]
 
     def mark_in_progress(self, slug: Slug) -> None:
@@ -95,4 +101,4 @@ class TicketRepository:
 @contextmanager
 def ticket_transaction(database: Database) -> Generator[TicketRepository]:
     with database.transaction() as session:
-        yield TicketRepository(session=session)
+        yield TicketRepository(session=session, repository_key=database.repository_key)
