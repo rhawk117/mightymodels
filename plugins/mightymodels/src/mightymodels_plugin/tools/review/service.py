@@ -3,6 +3,7 @@
 A run records its scope, depth, persona weights and reviewer models at HEAD. `add` reads a
 persona's report from the run directory and records its findings; the reports and the metrics
 file are the only files a run keeps, and `report` returns its text for the agent to write.
+`listing` names the newest runs and says so when older ones are left out.
 Every write is validated in full before anything is stored, so a rejected batch stores nothing.
 Only the user's dispositions move a finding to remediation, and a decision stands for the finding
 as the user saw it: when a later `add` merges into a decided finding and changes it, its decision
@@ -42,15 +43,11 @@ from mightymodels_plugin.tools.review.errors import (
     WeightsMissingError,
     WeightSumError,
 )
-from mightymodels_plugin.tools.review.finding_merge import (
-    finding_number,
-    fold,
-    normalized,
-    number_of,
-)
+from mightymodels_plugin.tools.review.finding_merge import fold, normalized
 from mightymodels_plugin.tools.review.rendering import Standing, gate_text, report_text, verdict_of
 from mightymodels_plugin.tools.review.report_parser import parse_report
 from mightymodels_plugin.tools.review.repository import (
+    RUNS_LISTED,
     DecidedFinding,
     ResolvedFinding,
     ReviewRepository,
@@ -105,6 +102,8 @@ REVIEWERS: Mapping[Persona, Worker] = MappingProxyType(
         Persona.UNCLE_BOB: Worker.UNCLE_BOB_REVIEWER,
     }
 )
+NO_RUNS = 'no review runs\n'
+OLDER_LEFT_OUT = f'older review runs are left out: these are the latest {RUNS_LISTED.rows}\n'
 
 
 def run_of(row: ReviewRunRow) -> ReviewRun:
@@ -147,8 +146,7 @@ def finding_of(row: ReviewFindingRow) -> Finding:
 
 
 def findings_of(repository: ReviewRepository, run: RunId) -> dict[str, Finding]:
-    findings = sorted(map(finding_of, repository.finding_rows(run)), key=number_of)
-    return {finding.id: finding for finding in findings}
+    return {row.finding_id: finding_of(row) for row in repository.finding_rows(run)}
 
 
 def dispositions_of(repository: ReviewRepository, run: RunId) -> dict[str, Disposition]:
@@ -353,7 +351,7 @@ class ReviewService:
             ]
             repository.decisions.record_dispositions(run, decided)
             disposed = set(dispositions_of(repository, run)) | set(payload.decisions)
-        undecided = sorted(set(findings) - disposed, key=finding_number)
+        undecided = [finding_id for finding_id in findings if finding_id not in disposed]
         tail = f'; undecided: {", ".join(undecided)}' if undecided else ''
         return ReviewView(text=f'{len(decided)} dispositions recorded{tail}\n', run_id=run.root)
 
@@ -389,5 +387,7 @@ class ReviewService:
 
     def listing(self) -> ReviewView:
         with review_transaction(self.database) as repository:
-            lines = [listing_line(repository, run_of(row)) for row in repository.run_rows()]
-        return ReviewView(text=''.join(lines) or 'no review runs\n')
+            listed = repository.latest_run_rows()
+            lines = [listing_line(repository, run_of(row)) for row in listed.rows]
+        note = OLDER_LEFT_OUT if listed.older_left_out else ''
+        return ReviewView(text=(''.join(lines) or NO_RUNS) + note)

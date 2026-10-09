@@ -10,6 +10,10 @@ The user's decisions and the fix outcomes sit on a `DecisionRepository` that the
 repository carries the same way. Its `reopen` is the only delete here: the findings it is given
 lose their decision and their outcome and read as undecided again.
 
+A run's findings, decisions and outcomes are each read whole, the findings in the order of their
+numbers, and a read is refused once a run holds more than `FINDINGS`. `latest_run_rows` lists the
+newest runs, oldest first, and no more than `RUNS_LISTED` of them.
+
 A method that writes takes values and builds the rows itself. `DecidedFinding` and
 `ResolvedFinding` are what the user decided and what a fix came to, as they are stored.
 """
@@ -18,10 +22,10 @@ from collections.abc import Collection, Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from mightymodels_plugin.database import Database
+from mightymodels_plugin.database import Database, Latest, ReadLimit
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import Slug
@@ -34,6 +38,9 @@ from mightymodels_plugin.tools.review.tables import (
     ReviewRunRow,
 )
 from mightymodels_plugin.tools.ticket.repository import TicketRepository
+
+FINDINGS = ReadLimit(rows=1000, kept='findings')
+RUNS_LISTED = ReadLimit(rows=50, kept='review runs')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -127,18 +134,32 @@ class DecisionRepository:
     repository_key: RepositoryKey
 
     def disposition_rows(self, run: RunId) -> list[ReviewDispositionRow]:
-        query = select(ReviewDispositionRow).where(
-            ReviewDispositionRow.repository_key == self.repository_key.root,
-            ReviewDispositionRow.run_id == run.root,
+        query = (
+            select(ReviewDispositionRow)
+            .where(
+                ReviewDispositionRow.repository_key == self.repository_key.root,
+                ReviewDispositionRow.run_id == run.root,
+            )
+            .limit(FINDINGS.fetched)
         )
-        return list(self.session.scalars(query))
+        rows = list(self.session.scalars(query))
+        if (error := FINDINGS.error(rows, owner=f'run {run}')) is not None:
+            raise error
+        return rows
 
     def outcome_rows(self, run: RunId) -> list[ReviewOutcomeRow]:
-        query = select(ReviewOutcomeRow).where(
-            ReviewOutcomeRow.repository_key == self.repository_key.root,
-            ReviewOutcomeRow.run_id == run.root,
+        query = (
+            select(ReviewOutcomeRow)
+            .where(
+                ReviewOutcomeRow.repository_key == self.repository_key.root,
+                ReviewOutcomeRow.run_id == run.root,
+            )
+            .limit(FINDINGS.fetched)
         )
-        return list(self.session.scalars(query))
+        rows = list(self.session.scalars(query))
+        if (error := FINDINGS.error(rows, owner=f'run {run}')) is not None:
+            raise error
+        return rows
 
     def record_dispositions(self, run: RunId, decided: Iterable[DecidedFinding]) -> None:
         for decision in decided:
@@ -175,13 +196,14 @@ class ReviewRepository:
             raise RunNotFoundError(run)
         return row
 
-    def run_rows(self) -> list[ReviewRunRow]:
+    def latest_run_rows(self) -> Latest[ReviewRunRow]:
         query = (
             select(ReviewRunRow)
             .where(ReviewRunRow.repository_key == self.repository_key.root)
-            .order_by(ReviewRunRow.run_id)
+            .order_by(ReviewRunRow.run_id.desc())
+            .limit(RUNS_LISTED.fetched)
         )
-        return list(self.session.scalars(query))
+        return RUNS_LISTED.latest(self.session.scalars(query).all())
 
     def latest_run_row(self, slug: Slug) -> ReviewRunRow | None:
         query = (
@@ -191,15 +213,24 @@ class ReviewRepository:
                 ReviewRunRow.slug == slug.root,
             )
             .order_by(ReviewRunRow.run_id.desc())
+            .limit(1)
         )
         return self.session.scalars(query).first()
 
     def finding_rows(self, run: RunId) -> list[ReviewFindingRow]:
-        query = select(ReviewFindingRow).where(
-            ReviewFindingRow.repository_key == self.repository_key.root,
-            ReviewFindingRow.run_id == run.root,
+        query = (
+            select(ReviewFindingRow)
+            .where(
+                ReviewFindingRow.repository_key == self.repository_key.root,
+                ReviewFindingRow.run_id == run.root,
+            )
+            .order_by(func.length(ReviewFindingRow.finding_id), ReviewFindingRow.finding_id)
+            .limit(FINDINGS.fetched)
         )
-        return list(self.session.scalars(query))
+        rows = list(self.session.scalars(query))
+        if (error := FINDINGS.error(rows, owner=f'run {run}')) is not None:
+            raise error
+        return rows
 
     def record_run(self, run: ReviewRun) -> None:
         self.session.add(run_row_of(run, repository_key=self.repository_key))

@@ -166,7 +166,7 @@ def attempts_read(database: Database) -> int:
 
 def transitions_read(database: Database) -> int:
     with task_transaction(database) as repository:
-        return len(repository.transition_rows(TICKET))
+        return len(repository.latest_transitions_into(TICKET, tuple(Status), limit=2))
 
 
 def commands_read(database: Database) -> int:
@@ -181,7 +181,7 @@ def receipts_read(database: Database) -> int:
 
 def runs_read(database: Database) -> int:
     with review_transaction(database) as repository:
-        return len(repository.run_rows())
+        return len(repository.latest_run_rows().rows)
 
 
 def findings_read(database: Database) -> int:
@@ -211,7 +211,7 @@ def ledger_entries_read(database: Database) -> int:
 
 def crashouts_read(database: Database) -> int:
     with crashout_transaction(database) as repository:
-        return len(repository.rows())
+        return len(repository.latest_rows().rows)
 
 
 def answers_of(server: StateServer) -> list[str]:

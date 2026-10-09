@@ -123,8 +123,8 @@ def passing_commands(
     return tuple(islice(passing, limit))
 
 
-def failed_attempts(transitions: Sequence[TransitionRow], limit: int) -> tuple[FailedAttempt, ...]:
-    stuck = [
+def failed_attempts(stuck: Sequence[TransitionRow]) -> tuple[FailedAttempt, ...]:
+    return tuple(
         FailedAttempt(
             task=transition.task_id,
             to=transition.after,
@@ -132,10 +132,8 @@ def failed_attempts(transitions: Sequence[TransitionRow], limit: int) -> tuple[F
             head=short_head(transition.head),
             at=transition.at,
         )
-        for transition in transitions
-        if transition.after in STUCK
-    ]
-    return tuple(stuck[-limit:])
+        for transition in stuck
+    )
 
 
 def ledger_lines(ledgers: Sequence[Ledger], kind: EntryKind, limit: int) -> tuple[LedgerLine, ...]:
@@ -196,7 +194,9 @@ class SnapshotService:
                 works=passing_commands(commands, receipts, limit),
                 decisions=ledger_lines(linked.ledgers, EntryKind.DECISION, limit),
                 open_questions=ledger_lines(linked.ledgers, EntryKind.OPEN, limit),
-                do_not_retry=failed_attempts(repository.tasks.transition_rows(slug), limit),
+                do_not_retry=failed_attempts(
+                    repository.tasks.latest_transitions_into(slug, STUCK, limit)
+                ),
                 review=review_state(latest_review_of(repository.reviews, slug), limit),
                 warnings=(*git_warnings(git.refusal()), *ledger_warnings(linked)),
             )

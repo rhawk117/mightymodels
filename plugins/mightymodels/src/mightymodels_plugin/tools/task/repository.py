@@ -9,6 +9,11 @@ key of the git repository the database was opened for, and every read and write 
 A method that changes a task takes the transition the change is part of and stores the
 transition's row with it, so no task moves without its record.
 
+A ticket's tasks are read whole, and the read is refused once a ticket holds more than `TASKS`.
+The attempts are counted by the database, so a read fetches one row per task and worker however
+many attempts there were, and `latest_transitions_into` fetches only the transitions it is asked
+for.
+
 A task's base is the HEAD of its first start that had one. A restart keeps it, so what the task
 changed is measured from where its first attempt began.
 """
@@ -17,10 +22,10 @@ from collections.abc import Collection, Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from mightymodels_plugin.database import Database
+from mightymodels_plugin.database import Database, ReadLimit
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.contract.repository import ContractRepository
@@ -29,6 +34,9 @@ from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, Transitio
 from mightymodels_plugin.tools.ticket.repository import TicketRepository
 
 type AttemptCounts = dict[str, dict[str, int]]
+
+TASKS = ReadLimit(rows=1000, kept='tasks')
+ATTEMPT_COUNTS = ReadLimit(rows=TASKS.rows * len(Implementer), kept='attempt counts')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -74,45 +82,62 @@ class TaskRepository:
         return self.session.get(TaskRow, (self.repository_key.root, slug.root, task_id))
 
     def rows(self, slug: Slug) -> list[TaskRow]:
-        query = select(TaskRow).where(
-            TaskRow.repository_key == self.repository_key.root, TaskRow.slug == slug.root
+        query = (
+            select(TaskRow)
+            .where(TaskRow.repository_key == self.repository_key.root, TaskRow.slug == slug.root)
+            .limit(TASKS.fetched)
         )
-        return list(self.session.scalars(query))
+        rows = list(self.session.scalars(query))
+        if (error := TASKS.error(rows, owner=f'ticket {slug}')) is not None:
+            raise error
+        return rows
 
     def attempts_by_worker(self, slug: Slug) -> AttemptCounts:
         query = (
-            select(AttemptRow)
+            select(AttemptRow.task_id, AttemptRow.worker, func.count())
             .where(
                 AttemptRow.repository_key == self.repository_key.root,
                 AttemptRow.slug == slug.root,
             )
-            .order_by(AttemptRow.id)
+            .group_by(AttemptRow.task_id, AttemptRow.worker)
+            .order_by(func.min(AttemptRow.id))
+            .limit(ATTEMPT_COUNTS.fetched)
         )
+        rows = self.session.execute(query).all()
+        if (error := ATTEMPT_COUNTS.error(rows, owner=f'ticket {slug}')) is not None:
+            raise error
         counts: AttemptCounts = {}
-        for attempt in self.session.scalars(query):
-            by_worker = counts.setdefault(attempt.task_id, {})
-            by_worker[attempt.worker] = by_worker.get(attempt.worker, 0) + 1
+        for task_id, worker, attempts in rows:
+            counts.setdefault(task_id, {})[worker] = attempts
         return counts
 
     def attempts_in_modes(self, slug: Slug, task_id: str, modes: Collection[ArchitectMode]) -> int:
-        query = select(AttemptRow).where(
-            AttemptRow.repository_key == self.repository_key.root,
-            AttemptRow.slug == slug.root,
-            AttemptRow.task_id == task_id,
-            AttemptRow.mode.in_(sorted(modes)),
+        query = (
+            select(func.count())
+            .select_from(AttemptRow)
+            .where(
+                AttemptRow.repository_key == self.repository_key.root,
+                AttemptRow.slug == slug.root,
+                AttemptRow.task_id == task_id,
+                AttemptRow.mode.in_(sorted(modes)),
+            )
         )
-        return len(self.session.scalars(query).all())
+        return self.session.scalars(query).one()
 
-    def transition_rows(self, slug: Slug) -> list[TransitionRow]:
+    def latest_transitions_into(
+        self, slug: Slug, statuses: Collection[Status], limit: int
+    ) -> list[TransitionRow]:
         query = (
             select(TransitionRow)
             .where(
                 TransitionRow.repository_key == self.repository_key.root,
                 TransitionRow.slug == slug.root,
+                TransitionRow.after.in_(sorted(statuses)),
             )
-            .order_by(TransitionRow.id)
+            .order_by(TransitionRow.id.desc())
+            .limit(limit)
         )
-        return list(self.session.scalars(query))
+        return list(reversed(self.session.scalars(query).all()))
 
     def record_start(self, slug: Slug, transition: Transition, attempt: Attempt) -> None:
         started = self.row(slug, transition.task_id)

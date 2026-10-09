@@ -10,23 +10,32 @@ An investigation has no row of its own. It exists once its target is stored, whi
 its ledger, so `has_entries` asks for that row. `append` is the only write and nothing updates or
 deletes an entry: a later entry retires an earlier one by naming it in `supersedes`.
 
+A ledger is read whole, and the read is refused once an investigation holds more than `ENTRIES`.
+`latest_rounds` lists the newest investigations by id, which starts with the day, and no more than
+`INVESTIGATIONS_LISTED` of them. `unrecorded` asks for the targets of all the investigations it
+is given in one read.
+
 `LedgerRecord` is one entry as it is stored.
 """
 
-from collections.abc import Generator, Iterable
+from collections.abc import Collection, Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from mightymodels_plugin.database import Database
+from mightymodels_plugin.database import Database, Latest, ReadLimit
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.tools.investigation.schema import EntryKind, Source
 from mightymodels_plugin.tools.investigation.tables import LedgerEntryRow
 
 TARGET_SEQ = 1
+ENTRIES = ReadLimit(rows=2000, kept='ledger entries')
+INVESTIGATIONS_LISTED = ReadLimit(rows=100, kept='investigations')
+
+type LatestRound = tuple[str, int]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -77,17 +86,38 @@ class InvestigationRepository:
                 LedgerEntryRow.investigation_id == investigation.root,
             )
             .order_by(LedgerEntryRow.seq)
+            .limit(ENTRIES.fetched)
         )
-        return list(self.session.scalars(query))
+        rows = list(self.session.scalars(query))
+        if (error := ENTRIES.error(rows, owner=f'investigation {investigation}')) is not None:
+            raise error
+        return rows
 
-    def latest_rounds(self) -> dict[str, int]:
+    def unrecorded(self, investigations: Collection[Slug]) -> list[Slug]:
+        query = (
+            select(LedgerEntryRow.investigation_id)
+            .where(
+                LedgerEntryRow.repository_key == self.repository_key.root,
+                LedgerEntryRow.investigation_id.in_([slug.root for slug in investigations]),
+                LedgerEntryRow.seq == TARGET_SEQ,
+            )
+            .limit(len(investigations))
+        )
+        recorded = set(self.session.scalars(query))
+        return [slug for slug in investigations if slug.root not in recorded]
+
+    def latest_rounds(self) -> Latest[LatestRound]:
         query = (
             select(LedgerEntryRow.investigation_id, func.max(LedgerEntryRow.round))
             .where(LedgerEntryRow.repository_key == self.repository_key.root)
             .group_by(LedgerEntryRow.investigation_id)
-            .order_by(LedgerEntryRow.investigation_id)
+            .order_by(LedgerEntryRow.investigation_id.desc())
+            .limit(INVESTIGATIONS_LISTED.fetched)
         )
-        return dict(self.session.execute(query).all())
+        newest_first = [
+            (investigation, latest) for investigation, latest in self.session.execute(query)
+        ]
+        return INVESTIGATIONS_LISTED.latest(newest_first)
 
     def append(self, investigation: Slug, records: Iterable[LedgerRecord]) -> None:
         self.session.add_all(

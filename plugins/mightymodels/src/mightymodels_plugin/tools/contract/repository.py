@@ -5,6 +5,10 @@ holds that transaction's session, so the contract service never sees a session. 
 commands or receipts inside its own transaction builds a `ContractRepository` on that transaction's
 session. The repository holds the key of the git repository the database was opened for, and
 reads and writes rows under that key only.
+
+A read returns every command of a ticket, or the latest receipt of every command, and is refused
+once a ticket holds more than `COMMANDS`. The latest receipt of each command is chosen by the
+database, so a read fetches one row per command however often each was run.
 """
 
 import re
@@ -12,10 +16,10 @@ from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from mightymodels_plugin.database import Database
+from mightymodels_plugin.database import Database, ReadLimit
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.slug import Slug
 from mightymodels_plugin.task_id import TASK_ID_PATTERN
@@ -23,6 +27,7 @@ from mightymodels_plugin.tools.contract.schema import ContractCommand, Receipt
 from mightymodels_plugin.tools.contract.tables import CommandRow, ReceiptRow
 
 TASK_ID = re.compile(TASK_ID_PATTERN)
+COMMANDS = ReadLimit(rows=1000, kept='contract commands')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -84,19 +89,31 @@ class ContractRepository:
                 CommandRow.slug == slug.root,
             )
             .order_by(CommandRow.command_id)
+            .limit(COMMANDS.fetched)
         )
-        return list(self.session.scalars(query))
+        rows = list(self.session.scalars(query))
+        if (error := COMMANDS.error(rows, owner=f'ticket {slug}')) is not None:
+            raise error
+        return rows
 
     def latest_receipts(self, slug: Slug) -> dict[str, ReceiptRow]:
-        query = (
-            select(ReceiptRow)
+        latest_of_each_command = (
+            select(func.max(ReceiptRow.id))
             .where(
                 ReceiptRow.repository_key == self.repository_key.root,
                 ReceiptRow.slug == slug.root,
             )
-            .order_by(ReceiptRow.id)
+            .group_by(ReceiptRow.command_id)
         )
-        return {receipt.command_id: receipt for receipt in self.session.scalars(query)}
+        query = (
+            select(ReceiptRow)
+            .where(ReceiptRow.id.in_(latest_of_each_command))
+            .limit(COMMANDS.fetched)
+        )
+        rows = list(self.session.scalars(query))
+        if (error := COMMANDS.error(rows, owner=f'ticket {slug}')) is not None:
+            raise error
+        return {receipt.command_id: receipt for receipt in rows}
 
     def approve(self, slug: Slug, commands: Iterable[ContractCommand], approval: Approval) -> None:
         self.session.add_all(

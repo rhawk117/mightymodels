@@ -13,7 +13,7 @@ A ticket links investigations by id, and `unrecorded_investigations` says which 
 ledger, read through the investigation repository on the same session.
 """
 
-from collections.abc import Generator, Iterable, Sequence
+from collections.abc import Collection, Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -85,11 +85,11 @@ class TicketRepository:
         )
         return self.session.merge(row)
 
-    def unrecorded_investigations(self, linked: Iterable[Slug]) -> list[Slug]:
+    def unrecorded_investigations(self, linked: Collection[Slug]) -> list[Slug]:
         investigations = InvestigationRepository(
             session=self.session, repository_key=self.repository_key
         )
-        return [slug for slug in linked if not investigations.has_entries(slug)]
+        return investigations.unrecorded(linked)
 
     def mark_in_progress(self, slug: Slug) -> None:
         self.unclosed_row(slug).status = TicketStatus.IN_PROGRESS

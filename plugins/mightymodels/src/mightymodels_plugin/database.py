@@ -16,15 +16,27 @@ nothing is stamped before its tables are created. A file with any other stamp is
 and left as it was: there is no migration, and tables of another shape would be read wrong. An
 unstamped file that already holds tables is such a file, and a database an earlier version kept
 inside a repository is one.
+
+SQLite checks a foreign key only on a connection that asks it to, so every connection of the
+engine asks as it opens. A row whose parent is missing is then refused when its transaction
+commits.
+
+No read returns more rows as a repository's history grows, and none answers from a part of what
+it was asked for without saying so. A `ReadLimit` is the most rows one read returns, and the read
+asks for one row more to learn whether there were more. A read of everything a ticket, a run or an
+investigation holds is refused with `ReadLimitError` once there are more. A read of a repository's
+history returns its newest rows as a `Latest`, which says whether older ones were left out.
 """
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence, Sized
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import URL, Connection, Engine, create_engine
+from sqlalchemy import URL, Connection, Engine, create_engine, event
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import ConnectionPoolEntry
 
 from mightymodels_plugin.declarative import Base
 from mightymodels_plugin.errors import StateError
@@ -43,11 +55,12 @@ from mightymodels_plugin.tools.task.tables import AttemptRow, TaskRow, Transitio
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 
 DATABASE_NAME = 'mightymodels.db'
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 UNSTAMPED = 0
 STORED_VERSION = 'PRAGMA user_version'
 STAMP = f'{STORED_VERSION} = {SCHEMA_VERSION}'
 STORED_OBJECTS = 'SELECT count(*) FROM sqlite_master'
+ENFORCE_FOREIGN_KEYS = 'PRAGMA foreign_keys = ON'
 ROW_TYPES: tuple[type[Base], ...] = (
     TicketRow,
     TaskRow,
@@ -76,6 +89,44 @@ class SchemaVersionError(StateError):
         self.found = found
 
 
+class ReadLimitError(StateError):
+    def __init__(self, owner: str, *, rows: int, kept: str) -> None:
+        super().__init__(
+            f'{owner} holds more than {rows} {kept}, the most one read returns; the read is '
+            'refused, because an answer from a part of them would be wrong'
+        )
+        self.owner = owner
+        self.rows = rows
+        self.kept = kept
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Latest[Row]:
+    rows: tuple[Row, ...]
+    older_left_out: bool
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ReadLimit:
+    rows: int
+    kept: str
+
+    @property
+    def fetched(self) -> int:
+        return self.rows + 1
+
+    def error(self, fetched: Sized, *, owner: str) -> ReadLimitError | None:
+        if len(fetched) <= self.rows:
+            return None
+        return ReadLimitError(owner, rows=self.rows, kept=self.kept)
+
+    def latest[Row](self, newest_first: Sequence[Row]) -> Latest[Row]:
+        return Latest(
+            rows=tuple(reversed(newest_first[: self.rows])),
+            older_left_out=len(newest_first) > self.rows,
+        )
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Database:
     engine: Engine
@@ -86,6 +137,12 @@ class Database:
     def transaction(self) -> Generator[Session]:
         with self.sessions.begin() as session:
             yield session
+
+
+def enforce_foreign_keys(connection: DBAPIConnection, _entry: ConnectionPoolEntry) -> None:
+    cursor = connection.cursor()
+    cursor.execute(ENFORCE_FOREIGN_KEYS)
+    cursor.close()
 
 
 def stamp_a_file_that_holds_nothing(connection: Connection) -> None:
@@ -105,6 +162,7 @@ def schema_version_error(connection: Connection, database_file: Path) -> SchemaV
 def open_database(database_file: Path, repository_key: RepositoryKey) -> Generator[Database]:
     database_file.parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(URL.create('sqlite', database=str(database_file)))
+    event.listen(engine, 'connect', enforce_foreign_keys)
     tables = [Base.metadata.tables[row_type.__tablename__] for row_type in ROW_TYPES]
     try:
         with engine.begin() as connection:

@@ -76,7 +76,7 @@ def last_entry(crashouts: CrashoutService) -> JournaledCrashout:
 
 def journal_times(crashouts: CrashoutService) -> list[str]:
     with crashout_transaction(crashouts.database) as repository:
-        return [row.at for row in repository.rows()]
+        return [row.at for row in repository.latest_rows().rows]
 
 
 class TestAdd:

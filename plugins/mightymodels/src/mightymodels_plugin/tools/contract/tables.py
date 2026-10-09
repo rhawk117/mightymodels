@@ -1,39 +1,74 @@
-"""The `contract_commands` and `receipts` tables: a ticket's approved commands and their runs."""
+"""The `contract_commands` and `receipts` tables: a ticket's approved commands and their runs.
 
-from sqlalchemy.orm import Mapped
+A receipt belongs to the approved command it is a run of. A command is approved for a ticket by
+its slug alone, staged or not, so no ticket row stands behind it.
+"""
 
-from mightymodels_plugin.declarative import Base, Indexed, Key, Serial, Texts
+from typing import Annotated
+
+from sqlalchemy import Index, String, text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from mightymodels_plugin.declarative import (
+    NAME_LIMIT,
+    Base,
+    Name,
+    RepositoryKeyPart,
+    RepositoryName,
+    Serial,
+    Sha,
+    SlugKeyPart,
+    SlugName,
+    TaskName,
+    Texts,
+    Timestamp,
+    Word,
+    child_of,
+)
+from mightymodels_plugin.tools.contract.executor import TAIL_CHARS
+from mightymodels_plugin.tools.contract.schema import DEFAULT_TIMEOUT
+
+type CommandKeyPart = Annotated[str, mapped_column(String(NAME_LIMIT), primary_key=True)]
+type ExitZeroAtFirst = Annotated[int, mapped_column(server_default=text('0'))]
+type DefaultTimeoutAtFirst = Annotated[
+    int, mapped_column(server_default=text(str(DEFAULT_TIMEOUT)))
+]
+type Tail = Annotated[str, mapped_column(String(TAIL_CHARS))]
 
 
 class CommandRow(Base):
     __tablename__ = 'contract_commands'
 
-    repository_key: Mapped[Key]
-    slug: Mapped[Key]
-    command_id: Mapped[Key]
-    task_id: Mapped[str | None]
+    repository_key: Mapped[RepositoryKeyPart]
+    slug: Mapped[SlugKeyPart]
+    command_id: Mapped[CommandKeyPart]
+    task_id: Mapped[TaskName | None]
     argv: Mapped[Texts]
-    expect_exit: Mapped[int]
-    timeout: Mapped[int]
-    approved_by: Mapped[str]
-    approved_at: Mapped[str]
-    head: Mapped[str | None]
+    expect_exit: Mapped[ExitZeroAtFirst]
+    timeout: Mapped[DefaultTimeoutAtFirst]
+    approved_by: Mapped[Name]
+    approved_at: Mapped[Timestamp]
+    head: Mapped[Sha | None]
 
 
 class ReceiptRow(Base):
     __tablename__ = 'receipts'
+    __table_args__ = (
+        child_of(CommandRow),
+        Index('ix_receipts_command', 'repository_key', 'slug', 'command_id'),
+    )
 
     id: Mapped[Serial]
-    repository_key: Mapped[str]
-    slug: Mapped[Indexed]
-    command_id: Mapped[str]
+    repository_key: Mapped[RepositoryName]
+    slug: Mapped[SlugName]
+    command_id: Mapped[Name]
     argv: Mapped[Texts]
-    outcome: Mapped[str]
+    outcome: Mapped[Word]
     exit: Mapped[int | None]
     duration_ms: Mapped[int]
-    stdout_tail: Mapped[str]
-    stderr_tail: Mapped[str]
-    digest: Mapped[str]
-    head: Mapped[str | None]
-    phase: Mapped[str]
-    at: Mapped[str]
+    stdout_tail: Mapped[Tail]
+    stderr_tail: Mapped[Tail]
+    digest: Mapped[Sha]
+    head: Mapped[Sha | None]
+    phase: Mapped[Word]
+    at: Mapped[Timestamp]

@@ -1,45 +1,79 @@
-"""The `tasks`, `task_attempts` and `task_transitions` tables: a task, who tried it, each move."""
+"""The `tasks`, `task_attempts` and `task_transitions` tables: a task, who tried it, each move.
 
-from sqlalchemy.orm import Mapped
+A task belongs to a staged ticket, and an attempt and a transition belong to a task.
+"""
 
-from mightymodels_plugin.declarative import Base, Indexed, Key, Serial, Texts
+from typing import Annotated
+
+from sqlalchemy import Index, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from mightymodels_plugin.declarative import (
+    TASK_ID_LIMIT,
+    Base,
+    Name,
+    RepositoryKeyPart,
+    RepositoryName,
+    Serial,
+    Sha,
+    SlugKeyPart,
+    SlugName,
+    TaskName,
+    Texts,
+    TextsIfAny,
+    Timestamp,
+    Word,
+    child_of,
+)
+from mightymodels_plugin.tools.ticket.tables import TicketRow
+
+type TaskKeyPart = Annotated[str, mapped_column(String(TASK_ID_LIMIT), primary_key=True)]
 
 
 class TaskRow(Base):
     __tablename__ = 'tasks'
+    __table_args__ = (child_of(TicketRow),)
 
-    repository_key: Mapped[Key]
-    slug: Mapped[Key]
-    task_id: Mapped[Key]
-    status: Mapped[str]
+    repository_key: Mapped[RepositoryKeyPart]
+    slug: Mapped[SlugKeyPart]
+    task_id: Mapped[TaskKeyPart]
+    status: Mapped[Word]
     owned: Mapped[Texts]
-    base: Mapped[str | None]
-    commit: Mapped[str | None]
-    reasons: Mapped[Texts]
-    updated_at: Mapped[str]
+    base: Mapped[Sha | None]
+    commit: Mapped[Name | None]
+    reasons: Mapped[TextsIfAny]
+    updated_at: Mapped[Timestamp]
 
 
 class AttemptRow(Base):
     __tablename__ = 'task_attempts'
+    __table_args__ = (
+        child_of(TaskRow),
+        Index('ix_task_attempts_task_mode', 'repository_key', 'slug', 'task_id', 'mode'),
+    )
 
     id: Mapped[Serial]
-    repository_key: Mapped[str]
-    slug: Mapped[Indexed]
-    task_id: Mapped[str]
-    worker: Mapped[str]
-    mode: Mapped[str | None]
-    at: Mapped[str]
+    repository_key: Mapped[RepositoryName]
+    slug: Mapped[SlugName]
+    task_id: Mapped[TaskName]
+    worker: Mapped[Word]
+    mode: Mapped[Word | None]
+    at: Mapped[Timestamp]
 
 
 class TransitionRow(Base):
     __tablename__ = 'task_transitions'
+    __table_args__ = (
+        child_of(TaskRow),
+        Index('ix_task_transitions_after', 'repository_key', 'slug', 'after'),
+    )
 
     id: Mapped[Serial]
-    repository_key: Mapped[str]
-    slug: Mapped[Indexed]
-    task_id: Mapped[str]
-    before: Mapped[str]
-    after: Mapped[str]
+    repository_key: Mapped[RepositoryName]
+    slug: Mapped[SlugName]
+    task_id: Mapped[TaskName]
+    before: Mapped[Word]
+    after: Mapped[Word]
     reasons: Mapped[Texts]
-    head: Mapped[str | None]
-    at: Mapped[str]
+    head: Mapped[Sha | None]
+    at: Mapped[Timestamp]

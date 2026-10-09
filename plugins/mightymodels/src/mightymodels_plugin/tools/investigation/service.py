@@ -3,8 +3,8 @@
 `start` opens an investigation by storing its target as entry 1 and names it after the day and
 the target. `add` appends a round's entries: the round may not go back, every entry is checked
 against the rule of its kind, and one refused entry refuses the whole batch, so nothing of it is
-stored. `render` and `knowns` return the ledger's two texts and `listing` names every
-investigation with its latest round.
+stored. `render` and `knowns` return the ledger's two texts and `listing` names the
+newest investigations with the latest round of each, and says so when older ones are left out.
 
 The target and every entry's text and cite are redacted before they are stored, and the
 investigation is named after the redacted target, so a secret reaches neither a row nor an id.
@@ -39,6 +39,7 @@ from mightymodels_plugin.tools.investigation.errors import (
 from mightymodels_plugin.tools.investigation.ledger import Ledger, recorded_ledger
 from mightymodels_plugin.tools.investigation.rendering import knowns_table, ledger_text
 from mightymodels_plugin.tools.investigation.repository import (
+    INVESTIGATIONS_LISTED,
     TARGET_SEQ,
     InvestigationRepository,
     LedgerRecord,
@@ -59,6 +60,9 @@ TARGET_NAME_LIMIT = 40
 UNNAMED_TARGET = 'investigation'
 OUTSIDE_A_NAME = re.compile(r'[^a-z0-9]+')
 NO_INVESTIGATIONS = 'no investigations\n'
+OLDER_LEFT_OUT = (
+    f'older investigations are left out: these are the latest {INVESTIGATIONS_LISTED.rows}\n'
+)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -213,8 +217,7 @@ class InvestigationService:
 
     def listing(self) -> InvestigationView:
         with investigation_transaction(self.database) as repository:
-            latest_rounds = repository.latest_rounds()
-        lines = [
-            f'{investigation}\tround {latest}\n' for investigation, latest in latest_rounds.items()
-        ]
-        return InvestigationView(text=''.join(lines) or NO_INVESTIGATIONS)
+            listed = repository.latest_rounds()
+        lines = [f'{investigation}\tround {latest}\n' for investigation, latest in listed.rows]
+        note = OLDER_LEFT_OUT if listed.older_left_out else ''
+        return InvestigationView(text=(''.join(lines) or NO_INVESTIGATIONS) + note)

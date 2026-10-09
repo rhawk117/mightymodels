@@ -1,23 +1,31 @@
 import asyncio
-from collections.abc import Generator, Sequence
-from contextlib import contextmanager
+import sqlite3
+from collections.abc import Generator, Mapping, Sequence
+from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 from mcp import Client
 from mcp.types import CallToolResult, TextContent, Tool
-from sqlalchemy import Engine, event
+from sqlalchemy import Engine, Table, event
 from sqlalchemy.orm import Session, SessionTransaction
 
 from mightymodels_plugin.data_directory import SESSION_DATA_VARIABLE, DataDirectory
 from mightymodels_plugin.database import DATABASE_NAME, Database, open_database
+from mightymodels_plugin.declarative import Base
 from mightymodels_plugin.repository_key import RepositoryKey, local_key
 from mightymodels_plugin.server import build_server
 from mightymodels_plugin.workspace import PROJECT_DIR_VARIABLE, Checkout, Workspace, workspace_at
 
 type ToolCall = tuple[str, dict[str, object]]
+type RowValues = Mapping[str, object]
+
+SELECT = 'SELECT'
+EXPLAINED = 'EXPLAIN QUERY PLAN '
+FILLERS = MappingProxyType({str: 'x', int: 1, bool: True, object: ()})
 
 
 class ActivityKind(StrEnum):
@@ -49,6 +57,63 @@ class DatabaseActivity:
 
     def engines(self) -> set[Engine]:
         return {recorded.engine for recorded in self.events}
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class SelectSent:
+    sql: str
+    parameters: tuple[object, ...]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class SelectsSent:
+    database_file: Path
+    sent: list[SelectSent] = field(default_factory=list)
+
+    def record(self, *, statement: str, parameters: Sequence[object], **_others: object) -> None:
+        if statement.startswith(SELECT):
+            self.sent.append(SelectSent(sql=statement, parameters=tuple(parameters)))
+
+    def rows_fetched(self) -> list[int]:
+        with closing(sqlite3.connect(self.database_file)) as connection:
+            return [
+                len(connection.execute(select.sql, select.parameters).fetchall())
+                for select in self.sent
+            ]
+
+    def plan_steps(self) -> list[str]:
+        with closing(sqlite3.connect(self.database_file)) as connection:
+            return [
+                str(step)
+                for select in self.sent
+                for *_, step in connection.execute(EXPLAINED + select.sql, select.parameters)
+            ]
+
+
+@contextmanager
+def selects_sent_to(database: Database) -> Generator[SelectsSent]:
+    selects = SelectsSent(database_file=Path(str(database.engine.url.database)))
+    event.listen(database.engine, 'before_cursor_execute', selects.record, named=True)
+    try:
+        yield selects
+    finally:
+        event.remove(database.engine, 'before_cursor_execute', selects.record)
+
+
+def table_of(row_type: type[Base]) -> Table:
+    return Base.metadata.tables[row_type.__tablename__]
+
+
+def filled_row(row_type: type[Base], **given: object) -> RowValues:
+    table = table_of(row_type)
+    needed = (
+        column
+        for column in table.columns
+        if column.server_default is None
+        and not column.nullable
+        and column is not table.autoincrement_column
+    )
+    return {column.name: FILLERS[column.type.python_type] for column in needed} | given
 
 
 def tree(top: Path) -> dict[str, bytes]:

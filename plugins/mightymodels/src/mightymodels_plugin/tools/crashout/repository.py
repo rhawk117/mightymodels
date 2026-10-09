@@ -7,6 +7,9 @@ only write: it adds one row and answers its number, and nothing updates or delet
 The repository holds the key of the git repository the database was opened for, and reads and
 writes the journal under that key only. A crashout's number is its place in that repository's
 journal, so each repository counts from 1 whatever the others journaled.
+
+`latest_rows` is the newest end of the journal, oldest first, and no more than `JOURNAL_WINDOW`
+of it: the journal only grows, and a read of all of it would grow with it.
 """
 
 from collections.abc import Generator
@@ -16,10 +19,12 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from mightymodels_plugin.database import Database
+from mightymodels_plugin.database import Database, Latest, ReadLimit
 from mightymodels_plugin.repository_key import RepositoryKey
 from mightymodels_plugin.tools.crashout.schema import JournaledCrashout
 from mightymodels_plugin.tools.crashout.tables import CrashoutRow
+
+JOURNAL_WINDOW = ReadLimit(rows=100, kept='crashouts')
 
 
 def crashout_row(crashout: JournaledCrashout, *, repository_key: RepositoryKey) -> CrashoutRow:
@@ -43,19 +48,21 @@ class CrashoutRepository:
     session: Session
     repository_key: RepositoryKey
 
-    def rows(self) -> list[CrashoutRow]:
+    def latest_rows(self) -> Latest[CrashoutRow]:
         query = (
             select(CrashoutRow)
             .where(CrashoutRow.repository_key == self.repository_key.root)
-            .order_by(CrashoutRow.id)
+            .order_by(CrashoutRow.id.desc())
+            .limit(JOURNAL_WINDOW.fetched)
         )
-        return list(self.session.scalars(query))
+        return JOURNAL_WINDOW.latest(self.session.scalars(query).all())
 
     def latest_row(self) -> CrashoutRow | None:
         query = (
             select(CrashoutRow)
             .where(CrashoutRow.repository_key == self.repository_key.root)
             .order_by(CrashoutRow.id.desc())
+            .limit(1)
         )
         return self.session.scalars(query).first()
 

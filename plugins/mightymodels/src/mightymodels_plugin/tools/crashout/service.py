@@ -2,8 +2,9 @@
 
 `add` journals one crashout with the time the server received it. The rant keeps its words: its
 line endings become newlines, the whitespace ending each line goes, and so do the blank lines
-around it. Every free-text field is redacted before it is stored. `stats` reports the journal's
-recurring patterns and `last` returns the newest crashout, as fields and as text.
+around it. Every free-text field is redacted before it is stored. `stats` reports the recurring
+patterns of the journal's latest crashouts, and says so when older ones are left out. `last`
+returns the newest crashout, as fields and as text.
 
 The service reads and writes the database and nothing else: no file, and nothing in git.
 
@@ -16,7 +17,7 @@ from mightymodels_plugin.clock import now
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.redaction import redact
 from mightymodels_plugin.tools.crashout.rendering import crashout_text, patterns_text
-from mightymodels_plugin.tools.crashout.repository import crashout_transaction
+from mightymodels_plugin.tools.crashout.repository import JOURNAL_WINDOW, crashout_transaction
 from mightymodels_plugin.tools.crashout.schema import (
     CrashoutEntry,
     CrashoutView,
@@ -28,6 +29,7 @@ from mightymodels_plugin.tools.crashout.tables import CrashoutRow
 
 NOTHING_JOURNALED = 'no crashouts recorded yet.'
 SERENITY = f'{NOTHING_JOURNALED} serenity.'
+OLDER_LEFT_OUT = f'older crashouts are left out: these are the latest {JOURNAL_WINDOW.rows}\n'
 
 
 def normalized_rant(rant: str) -> str:
@@ -77,8 +79,12 @@ class CrashoutService:
 
     def stats(self) -> CrashoutView:
         with crashout_transaction(self.database) as repository:
-            journal = tuple(map(crashout_of, repository.rows()))
-        return CrashoutView(text=patterns_text(journal) if journal else f'{SERENITY}\n')
+            latest = repository.latest_rows()
+            journal = tuple(map(crashout_of, latest.rows))
+        if not journal:
+            return CrashoutView(text=f'{SERENITY}\n')
+        note = OLDER_LEFT_OUT if latest.older_left_out else ''
+        return CrashoutView(text=patterns_text(journal) + note)
 
     def last(self) -> CrashoutView:
         with crashout_transaction(self.database) as repository:
