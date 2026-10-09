@@ -53,7 +53,6 @@ TOOL_NAMES = [
     'task',
     'ticket',
 ]
-WITHOUT_A_CALL_EXAMPLE_YET = frozenset({'similarity'})
 PLUGIN = Path(__file__).parent.parent
 PROMPT_DIRECTORIES = ('skills', 'agents')
 TOOL_NAME = re.compile(rf'mcp__plugin_mightymodels_{SERVER_NAME}__(\w+)')
@@ -182,13 +181,8 @@ class TestToolSchemas:
 class TestCallExamples:
     EXAMPLES = tuple(chain.from_iterable(map(call_examples, prompt_documents())))
 
-    def test_the_skills_and_agents_hold_a_call_example_of_every_tool_documented_so_far(
-        self,
-    ) -> None:
-        exampled = {example.tool for example in self.EXAMPLES}
-
-        assert sorted(exampled | WITHOUT_A_CALL_EXAMPLE_YET) == TOOL_NAMES
-        assert exampled.isdisjoint(WITHOUT_A_CALL_EXAMPLE_YET)
+    def test_the_skills_and_agents_hold_a_call_example_of_every_tool(self) -> None:
+        assert sorted({example.tool for example in self.EXAMPLES}) == TOOL_NAMES
 
     @pytest.mark.parametrize(
         'example', [pytest.param(example, id=example.location) for example in EXAMPLES]

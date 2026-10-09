@@ -163,6 +163,16 @@ plan and the ASKED stanza; adding a SWOT per task is context spent on a question
 
 ## Both modes
 
+Before a scout wave, search what the plugin already holds for this repository (ledger entries,
+scout reports, review findings and crashouts) through `mcp__plugin_mightymodels_state__similarity`:
+
+```json
+{"action": "search", "query": "<the target or the task's intent>"}
+```
+
+A row it returns says where earlier work looked. It is a lead, never a citation: re-verify it at
+HEAD before it reaches the table, or carry it as an uncertainty.
+
 Citations follow the scout discipline: cite the line you or your scout actually opened, and
 carry `INFERRED` findings as uncertainties, never as knowns. Delegate retrieval to scouts when
 they are available; the consolidation and the uncertainty judgment are yours, not theirs.
