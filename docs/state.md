@@ -31,8 +31,11 @@ closings. They are in one SQLite file, `mightymodels.db`, in the plugin data dir
 directory Claude Code names in `CLAUDE_PLUGIN_DATA` for the plugin's state server. One file
 serves every repository. Each row carries a repository key, the `owner/name` of the origin remote
 or, with no origin, a hash of the checkout's toplevel path, and a read finds only the rows of the
-repository it runs in. `.mightymodels/` itself sits at the git toplevel, whichever directory the
-session started in.
+repository it runs in. An origin that is not exactly `owner/name` on a host gets the path hash
+too: a subgroup path such as `group/sub/name`, a path of one name, a local path or a `file://`
+URL. Clones of one `owner/name` share their rows, whatever the host or the URL form. Checkouts
+keyed by their path each keep their own, and a checkout that moves starts empty.
+`.mightymodels/` itself sits at the git toplevel, whichever directory the session started in.
 
 A command run through the Bash tool does not get `CLAUDE_PLUGIN_DATA`. The plugin's SessionStart
 hook exports the same directory as `MIGHTYMODELS_DATA_DIR`, and `mightymodels verify run` reads

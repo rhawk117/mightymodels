@@ -1,4 +1,4 @@
-"""The repository key: one per origin whatever the URL's form, refused for a crafted URL."""
+"""The repository key: one per origin whatever the URL's form, the path hash for any other URL."""
 
 import hashlib
 import os
@@ -14,7 +14,6 @@ from mightymodels_plugin.repository_key import (
     LOCAL_PREFIX,
     REPOSITORY_KEY_LIMIT,
     RepositoryKey,
-    UnusableOriginError,
     local_key,
     origin_key,
 )
@@ -28,7 +27,6 @@ KEY = RepositoryKey(f'{OWNER}/{NAME}')
 PLAIN_KEY = re.compile(r'[a-z0-9._-]+/[a-z0-9._-]+')
 PARENT_REFERENCES = {'.', '..'}
 TOKEN = 'ghp_' + 'a' * 36
-NO_OWNER_AND_NAME = 'the origin remote does not name a repository as owner/name'
 LONGEST_NAME = 'w' * (REPOSITORY_KEY_LIMIT - len(f'{OWNER}/'))
 WRITE: ToolCall = (
     'ticket',
@@ -59,6 +57,10 @@ def is_two_plain_names_within_the_limit(key: RepositoryKey) -> bool:
         and len(key.root) <= REPOSITORY_KEY_LIMIT
         and PARENT_REFERENCES.isdisjoint(key.root.split('/'))
     )
+
+
+def local_prefix_and_path_hash(toplevel: Path) -> str:
+    return LOCAL_PREFIX + hashlib.sha256(os.fsencode(toplevel.resolve())).hexdigest()
 
 
 def checkout_key(directory: Path) -> RepositoryKey:
@@ -108,6 +110,7 @@ class TestOriginKey:
             pytest.param('file:///srv/git/acme/widgets.git', id='file-url'),
             pytest.param('https://github.com/acme', id='one-name'),
             pytest.param('https://github.com/group/acme/widgets', id='three-names'),
+            pytest.param('git@gitlab.com:group/sub/name.git', id='scp-three-names'),
             pytest.param('https://github.com/acme/..', id='parent-as-the-name'),
             pytest.param('https://github.com/../widgets', id='parent-as-the-owner'),
             pytest.param('https://github.com/acme/../../widgets', id='parents-in-the-path'),
@@ -127,8 +130,8 @@ class TestOriginKey:
             pytest.param(f'https://github.com/{LOCAL_PREFIX}{"a" * 64}', id='the-reserved-prefix'),
         ],
     )
-    def test_a_url_that_does_not_name_an_owner_and_a_name_is_refused(self, url: str) -> None:
-        assert isinstance(origin_key(url), UnusableOriginError)
+    def test_a_url_that_is_not_exactly_an_owner_and_a_name_has_no_key(self, url: str) -> None:
+        assert origin_key(url) is None
 
     def test_a_key_of_exactly_the_limit_is_taken(self) -> None:
         key = origin_key(f'https://github.com/{OWNER}/{LONGEST_NAME}')
@@ -136,19 +139,14 @@ class TestOriginKey:
         assert isinstance(key, RepositoryKey)
         assert len(key.root) == REPOSITORY_KEY_LIMIT
 
-    def test_the_refusal_keeps_the_url_and_does_not_show_its_credential(self) -> None:
-        url = f'https://user:{TOKEN}@github.com/acme'
-        refusal = origin_key(url)
-
-        assert isinstance(refusal, UnusableOriginError)
-        assert refusal.url == url
-        assert TOKEN not in str(refusal)
-
     @given(url=URLS)
-    def test_whatever_the_url_a_key_is_two_plain_names_within_the_limit(self, url: str) -> None:
+    def test_whatever_the_url_a_key_is_two_plain_names_it_spells_within_the_limit(
+        self, url: str
+    ) -> None:
         key = origin_key(url)
 
-        assert isinstance(key, UnusableOriginError) or is_two_plain_names_within_the_limit(key)
+        assert key is None or is_two_plain_names_within_the_limit(key)
+        assert key is None or key.root in url.lower()
 
     def test_a_key_is_neither_text_nor_a_path(self) -> None:
         assert not isinstance(KEY, (str, os.PathLike))
@@ -157,7 +155,17 @@ class TestOriginKey:
 class TestARepositoryWithAnOrigin:
     HTTPS = 'https://github.com/acme/widgets.git'
     SSH = 'git@github.com:acme/widgets.git'
-    CRAFTED = f'https://user:{TOKEN}@github.com/acme/../../widgets'
+    NOT_EXACTLY_AN_OWNER_AND_A_NAME = (
+        pytest.param('https://gitlab.com/group/sub/name.git', id='subgroup-path'),
+        pytest.param('git@gitlab.com:group/sub/name.git', id='scp-subgroup-path'),
+        pytest.param('https://git.example.com/name.git', id='one-name'),
+        pytest.param('/srv/git/acme/widgets.git', id='local-path'),
+        pytest.param('file:///srv/git/acme/widgets.git', id='file-url'),
+        pytest.param(
+            f'https://user:{TOKEN}@github.com/acme/../../widgets', id='parents-in-the-path'
+        ),
+        pytest.param(f'https://github.com/{LOCAL_PREFIX}{"a" * 64}', id='the-reserved-prefix'),
+    )
 
     @pytest.fixture
     def origin(self) -> str:
@@ -197,14 +205,11 @@ class TestARepositoryWithAnOrigin:
         assert parts_of_state_paths.isdisjoint({OWNER, NAME})
         assert set(tree(data_directory)) == {DATABASE_NAME}
 
-    @pytest.mark.parametrize('origin', [pytest.param(CRAFTED, id='parents-in-the-path')])
-    def test_a_crafted_origin_refuses_every_call_and_creates_nothing(
-        self, written_ticket_text: str, repository: Path, data_directory: Path
+    @pytest.mark.parametrize('origin', NOT_EXACTLY_AN_OWNER_AND_A_NAME)
+    def test_an_origin_that_is_not_exactly_an_owner_and_a_name_is_keyed_by_the_toplevel_path(
+        self, repository: Path
     ) -> None:
-        assert NO_OWNER_AND_NAME in written_ticket_text
-        assert TOKEN not in written_ticket_text
-        assert not repository.joinpath(STATE_DIRECTORY).exists()
-        assert not data_directory.exists()
+        assert checkout_key(repository).root == local_prefix_and_path_hash(repository)
 
 
 class TestARepositoryWithNoOrigin:
@@ -224,9 +229,7 @@ class TestARepositoryWithNoOrigin:
     def test_the_key_is_the_reserved_prefix_and_a_hash_of_the_toplevel_path(
         self, repository: Path
     ) -> None:
-        toplevel = os.fsencode(repository.resolve())
-
-        assert checkout_key(repository).root == LOCAL_PREFIX + hashlib.sha256(toplevel).hexdigest()
+        assert checkout_key(repository).root == local_prefix_and_path_hash(repository)
 
     def test_the_key_is_the_same_from_a_subdirectory(
         self, repository: Path, subdirectory: Path

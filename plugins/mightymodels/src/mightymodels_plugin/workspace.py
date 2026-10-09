@@ -5,8 +5,8 @@ An edge starts wherever the session did, which may be a subdirectory, so it asks
 where it is and builds the workspace at the toplevel: `.mightymodels/` sits there whatever
 directory the edge started in. With no git executable, or outside a work tree, the answer is the
 refusal. A `Checkout` is the toplevel and the origin remote's URL, and its `repository_key` names
-the repository for the state database: from the origin when there is one, and from the toplevel
-path otherwise.
+the repository for the state database: from the origin when that is exactly an owner and a name on
+a host, and from the toplevel path otherwise.
 
 Every path under the state directory comes whole from `contained_in`, which resolves it and
 refuses one that leaves the resolved state directory, so a symlink planted below it carries no
@@ -40,12 +40,7 @@ from enum import StrEnum, auto
 from pathlib import Path
 
 from mightymodels_plugin.errors import StateError
-from mightymodels_plugin.repository_key import (
-    RepositoryKey,
-    UnusableOriginError,
-    local_key,
-    origin_key,
-)
+from mightymodels_plugin.repository_key import RepositoryKey, local_key, origin_key
 from mightymodels_plugin.run_id import RunId
 from mightymodels_plugin.slug import ARCHIVES_DIRECTORY, Slug
 
@@ -117,12 +112,8 @@ class Checkout:
     origin_url: str | None
 
     def repository_key(self) -> RepositoryKey:
-        if self.origin_url is None:
-            return local_key(self.toplevel)
-        key = origin_key(self.origin_url)
-        if isinstance(key, UnusableOriginError):
-            raise key
-        return key
+        owner_and_name = None if self.origin_url is None else origin_key(self.origin_url)
+        return local_key(self.toplevel) if owner_and_name is None else owner_and_name
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

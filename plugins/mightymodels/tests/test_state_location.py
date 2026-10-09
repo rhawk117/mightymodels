@@ -9,7 +9,7 @@ import json
 import shlex
 import sqlite3
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +32,8 @@ from mightymodels_plugin.database import (
 from mightymodels_plugin.repository_key import local_key
 from mightymodels_plugin.tools.tests.support import StateServer, ToolCall, text_of, tree
 from mightymodels_plugin.workspace import PROJECT_DIR_VARIABLE, STATE_DIRECTORY
+
+type GitRunner = Callable[..., str]
 
 SLUG = 'retry-queue'
 PASSED, REJECTED = 0, 2
@@ -217,6 +219,35 @@ class TestStartingInASubdirectory:
         assert code == PASSED
         assert capsys.readouterr().out.startswith('I1 pass ')
         assert not subdirectory.joinpath(STATE_DIRECTORY).exists()
+
+
+class TestAnOriginThatIsNotExactlyAnOwnerAndAName:
+    ORIGINS = (
+        pytest.param('https://gitlab.com/group/sub/name.git', id='subgroup-path'),
+        pytest.param('https://git.example.com/name.git', id='one-name'),
+        pytest.param('/srv/git/acme/widgets.git', id='local-path'),
+        pytest.param('file:///srv/git/acme/widgets.git', id='file-url'),
+    )
+
+    @pytest.fixture(params=ORIGINS)
+    def repository(self, request: pytest.FixtureRequest, repository: Path, git: GitRunner) -> Path:
+        git(repository, 'remote', 'add', 'origin', request.param)
+        return repository
+
+    def test_the_server_answers_its_calls(self, state_server: StateServer) -> None:
+        written, validated, shown = slug_results(state_server, WRITE, VALIDATE, SHOW)
+
+        assert (written.is_error, validated.is_error, shown.is_error) == (False, False, False)
+        assert shown.structured_content['unit']['slug'] == SLUG
+
+    @pytest.mark.usefixtures('approved_command', 'session_in_the_repository')
+    def test_verify_run_runs_the_command_the_server_approved(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        code = main(VERIFY_RUN)
+
+        assert code == PASSED
+        assert capsys.readouterr().out.startswith('I1 pass ')
 
 
 class TestAnOldDatabaseInTheRepository:

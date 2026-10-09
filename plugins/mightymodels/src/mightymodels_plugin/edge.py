@@ -6,9 +6,10 @@ out the workspace at the git toplevel with the database opened under that reposi
 the two edges of one session open the same file and see the same rows.
 
 Every refusal comes before anything is created: no data directory, no git executable, no work
-tree, an origin remote that names no repository, and a database file of another schema version.
-Each is a `StateError` naming what is missing, which the edge shows its caller. Only with the
-database open is `.mightymodels/` excluded from git, before anything is written there.
+tree, and a database file of another schema version. Each is a `StateError` naming what is
+missing, which the edge shows its caller. An origin remote that is not an owner and a name is no
+refusal: that repository is keyed by its toplevel path. Only with the database open is
+`.mightymodels/` excluded from git, before anything is written there.
 """
 
 from collections.abc import Generator

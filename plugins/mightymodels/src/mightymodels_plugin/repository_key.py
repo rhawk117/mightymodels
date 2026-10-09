@@ -9,8 +9,13 @@ its toplevel path; the prefix holds a colon, which no `owner/name` may, so the t
 The remote URL is text the plugin does not control. `origin_key` takes the path of a hosted URL,
 in the URL form or the scp form, and a path with a colon in it is no path, so no origin spells the
 local prefix. The key type then refuses anything but two plain names: no other separator, no
-parent reference, no encoded character, nothing over `REPOSITORY_KEY_LIMIT`. The refusal does not
-repeat the URL, which may carry a credential.
+parent reference, no encoded character, nothing over `REPOSITORY_KEY_LIMIT`.
+
+An origin that is not exactly an owner and a name on a host has no key of its own, and
+`origin_key` answers `None` for it: a subgroup path, a path of one name, a local path, a `file://`
+URL, and every crafted one. Its repository is keyed as one with no origin is, by its toplevel path
+and by no part of the URL, which may carry a credential. Such a repository is usable, and its
+checkouts each keep their own rows.
 
 A key is a column value. It is not a `str` and not a path, and nothing joins one onto a directory.
 """
@@ -22,8 +27,6 @@ from pathlib import Path
 from typing import Annotated, override
 
 from pydantic import ConfigDict, RootModel, StringConstraints, ValidationError
-
-from mightymodels_plugin.errors import StateError
 
 LOCAL_PREFIX = 'local:'
 REPOSITORY_KEY_LIMIT = 140
@@ -40,16 +43,6 @@ type RepositoryKeyText = Annotated[
 ]
 
 
-class UnusableOriginError(StateError):
-    def __init__(self, url: str) -> None:
-        super().__init__(
-            'the origin remote does not name a repository as owner/name on a host, so this '
-            'repository has no key to keep its state under; `git remote get-url origin` shows '
-            'the URL'
-        )
-        self.url = url
-
-
 class RepositoryKey(RootModel[RepositoryKeyText]):
     model_config = ConfigDict(frozen=True)
 
@@ -58,15 +51,15 @@ class RepositoryKey(RootModel[RepositoryKeyText]):
         return self.root
 
 
-def origin_key(url: str) -> RepositoryKey | UnusableOriginError:
+def origin_key(url: str) -> RepositoryKey | None:
     hosted = HOSTED_REPOSITORY.fullmatch(url)
     if hosted is None:
-        return UnusableOriginError(url)
+        return None
     owner_and_name = hosted['path'].strip('/').removesuffix(GIT_SUFFIX).lower()
     try:
         return RepositoryKey(owner_and_name)
     except ValidationError:
-        return UnusableOriginError(url)
+        return None
 
 
 def local_key(toplevel: Path) -> RepositoryKey:
