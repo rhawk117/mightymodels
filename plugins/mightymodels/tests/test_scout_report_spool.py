@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from mightymodels_plugin.database import DATABASE_NAME, SCHEMA_VERSION, Database
 from mightymodels_plugin.declarative import PROSE_LIMIT
+from mightymodels_plugin.repository_key import RepositoryKey, spool_file_prefix
 from mightymodels_plugin.tools.similarity.schema import SimilarityKind
 from mightymodels_plugin.tools.similarity.spool import (
     REJECTED_DIRECTORY,
@@ -45,6 +46,10 @@ def report_for(key: str, **given: object) -> Report:
     } | given
 
 
+def named(key: str, unique: str) -> str:
+    return f'{spool_file_prefix(RepositoryKey(key))}{unique}.json'
+
+
 def spooled(spool: Path, name: str, content: Report | bytes) -> Path:
     spool.mkdir(parents=True, exist_ok=True)
     file = spool.joinpath(name)
@@ -78,7 +83,7 @@ class TestAReportFileOfThisRepository:
     def after_the_next_call(
         self, own_key: str, spool: Path, state_server: StateServer
     ) -> tuple[Path, str]:
-        file = spooled(spool, 'first.json', report_for(own_key))
+        file = spooled(spool, named(own_key, 'first'), report_for(own_key))
         (searched,) = state_server.call(SEARCH)
         assert not searched.is_error
         return file, text_of(searched)
@@ -107,7 +112,7 @@ class TestAReportFileOfThisRepository:
     def test_is_taken_in_by_any_tool_and_only_once(
         self, own_key: str, spool: Path, state_server: StateServer, repository_database: Database
     ) -> None:
-        spooled(spool, 'first.json', report_for(own_key))
+        spooled(spool, named(own_key, 'first'), report_for(own_key))
 
         state_server.call(('crashout', {'action': 'stats'}))
         state_server.call(SEARCH)
@@ -118,7 +123,7 @@ class TestAReportFileOfThisRepository:
         self, own_key: str, spool: Path, state_server: StateServer, repository_database: Database
     ) -> None:
         leaking = report_for(own_key, report='drain password=hunter2', target='token=abc123')
-        spooled(spool, 'leaking.json', leaking)
+        spooled(spool, named(own_key, 'leaking'), leaking)
 
         state_server.call(SEARCH)
         (stored,) = scout_reports(repository_database)
@@ -129,8 +134,8 @@ class TestAReportFileOfThisRepository:
     def test_several_files_are_taken_in_by_one_call(
         self, own_key: str, spool: Path, state_server: StateServer, repository_database: Database
     ) -> None:
-        spooled(spool, 'first.json', report_for(own_key))
-        spooled(spool, 'second.json', report_for(own_key, report=f'{REPORT_TEXT}s'))
+        spooled(spool, named(own_key, 'first'), report_for(own_key))
+        spooled(spool, named(own_key, 'second'), report_for(own_key, report=f'{REPORT_TEXT}s'))
 
         state_server.call(SEARCH)
 
@@ -139,7 +144,7 @@ class TestAReportFileOfThisRepository:
     def test_is_not_taken_in_when_the_call_is_refused_before_it_runs(
         self, own_key: str, spool: Path, state_server: StateServer
     ) -> None:
-        file = spooled(spool, 'first.json', report_for(own_key))
+        file = spooled(spool, named(own_key, 'first'), report_for(own_key))
 
         (refused,) = state_server.call(('similarity', {'action': 'delete'}))
 
@@ -173,8 +178,8 @@ class TestAMalformedFile:
         spool: Path,
         state_server: StateServer,
     ) -> tuple[Path, bytes, bool]:
-        file = spooled(spool, 'a-bad.json', request.param)
-        spooled(spool, 'b-good.json', report_for(own_key))
+        file = spooled(spool, named(own_key, 'a-bad'), request.param)
+        spooled(spool, named(own_key, 'b-good'), report_for(own_key))
         (searched,) = state_server.call(SEARCH)
         return file, request.param, searched.is_error
 
@@ -191,17 +196,17 @@ class TestAMalformedFile:
     @pytest.mark.parametrize('beside_a_good_file', CASES, indirect=True)
     @pytest.mark.usefixtures('beside_a_good_file')
     def test_does_not_keep_the_good_file_beside_it_from_being_taken_in(
-        self, spool: Path, repository_database: Database
+        self, spool: Path, repository_database: Database, own_key: str
     ) -> None:
-        assert not spool.joinpath('b-good.json').exists()
+        assert not spool.joinpath(named(own_key, 'b-good')).exists()
         assert len(scout_reports(repository_database)) == 1
 
     @pytest.mark.parametrize('beside_a_good_file', CASES[:1], indirect=True)
     @pytest.mark.usefixtures('beside_a_good_file')
     def test_is_kept_under_a_name_of_its_own_beside_one_set_aside_before(
-        self, spool: Path, state_server: StateServer
+        self, spool: Path, state_server: StateServer, own_key: str
     ) -> None:
-        spooled(spool, 'a-bad.json', b'not json again')
+        spooled(spool, named(own_key, 'a-bad'), b'not json again')
 
         state_server.call(SEARCH)
 
@@ -214,7 +219,7 @@ class TestAMalformedFile:
         self, own_key: str, spool: Path, state_server: StateServer, repository_database: Database
     ) -> None:
         lengthened = 'x' * (PROSE_LIMIT - len(CREDENTIALS)) + CREDENTIALS
-        file = spooled(spool, 'long.json', report_for(own_key, report=lengthened))
+        file = spooled(spool, named(own_key, 'long'), report_for(own_key, report=lengthened))
 
         (searched,) = state_server.call(SEARCH)
 
@@ -235,7 +240,7 @@ class TestAFileOfAnotherRepository:
 
     @pytest.fixture
     def file_of_the_other(self, spool: Path) -> tuple[Path, bytes]:
-        file = spooled(spool, 'other.json', report_for(OTHER_KEY))
+        file = spooled(spool, named(OTHER_KEY, 'other'), report_for(OTHER_KEY))
         return file, file.read_bytes()
 
     @pytest.fixture
@@ -264,16 +269,60 @@ class TestAFileOfAnotherRepository:
 
         assert not after_the_next_call[0].exists()
 
+    def test_under_a_name_of_that_repository_is_not_opened(
+        self, spool: Path, state_server: StateServer
+    ) -> None:
+        unreadable = spooled(spool, named(OTHER_KEY, 'garbage'), b'garbage')
+
+        state_server.call(SEARCH)
+
+        assert unreadable.read_bytes() == b'garbage'
+        assert not spool.joinpath(REJECTED_DIRECTORY).exists()
+
+
+class TestAFileUnderTheDigestOfThisRepositoryThatNamesAnother:
+    def test_is_set_aside_with_its_bytes(
+        self, own_key: str, spool: Path, state_server: StateServer, repository_database: Database
+    ) -> None:
+        file = spooled(spool, named(own_key, 'misnamed'), report_for(OTHER_KEY))
+        content = file.read_bytes()
+
+        state_server.call(SEARCH)
+
+        assert not file.exists()
+        assert [kept.read_bytes() for kept in rejected_files(spool)] == [content]
+        assert scout_reports(repository_database) == []
+
+
+class TestAFileUnderAnyOtherName:
+    @pytest.mark.parametrize(
+        'name',
+        [
+            pytest.param('plain.json', id='no-digest'),
+            pytest.param('{digest}.json', id='digest-without-separator'),
+            pytest.param('x{digest}-late.json', id='digest-not-first'),
+        ],
+    )
+    def test_is_never_read(
+        self, name: str, own_key: str, spool: Path, state_server: StateServer
+    ) -> None:
+        digest = spool_file_prefix(RepositoryKey(own_key)).removesuffix('-')
+        file = spooled(spool, name.format(digest=digest), report_for(own_key))
+
+        state_server.call(SEARCH)
+
+        assert file.exists()
+
 
 class TestNoRepositoryKeyIsEverInAPath:
     @pytest.fixture
     def after_every_kind_of_file(
         self, own_key: str, spool: Path, state_server: StateServer, data_directory: Path
     ) -> list[str]:
-        spooled(spool, 'own.json', report_for(own_key))
-        spooled(spool, 'other.json', report_for(OTHER_KEY))
-        spooled(spool, 'traversal.json', report_for('../../escape'))
-        spooled(spool, 'garbage.json', b'garbage')
+        spooled(spool, named(own_key, 'own'), report_for(own_key))
+        spooled(spool, named(OTHER_KEY, 'other'), report_for(OTHER_KEY))
+        spooled(spool, named(own_key, 'traversal'), report_for('../../escape'))
+        spooled(spool, named(own_key, 'garbage'), b'garbage')
         state_server.call(SEARCH)
         return sorted(tree(data_directory.parent))
 
@@ -284,7 +333,7 @@ class TestNoRepositoryKeyIsEverInAPath:
 
         assert 'escape' not in paths
         assert own_key.removeprefix('local:') not in paths
-        assert 'gadgets' not in paths.replace('other.json', '')
+        assert 'gadgets' not in paths
 
     def test_the_file_naming_a_traversal_is_set_aside_inside_the_spool(
         self, after_every_kind_of_file: list[str], data_directory: Path
@@ -303,20 +352,24 @@ class TestAFileThatIsNotARegularFile:
         outside = tmp_path.joinpath('outside.json')
         outside.write_text(json.dumps(report_for(own_key)), encoding='utf-8')
         spool.mkdir(parents=True)
-        spool.joinpath('link.json').symlink_to(outside)
-        spool.joinpath('directory.json').mkdir()
+        spool.joinpath(named(own_key, 'link')).symlink_to(outside)
+        spool.joinpath(named(own_key, 'directory')).mkdir()
 
         (searched,) = state_server.call(SEARCH)
 
         assert not searched.is_error
-        assert spool.joinpath('link.json').is_symlink()
-        assert spool.joinpath('directory.json').is_dir()
+        assert spool.joinpath(named(own_key, 'link')).is_symlink()
+        assert spool.joinpath(named(own_key, 'directory')).is_dir()
         assert outside.exists()
 
     def test_a_file_that_does_not_end_in_json_is_not_read(
         self, own_key: str, spool: Path, state_server: StateServer
     ) -> None:
-        file = spooled(spool, 'half-written.tmp', report_for(own_key))
+        file = spooled(
+            spool,
+            f'{spool_file_prefix(RepositoryKey(own_key))}half-written.tmp',
+            report_for(own_key),
+        )
 
         state_server.call(SEARCH)
 
@@ -329,7 +382,9 @@ class TestTheBoundOnAFileCount:
         count = SPOOL_FILES_PER_CALL + 2
         for number in range(count):
             spooled(
-                spool, f'{number:04}.json', report_for(own_key, report=f'{REPORT_TEXT} {number}')
+                spool,
+                named(own_key, f'{number:04}'),
+                report_for(own_key, report=f'{REPORT_TEXT} {number}'),
             )
         return count
 
@@ -347,6 +402,30 @@ class TestTheBoundOnAFileCount:
         assert after_one == SPOOL_FILES_PER_CALL
         assert len(scout_reports(repository_database)) == more_files_than_a_call_takes
         assert list(spool.glob('*.json')) == []
+
+
+class TestFilesOfAnotherRepositoryWaitingBeyondTheBound:
+    @pytest.fixture
+    def own_file(self, own_key: str, spool: Path) -> Path:
+        for number in range(SPOOL_FILES_PER_CALL + 2):
+            name = f'{"0" * 64}-{number:04}.json'
+            spooled(spool, name, report_for(OTHER_KEY, report=f'{REPORT_TEXT} {number}'))
+        return spooled(spool, named(own_key, 'mine'), report_for(own_key))
+
+    def test_do_not_keep_the_file_of_this_one_from_the_next_call(
+        self,
+        own_file: Path,
+        spool: Path,
+        state_server: StateServer,
+        repository_database: Database,
+    ) -> None:
+        assert min(spool.glob('*.json')) != own_file
+
+        state_server.call(SEARCH)
+
+        assert not own_file.exists()
+        assert len(scout_reports(repository_database)) == 1
+        assert len(list(spool.glob('*.json'))) == SPOOL_FILES_PER_CALL + 2
 
 
 class TestWhereNothingIsToBeTakenIn:
@@ -369,7 +448,7 @@ class TestAFileOfAnotherSchemaVersion:
         data_directory.mkdir()
         with closing(sqlite3.connect(data_directory.joinpath(DATABASE_NAME))) as connection:
             connection.execute(f'PRAGMA user_version = {SCHEMA_VERSION + 1}')
-        spooled(spool, 'first.json', report_for(own_key))
+        spooled(spool, named(own_key, 'first'), report_for(own_key))
         return tree(data_directory)
 
     def test_leaves_the_database_and_the_spool_as_they_were(

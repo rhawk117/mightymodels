@@ -1,8 +1,8 @@
 """The scout-report spool: files a process outside the server leaves for it to take in.
 
 The spool is the directory `SPOOL_DIRECTORY` in the plugin data directory, which every repository
-shares. A report is one file in it named `<anything>.json`, whose content is a JSON object with
-exactly these keys:
+shares. A report is one file in it named `<digest>-<unique part>.json`, whose content is a JSON
+object with exactly these keys:
 
     {"repository_key": "owner/name", "scout": "code-scout", "target": "...", "report": "..."}
 
@@ -10,11 +10,17 @@ exactly these keys:
 is non-blank text of at most `PROSE_LIMIT`. A writer creates the file under a name that does not
 end in `.json` and renames it to one that does, so the server never reads half a report.
 
-The key is in the file, since the directory is shared. A server takes in the files of its own
-repository and leaves every other file where it is. A file it cannot take in, because it is over
-`SPOOL_FILE_BYTES`, is not a report, or holds text that redaction lengthens past its column, is
-moved to `REJECTED_DIRECTORY` inside the spool under a name of its own and kept. Every path is the
-data directory and a fixed name: the file says which repository it is for and nothing else, and no
+`<digest>` is the SHA-256 hex digest of the repository key's text in UTF-8, and
+`spool_file_prefix` in `repository_key.py` gives `<digest>-` for a key, so a writer names its file
+`spool_file_prefix(key)` followed by a unique part and `.json`. A server lists only the names that
+begin with its own prefix: a file of another repository costs it nothing and cannot starve it, and
+a file under any other name is never opened, read or moved.
+
+The key is in the file as well, so a file under this repository's digest whose content names
+another key is set aside, and so is a file it cannot take in, because it is over
+`SPOOL_FILE_BYTES`, is not a report, or holds text that redaction lengthens past its column. A
+file set aside is moved to `REJECTED_DIRECTORY` inside the spool under a name of its own and
+kept. Every path is the data directory, a fixed name, the digest and the writer's unique part: no
 key is ever part of a path.
 
 A call takes in at most `SPOOL_FILES_PER_CALL` files, oldest name first.
@@ -35,10 +41,10 @@ SPOOL_FILES_PER_CALL = 100
 SPOOL_FILE_BYTES = 64 * 1024
 
 
-def waiting_files(spool: Path) -> list[Path]:
+def waiting_files(spool: Path, prefix: str) -> list[Path]:
     files = (
         file
-        for file in sorted(spool.glob(f'*{REPORT_SUFFIX}'))
+        for file in sorted(spool.glob(f'{prefix}*{REPORT_SUFFIX}'))
         if file.is_file(follow_symlinks=False)
     )
     return list(islice(files, SPOOL_FILES_PER_CALL))

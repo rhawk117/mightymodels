@@ -37,6 +37,7 @@ HOSTED_REPOSITORY = re.compile(
     r'(?P<path>[^:]+)'
 )
 GIT_SUFFIX = '.git'
+SPOOL_NAME_SEPARATOR = '-'
 
 type RepositoryKeyText = Annotated[
     str, StringConstraints(pattern=REPOSITORY_KEY_PATTERN, max_length=REPOSITORY_KEY_LIMIT)
@@ -65,3 +66,7 @@ def origin_key(url: str) -> RepositoryKey | None:
 def local_key(toplevel: Path) -> RepositoryKey:
     digest = hashlib.sha256(os.fsencode(toplevel)).hexdigest()
     return RepositoryKey(f'{LOCAL_PREFIX}{digest}')
+
+
+def spool_file_prefix(key: RepositoryKey) -> str:
+    return f'{hashlib.sha256(key.root.encode()).hexdigest()}{SPOOL_NAME_SEPARATOR}'

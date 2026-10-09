@@ -5,9 +5,10 @@ most `CANDIDATE_CAP` of them, each with its overlap with the query, and it can b
 It applies no threshold: a query is usually a part of what it looks for.
 
 `take_in_spool` stores the scout reports waiting in the spool for this repository, each with its
-similarity row in one transaction, and removes the file. A file for another repository stays. A
-file that is not a report, or that redaction lengthens past its column, is set aside and the call
-goes on. The spool and its file format are in `spool.py`.
+similarity row in one transaction, and removes the file. Only the files named with this
+repository's digest are listed, so a file for another repository is never opened. A file that is
+not a report, that names another repository, or that redaction lengthens past its column, is set
+aside and the call goes on. The spool and its file format are in `spool.py`.
 
 The service reads and writes the database and the spool and nothing else.
 """
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from mightymodels_plugin.database import Database
 from mightymodels_plugin.redaction import RedactedTextTooLongError
+from mightymodels_plugin.repository_key import spool_file_prefix
 from mightymodels_plugin.tools.similarity.rendering import matches_text
 from mightymodels_plugin.tools.similarity.repository import similarity_transaction
 from mightymodels_plugin.tools.similarity.schema import (
@@ -52,10 +54,8 @@ class SimilarityService:
 
     def take_in(self, file: Path) -> None:
         report = spooled_report(file)
-        if report is None:
+        if report is None or report.repository_key != self.database.repository_key:
             set_aside(file, self.spool)
-            return
-        if report.repository_key != self.database.repository_key:
             return
         if self.store(report) is not None:
             set_aside(file, self.spool)
@@ -63,6 +63,6 @@ class SimilarityService:
         file.unlink()
 
     def take_in_spool(self) -> None:
-        for file in waiting_files(self.spool):
+        for file in waiting_files(self.spool, spool_file_prefix(self.database.repository_key)):
             with suppress(FileNotFoundError):
                 self.take_in(file)

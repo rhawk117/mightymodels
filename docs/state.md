@@ -80,7 +80,7 @@ repository key, since FTS5 keeps one set of term statistics for all repositories
 
 Scout reports reach the database through a spool, so a hook can leave one without calling the
 server. The spool is the directory `scout-spool` in the plugin data directory, beside
-`mightymodels.db`. A report is one file `<anything>.json` directly in it, whose content is one
+`mightymodels.db`. A report is one file `<digest>-<unique part>.json` directly in it, whose content is one
 JSON object with exactly these keys:
 
 ```json
@@ -90,13 +90,15 @@ JSON object with exactly these keys:
 `repository_key` is the key described above (`owner/name`, or `local:` and 64 hex digits),
 `scout` is `code-scout` or `web-scout`, `target` is at most 255 characters and `report` is
 non-blank text of at most 4000, and the file is at most 64 KiB. A writer creates the file under
-a name that does not end in `.json` and renames it, so a half-written file is never read. The
-directory is shared by every repository, so the key is in the file: the server takes in the files
-of its own repository on its next tool call, stores each as a scout report with a similarity row,
-and deletes the file. It leaves every other repository's file where it is, ignores symlinks and
-directories, and takes in at most 100 files per call. A file that is not valid, or whose text
+a name that does not end in `.json` and renames it, so a half-written file is never read. `<digest>` is the SHA-256 hex digest of the repository key's text in UTF-8 and the
+`spool_file_prefix(key)` function in `repository_key.py` gives `<digest>-`. The directory is
+shared by every repository, so the server lists only the names that begin with its own digest
+and a file under any other name is never opened, read or moved: other repositories' files cannot
+keep it from its own. It takes in those files on its next tool call, stores each as a scout report
+with a similarity row, and deletes the file; a file under its digest whose content names another
+key is set aside. It ignores symlinks and directories, and takes in at most 100 files per call. A file that is not valid, or whose text
 redaction lengthens past its column, is moved to `scout-spool/rejected/` under a new name and kept;
-the call goes on. No key is ever part of a path.
+the call goes on. A path holds the digest and never the key.
 
 ## ticket.yml
 
