@@ -6,8 +6,8 @@ the answer. The answer is validated against the question's model before the tool
 value outside the choices, or over the length of an argument, is refused before any write. Nothing
 is stored by the call that asks; the retried call carries the answer and stores it.
 
-`Context.elicit` is not used: Claude Code speaks a protocol with no back-channel, and only a
-`Resolve` parameter is answered there.
+The context method that asks over a back-channel is not used: Claude Code speaks a protocol with
+none, and only a `Resolve` parameter is answered there.
 
 Nobody may answer, as under `claude -p`, where the tool receives `cancel` at once. A tool then
 returns `needs_input_text`, which names each question, its choices and the argument to pass on the
