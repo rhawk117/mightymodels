@@ -1,0 +1,67 @@
+{
+  "description": "mightymodels: export the plugin data directory to the session's commands, so `mightymodels verify run` opens the database the state server keeps; deny a dispatch by one of this plugin's workers (agent_type mightymodels:<worker>) outside the workers its agent file allows, and leave every other caller alone; keep a scout's report for search, from its hand-back or else its closing text; hold an implementer's stop once while its task has no DONE brief; and write the snapshot of the ticket on the checked-out branch before a compaction.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels\" session-start"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-dispatch-hook\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^mightymodels:(code-scout|web-scout)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-hook\" subagent-record"
+          }
+        ]
+      },
+      {
+        "matcher": "^mightymodels:(engineer|architect)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-hook\" completion-gate"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-hook\" subagent-handback"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/bin/mightymodels-hook\" pre-compact"
+          }
+        ]
+      }
+    ]
+  }
+}

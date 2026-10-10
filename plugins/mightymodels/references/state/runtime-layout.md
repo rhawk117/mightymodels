@@ -1,0 +1,41 @@
+# Runtime layout for hooks
+
+Read before changing a hook. A hook is a CLI subcommand of `mightymodels` that `hooks/hooks.json` runs, and it works from the state database below and from git. It never defines a second state model, and it keeps no file of its own to remember what it did.
+
+## Where the state database is
+
+The state database is `mightymodels.db` in the plugin data directory, the directory Claude Code names in `CLAUDE_PLUGIN_DATA` for the state server and for hook commands. It is outside every repository and serves all of them: each row carries a repository key, the origin remote's `owner/name` or, with no origin, a hash of the toplevel path. An origin that is not exactly `owner/name` on a host gets the path hash too: a subgroup path such as `group/sub/name`, a path of one name, a local path or a `file://` URL. Checkouts keyed by their path each keep their own rows, and one that moves starts empty. A command run through the Bash tool gets none of the plugin's variables, so the SessionStart hook, `mightymodels session-start`, appends one line to the session's env file (`CLAUDE_ENV_FILE`) that exports the same directory as `MIGHTYMODELS_DATA_DIR`, and `mightymodels verify run` reads that to open the file the server opened. Without the variable, or outside a git work tree, the server answers every tool call with what is missing and `verify run` exits 2 with the same on standard error.
+
+Every session of every repository writes that one file. It is kept in SQLite's write-ahead log mode, so `mightymodels.db-wal` and `mightymodels.db-shm` sit beside it while a session has it open, and every connection has a busy timeout of 10 seconds: a write waits that long for another session's write before it is refused as locked. The mode is set only after the schema version stamp is accepted.
+
+This breaks with earlier versions, which kept the database inside the repository under `.mightymodels/`. That file is not read, imported or changed, so state recorded in it does not carry over, and it can be deleted. The new file carries a schema version stamp, and a file with another stamp is refused by name instead of read, and nothing is written to it.
+
+## The hooks
+
+Under GitHub Copilot the plugin ran five hooks. Each has a counterpart now. A hook command exits 0 whatever happens and says on standard error why it did nothing (no data directory, not a git work tree, a database it refuses); only the completion gate ever answers a block, and only as below. The three that can stop something go through `bin/mightymodels-hook`, a `sh` wrapper that turns any failure of the Python process into exit 0 with one line on standard error, because exit 2 from a `SubagentStop` or `PreCompact` hook blocks.
+
+| Former behaviour    | Claude Code event (matcher)                                   | Command (script)                                  | Reads                                                                                                                      | Writes                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| session bootstrap   | `SessionStart`                                                | `session-start` (`bin/mightymodels`)              | `CLAUDE_PLUGIN_DATA`, `CLAUDE_ENV_FILE`, the env file                                                                      | one `export MIGHTYMODELS_DATA_DIR=...` line to the env file, unless it is already there                                                                 |
+| decision recorder   | none: elicitation persistence (T11) replaces it                | none                                              | not applicable                                                                                                             | not applicable                                         |
+| subagent recorder   | `SubagentStop` (`^mightymodels:(code-scout\|web-scout)$`) and `PostToolUse` (`SubagentHandback`) | `subagent-record` and `subagent-handback` (`bin/mightymodels-hook`) | the hook input (`agent_type`, `agent_id`, and `last_assistant_message` on the stop or `tool_input.message` on the hand-back), the data directory, git for the repository key | one file in `scout-spool/` in the data directory, named `spool_file_prefix(key)`, `stop-` or `handback-`, a unique part and `.json`, written as `.part` and renamed |
+| completion gate     | `SubagentStop` (`^mightymodels:(engineer\|architect)$`)        | `completion-gate` (`bin/mightymodels-hook`)       | the hook input (`agent_type`, `stop_hook_active`), the ticket on the checked-out branch, its in-progress tasks, the briefs | on standard output `{"decision": "block", "reason": ...}` when a task the worker started has no brief DONE half naming a commit; no file, no row        |
+| pre-compact snapshot | `PreCompact` (any trigger)                                    | `pre-compact` (`bin/mightymodels-hook`)           | the ticket on the checked-out branch, its tasks, contract receipts, ledgers and review, and git                            | `.mightymodels/SLUG/handoffs/snapshot.json` and `snapshot.md`, the record and Markdown the `snapshot` tool serves                                       |
+
+The plugin also has a `PreToolUse` hook on `Agent`, `dispatch-hook` (`bin/mightymodels-dispatch-hook`), which has no Copilot counterpart: it denies a plugin worker's dispatch outside the workers its agent file allows, and fails closed for a worker.
+
+### The branch ticket
+
+A hook's ticket is the one ticket of the repository, not closed, whose `branch` is the checked-out branch. A detached HEAD, no match, or two matches mean no ticket: the completion gate and the snapshot do nothing.
+
+### The completion gate
+
+When `mightymodels:engineer` or `mightymodels:architect` stops, the gate looks for in-progress tasks whose latest attempt was that worker's. A plan task (`T` id) whose brief `.mightymodels/SLUG/briefs/task-NN.md` is missing, or has no `## DONE` half with a `commit: <hash>` line, blocks the stop; the reason names the task and what is missing. A `C` or `R` task has no brief and is not held. The gate keeps no marker of its own: Claude Code sets `stop_hook_active` on the stop that follows a block, and the gate lets that stop through, so a worker that cannot finish is never trapped. A worker with nothing in progress, any other agent type and a stop with no ticket pass untouched.
+
+### The subagent recorder
+
+On Claude Code 2.1.271 or later in auto mode a scout delivers its report through the `SubagentHandback` tool, and the `last_assistant_message` of its `SubagentStop` is closing text. The `PostToolUse` hook on `SubagentHandback` spools the call's `tool_input.message` (the input carries the scout's `agent_type` and `agent_id`); the `SubagentStop` hook spools `last_assistant_message`, which is the report of a session with no hand-back. Both targets are the scout and the `agent_id`, since the input carries no dispatch. Neither hook ever blocks or changes a hand-back. The recorder opens no database: the state server takes the file in on its next tool call, takes in a `handback-` file before any `stop-` file, and drops a `stop-` file when a report of that scout and target is stored, so one report is kept per agent and the handed-back one wins. A report whose file would pass the spool's cap (`SPOOL_FILE_BYTES`, sized from `REPORT_LIMIT`) is not written; one over `REPORT_LIMIT` characters is written and set aside by the server. `docs/state.md` has the spool's name and format.
+
+### Snapshot files
+
+The pre-compact hook writes the two files the `snapshot` tool describes under the ticket's `handoffs/`, limit 20 per list. `.mightymodels/` is excluded from git by the same call that opens the database, before anything is written there.

@@ -4,28 +4,30 @@ The shared vocabulary of the mightymodels loop. Every mightymodels skill and age
 
 ## Severity table
 
-| Severity | Anchor |
-|---|---|
-| Critical | Merging or shipping causes harm now: exploitable defect reachable from an untrusted boundary, committed secret (including branch history), removed authn/authz enforcement, data-loss path |
-| High | Unacceptable risk, or removes the net that catches future defects: deleted/skipped test without replacement, weakened CI gate, breaking change with confirmed live callers, silently dropped plan commitment, security defect requiring preconditions |
-| Medium | Costs real time later: new logic without tests, public doc drift, swallowed errors, compounding maintainability debt, unjustified non-security suppressions |
-| Low | Nits, style, internal doc drift |
+| Severity | Anchor                                                                                                                                                                                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Critical | Merging or shipping causes harm now: exploitable defect reachable from an untrusted boundary, committed secret (including branch history), removed authn/authz enforcement, data-loss path                                                            |
+| High     | Unacceptable risk, or removes the net that catches future defects: deleted/skipped test without replacement, weakened CI gate, breaking change with confirmed live callers, silently dropped plan commitment, security defect requiring preconditions |
+| Medium   | Costs real time later: new logic without tests, public doc drift, swallowed errors, compounding maintainability debt, unjustified non-security suppressions                                                                                           |
+| Low      | Nits, style, internal doc drift                                                                                                                                                                                                                       |
 
-Cross-reviewer mapping: uncle-bob's `Blocker` maps to **Critical**; its High/Medium/Low map straight across. When two reviewers flag the same defect at different severities, the higher wins and both are noted; a gap of two or more levels is flagged for the user's judgment.
+Cross-reviewer mapping: uncle-bob's `Blocker` maps to **High**; its High/Medium/Low map straight across. When two reviewers flag the same defect at different severities, the higher wins and both are noted; a gap of two or more levels is flagged for the user's judgment.
 
 ## Verdict vocabularies (per role, consumed by the coordinator)
 
-| Role | Vocabulary | Meaning of the hard state |
-|---|---|---|
-| scout | `VERIFIED` / `INFERRED` / `NEEDS-ANALYSIS` / `UNKNOWN-BLOCKED` | UNKNOWN-BLOCKED: the answer is not in what it can read, and it names where the answer lives |
-| engineer | `done` / `blocked`; per task `verified="true|false|deferred"` | blocked: missing inputs, out-of-scope reference, or plan mismatch — with file:line |
-| budgetron | `fixed` / `escalated` | escalated: the fix exceeds the named issue's budget or scope; route to a full engineer |
-| gitty-up (ci) | `pass` / `fail` / `error` | error: checks absent, pending, or unresolvable — never treated as pass |
-| review | `BLOCK` / `MERGE WITH CONDITIONS` / `CLEAR` | CLEAR is impossible while any security-relevant question sits UNKNOWN-BLOCKED |
+| Role                 | Vocabulary                                                                          | Meaning of the hard state                                                                                                                                                                                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| code-scout           | `VERIFIED` / `INFERRED` / `NEEDS-ANALYSIS` / `UNKNOWN-BLOCKED`                      | UNKNOWN-BLOCKED: the answer is not in what it can read, and it names where the answer lives                                                                                                                                                                               |
+| web-scout            | `VERIFIED` / `INFERRED` / `NEEDS-ANALYSIS` / `UNKNOWN-BLOCKED`                      | UNKNOWN-BLOCKED: the answer is not in what it can fetch, and it names where the answer lives                                                                                                                                                                              |
+| engineer             | `done` / `failed` / `blocked`; per task `verified` = `true`, `false`, or `deferred` | failed: edits made but a required verification still fails after its failed fixes (up to three, each recorded with the `failed_fix` tool); blocked: dispatch incomplete or plan wrong on the ground. Both route to architect                                                                                                       |
+| architect            | `completed` / `replanned` / `scope-expansion-requested` / `blocked`                 | scope-expansion-requested: the durable fix needs files outside the envelope; the coordinator or user approves before a systemic-refactor dispatch                                                                                                                         |
+| task (the `task` tool) | `pending` / `in-progress` / `verified` / `failed` / `blocked` / `superseded` | verified: the commit is HEAD, every `Tn.*` (or `Cn.*`) contract command passed at it, every other AC cited, commit inside the owned set; checked by the tool, never asserted. superseded: a replanned task, closed so `ready` can pass. `Tn` are plan tasks, `Cn` CI fixes during stick-the-landing, `Rn` review-circus remediation of finding `Fn` |
+| gitty-up (ci)        | `pass` / `fail` / `error`                                                           | error: checks absent, pending, or unresolvable — never treated as pass                                                                                                                                                                                                    |
+| review               | `BLOCK` / `MERGE WITH CONDITIONS` / `CLEAR`                                         | CLEAR is impossible while any security-relevant question sits UNKNOWN-BLOCKED                                                                                                                                                                                             |
 
 ## The two-half task brief
 
-`briefs/task-NN.md`, 80 lines total — roughly 15 ASKED, up to 65 DONE. The ASKED half is written by the primary at dispatch (promptlint's engineer template emits it); the DONE half is appended by the engineer on completion. The scout verification step checks DONE against ASKED, criterion by criterion.
+`briefs/task-NN.md`, 80 lines total — roughly 15 ASKED, up to 65 DONE. The ASKED half is written by the primary at dispatch (prompting-subagents' engineer template emits it); the DONE half is appended by the engineer on completion. The scout verification step checks DONE against ASKED, criterion by criterion.
 
 ```markdown
 ## ASKED
@@ -54,16 +56,22 @@ IDs are stable within their report (MV-n, UB-n) and aggregation preserves proven
 
 ## Caps are contracts
 
-Brief 80 lines · REPORT.md 50 · archive 30 · plan.md ~200 · whats-broken.md current-state only, regenerated per attempt. Hitting a cap means the content belongs in a different layer, not that the file grows.
+Brief 80 lines · REPORT.md 50 · archive 30 · plan.md ~200 · whats-broken.md current-state only, regenerated per attempt · one architect implementation attempt per task, plus one `systemic-refactor` pass after an approved scope expansion; `diagnose-replan` passes never count against it. Hitting a cap means the content belongs in a different layer, not that the file grows.
 
 ## Durable-before-advance
 
 Workflow state advances only after the evidence for it is externalized; recovery reads
-artifacts, never conversation. The per-task order is fixed: the engineer commits, appends the
-DONE half (with the commit hash) to the brief, then reports; the verifying scout runs; the
-verification outcome is recorded in the brief or the issue checklist; only then is the task's
-box checked. On recovery, a commit with no DONE half is an incomplete task and an unrecorded
+artifacts, never conversation. The per-task order is fixed: `task` `start` records the attempt (`task_attempts`) and its owned set; the
+engineer commits, appends the DONE half (with the commit hash) to the brief, then reports; the
+contract commands run through `mightymodels verify run`, each writing a `receipts` row, and
+code-scout checks the assertion ACs; `task` `verify` records the outcome in the `tasks` and
+`task_transitions` rows; only then does the loop advance. On recovery, a commit with no DONE half is an incomplete task and an unrecorded
 verification is an unverified task — worker conversational state is never authoritative.
+
+Nothing is pushed until `task` `ready` answers `ready`: every plan task verified or superseded,
+no `Cn` or `Rn` task failed or blocked, and every contract command outside superseded tasks passing at the
+current HEAD. A commit after the last verification makes every receipt stale, so a CI-fix push
+follows `mightymodels verify run --all --phase landing`.
 
 ## Rot rules
 
