@@ -25,7 +25,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def run_git(directory: Path, *arguments: str) -> str:
     completed = subprocess.run(  # noqa: S603 - fixed git argv, every argument is a separate word
-        ['git', '-C', str(directory), *arguments],  # noqa: S607 - git is resolved from PATH like in the package
+        ['git', '-C', str(directory), *arguments],  # noqa: S607 - git is resolved from PATH by name
         check=True,
         capture_output=True,
         text=True,

@@ -69,17 +69,22 @@ extend-select = [
 ]
 
 
-ignore = ["E111", "E114", "E117", "W191", "T201", "TRY003"]
+ignore = [
+    "E111",  # conflicts with the formatter, which owns indentation
+    "E114",  # conflicts with the formatter, which owns indentation
+    "E117",  # conflicts with the formatter, which owns indentation
+    "W191",  # conflicts with the formatter, which owns indentation
+    "T201",  # every print the rule reports is in the vibe-code plugin, whose CLI writes to stdout
+]
 
 
 [lint.per-file-ignores]
 "**/tests/**/*.py" = [
-    "S101",
-    "PLR2004",
-    "PLR0913",
-    "PLR0917",
-    "FBT001",
-    "ANN401",
+    "S101",  # tests are written as bare assert statements
+    "PLR2004",  # tests compare against literal expected values
+    "PLR0913",  # test functions and helpers take many fixtures as arguments
+    "PLR0917",  # test functions and helpers take many positional fixtures
+    "FBT001",  # test helpers and parametrized tests take boolean positional flags
 ]
 
 [lint.flake8-annotations]

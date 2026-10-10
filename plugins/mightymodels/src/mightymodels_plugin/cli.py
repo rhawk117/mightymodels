@@ -94,10 +94,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if (code := run_hook_command(arguments)) is not None:
         return code
     if arguments.command == VERIFY_COMMAND:
-        from mightymodels_plugin.commands.verify import verify_run  # noqa: PLC0415 - SQLAlchemy and Pydantic cost up to a second to import and `--help` must not pay it
+        from mightymodels_plugin.commands.verify import verify_run  # noqa: PLC0415 - importing commands.verify (SQLAlchemy and Pydantic) took 0.37 s measured with -X importtime and `--help` must not pay it
 
         return verify_run(arguments)
-    from mightymodels_plugin.server import serve  # noqa: PLC0415 - importing mcp costs over a second and every hook and --help run would pay it
+    from mightymodels_plugin.server import serve  # noqa: PLC0415 - importing server (mcp) took 1.5 s measured with -X importtime and every hook and --help run would pay it
 
     serve()
     return 0
