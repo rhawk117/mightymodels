@@ -4,6 +4,10 @@ Every action but `start` and `list` works on one investigation, and `investigati
 one place that refuses a call that names none. `knowns` reads the whole table when the call
 carries no filter.
 
+`start` asks the user for the kind of target when the request leaves it out, through `AskedKind`.
+`ServedInvestigation` holds the service and the answer, which a tool's argument limit leaves no
+room to take as two parameters.
+
 `ResolvedInvestigations` is a plain assignment because the SDK does not see a `Resolve` marker
 behind a PEP 695 `type` alias and would put the parameter in the tool's schema.
 """
@@ -14,13 +18,17 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Annotated
 
+from mcp.server.elicitation import ElicitationResult
 from mcp.server.mcpserver import Context, Resolve
 
 from mightymodels_plugin.slug import Slug
+from mightymodels_plugin.tools.asking import chosen, needs_input_text
+from mightymodels_plugin.tools.investigation.questions import AskedKind, KindAnswer, kind_question
 from mightymodels_plugin.tools.investigation.schema import (
     InvestigationAction,
     InvestigationPayload,
     InvestigationStart,
+    InvestigationStartRequest,
     InvestigationView,
     KnownsFilter,
     LedgerRound,
@@ -42,6 +50,7 @@ INVESTIGATION_ARGUMENT = 'investigation_id'
 class InvestigationCall:
     investigation_id: Slug | None
     payload: InvestigationPayload
+    asked: ElicitationResult[KindAnswer]
 
 
 def investigation_for(action: InvestigationAction, call: InvestigationCall) -> Slug:
@@ -53,9 +62,14 @@ def investigation_for(action: InvestigationAction, call: InvestigationCall) -> S
 def start_investigation(
     investigations: InvestigationService, call: InvestigationCall
 ) -> InvestigationView:
-    if not isinstance(call.payload.request, InvestigationStart):
+    request = call.payload.request
+    if not isinstance(request, InvestigationStartRequest):
         raise MissingArgumentsError(InvestigationAction.START, 'a request holding target and kind')
-    return investigations.start(call.payload.request, started=datetime.now(tz=UTC))
+    kind = request.kind or chosen(call.asked)
+    if kind is None:
+        return InvestigationView(text=needs_input_text([kind_question(request.target)]))
+    started = InvestigationStart(target=request.target, kind=kind)
+    return investigations.start(started, started=datetime.now(tz=UTC))
 
 
 def add_entries(investigations: InvestigationService, call: InvestigationCall) -> InvestigationView:
@@ -97,6 +111,21 @@ ResolvedInvestigations = Annotated[InvestigationService, Resolve(lifespan_invest
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class InvestigationServed:
+    investigations: InvestigationService
+    asked: ElicitationResult[KindAnswer]
+
+
+def serve_investigations(
+    investigations: ResolvedInvestigations, asked: AskedKind
+) -> InvestigationServed:
+    return InvestigationServed(investigations=investigations, asked=asked)
+
+
+ServedInvestigation = Annotated[InvestigationServed, Resolve(serve_investigations)]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class InvestigationTool:
     handlers: Mapping[
         InvestigationAction,
@@ -109,14 +138,15 @@ class InvestigationTool:
         investigation_id: Slug | None = None,
         payload: InvestigationPayload | None = None,
         *,
-        investigations: ResolvedInvestigations,
+        served: ServedInvestigation,
     ) -> InvestigationView:
         """Open an investigation, append ledger entries, or render the ledger or its knowns."""
         call = InvestigationCall(
             investigation_id=investigation_id,
             payload=InvestigationPayload() if payload is None else payload,
+            asked=served.asked,
         )
-        return dispatch_to_service(self.handlers, action, call, service=investigations)
+        return dispatch_to_service(self.handlers, action, call, service=served.investigations)
 
 
 investigation_tool = InvestigationTool(

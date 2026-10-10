@@ -5,7 +5,9 @@ round, the time and HEAD, and stores it; the target is the first entry of every 
 `start` writes it.
 
 `InvestigationRequest` is what an action needs beyond the investigation and the entries: the
-target and its kind for `start`, the round for `add`, the kinds and the limit for `knowns`.
+target and its kind for `start`, the round for `add`, the kinds and the limit for `knowns`. A
+`start` request may leave the kind out, and the tool asks the user; `InvestigationStart` is the
+complete form the service takes.
 `InvestigationPayload` carries the entries and the request as the tool's one payload argument.
 """
 
@@ -75,8 +77,12 @@ class LedgerEntry(RequestModel):
     supersedes: tuple[int, ...] = ()
 
 
-class InvestigationStart(RequestModel):
+class InvestigationStartRequest(RequestModel):
     target: ProseText
+    kind: TargetKind | None = None
+
+
+class InvestigationStart(InvestigationStartRequest):
     kind: TargetKind
 
 
@@ -89,7 +95,7 @@ class KnownsFilter(RequestModel):
     limit: KnownsLimit = DEFAULT_KNOWNS_LIMIT
 
 
-type InvestigationRequest = InvestigationStart | LedgerRound | KnownsFilter
+type InvestigationRequest = InvestigationStartRequest | LedgerRound | KnownsFilter
 
 
 class InvestigationPayload(RequestModel):

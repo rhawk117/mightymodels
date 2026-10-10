@@ -37,7 +37,11 @@ from mightymodels_plugin.tools.crashout.schema import CrashoutEntry
 from mightymodels_plugin.tools.crashout.service import CrashoutService
 from mightymodels_plugin.tools.crashout.tables import CrashoutRow
 from mightymodels_plugin.tools.failed_fix.schema import FailedFixPayload, TaskFailedFix
-from mightymodels_plugin.tools.investigation.schema import InvestigationStart, LedgerEntry
+from mightymodels_plugin.tools.investigation.schema import (
+    InvestigationStart,
+    InvestigationStartRequest,
+    LedgerEntry,
+)
 from mightymodels_plugin.tools.investigation.service import InvestigationService
 from mightymodels_plugin.tools.investigation.tables import LedgerEntryRow
 from mightymodels_plugin.tools.request import RequestModel
@@ -47,6 +51,7 @@ from mightymodels_plugin.tools.review.schema import (
     FINDING_ID_LIMIT,
     Decision,
     DisposePayload,
+    DisposeRequest,
     Disposition,
     Emphasis,
     Evidence,
@@ -61,6 +66,7 @@ from mightymodels_plugin.tools.review.schema import (
     Severity,
     Shape,
     StartPayload,
+    StartRequest,
 )
 from mightymodels_plugin.tools.review.service import REPORT_FILES, ReviewService
 from mightymodels_plugin.tools.review.tables import (
@@ -87,7 +93,7 @@ from mightymodels_plugin.tools.tests.support import (
     table_of,
     text_of,
 )
-from mightymodels_plugin.tools.ticket.schema import TicketAnswers, TicketContext
+from mightymodels_plugin.tools.ticket.schema import TicketAnswers, TicketContext, TicketRequest
 from mightymodels_plugin.tools.ticket.service import TicketService
 from mightymodels_plugin.tools.ticket.tables import TicketRow
 from pydantic import ValidationError
@@ -153,6 +159,7 @@ VALID: Mapping[type[RequestModel], dict[str, object]] = MappingProxyType(
         },
         LedgerEntry: {'kind': 'open', 'text': 'why is the drain slow', 'source': 'user'},
         InvestigationStart: {'target': 'the drain loop', 'kind': 'behavior'},
+        InvestigationStartRequest: {'target': 'the drain loop', 'kind': 'behavior'},
         Evidence: {'kind': 'metric', 'cite': 'cyclomatic complexity 14'},
         FindingInput: {
             'sources': ['MV-1'],
@@ -169,8 +176,10 @@ VALID: Mapping[type[RequestModel], dict[str, object]] = MappingProxyType(
             'report': 'the drain loop sleeps between batches',
         },
         StartPayload: {'scope': 'codebase', 'depth': 'deep', 'emphasis': 'balanced'},
+        StartRequest: {'scope': 'codebase', 'depth': 'deep', 'emphasis': 'balanced'},
         Disposition: {'decision': 'fix'},
         DisposePayload: {'by': 'user', 'decisions': {'F1': {'decision': 'fix'}}},
+        DisposeRequest: {'by': 'user', 'decisions': {'F1': {'decision': 'fix'}}},
         ResolvePayload: {'finding': 'F1', 'result': 'fixed'},
         TaskStart: {'by': 'engineer', 'owned': ['src/queue.py']},
         TaskVerification: {'commit': 'abc1234'},
@@ -179,6 +188,13 @@ VALID: Mapping[type[RequestModel], dict[str, object]] = MappingProxyType(
         TaskFailedFix: {'hypothesis': 'the drain loop sleeps between batches'},
         TaskPayload: {},
         TicketAnswers: {
+            'summary': 'Retry queue drains slowly',
+            'scope': 'large',
+            'compaction': True,
+            'branch': 'fix/retry-queue',
+            'context': ['drain loop sleeps between batches'],
+        },
+        TicketRequest: {
             'summary': 'Retry queue drains slowly',
             'scope': 'large',
             'compaction': True,
@@ -354,7 +370,7 @@ class TestEveryStringOfARequestModel:
         stored(CrashoutEntry, 'corrective_action', CrashoutRow, 'corrective_action'),
         stored(LedgerEntry, 'text', LedgerEntryRow, 'text'),
         stored(LedgerEntry, 'cite', LedgerEntryRow, 'cite'),
-        stored(InvestigationStart, 'target', LedgerEntryRow, 'text'),
+        stored(InvestigationStartRequest, 'target', LedgerEntryRow, 'text'),
         stored(Evidence, 'cite', ReviewFindingRow, 'evidence_cite'),
         stored(FindingInput, 'title', ReviewFindingRow, 'title'),
         stored(FindingInput, 'location', ReviewFindingRow, 'location'),
@@ -362,15 +378,21 @@ class TestEveryStringOfARequestModel:
         stored(FindingInput, 'verify', ReviewFindingRow, 'verify'),
         stored(SpooledReport, 'target', ScoutReportRow, 'target'),
         stored(SpooledReport, 'report', ScoutReportRow, 'report'),
-        stored(StartPayload, 'base', ReviewRunRow, 'base'),
+        stored(StartRequest, 'base', ReviewRunRow, 'base'),
         stored(Disposition, 'reason', ReviewDispositionRow, 'reason'),
-        stored(DisposePayload, 'by', ReviewDispositionRow, 'by'),
+        stored(DisposeRequest, 'by', ReviewDispositionRow, 'by'),
         CallerText(
-            model=DisposePayload,
+            model=DisposeRequest,
             field='decisions',
             limit=length_of(ReviewDispositionRow, 'finding_id'),
             part='key',
             placed=naming_a_decision,
+            spelled=finding_id,
+        ),
+        CallerText(
+            model=DisposeRequest,
+            field='finding',
+            limit=length_of(ReviewDispositionRow, 'finding_id'),
             spelled=finding_id,
         ),
         CallerText(
@@ -382,9 +404,9 @@ class TestEveryStringOfARequestModel:
         stored(ResolvePayload, 'commit', ReviewOutcomeRow, 'commit'),
         stored(ResolvePayload, 'reason', ReviewOutcomeRow, 'reason'),
         stored(TaskVerification, 'commit', TaskRow, 'commit'),
-        stored(TicketAnswers, 'summary', TicketRow, 'summary'),
-        stored(TicketAnswers, 'branch', TicketRow, 'branch'),
-        stored(TicketAnswers, 'jira', TicketRow, 'jira'),
+        stored(TicketRequest, 'summary', TicketRow, 'summary'),
+        stored(TicketRequest, 'branch', TicketRow, 'branch'),
+        stored(TicketRequest, 'jira', TicketRow, 'jira'),
         CallerText(
             model=TaskPayload,
             field='task_id',
@@ -438,17 +460,17 @@ class TestEveryStringOfARequestModel:
         CallerText(model=TaskMark, field='reason', limit=PROSE_LIMIT),
         CallerText(model=TaskFailedFix, field='hypothesis', limit=PROSE_LIMIT),
         CallerText(
-            model=TicketAnswers, field='context', limit=PROSE_LIMIT, part='item', placed=in_a_list
+            model=TicketRequest, field='context', limit=PROSE_LIMIT, part='item', placed=in_a_list
         ),
         CallerText(
-            model=TicketAnswers,
+            model=TicketRequest,
             field='reference_urls',
             limit=PROSE_LIMIT,
             part='item',
             placed=in_a_list,
         ),
         CallerText(
-            model=TicketAnswers,
+            model=TicketRequest,
             field='investigations',
             limit=SLUG_LIMIT,
             part='item',

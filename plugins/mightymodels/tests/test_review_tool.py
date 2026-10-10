@@ -84,7 +84,11 @@ class TestReviewCalls:
     @pytest.mark.parametrize(
         ('arguments', 'needs'),
         [
-            pytest.param({'action': 'start'}, 'start needs a payload', id='start'),
+            pytest.param(
+                {'action': 'start', 'payload': {'shape': 'full'}},
+                'start needs no payload, or a payload holding scope, depth and emphasis',
+                id='start',
+            ),
             pytest.param({'action': 'gate'}, 'gate needs run_id', id='gate'),
             pytest.param({'action': 'add'}, 'add needs run_id', id='add-run'),
             pytest.param({'action': 'dispose'}, 'dispose needs run_id', id='dispose-run'),

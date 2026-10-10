@@ -2,6 +2,10 @@
 
 A `LinkedInvestigation` is the id of an investigation as a caller names it. It is held to a slug's
 length here, and `validate` refuses one that is not a slug.
+
+`TicketRequest` is the interview as a caller fills it in, and may leave out the scope, the
+compaction and the branch, which the tool then asks the user. `TicketAnswers` is the complete form
+the service writes.
 """
 
 from enum import StrEnum
@@ -29,23 +33,34 @@ class TicketStatus(StrEnum):
     CLOSED = 'closed'
 
 
-class TicketAnswers(RequestModel):
+class BranchChoice(StrEnum):
+    CURRENT = 'current'
+    NEW = 'new'
+
+
+class TicketRequest(RequestModel):
     summary: ProseText
-    scope: Scope
-    compaction: bool
-    branch: NameText
     context: tuple[ProseText, ...]
+    scope: Scope | None = None
+    compaction: bool | None = None
+    branch: NameText | None = None
     issue: int | None = None
     jira: NameText | None = None
     reference_urls: tuple[ProseText, ...] = ()
     investigations: tuple[LinkedInvestigation, ...] = ()
 
 
+class TicketAnswers(TicketRequest):
+    scope: Scope
+    compaction: bool
+    branch: NameText
+
+
 class TicketContext(RequestModel):
     context: tuple[ProseText, ...]
 
 
-type TicketFields = TicketAnswers | TicketContext
+type TicketFields = TicketRequest | TicketContext
 
 
 class Tracker(BaseModel):

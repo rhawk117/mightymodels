@@ -16,6 +16,7 @@ from mightymodels_plugin.tools.request import NameText, ProseText, RequestModel
 COMMAND_ID_PATTERN = r'^[A-Za-z0-9._-]+$'
 DEFAULT_TIMEOUT = 300
 MAX_TIMEOUT = 3600
+USER_APPROVER = 'user'
 
 
 class ShellStringError(ValueError):
@@ -40,6 +41,12 @@ type Timeout = Annotated[int, Field(ge=1, le=MAX_TIMEOUT)]
 class ContractAction(StrEnum):
     APPROVE = 'approve'
     STATUS = 'status'
+
+
+class ApprovalChoice(StrEnum):
+    APPROVE = 'approve'
+    REMOVE = 'remove'
+    EDIT = 'edit'
 
 
 class Phase(StrEnum):

@@ -2,7 +2,7 @@
 name: open-ticket
 description: >-
   Turn an understood problem into a staged unit of work: one AskUserQuestion interview (slug,
-  tracker GitHub / Jira / both / none, branch, compaction likely, per-task scope), then the
+  tracker GitHub / Jira / both / none), then the
   ticket directory, a Findings rollup from the lets-investigate ledger or what-we-know, the
   GitHub issue and/or Jira ticket (a draft file when the CLI is absent) with a checked tracker
   body, the branch, ticket.yml with derived model routing, and a validated ticket row in the
@@ -29,16 +29,16 @@ reports, or the database, which may carry raw command output.
 
 ## The interview
 
-One `AskUserQuestion` dialog, batched (a call takes up to four questions, so ask 1 to 4 first
-and 5 second), containing only the questions the conversation has not already answered. Each
+One `AskUserQuestion` dialog containing only the questions the conversation has not already
+answered. Each
 question carries two to four options, and the user can always type an answer of their own.
 Answers already given are confirmed in the summary, not re-asked.
 
 1. **Name** this unit of work; options: a slug proposed from the triage target, a shorter one.
 2. **Tracker**: GitHub issue, Jira ticket, both, or none.
-3. **Branch**: the current checkout as-is, or a new branch from HEAD (propose its name in the option).
-4. **Compaction**: would implementing this likely cause at least one compaction?
-5. **Scope** of each anticipated task: sm, med, or large.
+
+The branch, the compaction and the scope of each anticipated task are not asked here: the
+`ticket` `write` call (step D) leaves them out and asks the user itself.
 
 When the tracker answer includes Jira, ask once, in chat, for the fields in one line: project
 key, parent epic, issue type, story points, labels. Take whatever the user gives ("under
@@ -118,20 +118,26 @@ it exits 0. No body reaches a tracker before it passes.
 - *Both.* Create the GitHub issue first, then the Jira ticket with the issue URL in its body,
   so the two link one way and the sprint's task list has one home (the GitHub issue).
 
-**C. Branch.** *New*: create and push it; a rejected push (no remote, no auth) is a note in the
-summary, not a blocker, since the branch exists locally. *Current checkout*: record the
-current branch name and create nothing. A detached HEAD is not a checkout the sprint can run
-on; say so and ask for a branch.
+**C. Branch.** Do this after D, because the branch is the user's answer to D's question: read
+`branch-name` from ticket.yml. When it is not the current branch, create it from HEAD and push
+it; a rejected push (no remote, no auth) is a note in the summary, not a blocker, since the
+branch exists locally. When it is the current checkout, create nothing. A detached HEAD is not a
+checkout the sprint can run on; the tool refuses it, so ask the user for a branch name and call
+`write` again with `branch` in `fields`.
 
 **D. ticket.yml.** Call `mcp__plugin_mightymodels_state__ticket` with action `write` and
-the interview, rollup and tracker answers under `fields`:
+the rollup and tracker answers under `fields`, and no `scope`, `compaction` or `branch`; the tool
+asks the user for those three:
 
 ```json
 {"action": "write", "slug": "SLUG",
- "fields": {"summary": "...", "scope": "med", "compaction": false, "branch": "fix/...",
-            "context": ["...", "..."], "issue": 42, "jira": "PLAT-41",
+ "fields": {"summary": "...", "context": ["...", "..."], "issue": 42, "jira": "PLAT-41",
             "reference_urls": ["https://..."], "investigations": ["20260928-..."]}}
 ```
+
+An answer starting `needs input` means no one could be asked through the tool: put each question
+it names to the user in one `AskUserQuestion` dialog, then call again with those arguments in
+`fields` (`scope`, `compaction`, and `branch` as the current branch name or the new branch name).
 
 The tool derives the model routing from the scope and `plan-first` from the compaction answer,
 per the schema, and refuses to overwrite an existing ticket.yml. Tell the user the file exists

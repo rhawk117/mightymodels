@@ -203,28 +203,46 @@
           "title": "Depth",
           "type": "string"
         },
-        "DisposePayload": {
+        "DisposeRequest": {
           "additionalProperties": false,
           "properties": {
             "by": {
               "$ref": "#/$defs/Approver"
             },
             "decisions": {
-              "additionalProperties": {
-                "$ref": "#/$defs/Disposition"
-              },
-              "propertyNames": {
-                "$ref": "#/$defs/FindingId"
-              },
-              "title": "Decisions",
-              "type": "object"
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/Disposition"
+                  },
+                  "propertyNames": {
+                    "$ref": "#/$defs/FindingId"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Decisions"
+            },
+            "finding": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FindingId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             }
           },
           "required": [
-            "by",
-            "decisions"
+            "by"
           ],
-          "title": "DisposePayload",
+          "title": "DisposeRequest",
           "type": "object"
         },
         "Disposition": {
@@ -351,19 +369,19 @@
         "ReviewPayload": {
           "anyOf": [
             {
-              "$ref": "#/$defs/StartPayload"
+              "$ref": "#/$defs/ReportPayload"
             },
             {
               "$ref": "#/$defs/AddPayload"
             },
             {
-              "$ref": "#/$defs/DisposePayload"
+              "$ref": "#/$defs/DisposeRequest"
             },
             {
               "$ref": "#/$defs/ResolvePayload"
             },
             {
-              "$ref": "#/$defs/ReportPayload"
+              "$ref": "#/$defs/StartRequest"
             }
           ]
         },
@@ -402,17 +420,41 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
           "type": "string"
         },
-        "StartPayload": {
+        "StartRequest": {
           "additionalProperties": false,
           "properties": {
             "scope": {
-              "$ref": "#/$defs/ReviewScope"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReviewScope"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             },
             "depth": {
-              "$ref": "#/$defs/Depth"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Depth"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             },
             "emphasis": {
-              "$ref": "#/$defs/Emphasis"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Emphasis"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             },
             "slug": {
               "anyOf": [
@@ -466,12 +508,7 @@
               "default": null
             }
           },
-          "required": [
-            "scope",
-            "depth",
-            "emphasis"
-          ],
-          "title": "StartPayload",
+          "title": "StartRequest",
           "type": "object"
         }
       },
@@ -914,21 +951,38 @@
           "title": "TicketAction",
           "type": "string"
         },
-        "TicketAnswers": {
+        "TicketContext": {
+          "additionalProperties": false,
+          "properties": {
+            "context": {
+              "items": {
+                "$ref": "#/$defs/ProseText"
+              },
+              "title": "Context",
+              "type": "array"
+            }
+          },
+          "required": [
+            "context"
+          ],
+          "title": "TicketContext",
+          "type": "object"
+        },
+        "TicketFields": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TicketRequest"
+            },
+            {
+              "$ref": "#/$defs/TicketContext"
+            }
+          ]
+        },
+        "TicketRequest": {
           "additionalProperties": false,
           "properties": {
             "summary": {
               "$ref": "#/$defs/ProseText"
-            },
-            "scope": {
-              "$ref": "#/$defs/Scope"
-            },
-            "compaction": {
-              "title": "Compaction",
-              "type": "boolean"
-            },
-            "branch": {
-              "$ref": "#/$defs/NameText"
             },
             "context": {
               "items": {
@@ -936,6 +990,40 @@
               },
               "title": "Context",
               "type": "array"
+            },
+            "scope": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Scope"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "compaction": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Compaction"
+            },
+            "branch": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NameText"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             },
             "issue": {
               "anyOf": [
@@ -979,40 +1067,10 @@
           },
           "required": [
             "summary",
-            "scope",
-            "compaction",
-            "branch",
             "context"
           ],
-          "title": "TicketAnswers",
+          "title": "TicketRequest",
           "type": "object"
-        },
-        "TicketContext": {
-          "additionalProperties": false,
-          "properties": {
-            "context": {
-              "items": {
-                "$ref": "#/$defs/ProseText"
-              },
-              "title": "Context",
-              "type": "array"
-            }
-          },
-          "required": [
-            "context"
-          ],
-          "title": "TicketContext",
-          "type": "object"
-        },
-        "TicketFields": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TicketAnswers"
-            },
-            {
-              "$ref": "#/$defs/TicketContext"
-            }
-          ]
         }
       },
       "additionalProperties": false,
@@ -2347,7 +2405,7 @@
         "InvestigationRequest": {
           "anyOf": [
             {
-              "$ref": "#/$defs/InvestigationStart"
+              "$ref": "#/$defs/InvestigationStartRequest"
             },
             {
               "$ref": "#/$defs/LedgerRound"
@@ -2357,21 +2415,28 @@
             }
           ]
         },
-        "InvestigationStart": {
+        "InvestigationStartRequest": {
           "additionalProperties": false,
           "properties": {
             "target": {
               "$ref": "#/$defs/ProseText"
             },
             "kind": {
-              "$ref": "#/$defs/TargetKind"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TargetKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
             }
           },
           "required": [
-            "target",
-            "kind"
+            "target"
           ],
-          "title": "InvestigationStart",
+          "title": "InvestigationStartRequest",
           "type": "object"
         },
         "KnownsFilter": {

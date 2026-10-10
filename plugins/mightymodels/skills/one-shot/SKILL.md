@@ -42,29 +42,33 @@ options each, and the user can always type an answer of their own), containing o
 questions the context has not answered. The full set, in open-ticket's order, minus the one one-shot answers itself:
 
 - Slug for this unit of work (the options are one derived from the target and a shorter variant).
-- Scope of each anticipated task: sm, med, or large. This derives the engineer model per the
-  ticket schema, same as open-ticket.
-- Branch: current, or a new one (propose the name in the option).
 - Progress view: a GitHub issue, or a local `issue-body.md`; task progress is the `task`
   tool's rows either way.
 
-Compaction is not asked. one-shot answers it: `plan-first: false`. When scope comes back med or
-large, one more `AskUserQuestion` before anything is written: proceed under the no-compaction
-assumption, or route to game-plan. A med or large ticket that hits a compaction mid-sprint
-loses more than a sm one, so the user confirms that trade knowingly.
+The scope of each anticipated task and the branch are not asked here: the `ticket` `write` call
+in step 3 leaves them out and asks the user itself. Compaction is not asked. one-shot answers it:
+`plan-first: false`. When the scope the user chose comes back med or large (read `scope` in
+ticket.yml after the write), one more `AskUserQuestion` before the loop starts: proceed under the
+no-compaction assumption, or route to game-plan. A med or large ticket that hits a compaction
+mid-sprint loses more than a sm one, so the user confirms that trade knowingly.
 
 Answers already in the conversation or the ticket are confirmed in the target summary, not
 re-asked.
 
-**3. Materialize the minimum.** Only when no ticket exists: the branch if one was asked for,
-the issue via `gh issue create` if one was asked for (else `issue-body.md`), then stage the
-ticket through the `ticket` tool, as open-ticket does. Call
-`mcp__plugin_mightymodels_state__ticket` with action `write`, the answers under `fields`:
+**3. Materialize the minimum.** Only when no ticket exists: the issue via `gh issue create` if
+one was asked for (else `issue-body.md`), then stage the ticket through the `ticket` tool, as
+open-ticket does. Call `mcp__plugin_mightymodels_state__ticket` with action `write`, the answers
+under `fields`, and no `scope` or `branch`; the tool asks the user for both:
 
 ```json
 {"action": "write", "slug": "SLUG",
- "fields": {"summary": "...", "scope": "sm", "compaction": false, "branch": "...", "context": ["..."]}}
+ "fields": {"summary": "...", "compaction": false, "context": ["..."]}}
 ```
+
+An answer starting `needs input` means no one could be asked through the tool: put each question
+it names to the user in one `AskUserQuestion` dialog, then call again with those arguments in
+`fields`. Then read `branch-name` from ticket.yml: when it is not the current branch, create that
+branch from HEAD.
 
 Then call it again with action `validate`, which stages the ticket as a row in the state
 database:
@@ -97,14 +101,20 @@ no boxes; progress is the `task` tool's rows, which the loop starts and marks:
 Without a plan, the task list is the only enumerable list of work the loop has, and an item with
 no acceptance makes the verification step theater. "Works correctly" is refused here for the
 same reason it is refused in the ASKED stanza. Give every command-shaped AC a contract id
-(`T1.AC-1`) and an argv list, and present the task list with its commands in one `AskUserQuestion`
-dialog: go, or revise. On go, approve the commands, since the loop's runner executes only
-contract commands. Call `mcp__plugin_mightymodels_state__contract` with action `approve`:
+(`T1.AC-1`) and an argv list, and show the task list with its commands. The loop's runner
+executes only contract commands, so approve them with one call to
+`mcp__plugin_mightymodels_state__contract` with action `approve` and no `approved_by`; the tool
+asks the user and records the commands only when the user approves:
 
 ```json
 {"action": "approve", "slug": "SLUG",
- "commands": [{"id": "T1.AC-1", "argv": ["..."], "expect_exit": 0, "timeout": 300, "approved_by": "user"}]}
+ "commands": [{"id": "T1.AC-1", "argv": ["..."], "expect_exit": 0, "timeout": 300}]}
 ```
+
+An answer starting `not approved` means the user wants the list changed: change it and call
+again. An answer starting `needs input` means no one could be asked through the tool: put the
+question it names to the user in one `AskUserQuestion` dialog, and on approval call again with
+`"approved_by": "user"` on each command.
 
 Then baseline each one with `mightymodels verify run`, a bare Bash command (the plugin's
 `bin/` is on the Bash PATH):

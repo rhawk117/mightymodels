@@ -3,7 +3,8 @@
 `write` renders the interview answers into ticket.yml and refuses to overwrite a ticket the
 user may have tweaked. `validate` reads the file back, hand edits included, and stages or
 refreshes the ticket's row without touching task progress. `update_context` replaces the
-context lines in the file and restages it. `show` reads the staged row back.
+context lines in the file and restages it. `show` reads the staged row back. `branch_named` turns
+the user's branch answer into the name `write` records.
 
 A ticket may link investigations, and each link must name one that has a ledger. `validate` and
 `update_context` read the ledgers in the transaction that stages the row. `write` stages nothing,
@@ -28,6 +29,7 @@ from mightymodels_plugin.routing import FIXED_WORKERS, Scope, Worker, fixed_mode
 from mightymodels_plugin.slug import InvalidSlugError, Slug, parsed_slug
 from mightymodels_plugin.tools.ticket.repository import TicketRepository, ticket_transaction
 from mightymodels_plugin.tools.ticket.schema import (
+    BranchChoice,
     TicketAnswers,
     TicketContext,
     TicketSection,
@@ -73,6 +75,16 @@ class TicketExistsError(StateError):
     def __init__(self, path: Path) -> None:
         super().__init__(f'{path} exists; edit it by hand, then run validate')
         self.path = path
+
+
+class BranchNameRequiredError(StateError):
+    def __init__(self) -> None:
+        super().__init__('a new branch needs a name')
+
+
+class DetachedHeadError(StateError):
+    def __init__(self) -> None:
+        super().__init__('HEAD is detached, so there is no current branch; ask for a branch name')
 
 
 class MissingTicketError(StateError):
@@ -269,6 +281,15 @@ class TicketService:
             return []
         with ticket_transaction(self.database) as repository:
             return repository.unrecorded_investigations(linked)
+
+    def branch_named(self, choice: BranchChoice, name: str) -> str:
+        if choice is BranchChoice.NEW:
+            if not name.strip():
+                raise BranchNameRequiredError
+            return name.strip()
+        if (current := self.workspace.git.current_branch()) is None:
+            raise DetachedHeadError
+        return current
 
     def write(self, slug: Slug, answers: TicketAnswers) -> TicketView:
         path = self.workspace.ticket_file(slug)

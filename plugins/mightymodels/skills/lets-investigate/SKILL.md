@@ -35,7 +35,8 @@ it, and the user hears about a dead end after one round instead of five.
 
 ## Round zero: frame the target
 
-Write the target as one line the user can disagree with, then classify it:
+Write the target as one line the user can disagree with, then work out which of these it is (the
+user confirms the classification when the ledger opens):
 
 - **Explain a behavior**: something happens and nobody knows why yet.
 - **Check a claim**: someone asserted a fact about the system; find out whether it holds.
@@ -48,18 +49,23 @@ research question needs the documentation for the version in the lockfile and th
 that depend on it.
 
 Put the framing to the user through one `AskUserQuestion` dialog before dispatching anything: the
-target line, the classification, and one question asking what they already know or have ruled
-out (the user can always type an answer of their own). Scouts pointed at a vague target return precise answers to the wrong question, and facts
+target line, and one question asking what they already know or have ruled out (the user can
+always type an answer of their own). Scouts pointed at a vague target return precise answers to the wrong question, and facts
 the user already holds cost nothing to record and a round to rediscover.
 
-Once the user confirms the framing, open the ledger and record their answers as round 0:
+Once the user confirms the target, open the ledger and record their answers as round 0:
 
-Call `mcp__plugin_mightymodels_state__investigation` with action `start`; `kind` is `behavior`,
-`claim`, `research` or `change` (a proposed change to weigh, which what-we-know opens):
+Call `mcp__plugin_mightymodels_state__investigation` with action `start` and the target, and
+leave `kind` out: the tool asks the user for the classification and records the answer. The kinds
+are `behavior`, `claim`, `research` and `change` (a proposed change to weigh, which what-we-know
+opens):
 
 ```json
-{"action": "start", "payload": {"request": {"target": "<target line>", "kind": "behavior"}}}
+{"action": "start", "payload": {"request": {"target": "<target line>"}}}
 ```
+
+An answer starting `needs input` means no one could be asked through the tool: put the question
+it names to the user in one `AskUserQuestion` dialog, then call again with `kind` in the request.
 
 `start` returns the investigation id; every later call names it. Then the same tool with action
 `add` records the user's answers:

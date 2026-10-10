@@ -35,20 +35,22 @@ worker through prompting-subagents.
 
 ## 1. Profile
 
-One `AskUserQuestion` dialog (up to four questions a call, two to four options each), with only
-what the conversation has not already settled:
-
-- **Scope**: diff, branch (against which base), ticket, or codebase.
-- **Depth**: quick, standard, or deep. Say what each costs (profiles.md): quick is one
-  persona on sonnet, standard and deep run their reviewers on opus.
-- **Emphasis**: release-readiness, maintainability, balanced, or custom weights.
-- For a quick review with balanced weights: which persona.
-
-Then record it with `mcp__plugin_mightymodels_state__review` and action `start`:
+The profile is the scope, the depth and the emphasis of the review. Say what each depth costs
+(profiles.md): quick is one persona on sonnet, standard and deep run their reviewers on opus.
+Then record the profile with `mcp__plugin_mightymodels_state__review` and action `start`,
+carrying only what the conversation has already settled. The tool puts each of `scope`, `depth`
+and `emphasis` that the payload leaves out to the user and starts the run with the answers:
 
 ```json
-{"action": "start", "payload": {"scope": "ticket", "depth": "standard", "emphasis": "balanced", "slug": "SLUG", "base": "main"}}
+{"action": "start", "payload": {"scope": "ticket", "slug": "SLUG", "base": "main"}}
 ```
+
+An answer starting `needs input` means no one could be asked through the tool: put each question
+it names to the user in one `AskUserQuestion` dialog, then call again with those arguments in the
+payload. A scope of branch needs `base`, a scope of ticket needs `slug`, and an emphasis of custom
+needs `weights`; a refusal naming one of them means: ask the user for it, then call again.
+
+For a quick review with balanced weights, ask the user which persona and pass it as `persona`.
 
 It answers with the run id, the run directory, and each persona's model. Every later step
 names the run with `run_id`.
@@ -109,16 +111,25 @@ relabel it a defect. A security question a reviewer left UNKNOWN-BLOCKED belongs
 as a High finding in the `security` dimension whose Fix is to answer it, since CLEAR is
 impossible while it stands. Overlapping findings merge in the tool, and a two-level severity
 gap is flagged for the user. When `add` answers that findings are `back to undecided`, show
-the gate again and put them to the user before any remediation continues.
+the gate again and call `dispose` for them again before any remediation continues.
 
 ## 5. The finding gate
 
 Always, when any finding exists. Show the user the `review` answer to action `gate`: findings
 by severity, security first, then by persona weight, with sources, location, any severity
-conflict, and the decision so far. One `AskUserQuestion` dialog: which findings to fix now. For
-the rest, defer (ticketed for later), accept the risk, or dismiss; the last two need a reason. A
-severity conflict is settled here by the decision the user makes about it. Record the answer
-with `mcp__plugin_mightymodels_state__review` and action `dispose`:
+conflict, and the decision so far. Then take the findings one at a time, in gate order. For each
+`Fn`, call `mcp__plugin_mightymodels_state__review` with action `dispose` and `finding` and no
+`decisions`; the tool asks the user what to do with that finding and records the answer. Two of
+the choices need a reason, which the tool asks with the choice. A severity conflict is settled
+here by the decision the user makes about it:
+
+```json
+{"action": "dispose", "run_id": "20261005-103000", "payload": {"by": "user", "finding": "F1"}}
+```
+
+The answer says which findings are still undecided. An answer starting `needs input` means no one
+could be asked through the tool: put the question it names to the user in one `AskUserQuestion`
+dialog, then call again with `decisions` for that finding (several findings may go in one call):
 
 ```json
 {"action": "dispose", "run_id": "20261005-103000", "payload": {"by": "user", "decisions": {"F1": {"decision": "fix"}, "F2": {"decision": "accept-risk", "reason": "..."}}}}

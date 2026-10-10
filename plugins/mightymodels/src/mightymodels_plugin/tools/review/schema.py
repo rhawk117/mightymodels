@@ -3,6 +3,9 @@
 `FindingInput` is one finding as a persona reports it and `Finding` is one as the run holds it.
 `ReviewRun` is a run as it is recorded and read back.
 
+`StartRequest` and `DisposeRequest` are what a caller fills in, and may leave out what the tool then
+asks the user. `StartPayload` and `DisposePayload` are the complete forms the service takes.
+
 The finding id pattern is published in the tool's schema and names its digits as `[0-9]`, so the
 schema and the server accept the same ASCII digits and no others. Its maximum is the length of the
 column a finding id is stored in, `FINDING_ID_LIMIT`.
@@ -148,14 +151,20 @@ class Finding(BaseModel):
     conflict: str | None = None
 
 
-class StartPayload(RequestModel):
-    scope: ReviewScope
-    depth: Depth
-    emphasis: Emphasis
+class StartRequest(RequestModel):
+    scope: ReviewScope | None = None
+    depth: Depth | None = None
+    emphasis: Emphasis | None = None
     slug: Slug | None = None
     base: NameText | None = None
     weights: dict[Persona, float] | None = None
     persona: Persona | None = None
+
+
+class StartPayload(StartRequest):
+    scope: ReviewScope
+    depth: Depth
+    emphasis: Emphasis
 
 
 class AddPayload(RequestModel):
@@ -167,8 +176,13 @@ class Disposition(RequestModel):
     reason: ProseText = ''
 
 
-class DisposePayload(RequestModel):
+class DisposeRequest(RequestModel):
     by: Approver
+    decisions: dict[FindingId, Disposition] | None = None
+    finding: FindingId | None = None
+
+
+class DisposePayload(DisposeRequest):
     decisions: dict[FindingId, Disposition]
 
 
@@ -183,7 +197,7 @@ class ReportPayload(RequestModel):
     shape: Shape = Shape.FULL
 
 
-type ReviewPayload = StartPayload | AddPayload | DisposePayload | ResolvePayload | ReportPayload
+type ReviewPayload = ReportPayload | AddPayload | DisposeRequest | ResolvePayload | StartRequest
 
 
 class ReviewView(BaseModel):

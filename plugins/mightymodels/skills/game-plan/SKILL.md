@@ -79,16 +79,21 @@ sees it; the user's time is for direction, not for catching a task with no accep
 
 **4b. Approve and run the verification commands.** Every invariant's proving command and
 every command-shaped acceptance criterion gets a contract id (`I1`, `T1.AC-1`) and an argv
-list. Put the full list, id and argv per line, to the user in one `AskUserQuestion` dialog:
-approve all, remove some, or edit. Only approved commands are recorded, all in one call to
-`mcp__plugin_mightymodels_state__contract` with action `approve`:
+list. Make one call to `mcp__plugin_mightymodels_state__contract` with action `approve`, the full
+list, and no `approved_by`; the tool shows the user each id and argv and records the commands
+only when the user approves them:
 
 ```json
 {"action": "approve", "slug": "SLUG", "commands": [
-  {"id": "I1", "argv": ["uv", "run", "pytest", "-q"], "approved_by": "user"},
-  {"id": "T1.AC-1", "argv": ["uv", "run", "pytest", "-q", "tests/test_queue.py"], "timeout": 120, "approved_by": "user"}
+  {"id": "I1", "argv": ["uv", "run", "pytest", "-q"]},
+  {"id": "T1.AC-1", "argv": ["uv", "run", "pytest", "-q", "tests/test_queue.py"], "timeout": 120}
 ]}
 ```
+
+An answer starting `not approved` means the user wants the list changed: change it as they said
+and call again. An answer starting `needs input` means no one could be asked through the tool: put
+the question it names to the user in one `AskUserQuestion` dialog, and on approval call again with
+`"approved_by": "user"` on each command.
 
 Then run them at HEAD with a bare Bash command (the plugin's `bin/` is on the Bash PATH):
 
