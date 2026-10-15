@@ -36,6 +36,7 @@ extend-select = [
     "PT",
     "PTH",
     "PYI",
+    "RUF",
     "RET",
     "RSE",
     "S",

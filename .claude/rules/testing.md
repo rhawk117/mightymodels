@@ -57,18 +57,14 @@ class TestStoreUpload:
         stocked = MemoryUploadStorage(uploads={self.photo.filename: self.photo})
         return create_harness(stocked)
 
-    def assert_rejected_without_change(
-        self, harness: UploadHarness, upload: Upload
-    ) -> None:
+    def assert_rejected_without_change(self, harness: UploadHarness, upload: Upload) -> None:
         stored_before = len(harness.storage)
         with pytest.raises(VaultError):
             harness.service.store(upload)
         assert len(harness.storage) == stored_before
 
     @invalid_upload_cases()
-    def test_invalid_upload_is_rejected(
-        self, harness: UploadHarness, upload: Upload
-    ) -> None:
+    def test_invalid_upload_is_rejected(self, harness: UploadHarness, upload: Upload) -> None:
         self.assert_rejected_without_change(harness, upload)
 
     def test_duplicate_upload_is_rejected(self, stocked_harness: UploadHarness) -> None:
@@ -112,9 +108,7 @@ def upload_policy_size_boundary_cases(options: UploadOptions) -> pytest.MarkDeco
         upload=Upload(filename='scan.png', size=options.max_bytes + 1),
         issue_type=UploadTooLargeError,
     )
-    return pytest.mark.parametrize(
-        'boundary', [empty.param, at_limit.param, one_over_limit.param]
-    )
+    return pytest.mark.parametrize('boundary', [empty.param, at_limit.param, one_over_limit.param])
 ```
 
 ## Hypothesis or pytest.param

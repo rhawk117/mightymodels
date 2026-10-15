@@ -24,7 +24,9 @@ check = [
     "ty>=0.0.88",
 ]
 test = [
+    "anyio>=4.15.1",
     "hypothesis>=6.169.4",
+    "msgspec>=0.22.0",
     "pytest>=9.1.1",
     "pytest-anyio>=0.0.0",
     "pytest-cov>=7.1.0",

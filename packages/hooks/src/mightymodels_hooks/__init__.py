@@ -1,2 +1,2 @@
 def main() -> None:
-    print("Hello from mightymodels-hooks!")
+    print('Hello from mightymodels-hooks!')

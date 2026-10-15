@@ -47,9 +47,7 @@ class UploadTooLargeError(VaultError):
         super().__init__(f'{filename} exceeds {limit} bytes')
 
 
-type UploadStorageIssue = (
-    EmptyUploadError | UploadTooLargeError | UnsupportedUploadTypeError
-)
+type UploadStorageIssue = EmptyUploadError | UploadTooLargeError | UnsupportedUploadTypeError
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -128,9 +126,7 @@ class UploadService:
 - The factory that builds the real backend lives in its own module at the edge, so the service only knows the Protocol. Unit tests construct the service with a fake; integration tests call the factory with their own root and options.
 
 ```python
-def create_upload_service(
-    root: Path, options: UploadOptions | None = None
-) -> UploadService:
+def create_upload_service(root: Path, options: UploadOptions | None = None) -> UploadService:
     options = options or UploadOptions()
     storage = DirectoryUploadRepository(root=root)
     return UploadService(storage=storage, options=options)

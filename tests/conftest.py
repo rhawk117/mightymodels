@@ -100,10 +100,7 @@ def claude_plugin(repository_root: Path) -> PluginInventory:
         'mcp': repository_root.joinpath('.mcp.json'),
         'hooks': repository_root.joinpath('hooks', 'hooks.json'),
     }
-    plugin_files = {
-        key: PluginManifestFile.read(path)
-        for key, path in plugin_paths.items()
-    }
+    plugin_files = {key: PluginManifestFile.read(path) for key, path in plugin_paths.items()}
 
     return PluginInventory(
         **plugin_files,

@@ -1,2 +1,2 @@
 def main() -> None:
-    print("Hello from mightymodels-mcp!")
+    print('Hello from mightymodels-mcp!')

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.agents
 
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class BuiltinUse:
     path: Path
@@ -41,17 +42,15 @@ def parse_source(path: Path) -> ParsedSource:
 
 class TestBannedBuiltins:
     roots = ('packages', 'tests')
-    banned = frozenset(
-        {
-            '__import__',
-            'globals',
-            'locals',
-            'staticmethod',
-            'vars',
-            'eval',
-            'exec',
-        }
-    )
+    banned = frozenset({
+        '__import__',
+        'globals',
+        'locals',
+        'staticmethod',
+        'vars',
+        'eval',
+        'exec',
+    })
 
     @pytest.fixture
     def sources(self, pytestconfig: pytest.Config) -> tuple[ParsedSource, ...]:

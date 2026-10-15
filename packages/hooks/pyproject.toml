@@ -7,7 +7,9 @@ authors = [
     { name = "rhawk117", email = "noplaceLike127dot0dot0dot1@proton.me" },
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "msgspec>=0.22.0",
+]
 
 [project.scripts]
 mightymodels-hooks = "mightymodels_hooks:main"
