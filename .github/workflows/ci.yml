@@ -1,6 +1,7 @@
 name: Continuous Integration (CI)
 
 on:
+  workflow_call:
   pull_request:
     branches: [main]
 
@@ -102,7 +103,7 @@ jobs:
   workflow-narrator:
     name: Workflow Narrator 🔉
     needs: [labeler, quality]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -174,7 +175,7 @@ jobs:
 
             await core.summary.addRaw(commentBody, true).write();
 
-            if (!isFork) {
+            const commentOnPull = async () => {
               const commentsFound = await github.paginate(
                 github.rest.issues.listComments,
                 { owner, repo, issue_number: narratorContext.issueNumber, per_page: 100 },
@@ -191,14 +192,19 @@ jobs:
                   comment_id: existingComment.id,
                   body: commentBody,
                 });
-              } else {
-                await github.rest.issues.createComment({
-                  owner,
-                  repo,
-                  issue_number: narratorContext.issueNumber,
-                  body: commentBody,
-                });
+                return;
               }
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: narratorContext.issueNumber,
+                body: commentBody,
+              });
+            };
+
+            if (!isFork) {
+              await commentOnPull();
             }
 
             if (!allJobsSucceeded) {
