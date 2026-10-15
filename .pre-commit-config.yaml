@@ -1,0 +1,70 @@
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+
+      - id: check-case-conflict
+
+      - id: check-json
+
+      - id: check-shebang-scripts-are-executable
+        types: [python]
+
+      - id: check-toml
+
+      - id: end-of-file-fixer
+
+      - id: forbid-submodules
+
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --config .ruff.toml --force-exclude
+        language: system
+        types: [python]
+        pass_filenames: true
+        stages: [pre-commit]
+
+      - id: mdformat
+        name: mdformat
+        entry: uv run mdformat
+        language: system
+        types: [markdown]
+        pass_filenames: true
+        stages: [pre-commit]
+
+      - id: export-plugin-locks
+        name: export plugin locks
+        entry: scripts/export-plugin-locks.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true
+
+      - id: python-line-cap
+        name: python line cap
+        entry: scripts/check-python-line-cap.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true
+
+      - id: quality
+        name: quality
+        entry: scripts/quality.sh --lint
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true
