@@ -1,13 +1,10 @@
 import ast
+from collections.abc import Iterator
 from dataclasses import dataclass
 from itertools import chain
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from pathlib import Path
 
 pytestmark = pytest.mark.agents
 

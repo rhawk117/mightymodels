@@ -3,8 +3,8 @@
 set -uo pipefail
 shopt -s globstar
 
-readonly RUFF_CONFIG=(--config .ruff.toml --force-exclude)
-readonly MARKDOWN_GLOBS=(docs/**/*.md *.md)
+readonly RUFF_CONFIG=(--config ruff.toml --force-exclude)
+readonly MARKDOWN_GLOBS=(**/*.md *.md)
 
 FAILURES=()
 
@@ -34,7 +34,7 @@ run_linter() {
   run_step 'Ruff Format Check' uv run ruff format "${RUFF_CONFIG[@]}" --check .
   run_step 'Ruff Check' uv run ruff check "${RUFF_CONFIG[@]}" --no-fix .
   run_step 'Markdown Check' uv run mdformat --check "${MARKDOWN_GLOBS[@]}"
-  run_step 'Typecheck' uv run ty check --config-file .ty.toml
+  run_step 'Typecheck' uv run ty check --config-file ty.toml
 
   if ! command -v claude >/dev/null; then
     log::error 'claude not on PATH: npm install -g @anthropic-ai/claude-code'

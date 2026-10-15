@@ -1,16 +1,14 @@
 import functools
 import json
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from operator import attrgetter
+from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 
 import pytest
 import yaml
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Mapping
-    from pathlib import Path
 
 
 def read_json_file(path: Path) -> dict[str, Any]:

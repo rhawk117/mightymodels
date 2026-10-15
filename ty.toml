@@ -1,10 +1,10 @@
 [environment]
 python-version = "3.14"
 python-platform = "all"
-root = ["src"]
+root = ["packages", "tests"]
 
 [src]
-include = ["src"]
+include = ["packages", "tests"]
 respect-ignore-files = true
 exclude-scripts = true
 

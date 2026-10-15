@@ -10,14 +10,12 @@ import os
 import re
 import sys
 from collections import Counter
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Protocol, Self, get_args, runtime_checkable
+from typing import Literal, Protocol, Self, get_args, runtime_checkable
 
 import msgspec
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
 
 type HookCommand = Literal['format', 'diagnose', 'suppressions']
 

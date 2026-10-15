@@ -1,15 +1,12 @@
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from pathlib import Path
+from typing import Literal
 
 import msgspec
 import pytest
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-    from pathlib import Path
-
-    from _pytest.mark import ParameterSet
+from _pytest.mark import ParameterSet
 
 type HookCommand = Literal['format', 'diagnose', 'suppressions']
 type ToolName = Literal['Write', 'Edit', 'Read']
@@ -221,7 +218,7 @@ def suppression_hook_cases() -> pytest.MarkDecorator:
 @pytest.fixture
 def harness(pytestconfig: pytest.Config) -> HookHarness:
     root = pytestconfig.rootpath
-    script = root.joinpath('.claude', 'hooks', 'python_hooks.py')
+    script = root.joinpath('.claude', 'hooks', 'pyhooks.py')
     return HookHarness(script=script, project=root)
 
 
@@ -237,7 +234,7 @@ class TestFormatHook:
         matches = (
             outcome for outcome, prefix in self.outcome_prefixes if context.startswith(prefix)
         )
-        return next(matches, None)  # type: ignore
+        return next(matches, None)
 
     @pytest.fixture
     def payload(self, harness: HookHarness, case: FormatCase, tmp_path: Path) -> HookPayload:
