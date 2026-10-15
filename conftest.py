@@ -33,16 +33,19 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home.mkdir()
 
     isolated_environment: dict[str, str] = dict.fromkeys(('HOME', 'USERPROFILE'), str(home))
-    isolated_environment.update({
-        'XDG_CONFIG_HOME': str(home.joinpath('.config')),
-        'XDG_CACHE_HOME': str(home.joinpath('.cache')),
-        'XDG_DATA_HOME': str(home.joinpath('.local', 'share'))
-    })
+    isolated_environment.update(
+        {
+            'XDG_CONFIG_HOME': str(home.joinpath('.config')),
+            'XDG_CACHE_HOME': str(home.joinpath('.cache')),
+            'XDG_DATA_HOME': str(home.joinpath('.local', 'share')),
+        }
+    )
 
     for env_var, value in isolated_environment.items():
         monkeypatch.setenv(env_var, value)
 
     return home
+
 
 @pytest.fixture
 def repository_root() -> Path:

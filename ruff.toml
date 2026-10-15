@@ -1,6 +1,5 @@
 line-length = 100
 indent-width = 4
-src = ["plugins"]
 force-exclude = true
 show-fixes = true
 fix = true
@@ -103,17 +102,39 @@ parametrize-names-type = "tuple"
 parametrize-values-type = "list"
 parametrize-values-row-type = "tuple"
 
-[lint.flake8-tidy-imports.banned-api]
-"json.dumps".msg = "encode with mightymodels_plugin/core/codec.py, which writes JSON on msgspec alone"
-"json.dump".msg = "encode with mightymodels_plugin/core/codec.py, which writes JSON on msgspec alone"
-"json.loads".msg = "decode with mightymodels_plugin/core/codec.py, which reads JSON on msgspec alone"
-"json.load".msg = "decode with mightymodels_plugin/core/codec.py, which reads JSON on msgspec alone"
 
 [lint.flake8-type-checking]
 strict = true
 runtime-evaluated-base-classes = [
-    "mightymodels_plugin.tools.request.RequestModel",
+    "pydantic.BaseModel",
+    "msgspec.Struct",
+
 ]
+
+# pro tip
+[lint.flake8-tidy-imports.banned-api]
+"__future__.annotations".msg = "Python 3.14 evaluates annotations lazily; this import changes nothing but adds noise."
+"functools.partial".msg = "Use a class with a verb method, or pass a bound method."
+"functools.cached_property".msg = "Fails on slotted dataclasses and msgspec Structs; use a plain property."
+"asyncio.gather".msg = "Use asyncio.TaskGroup."
+"importlib.import_module".msg = "Import the module statically; dynamic imports hide dependencies from ty and readers."
+"importlib.reload".msg = "Restart the process instead of reloading modules in place."
+"importlib.util.spec_from_file_location".msg = "Install the code as a package and import it."
+"sys.path".msg = "Install the package with uv; editing sys.path breaks editors and type checkers."
+"sys.modules".msg = "Inject the dependency instead of patching the module cache."
+"abc.ABC".msg = "Define a typing.Protocol."
+"abc.ABCMeta".msg = "Define a typing.Protocol."
+"abc.abstractmethod".msg = "Define a typing.Protocol."
+"sys.exit".msg = "Return an exit code from main() and raise SystemExit(main())."
+"inspect.currentframe".msg = "Pass the value explicitly instead of reading the caller's frame."
+"os.execl".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
+"os.execle".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
+"os.execlp".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
+"os.execlpe".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
+"os.execv".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
+"os.execve".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
+"os.execvp".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
+"os.execvpe".msg = "Run a child with asyncio.create_subprocess_exec or subprocess.run instead of replacing this process."
 
 [lint.flake8-unused-arguments]
 ignore-variadic-names = false
@@ -122,9 +143,9 @@ ignore-variadic-names = false
 max-complexity = 8
 
 [lint.pylint]
-max-args = 4
+max-args = 3
 max-positional-args = 3
-max-returns = 4
+max-returns = 6
 max-branches = 8
 max-statements = 25
 max-locals = 10
@@ -140,3 +161,4 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = false
+preview = true
