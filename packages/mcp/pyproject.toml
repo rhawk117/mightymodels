@@ -1,10 +1,10 @@
 [project]
 name = "mightymodels-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "The MCP server for mightymodels"
 readme = "README.md"
 authors = [
-    { name = "rhawk117", email = "hawkinsry19@gmail.com" }
+    { name = "rhawk117", email = "noplaceLike127dot0dot0dot1@proton.me" },
 ]
 requires-python = ">=3.14"
 dependencies = []
