@@ -5,7 +5,7 @@ from enum import StrEnum, auto
 from typing import Any
 
 import pytest
-from hypothesis import given
+from hypothesis import example, given
 from hypothesis import strategies as st
 from mightymodels_core.database import (
     NaiveTimestampError,
@@ -76,7 +76,17 @@ class TestRoundTrip:
         flag=st.booleans(),
     )
 
+    @pytest.mark.regression
     @given(params=params)
+    @example(
+        params=EchoParams(
+            items=[],
+            mapping={},
+            at=datetime(3059, 1, 1, 0, 0, 0, 999997, tzinfo=UTC),
+            color=Color.RED,
+            flag=False,
+        )
+    )
     def test_bound_params_read_back_equal(self, params: EchoParams) -> None:
         row = echo(params)
 

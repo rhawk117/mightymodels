@@ -4,8 +4,7 @@ Lists, dicts and Structs bind as JSON text, aware datetimes as whole seconds sin
 and everything else as itself. A row is the single JSON text a statement selects.
 """
 
-from datetime import datetime
-from math import floor
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import msgspec
@@ -18,13 +17,16 @@ if TYPE_CHECKING:
 
     from .statements import Query
 
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+ONE_SECOND = timedelta(seconds=1)
+
 
 def bind_value(field: str, value: object) -> object:
     if isinstance(value, datetime):
         if value.tzinfo is None:
             raise NaiveTimestampError(field=field)
 
-        return floor(value.timestamp())
+        return (value - EPOCH) // ONE_SECOND
 
     if isinstance(value, list | dict | Struct):
         return msgspec.json.encode(value).decode()
