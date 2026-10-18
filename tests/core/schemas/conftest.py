@@ -2,6 +2,7 @@
 
 import sqlite3
 from contextlib import closing
+from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ from mightymodels_core.schemas.repositories import (
     ENSURE_REPOSITORY,
     RepositoryKeyParams,
 )
+from mightymodels_core.schemas.tickets import STAGE_TICKET, StageTicketParams, TicketScope
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -58,3 +60,26 @@ def repository_id(database: Database) -> int:
         repository = unit.one(ENSURE_REPOSITORY, RepositoryKeyParams(repository_key='owner/repo'))
     assert repository is not None
     return repository.id
+
+
+@pytest.fixture
+def ticket_id(database: Database, repository_id: int) -> int:
+    params = StageTicketParams(
+        repository_id=repository_id,
+        slug='staged',
+        ticket='a staged ticket',
+        summary='summary',
+        branch='main',
+        scope=TicketScope.MED,
+        plan_first=False,
+        auto_escalate=False,
+        issue=None,
+        jira=None,
+        models={},
+        context=[],
+        validated_at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
+    )
+    with database.write() as unit:
+        staged = unit.one(STAGE_TICKET, params)
+    assert staged is not None
+    return staged.id
