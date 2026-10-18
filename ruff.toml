@@ -66,6 +66,7 @@ ignore = [
     "T201",
     "any-type",
     "shebang-missing-executable-file",
+    "async-function-with-timeout"
 ]
 
 

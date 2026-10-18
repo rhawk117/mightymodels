@@ -1,0 +1,21 @@
+[project]
+name = "mightymodels-core"
+version = "0.1.0"
+description = "The core shared package for mightymodels"
+readme = "README.md"
+authors = [
+    { name = "rhawk117", email = "noplaceLike127dot0dot0dot1@proton.me" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "msgspec>=0.22.0",
+    "pydantic>=2.14.1",
+    "sqlalchemy>=2.1.5",
+]
+
+[project.scripts]
+mightymodels-core = "mightymodels_core:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
