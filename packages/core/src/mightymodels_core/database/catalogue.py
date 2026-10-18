@@ -10,6 +10,7 @@ from .errors import (
     EmptyBlockError,
     MissingBlockError,
     UndeclaredBlockError,
+    UnknownStatementError,
 )
 
 if TYPE_CHECKING:
@@ -57,7 +58,10 @@ class Catalogue:
     sql_by_name: Mapping[str, str]
 
     def sql_for(self, declaration: Declaration) -> str:
-        return self.sql_by_name[declaration.name]
+        if (sql := self.sql_by_name.get(declaration.name)) is None:
+            raise UnknownStatementError(name=declaration.name)
+
+        return sql
 
 
 def bind_catalogue(text: str, declarations: Iterable[Declaration]) -> Catalogue:

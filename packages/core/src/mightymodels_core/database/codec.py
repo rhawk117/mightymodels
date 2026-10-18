@@ -14,6 +14,8 @@ from msgspec import Struct
 from .errors import NaiveTimestampError, RowDecodeError
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from .statements import Query
 
 
@@ -40,8 +42,13 @@ def create_row_decoder[R: Struct](row: type[R]) -> msgspec.json.Decoder[R]:
     return msgspec.json.Decoder(row, strict=False)
 
 
-def decode_row[P: Struct, R: Struct](query: Query[P, R], row: str) -> R:
+def decode_rows[P: Struct, R: Struct](query: Query[P, R], rows: Iterable[str]) -> list[R]:
+    decoder = create_row_decoder(query.row)
     try:
-        return create_row_decoder(query.row).decode(row)
+        return [decoder.decode(row) for row in rows]
     except msgspec.DecodeError as error:
         raise RowDecodeError(statement=query.name, detail=str(error)) from error
+
+
+def decode_row[P: Struct, R: Struct](query: Query[P, R], row: str) -> R:
+    return decode_rows(query, [row])[0]
