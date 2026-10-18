@@ -1,0 +1,17 @@
+[project]
+name = "mightymodels-hooks"
+version = "0.1.0"
+description = "The Claude Code Hooks for mightymodels"
+readme = "README.md"
+authors = [
+    { name = "rhawk117", email = "noplaceLike127dot0dot0dot1@proton.me" },
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+mightymodels-hooks = "mightymodels_hooks:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
