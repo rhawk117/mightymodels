@@ -116,7 +116,8 @@ def install_schema(connection: sqlite3.Connection, script: str) -> None:
         run_install(connection, script)
     except BaseException:
         if connection.in_transaction:
-            connection.execute('ROLLBACK')
+            with translate_errors('ROLLBACK'):
+                connection.execute('ROLLBACK')
         raise
 
 
@@ -132,6 +133,17 @@ def apply_schema(connection: sqlite3.Connection, schema: Schema) -> None:
 def prepare(connection: sqlite3.Connection, schema: Schema, options: ConnectionOptions) -> None:
     configure(connection, options)
     apply_schema(connection, schema)
+
+
+def prepare_or_close(
+    connection: sqlite3.Connection, schema: Schema, options: ConnectionOptions
+) -> None:
+    try:
+        prepare(connection, schema, options)
+    except BaseException:
+        with translate_errors('close'):
+            connection.close()
+        raise
 
 
 @dataclass(slots=True, kw_only=True)
@@ -171,10 +183,5 @@ def open_database(
             check_same_thread=False,
         )
 
-    try:
-        prepare(connection, schema, options)
-    except BaseException:
-        connection.close()
-        raise
-
+    prepare_or_close(connection, schema, options)
     return Database(channel=Channel(connection=connection, catalogue=catalogue))

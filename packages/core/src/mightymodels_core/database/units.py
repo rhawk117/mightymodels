@@ -156,11 +156,16 @@ class UnitScope:
             self.rollback()
             raise
 
+    def end_read_only(self) -> None:
+        try:
+            self.rollback()
+        finally:
+            self.run_sql('PRAGMA query_only = OFF')
+
     def release(self) -> None:
         try:
             if self.kind.is_read_only:
-                self.rollback()
-                self.run_sql('PRAGMA query_only = OFF')
+                self.end_read_only()
         finally:
             self.channel.holder = None
             self.channel.lock.release()

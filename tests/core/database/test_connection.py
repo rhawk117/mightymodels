@@ -1,3 +1,4 @@
+import sqlite3
 from contextlib import closing
 from typing import TYPE_CHECKING
 
@@ -13,8 +14,21 @@ from mightymodels_core.database import (
     UnversionedSchemaError,
     open_database,
 )
+from mightymodels_core.database.connection import (
+    install_schema,
+    parse_schema,
+    prepare_or_close,
+)
 
-from .conftest import FIXTURE_VERSION, NamePart, NoPart, PersonPart
+from .conftest import (
+    FIXTURE_SCHEMA,
+    FIXTURE_VERSION,
+    CloseFailingConnection,
+    NamePart,
+    NoPart,
+    PersonPart,
+    RollbackFailingConnection,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -117,6 +131,31 @@ class TestOpen:
         with pytest.raises(StatementFailedError) as failed:
             open_database(missing_directory, database_spec, ConnectionOptions())
         assert failed.value.statement == 'open'
+
+
+class TestFailureTranslation:
+    def test_a_failing_rollback_during_schema_install_is_a_domain_error(
+        self, database_path: Path
+    ) -> None:
+        connection = sqlite3.connect(
+            database_path, factory=RollbackFailingConnection, autocommit=True
+        )
+        with closing(connection), pytest.raises(StatementFailedError) as failed:
+            install_schema(connection, 'CREATE TABLE broken (')
+        assert failed.value.statement == 'ROLLBACK'
+
+    def test_a_failing_close_on_the_open_error_path_is_a_domain_error(
+        self, database_path: Path
+    ) -> None:
+        with closing(sqlite3.connect(database_path, autocommit=True)) as other:
+            other.execute('PRAGMA user_version = 3')
+        connection = sqlite3.connect(database_path, factory=CloseFailingConnection, autocommit=True)
+        try:
+            with pytest.raises(StatementFailedError) as failed:
+                prepare_or_close(connection, parse_schema(FIXTURE_SCHEMA), ConnectionOptions())
+        finally:
+            sqlite3.Connection.close(connection)
+        assert failed.value.statement == 'close'
 
 
 class TestClose:

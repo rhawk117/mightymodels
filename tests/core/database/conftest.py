@@ -1,7 +1,8 @@
 """Shared declarations and a tiny fixture database for the database adapter tests."""
 
+import sqlite3
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, override
 
 import pytest
 from mightymodels_core.database import (
@@ -44,6 +45,9 @@ INSERT INTO people (name, age, team_id) VALUES (:name, :age, :team_id);
 
 -- name: add_nameless_person
 INSERT INTO people (name) VALUES (NULL);
+
+-- name: add_person_with_text_age
+INSERT INTO people (name, age) VALUES ('ada', 'old');
 
 -- name: find_person
 SELECT json_object('name', name, 'age', age) FROM people WHERE name = :name;
@@ -101,6 +105,7 @@ class Statements:
     add_team: Command[NamePart]
     add_person: Command[PersonPart]
     add_nameless_person: Command[NoPart]
+    add_person_with_text_age: Command[NoPart]
     delete_from_missing_table: Command[NoPart]
     find_person: Query[NamePart, PersonRow]
     all_people: Query[NoPart, PersonRow]
@@ -114,6 +119,7 @@ class Statements:
             self.add_team,
             self.add_person,
             self.add_nameless_person,
+            self.add_person_with_text_age,
             self.delete_from_missing_table,
             self.find_person,
             self.all_people,
@@ -128,6 +134,7 @@ def create_statements() -> Statements:
         add_team=Command(name='add_team', params=NamePart),
         add_person=Command(name='add_person', params=PersonPart),
         add_nameless_person=Command(name='add_nameless_person', params=NoPart),
+        add_person_with_text_age=Command(name='add_person_with_text_age', params=NoPart),
         delete_from_missing_table=Command(name='delete_from_missing_table', params=NoPart),
         find_person=Query(name='find_person', params=NamePart, row=PersonRow),
         all_people=Query(name='all_people', params=NoPart, row=PersonRow),
@@ -135,6 +142,23 @@ def create_statements() -> Statements:
         journal_mode=Query(name='journal_mode', params=NoPart, row=TextRow),
         user_version=Query(name='user_version', params=NoPart, row=NumberRow),
     )
+
+
+class RollbackFailingConnection(sqlite3.Connection):
+    @override
+    def execute(self, sql: str, parameters: Any = (), /) -> sqlite3.Cursor:
+        if sql == 'ROLLBACK':
+            message = 'injected rollback failure'
+            raise sqlite3.OperationalError(message)
+
+        return super().execute(sql, parameters)
+
+
+class CloseFailingConnection(sqlite3.Connection):
+    @override
+    def close(self) -> None:
+        message = 'injected close failure'
+        raise sqlite3.OperationalError(message)
 
 
 @pytest.fixture

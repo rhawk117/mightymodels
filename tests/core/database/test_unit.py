@@ -1,3 +1,4 @@
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from dataclasses import dataclass
@@ -17,11 +18,22 @@ from mightymodels_core.database import (
     StatementFailedError,
     UnitExitedError,
     UnitReusedError,
+    UnitScope,
     UnknownStatementError,
+    bind_catalogue,
     open_database,
 )
+from mightymodels_core.database.connection import install_schema
+from mightymodels_core.database.units import READ_UNIT, WRITE_UNIT, Channel
 
-from .conftest import NamePart, NoPart, PersonPart, PersonRow, create_statements
+from .conftest import (
+    NamePart,
+    NoPart,
+    PersonPart,
+    PersonRow,
+    RollbackFailingConnection,
+    create_statements,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -29,7 +41,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from _pytest.mark import ParameterSet
-    from mightymodels_core.database import Command, Database, DatabaseSpec, UnitScope
+    from mightymodels_core.database import Command, Database, DatabaseSpec
     from mightymodels_core.database.errors import SqliteFailure
     from msgspec import Struct
 
@@ -81,6 +93,12 @@ def failing_statement_cases() -> pytest.MarkDecorator:
         FailingStatement(
             name='not-null',
             command=STATEMENTS.add_nameless_person,
+            params=NoPart(),
+            error_type=RejectedValueError,
+        ),
+        FailingStatement(
+            name='datatype',
+            command=STATEMENTS.add_person_with_text_age,
             params=NoPart(),
             error_type=RejectedValueError,
         ),
@@ -191,6 +209,35 @@ class TestReadUnit:
         count_people(database, statements)
         with database.write() as unit:
             assert unit.run(statements.add_person, ADA) == 1
+
+
+class TestReadUnitRollbackFailure:
+    def test_query_only_is_off_and_a_write_unit_works_afterwards(
+        self, tmp_path: Path, database_spec: DatabaseSpec, statements: Statements
+    ) -> None:
+        connection = sqlite3.connect(
+            tmp_path.joinpath('flaky.db'),
+            factory=RollbackFailingConnection,
+            autocommit=True,
+            check_same_thread=False,
+        )
+        with closing(connection):
+            install_schema(connection, database_spec.schema.read_text(encoding='utf-8'))
+            catalogue = bind_catalogue(
+                database_spec.statements.read_text(encoding='utf-8'), database_spec.declarations
+            )
+            channel = Channel(connection=connection, catalogue=catalogue)
+
+            with pytest.raises(StatementFailedError), UnitScope(channel=channel, kind=READ_UNIT):
+                raise RollbackTriggerError
+            query_only = connection.execute('PRAGMA query_only').fetchone()[0]
+            sqlite3.Connection.execute(connection, 'ROLLBACK')
+
+            with UnitScope(channel=channel, kind=WRITE_UNIT) as unit:
+                added = unit.run(statements.add_person, ADA)
+
+        assert query_only == 0
+        assert added == 1
 
 
 class TestUnitLifecycle:

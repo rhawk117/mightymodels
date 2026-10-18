@@ -160,11 +160,23 @@ FAILURE_BY_NAME: dict[str, type[SqliteFailure]] = {
     'SQLITE_READONLY': ReadOnlyUnitError,
 }
 
+SQLITE_CONSTRAINT_DATATYPE = 3091
+
+FAILURE_BY_CODE: dict[int, type[SqliteFailure]] = {
+    SQLITE_CONSTRAINT_DATATYPE: RejectedValueError,
+}
+
 
 def create_sqlite_error(error: sqlite3.Error, *, statement: str) -> SqliteFailure:
     name = getattr(error, 'sqlite_errorname', '')
     primary = '_'.join(name.split('_')[:2])
-    failure = FAILURE_BY_NAME.get(name) or FAILURE_BY_NAME.get(primary) or StatementFailedError
+    code = getattr(error, 'sqlite_errorcode', 0)
+    failure = (
+        FAILURE_BY_NAME.get(name)
+        or FAILURE_BY_CODE.get(code)
+        or FAILURE_BY_NAME.get(primary)
+        or StatementFailedError
+    )
     return failure(statement=statement, detail=str(error))
 
 
