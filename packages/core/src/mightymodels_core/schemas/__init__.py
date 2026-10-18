@@ -2,7 +2,17 @@
 
 from typing import TYPE_CHECKING
 
-from . import contract, crashouts, investigations, repositories, tasks, tickets
+from . import (
+    contract,
+    crashouts,
+    investigations,
+    repositories,
+    reviews,
+    scout_reports,
+    similarity,
+    tasks,
+    tickets,
+)
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
@@ -14,4 +24,7 @@ DECLARATIONS: tuple[Declaration, ...] = (
     *tasks.DECLARATIONS,
     *contract.DECLARATIONS,
     *crashouts.DECLARATIONS,
+    *reviews.DECLARATIONS,
+    *similarity.DECLARATIONS,
+    *scout_reports.DECLARATIONS,
 )

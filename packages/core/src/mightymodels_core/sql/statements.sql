@@ -419,3 +419,243 @@ LIMIT :limit;
 SELECT json_object('count', count(*))
 FROM crashouts
 WHERE repository_id = :repository_id;
+
+-- name: record_review_run
+INSERT INTO review_runs (
+  repository_id, run_key, ticket_key, scope, base, head, depth, emphasis, weights, personas,
+  models, created_at
+)
+VALUES (
+  :repository_id, :run_key, :ticket_key, :scope, :base, :head, :depth, :emphasis, :weights,
+  :personas, :models, :created_at
+)
+RETURNING json_object('id', id);
+
+-- name: record_review_models
+UPDATE review_runs SET models = :models
+WHERE repository_id = :repository_id AND run_key = :run_key;
+
+-- name: review_run
+SELECT json_object(
+  'id', id,
+  'run_key', run_key,
+  'ticket_key', ticket_key,
+  'scope', scope,
+  'base', base,
+  'head', head,
+  'depth', depth,
+  'emphasis', emphasis,
+  'weights', json(weights),
+  'personas', json(personas),
+  'models', json(models),
+  'created_at', created_at
+)
+FROM review_runs
+WHERE repository_id = :repository_id AND run_key = :run_key;
+
+-- name: latest_review_runs
+SELECT json_object(
+  'id', id,
+  'run_key', run_key,
+  'ticket_key', ticket_key,
+  'scope', scope,
+  'base', base,
+  'head', head,
+  'depth', depth,
+  'emphasis', emphasis,
+  'weights', json(weights),
+  'personas', json(personas),
+  'models', json(models),
+  'created_at', created_at
+)
+FROM review_runs
+WHERE repository_id = :repository_id
+ORDER BY run_key DESC
+LIMIT :limit;
+
+-- name: latest_review_run_of_ticket
+SELECT json_object(
+  'id', id,
+  'run_key', run_key,
+  'ticket_key', ticket_key,
+  'scope', scope,
+  'base', base,
+  'head', head,
+  'depth', depth,
+  'emphasis', emphasis,
+  'weights', json(weights),
+  'personas', json(personas),
+  'models', json(models),
+  'created_at', created_at
+)
+FROM review_runs
+WHERE repository_id = :repository_id AND ticket_key = :ticket_key
+ORDER BY run_key DESC
+LIMIT 1;
+
+-- name: upsert_review_finding
+INSERT INTO review_findings (
+  review_run_id, finding_key, sources, severity, kind, security, title, location, fix, verify,
+  evidence_kind, evidence_cite, conflict
+)
+VALUES (
+  :review_run_id, :finding_key, :sources, :severity, :kind, :security, :title, :location, :fix,
+  :verify, :evidence_kind, :evidence_cite, :conflict
+)
+ON CONFLICT (review_run_id, finding_key) DO UPDATE SET
+  sources = excluded.sources,
+  severity = excluded.severity,
+  kind = excluded.kind,
+  security = excluded.security,
+  title = excluded.title,
+  location = excluded.location,
+  fix = excluded.fix,
+  verify = excluded.verify,
+  evidence_kind = excluded.evidence_kind,
+  evidence_cite = excluded.evidence_cite,
+  conflict = excluded.conflict;
+
+-- name: review_findings_of_run
+SELECT json_object(
+  'finding_key', finding_key,
+  'sources', json(sources),
+  'severity', severity,
+  'kind', kind,
+  'security', security,
+  'title', title,
+  'location', location,
+  'fix', fix,
+  'verify', verify,
+  'evidence_kind', evidence_kind,
+  'evidence_cite', evidence_cite,
+  'conflict', conflict
+)
+FROM review_findings
+WHERE review_run_id = :review_run_id
+ORDER BY length(finding_key), finding_key
+LIMIT :limit;
+
+-- name: review_finding_count
+SELECT json_object('count', count(*))
+FROM review_findings
+WHERE review_run_id = :review_run_id;
+
+-- name: upsert_review_disposition
+INSERT INTO review_dispositions (review_finding_id, decision, reason, by, at)
+SELECT f.id, :decision, :reason, :by, :at
+FROM review_findings AS f
+WHERE f.review_run_id = :review_run_id AND f.finding_key = :finding_key
+ON CONFLICT (review_finding_id) DO UPDATE SET
+  decision = excluded.decision,
+  reason = excluded.reason,
+  by = excluded.by,
+  at = excluded.at;
+
+-- name: review_dispositions_of_run
+SELECT json_object(
+  'finding_key', f.finding_key,
+  'decision', d.decision,
+  'reason', d.reason,
+  'by', d.by,
+  'at', d.at
+)
+FROM review_findings AS f
+JOIN review_dispositions AS d ON d.review_finding_id = f.id
+WHERE f.review_run_id = :review_run_id
+ORDER BY length(f.finding_key), f.finding_key
+LIMIT :limit;
+
+-- name: review_disposition_count
+SELECT json_object('count', count(*))
+FROM review_findings AS f
+JOIN review_dispositions AS d ON d.review_finding_id = f.id
+WHERE f.review_run_id = :review_run_id;
+
+-- name: delete_review_dispositions
+DELETE FROM review_dispositions
+WHERE review_finding_id IN (
+  SELECT f.id
+  FROM review_findings AS f
+  WHERE f.review_run_id = :review_run_id
+    AND f.finding_key IN (SELECT value FROM json_each(:finding_keys))
+);
+
+-- name: upsert_review_outcome
+INSERT INTO review_outcomes (review_disposition_id, result, "commit", reason, at)
+SELECT d.id, :result, :commit, :reason, :at
+FROM review_findings AS f
+JOIN review_dispositions AS d ON d.review_finding_id = f.id
+WHERE f.review_run_id = :review_run_id AND f.finding_key = :finding_key
+ON CONFLICT (review_disposition_id) DO UPDATE SET
+  result = excluded.result,
+  "commit" = excluded."commit",
+  reason = excluded.reason,
+  at = excluded.at;
+
+-- name: review_outcomes_of_run
+SELECT json_object(
+  'finding_key', f.finding_key,
+  'result', o.result,
+  'commit', o."commit",
+  'reason', o.reason,
+  'at', o.at
+)
+FROM review_findings AS f
+JOIN review_dispositions AS d ON d.review_finding_id = f.id
+JOIN review_outcomes AS o ON o.review_disposition_id = d.id
+WHERE f.review_run_id = :review_run_id
+ORDER BY length(f.finding_key), f.finding_key
+LIMIT :limit;
+
+-- name: review_outcome_count
+SELECT json_object('count', count(*))
+FROM review_findings AS f
+JOIN review_dispositions AS d ON d.review_finding_id = f.id
+JOIN review_outcomes AS o ON o.review_disposition_id = d.id
+WHERE f.review_run_id = :review_run_id;
+
+-- name: delete_review_outcomes
+DELETE FROM review_outcomes
+WHERE review_disposition_id IN (
+  SELECT d.id
+  FROM review_findings AS f
+  JOIN review_dispositions AS d ON d.review_finding_id = f.id
+  WHERE f.review_run_id = :review_run_id
+    AND f.finding_key IN (SELECT value FROM json_each(:finding_keys))
+);
+
+-- name: upsert_similarity
+INSERT INTO similarity (repository_id, kind, reference, text)
+VALUES (:repository_id, :kind, :reference, :text)
+ON CONFLICT (repository_id, kind, reference) DO UPDATE SET text = excluded.text;
+
+-- name: similarity_of_reference
+SELECT json_object('id', id, 'kind', kind, 'reference', reference, 'text', text, 'at', at)
+FROM similarity
+WHERE repository_id = :repository_id AND kind = :kind AND reference = :reference;
+
+-- name: similarity_candidates
+SELECT json_object('kind', s.kind, 'reference', s.reference, 'text', s.text)
+FROM similarity_index
+JOIN similarity AS s ON s.id = similarity_index.rowid
+WHERE similarity_index MATCH :query
+  AND s.repository_id = :repository_id
+  AND (:kind IS NULL OR s.kind = :kind)
+  AND (
+    :excluded_reference IS NULL
+    OR s.kind != :excluded_kind
+    OR s.reference != :excluded_reference
+  )
+ORDER BY bm25(similarity_index)
+LIMIT 20;
+
+-- name: add_scout_report
+INSERT INTO scout_reports (repository_id, scout, target, report)
+VALUES (:repository_id, :scout, :target, :report)
+RETURNING json_object('id', id);
+
+-- name: scout_report_of_target
+SELECT json_object('id', id)
+FROM scout_reports
+WHERE repository_id = :repository_id AND scout = :scout AND target = :target
+LIMIT 1;
