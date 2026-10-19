@@ -35,9 +35,11 @@ run_step() {
 
 ruff_format_tracked() {
   local pattern
+  local status=0
   for pattern in '*.py' '*.pyi' '*.ipynb' '*.md'; do
-    files_with_extension "$pattern" uv run ruff format --force-exclude
+    files_with_extension "$pattern" uv run ruff format --force-exclude || status=$?
   done
+  return "$status"
 }
 
 write_format() {
