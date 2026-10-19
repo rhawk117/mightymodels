@@ -1,4 +1,9 @@
-"""The similarity rows of a repository and the full-text search over them."""
+"""The similarity rows of a repository and the full-text search over them.
+
+In `SimilarityCandidatesParams`, `query` is an FTS5 MATCH expression and `limit` caps the rows
+returned. A null `kind` matches every kind, and a null `excluded_reference` excludes nothing,
+otherwise the (`excluded_kind`, `excluded_reference`) pair is left out.
+"""
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal
@@ -12,6 +17,7 @@ if TYPE_CHECKING:
 
 
 type SimilarityKind = Literal['ledger-entry', 'scout-report', 'review-finding', 'crashout']
+type FtsMatchExpression = str
 
 
 class UpsertSimilarityParams(Struct, frozen=True, kw_only=True, gc=False):
@@ -28,15 +34,12 @@ class SimilarityReferenceParams(Struct, frozen=True, kw_only=True, gc=False):
 
 
 class SimilarityCandidatesParams(Struct, frozen=True, kw_only=True, gc=False):
-    """`query` is an FTS5 MATCH expression; a null `kind` matches every kind, and a null
-    `excluded_reference` excludes nothing, otherwise the (`excluded_kind`, `excluded_reference`)
-    pair is left out."""
-
     repository_id: int
-    query: str
+    query: FtsMatchExpression
     kind: SimilarityKind | None
     excluded_kind: SimilarityKind | None
     excluded_reference: str | None
+    limit: int
 
 
 class SimilarityRow(Struct, frozen=True, kw_only=True, gc=False):

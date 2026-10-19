@@ -38,6 +38,7 @@ def search(
     *,
     kind: SimilarityKind | None = None,
     excluding: tuple[SimilarityKind, str] | None = None,
+    limit: int = 20,
 ) -> list[tuple[SimilarityKind, str]]:
     params = SimilarityCandidatesParams(
         repository_id=repository_id,
@@ -45,6 +46,7 @@ def search(
         kind=kind,
         excluded_kind=None if excluding is None else excluding[0],
         excluded_reference=None if excluding is None else excluding[1],
+        limit=limit,
     )
     with database.read() as unit:
         found = unit.all(SIMILARITY_CANDIDATES, params)
@@ -171,9 +173,7 @@ class TestSimilaritySearch:
 
         assert found == [('crashout', 'exact'), ('crashout', 'padded')]
 
-    def test_a_search_returns_at_most_twenty_rows(
-        self, database: Database, repository_id: int
-    ) -> None:
+    def test_the_limit_caps_the_rows_returned(self, database: Database, repository_id: int) -> None:
         store(
             database,
             *(
@@ -182,4 +182,5 @@ class TestSimilaritySearch:
             ),
         )
 
-        assert len(search(database, repository_id, 'retry')) == 20
+        assert len(search(database, repository_id, 'retry', limit=20)) == 20
+        assert len(search(database, repository_id, 'retry', limit=5)) == 5

@@ -601,7 +601,7 @@ WHERE similarity_index MATCH :query
     OR s.reference != :excluded_reference
   )
 ORDER BY bm25(similarity_index)
-LIMIT 20;
+LIMIT :limit;
 
 -- name: add_scout_report
 INSERT INTO scout_reports (repository_id, scout, target, report)
