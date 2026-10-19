@@ -2,7 +2,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.primitives import Slug
+from mightymodels_core.primitives import RedactedTextTooLongError, Slug
 from mightymodels_core.tasks import (
     ArchitectSpentError,
     FixesSpentError,
@@ -11,6 +11,7 @@ from mightymodels_core.tasks import (
     MarkRequest,
     ModeNeedsArchitectError,
     TaskMovedError,
+    TaskOptions,
     TaskTooLargeError,
     TransitionError,
 )
@@ -295,6 +296,9 @@ class TestMark:
 
 
 class TestRecordFailedFix:
+    at_limit = 'a' * TaskOptions().hypothesis_limit
+    over_limit = at_limit + 'a'
+
     def test_a_failed_fix_is_recorded_redacted_with_the_fixes_left(
         self, started_harness: ServiceHarness
     ) -> None:
@@ -307,6 +311,21 @@ class TestRecordFailedFix:
         assert started_harness.attempts.failed_fixes(started_harness.ticket_id, FIRST_TASK) == [
             recorded.hypothesis
         ]
+
+    def test_a_hypothesis_over_the_limit_is_refused_and_nothing_is_stored(
+        self, started_harness: ServiceHarness
+    ) -> None:
+        with pytest.raises(RedactedTextTooLongError):
+            started_harness.service.record_failed_fix(SERVICE_SLUG, FIRST_TASK, self.over_limit)
+
+        assert started_harness.attempts.failed_fixes(started_harness.ticket_id, FIRST_TASK) == []
+
+    def test_a_hypothesis_at_the_limit_is_recorded(self, started_harness: ServiceHarness) -> None:
+        recorded = started_harness.service.record_failed_fix(
+            SERVICE_SLUG, FIRST_TASK, self.at_limit
+        )
+
+        assert recorded.hypothesis == self.at_limit
 
     def test_a_failed_fix_is_refused_on_a_task_that_is_not_in_progress(
         self, service_harness: ServiceHarness

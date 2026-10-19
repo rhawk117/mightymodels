@@ -10,7 +10,7 @@ and refuses when its status, base or owned set moved since.
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from mightymodels_core.primitives import redact
+from mightymodels_core.primitives import redact, redact_within
 from mightymodels_core.tasks.errors import TaskMovedError, TransitionError, UnknownTaskError
 from mightymodels_core.tasks.gates import (
     Evidence,
@@ -232,6 +232,7 @@ class TaskService:
         return self.task_held(ticket_id, task_key)
 
     def record_failed_fix(self, slug: Slug, task_key: TaskId, hypothesis: str) -> FixRecorded:
+        redacted = redact_within(hypothesis, 'hypothesis', self.options.hypothesis_limit)
         ticket_id = self.tickets.unclosed_ticket(slug).id
         tried = self.attempts.failed_fixes(ticket_id, task_key)
         policy = FixPolicy(
@@ -243,7 +244,6 @@ class TaskService:
         if problem := policy.get_fix_problem():
             raise problem
 
-        redacted = redact(hypothesis)
         fix = FailedFix(task_key=task_key, hypothesis=redacted, at=self.clock.now())
         self.attempts.record_failed_fix(ticket_id, fix)
         number = len(tried) + 1

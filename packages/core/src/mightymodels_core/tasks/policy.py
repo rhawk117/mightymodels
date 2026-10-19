@@ -49,6 +49,7 @@ class TaskOptions:
     failed_fix_limit: int = 3
     acceptance_limit: int = 4
     owned_limit: int = 10
+    hypothesis_limit: int = 4000
     transitions: Transitions = field(default_factory=create_transitions)
 
 
