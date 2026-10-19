@@ -2,6 +2,7 @@
 set -euo pipefail
 
 readonly LOGGING_UTILS="./scripts/log.sh"
+readonly SHARED_UTILS="./scripts/lib.sh"
 
 FAILURES=()
 
@@ -12,6 +13,8 @@ setup_environment() {
 
   # shellcheck disable=SC1090
   source "$LOGGING_UTILS"
+  # shellcheck disable=SC1090
+  source "$SHARED_UTILS"
 }
 
 run_step() {
@@ -30,14 +33,11 @@ run_step() {
   return 0
 }
 
-files_with_extension() {
-  local pattern=$1
-  shift
-  git ls-files -z -- "$pattern" | xargs -0 -r -- "$@" --
-}
-
 ruff_format_tracked() {
-  git ls-files -z -- '*.py' '*.pyi' '*.ipynb' '*.md' | xargs -0 -r -- uv run ruff format --force-exclude --
+  local pattern
+  for pattern in '*.py' '*.pyi' '*.ipynb' '*.md'; do
+    files_with_extension "$pattern" uv run ruff format --force-exclude
+  done
 }
 
 write_format() {
