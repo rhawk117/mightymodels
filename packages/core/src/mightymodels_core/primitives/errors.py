@@ -1,5 +1,10 @@
 """The root of the mightymodels state errors and the errors of the value types."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
 
 class StateError(Exception):
     pass
@@ -45,3 +50,9 @@ class InvalidRepositoryKeyError(StateError):
             f'repository key {raw!r} is not valid: an owner/name pair or a local: digest, '
             f'at most {limit} characters'
         )
+
+
+class NaiveClockTimeError(StateError):
+    def __init__(self, *, moment: datetime) -> None:
+        self.moment = moment
+        super().__init__(f'clock time {moment.isoformat()} has no timezone')
