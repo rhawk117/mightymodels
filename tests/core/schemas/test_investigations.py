@@ -13,8 +13,6 @@ from mightymodels_core.schemas.investigations import (
     RECORDED_INVESTIGATION_KEYS,
     AddInvestigationParams,
     AppendLedgerEntryParams,
-    EntryKind,
-    EntrySource,
     InvestigationIdParams,
     InvestigationKeyParams,
     LatestRoundsParams,
@@ -45,9 +43,9 @@ def entry(investigation_id: int, seq: int, round_number: int = 1) -> AppendLedge
         investigation_id=investigation_id,
         seq=seq,
         round=round_number,
-        kind=EntryKind.KNOWN,
+        kind='known',
         text=f'entry {seq}',
-        source=EntrySource.CODE_SCOUT,
+        source='code-scout',
         cite=None if seq == 1 else 'file.py:1',
         supersedes=[] if seq == 1 else [seq - 1],
         at=RECORDED_AT,
@@ -127,8 +125,8 @@ class TestLedgerEntries:
         assert entries[1].supersedes == [1]
         assert entries[1].cite == 'file.py:1'
         assert entries[0].cite is None
-        assert entries[0].kind is EntryKind.KNOWN
-        assert entries[0].source is EntrySource.CODE_SCOUT
+        assert entries[0].kind == 'known'
+        assert entries[0].source == 'code-scout'
         assert entries[0].at == RECORDED_AT
         assert count is not None
         assert count.count == 3

@@ -1,8 +1,7 @@
 """The task rows with their attempts, failed fixes and status transitions."""
 
 from datetime import datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -12,25 +11,13 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class TaskStatus(StrEnum):
-    PENDING = 'pending'
-    IN_PROGRESS = 'in-progress'
-    VERIFIED = 'verified'
-    FAILED = 'failed'
-    BLOCKED = 'blocked'
-    SUPERSEDED = 'superseded'
+type TaskStatus = Literal['pending', 'in-progress', 'verified', 'failed', 'blocked', 'superseded']
 
 
-class Worker(StrEnum):
-    ENGINEER = 'engineer'
-    ARCHITECT = 'architect'
-    INTERN = 'intern'
+type Worker = Literal['engineer', 'architect', 'intern']
 
 
-class ArchitectMode(StrEnum):
-    RECOVERY_IMPLEMENTATION = 'recovery-implementation'
-    SYSTEMIC_REFACTOR = 'systemic-refactor'
-    DIAGNOSE_REPLAN = 'diagnose-replan'
+type ArchitectMode = Literal['recovery-implementation', 'systemic-refactor', 'diagnose-replan']
 
 
 class TaskKeyParams(Struct, frozen=True, kw_only=True, gc=False):

@@ -24,9 +24,7 @@ from mightymodels_core.schemas.tickets import (
     SetTicketStatusParams,
     StageTicketParams,
     TicketIdParams,
-    TicketScope,
     TicketSlugParams,
-    TicketStatus,
     UpsertClosingParams,
 )
 
@@ -45,7 +43,7 @@ def stage_params(repository_id: int, slug: str, branch: str = 'main') -> StageTi
         ticket=f'ticket {slug}',
         summary='summary',
         branch=branch,
-        scope=TicketScope.MED,
+        scope='med',
         plan_first=True,
         auto_escalate=False,
         issue=7,
@@ -98,8 +96,8 @@ class TestTickets:
 
         assert by_slug is not None
         assert by_slug == by_id
-        assert by_slug.status is TicketStatus.STAGED
-        assert by_slug.scope is TicketScope.MED
+        assert by_slug.status == 'staged'
+        assert by_slug.scope == 'med'
         assert by_slug.plan_first is True
         assert by_slug.models == {'engineer': 'sonnet', 'intern': None}
         assert by_slug.context == ['first', 'second']
@@ -115,7 +113,7 @@ class TestTickets:
             unit.run(
                 SET_TICKET_STATUS,
                 SetTicketStatusParams(
-                    repository_id=repository_id, slug='first', status=TicketStatus.IN_PROGRESS
+                    repository_id=repository_id, slug='first', status='in-progress'
                 ),
             )
         again = stage(database, stage_params(repository_id, 'first', branch='next'))
@@ -126,7 +124,7 @@ class TestTickets:
         assert again == first
         assert ticket is not None
         assert ticket.branch == 'next'
-        assert ticket.status is TicketStatus.IN_PROGRESS
+        assert ticket.status == 'in-progress'
 
     def test_a_status_update_reports_whether_a_ticket_matched(
         self, database: Database, repository_id: int
@@ -134,9 +132,7 @@ class TestTickets:
         stage(database, stage_params(repository_id, 'first'))
 
         def update(slug: str) -> int:
-            params = SetTicketStatusParams(
-                repository_id=repository_id, slug=slug, status=TicketStatus.CLOSED
-            )
+            params = SetTicketStatusParams(repository_id=repository_id, slug=slug, status='closed')
             with database.write() as unit:
                 return unit.run(SET_TICKET_STATUS, params)
 
@@ -152,9 +148,7 @@ class TestTickets:
         with database.write() as unit:
             unit.run(
                 SET_TICKET_STATUS,
-                SetTicketStatusParams(
-                    repository_id=repository_id, slug='done', status=TicketStatus.CLOSED
-                ),
+                SetTicketStatusParams(repository_id=repository_id, slug='done', status='closed'),
             )
 
         branch = BranchParams(repository_id=repository_id, branch='main')

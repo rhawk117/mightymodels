@@ -1,8 +1,7 @@
 """The ticket rows, their investigation links and their closings."""
 
 from datetime import datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -12,16 +11,10 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class TicketStatus(StrEnum):
-    STAGED = 'staged'
-    IN_PROGRESS = 'in-progress'
-    CLOSED = 'closed'
+type TicketStatus = Literal['staged', 'in-progress', 'closed']
 
 
-class TicketScope(StrEnum):
-    SM = 'sm'
-    MED = 'med'
-    LARGE = 'large'
+type TicketScope = Literal['sm', 'med', 'large']
 
 
 class TicketIdParams(Struct, frozen=True, kw_only=True, gc=False):

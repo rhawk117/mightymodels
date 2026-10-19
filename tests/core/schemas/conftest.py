@@ -13,7 +13,7 @@ from mightymodels_core.schemas.repositories import (
     ENSURE_REPOSITORY,
     RepositoryKeyParams,
 )
-from mightymodels_core.schemas.tickets import STAGE_TICKET, StageTicketParams, TicketScope
+from mightymodels_core.schemas.tickets import STAGE_TICKET, StageTicketParams
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -70,7 +70,7 @@ def ticket_id(database: Database, repository_id: int) -> int:
         ticket='a staged ticket',
         summary='summary',
         branch='main',
-        scope=TicketScope.MED,
+        scope='med',
         plan_first=False,
         auto_escalate=False,
         issue=None,

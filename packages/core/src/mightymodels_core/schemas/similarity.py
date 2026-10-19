@@ -1,8 +1,7 @@
 """The similarity rows of a repository and the full-text search over them."""
 
 from datetime import datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -12,11 +11,7 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class SimilarityKind(StrEnum):
-    LEDGER_ENTRY = 'ledger-entry'
-    SCOUT_REPORT = 'scout-report'
-    REVIEW_FINDING = 'review-finding'
-    CRASHOUT = 'crashout'
+type SimilarityKind = Literal['ledger-entry', 'scout-report', 'review-finding', 'crashout']
 
 
 class UpsertSimilarityParams(Struct, frozen=True, kw_only=True, gc=False):

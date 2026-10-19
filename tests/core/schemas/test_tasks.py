@@ -21,22 +21,20 @@ from mightymodels_core.schemas.tasks import (
     AddTaskAttemptParams,
     AddTaskFailedFixParams,
     AddTaskTransitionParams,
-    ArchitectMode,
     AttemptsInModesParams,
     RecordTaskVerificationParams,
     StartedByParams,
     TaskFailedFixesParams,
     TaskKeyParams,
-    TaskStatus,
     TicketTaskCountParams,
     TicketTasksParams,
     TransitionsIntoParams,
     UpsertTaskParams,
-    Worker,
 )
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
+    from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
 
 pytestmark = pytest.mark.integration
 
@@ -47,7 +45,7 @@ LATER = datetime(2026, 1, 2, 3, 5, 6, tzinfo=UTC)
 def upsert(
     ticket_id: int,
     task_key: str,
-    status: TaskStatus = TaskStatus.IN_PROGRESS,
+    status: TaskStatus = 'in-progress',
     base: str | None = 'base1',
 ) -> UpsertTaskParams:
     return UpsertTaskParams(
@@ -90,7 +88,7 @@ class TestTasks:
             missing = unit.one(TASK_BY_KEY, TaskKeyParams(ticket_id=ticket_id, task_key='T9'))
 
         assert task is not None
-        assert task.status is TaskStatus.IN_PROGRESS
+        assert task.status == 'in-progress'
         assert task.owned == ['src/a.py']
         assert task.base == 'base1'
         assert task.commit is None
@@ -112,7 +110,7 @@ class TestTasks:
         assert task.base == 'base1'
 
     def test_a_mark_before_any_start_has_no_base(self, database: Database, ticket_id: int) -> None:
-        start(database, upsert(ticket_id, 'T1', status=TaskStatus.BLOCKED, base=None))
+        start(database, upsert(ticket_id, 'T1', status='blocked', base=None))
 
         with database.read() as unit:
             task = unit.one(TASK_BY_KEY, TaskKeyParams(ticket_id=ticket_id, task_key='T1'))
@@ -143,7 +141,7 @@ class TestTasks:
             params = RecordTaskVerificationParams(
                 ticket_id=ticket_id,
                 task_key=task_key,
-                status=TaskStatus.VERIFIED,
+                status='verified',
                 commit='deadbeef',
                 reasons=['ok'],
                 updated_at=LATER,
@@ -157,7 +155,7 @@ class TestTasks:
         with database.read() as unit:
             task = unit.one(TASK_BY_KEY, TaskKeyParams(ticket_id=ticket_id, task_key='T1'))
         assert task is not None
-        assert task.status is TaskStatus.VERIFIED
+        assert task.status == 'verified'
         assert task.commit == 'deadbeef'
         assert task.reasons == ['ok']
         assert task.updated_at == LATER
@@ -173,21 +171,21 @@ class TestStartedBy:
     ) -> None:
         first = start(database, upsert(ticket_id, 'T1'))
         second = start(database, upsert(ticket_id, 'T2'))
-        third = start(database, upsert(ticket_id, 'T3', status=TaskStatus.VERIFIED))
+        third = start(database, upsert(ticket_id, 'T3', status='verified'))
         with database.write() as unit:
-            unit.run(ADD_TASK_ATTEMPT, attempt(first, Worker.ENGINEER))
-            unit.run(ADD_TASK_ATTEMPT, attempt(first, Worker.ARCHITECT))
-            unit.run(ADD_TASK_ATTEMPT, attempt(second, Worker.ENGINEER))
-            unit.run(ADD_TASK_ATTEMPT, attempt(third, Worker.ENGINEER))
+            unit.run(ADD_TASK_ATTEMPT, attempt(first, 'engineer'))
+            unit.run(ADD_TASK_ATTEMPT, attempt(first, 'architect'))
+            unit.run(ADD_TASK_ATTEMPT, attempt(second, 'engineer'))
+            unit.run(ADD_TASK_ATTEMPT, attempt(third, 'engineer'))
 
         with database.read() as unit:
             engineers = unit.all(
                 IN_PROGRESS_TASKS_STARTED_BY,
-                StartedByParams(ticket_id=ticket_id, worker=Worker.ENGINEER, limit=10),
+                StartedByParams(ticket_id=ticket_id, worker='engineer', limit=10),
             )
             architects = unit.all(
                 IN_PROGRESS_TASKS_STARTED_BY,
-                StartedByParams(ticket_id=ticket_id, worker=Worker.ARCHITECT, limit=10),
+                StartedByParams(ticket_id=ticket_id, worker='architect', limit=10),
             )
 
         assert [row.task_key for row in engineers] == ['T2']
@@ -201,18 +199,18 @@ class TestAttempts:
         first = start(database, upsert(ticket_id, 'T1'))
         second = start(database, upsert(ticket_id, 'T2'))
         with database.write() as unit:
-            unit.run(ADD_TASK_ATTEMPT, attempt(second, Worker.ENGINEER))
-            unit.run(ADD_TASK_ATTEMPT, attempt(first, Worker.ENGINEER))
-            unit.run(ADD_TASK_ATTEMPT, attempt(second, Worker.ENGINEER))
-            unit.run(ADD_TASK_ATTEMPT, attempt(second, Worker.ARCHITECT))
+            unit.run(ADD_TASK_ATTEMPT, attempt(second, 'engineer'))
+            unit.run(ADD_TASK_ATTEMPT, attempt(first, 'engineer'))
+            unit.run(ADD_TASK_ATTEMPT, attempt(second, 'engineer'))
+            unit.run(ADD_TASK_ATTEMPT, attempt(second, 'architect'))
 
         with database.read() as unit:
             counts = unit.all(ATTEMPTS_BY_WORKER, TicketTasksParams(ticket_id=ticket_id, limit=10))
 
         assert [(row.task_key, row.worker, row.attempts) for row in counts] == [
-            ('T2', Worker.ENGINEER, 2),
-            ('T1', Worker.ENGINEER, 1),
-            ('T2', Worker.ARCHITECT, 1),
+            ('T2', 'engineer', 2),
+            ('T1', 'engineer', 1),
+            ('T2', 'architect', 1),
         ]
 
     def test_attempts_in_modes_counts_only_the_listed_modes(
@@ -220,13 +218,11 @@ class TestAttempts:
     ) -> None:
         task_id = start(database, upsert(ticket_id, 'T1'))
         with database.write() as unit:
-            unit.run(ADD_TASK_ATTEMPT, attempt(task_id, Worker.ENGINEER))
-            unit.run(
-                ADD_TASK_ATTEMPT, attempt(task_id, Worker.ARCHITECT, ArchitectMode.DIAGNOSE_REPLAN)
-            )
+            unit.run(ADD_TASK_ATTEMPT, attempt(task_id, 'engineer'))
+            unit.run(ADD_TASK_ATTEMPT, attempt(task_id, 'architect', 'diagnose-replan'))
             unit.run(
                 ADD_TASK_ATTEMPT,
-                attempt(task_id, Worker.ARCHITECT, ArchitectMode.SYSTEMIC_REFACTOR),
+                attempt(task_id, 'architect', 'systemic-refactor'),
             )
 
         def count(modes: list[ArchitectMode]) -> int:
@@ -237,8 +233,8 @@ class TestAttempts:
             assert row is not None
             return row.count
 
-        assert count([ArchitectMode.DIAGNOSE_REPLAN, ArchitectMode.SYSTEMIC_REFACTOR]) == 2
-        assert count([ArchitectMode.RECOVERY_IMPLEMENTATION]) == 0
+        assert count(['diagnose-replan', 'systemic-refactor']) == 2
+        assert count(['recovery-implementation']) == 0
         assert count([]) == 0
 
 
@@ -272,33 +268,23 @@ class TestTransitions:
         first = start(database, upsert(ticket_id, 'T1'))
         second = start(database, upsert(ticket_id, 'T2'))
         with database.write() as unit:
-            unit.run(
-                ADD_TASK_TRANSITION, transition(first, TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
-            )
-            unit.run(
-                ADD_TASK_TRANSITION, transition(second, TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
-            )
-            unit.run(
-                ADD_TASK_TRANSITION, transition(first, TaskStatus.IN_PROGRESS, TaskStatus.FAILED)
-            )
-            unit.run(
-                ADD_TASK_TRANSITION, transition(first, TaskStatus.FAILED, TaskStatus.IN_PROGRESS)
-            )
+            unit.run(ADD_TASK_TRANSITION, transition(first, 'pending', 'in-progress'))
+            unit.run(ADD_TASK_TRANSITION, transition(second, 'pending', 'in-progress'))
+            unit.run(ADD_TASK_TRANSITION, transition(first, 'in-progress', 'failed'))
+            unit.run(ADD_TASK_TRANSITION, transition(first, 'failed', 'in-progress'))
 
     def test_latest_transitions_into_are_newest_first_and_limited(
         self, database: Database, ticket_id: int
     ) -> None:
-        params = TransitionsIntoParams(
-            ticket_id=ticket_id, statuses=[TaskStatus.IN_PROGRESS], limit=2
-        )
+        params = TransitionsIntoParams(ticket_id=ticket_id, statuses=['in-progress'], limit=2)
         with database.read() as unit:
             rows = unit.all(LATEST_TRANSITIONS_INTO, params)
 
         assert [(row.task_key, row.before) for row in rows] == [
-            ('T1', TaskStatus.FAILED),
-            ('T2', TaskStatus.PENDING),
+            ('T1', 'failed'),
+            ('T2', 'pending'),
         ]
-        assert rows[0].after is TaskStatus.IN_PROGRESS
+        assert rows[0].after == 'in-progress'
         assert rows[0].reasons == ['why']
         assert rows[0].head == 'abc'
         assert rows[0].at == STARTED_AT
@@ -307,14 +293,14 @@ class TestTransitions:
         self, database: Database, ticket_id: int
     ) -> None:
         params = TransitionsIntoParams(
-            ticket_id=ticket_id, statuses=[TaskStatus.IN_PROGRESS, TaskStatus.FAILED], limit=10
+            ticket_id=ticket_id, statuses=['in-progress', 'failed'], limit=10
         )
         with database.read() as unit:
             rows = unit.all(LATEST_TRANSITION_OF_EACH_TASK_INTO, params)
 
         assert sorted((row.task_key, row.before) for row in rows) == [
-            ('T1', TaskStatus.FAILED),
-            ('T2', TaskStatus.PENDING),
+            ('T1', 'failed'),
+            ('T2', 'pending'),
         ]
 
     def test_no_statuses_match_nothing(self, database: Database, ticket_id: int) -> None:

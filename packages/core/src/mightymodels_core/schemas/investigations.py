@@ -1,8 +1,7 @@
 """The investigation rows and their ledger entries."""
 
 from datetime import datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -12,19 +11,10 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class EntryKind(StrEnum):
-    KNOWN = 'known'
-    OPEN = 'open'
-    DECISION = 'decision'
-    RESOURCE = 'resource'
-    NEXT = 'next'
+type EntryKind = Literal['known', 'open', 'decision', 'resource', 'next']
 
 
-class EntrySource(StrEnum):
-    CODE_SCOUT = 'code-scout'
-    WEB_SCOUT = 'web-scout'
-    USER = 'user'
-    PRIMARY = 'primary'
+type EntrySource = Literal['code-scout', 'web-scout', 'user', 'primary']
 
 
 class AddInvestigationParams(Struct, frozen=True, kw_only=True, gc=False):
