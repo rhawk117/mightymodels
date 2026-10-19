@@ -19,7 +19,6 @@ timeout stays a timeout.
 import io
 import subprocess
 from dataclasses import dataclass, field
-from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 import anyio
@@ -31,11 +30,7 @@ if TYPE_CHECKING:
     from anyio.abc import ByteReceiveStream, Process
 
 
-class FailureKind(StrEnum):
-    TIMED_OUT = auto()
-    NOT_FOUND = auto()
-    REFUSED = auto()
-    UNDECODABLE = auto()
+type FailureKind = Literal['timed_out', 'not_found', 'refused', 'undecodable']
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -72,7 +67,7 @@ def captured_text(captured: bytearray, *, errors: DecodeErrors) -> str:
 
 def failed_run(error: LaunchError, *, program: str) -> FailedRun:
     missing = isinstance(error, FileNotFoundError) and error.filename == program
-    kind = FailureKind.NOT_FOUND if missing else FailureKind.REFUSED
+    kind: FailureKind = 'not_found' if missing else 'refused'
     return FailedRun(kind=kind, detail=str(error), stdout='', stderr='')
 
 
@@ -98,12 +93,12 @@ class CapturedOutput:
             stdout = captured_text(self.stdout, errors='strict')
             stderr = captured_text(self.stderr, errors='strict')
         except UnicodeDecodeError as error:
-            return FailedRun(kind=FailureKind.UNDECODABLE, detail=str(error), stdout='', stderr='')
+            return FailedRun(kind='undecodable', detail=str(error), stdout='', stderr='')
         return CompletedRun(exit=exit_code, stdout=stdout, stderr=stderr)
 
     def timed_out_run(self, timeout: float) -> FailedRun:
         return FailedRun(
-            kind=FailureKind.TIMED_OUT,
+            kind='timed_out',
             detail=f'timed out after {timeout}s',
             stdout=captured_text(self.stdout, errors='replace'),
             stderr=captured_text(self.stderr, errors='replace'),
