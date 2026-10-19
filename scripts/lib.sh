@@ -3,7 +3,7 @@
 
 # Runs CMD ARGS -- FILES... over the tracked files matching PATTERN that exist in the
 # working tree. `git ls-files` also lists paths deleted but not yet staged, so those are
-# filtered out. Runs nothing when no file matches.
+# filtered out. Runs nothing when no file matches, and returns git's status when it fails.
 files_with_extension() {
   local pattern=$1
   shift
@@ -14,6 +14,7 @@ files_with_extension() {
       existing+=("$path")
     fi
   done < <(git ls-files -z -- "$pattern")
+  wait $! || return
 
   if ((${#existing[@]} == 0)); then
     return 0
