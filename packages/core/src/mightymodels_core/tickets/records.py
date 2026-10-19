@@ -5,6 +5,7 @@ a ticket by the type alone.
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -40,3 +41,27 @@ class TicketRecord:
     status: TicketStatus
     section: TicketSection
     investigations: tuple[str, ...]
+
+
+class BranchChoice(StrEnum):
+    CURRENT = 'current'
+    NEW = 'new'
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class TicketSlot:
+    path: str
+    exists: bool
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class TicketAnswers:
+    summary: str
+    context: tuple[str, ...]
+    scope: TicketScope
+    plan_first: bool
+    branch: str
+    issue: int | None = None
+    jira: str | None = None
+    reference_urls: tuple[str, ...] = ()
+    investigations: tuple[str, ...] = ()

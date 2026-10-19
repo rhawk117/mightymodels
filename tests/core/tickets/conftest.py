@@ -18,8 +18,10 @@ from mightymodels_core.schemas.investigations import ADD_INVESTIGATION, AddInves
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.tickets import (
     SqliteTicketRepository,
+    TicketAnswers,
     TicketSection,
     TicketService,
+    TicketSlot,
     Tracker,
 )
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
@@ -133,3 +135,42 @@ def service(
     clock: FakeClock,
 ) -> TicketService:
     return TicketService(tickets=fake_repository, investigations=fake_investigations, clock=clock)
+
+
+def create_answers(
+    *,
+    summary: str = 'add the widget',
+    context: tuple[str, ...] = ('one line', 'two lines'),
+    investigations: tuple[str, ...] = ('first-look',),
+) -> TicketAnswers:
+    return TicketAnswers(
+        summary=summary,
+        context=context,
+        scope='large',
+        plan_first=True,
+        branch='feat/widget',
+        issue=7,
+        jira='WID-1',
+        reference_urls=('https://example.com/a', 'https://example.com/b'),
+        investigations=investigations,
+    )
+
+
+@pytest.fixture
+def answers() -> TicketAnswers:
+    return create_answers()
+
+
+@pytest.fixture
+def unrecorded_answers() -> TicketAnswers:
+    return create_answers(investigations=('never-added',))
+
+
+@pytest.fixture
+def free_slot() -> TicketSlot:
+    return TicketSlot(path='.mightymodels/add-widget/ticket.yml', exists=False)
+
+
+@pytest.fixture
+def taken_slot() -> TicketSlot:
+    return TicketSlot(path='.mightymodels/add-widget/ticket.yml', exists=True)

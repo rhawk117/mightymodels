@@ -2,8 +2,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.workspace import TicketFile, parse_ticket_file
-from mightymodels_core.workspace.ticket_text import with_context
+from mightymodels_core.workspace import (
+    CompanionDocsFile,
+    HandoffContextFile,
+    TicketFile,
+    parse_ticket_file,
+)
+from mightymodels_core.workspace.ticket_text import render_ticket, with_context
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -78,3 +83,56 @@ class TestWithContext:
 
         assert isinstance(parsed, TicketFile)
         assert parsed.context == (line,)
+
+
+def ticket_escape_cases() -> pytest.MarkDecorator:
+    texts = ['next\u0085', 'sep\u2028', 'para\u2029', 'del\x7f', 'c1\x9f', 'nul\x00']
+    return pytest.mark.parametrize('text', [pytest.param(text, id=ascii(text)) for text in texts])
+
+
+class TestRenderTicket:
+    @pytest.fixture
+    def ticket(self) -> TicketFile:
+        return TicketFile(
+            task='alpha',
+            summary='s',
+            triaged_at='2026-01-02T03:04:05+00:00',
+            context=('a', 'b'),
+            companion_docs=CompanionDocsFile(
+                issue_number=7, jira_key=None, reference_urls=('https://example.com',)
+            ),
+            subagent_models={'primary-agent': None, 'engineer': 'sonnet'},
+            handoff_context=HandoffContextFile(
+                scope='med', plan_first=True, branch_name='feat/x', worktrees_okay=False
+            ),
+            investigations=('first-look',),
+        )
+
+    def test_keys_come_in_the_fixed_order(self, ticket: TicketFile) -> None:
+        assert render_ticket(ticket) == (
+            'task: "alpha"\n'
+            'summary: "s"\n'
+            'triaged-at: "2026-01-02T03:04:05+00:00"\n'
+            'context:\n  - "a"\n  - "b"\n'
+            'companion-docs:\n  issue-number: 7\n  jira-key:\n'
+            '  reference-urls:\n    - "https://example.com"\n'
+            'subagent-models:\n  primary-agent:\n  engineer: "sonnet"\n'
+            'handoff-context:\n  scope: "med"\n  plan-first: true\n'
+            '  branch-name: "feat/x"\n  worktrees-okay: false\n'
+            'investigations:\n  - "first-look"\n'
+        )
+
+    def test_the_rendered_text_reads_back(self, ticket: TicketFile) -> None:
+        assert parse_ticket_file(render_ticket(ticket)) == ticket
+
+    @ticket_escape_cases()
+    def test_a_refused_character_is_escaped_and_reads_back(
+        self, ticket: TicketFile, text: str
+    ) -> None:
+        rendered = render_ticket(TicketFile(task=ticket.task, summary=text, context=ticket.context))
+
+        parsed = parse_ticket_file(rendered)
+
+        assert text not in rendered
+        assert isinstance(parsed, TicketFile)
+        assert parsed.summary == text

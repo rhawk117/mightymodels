@@ -36,3 +36,19 @@ class InvalidTicketError(StateError):
     def __init__(self, *, problems: tuple[str, ...]) -> None:
         self.problems = problems
         super().__init__('ticket.yml is invalid:\n  ' + '\n  '.join(problems))
+
+
+class TicketExistsError(StateError):
+    def __init__(self, *, path: str) -> None:
+        self.path = path
+        super().__init__(f'{path} exists; edit it by hand, then run validate')
+
+
+class BranchNameRequiredError(StateError):
+    def __init__(self) -> None:
+        super().__init__('a new branch needs a name')
+
+
+class DetachedHeadError(StateError):
+    def __init__(self) -> None:
+        super().__init__('HEAD is detached, so there is no current branch; ask for a branch name')

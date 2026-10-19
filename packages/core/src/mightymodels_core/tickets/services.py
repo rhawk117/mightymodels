@@ -7,16 +7,26 @@ returns and owns the unit of work, so the service never touches the filesystem o
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from mightymodels_core.primitives import redact
-from mightymodels_core.tickets.policy import TicketOptions, TicketPolicy, declared_slugs
-from mightymodels_core.tickets.records import TicketSection, Tracker
+from mightymodels_core.primitives import REVIEWER_AGENTS, redact
+from mightymodels_core.tickets.errors import (
+    BranchNameRequiredError,
+    DetachedHeadError,
+    TicketExistsError,
+)
+from mightymodels_core.tickets.policy import (
+    PRIMARY_AGENT,
+    TicketOptions,
+    TicketPolicy,
+    declared_slugs,
+)
+from mightymodels_core.tickets.records import BranchChoice, TicketSection, Tracker
 from mightymodels_core.workspace import (
     CompanionDocsFile,
     HandoffContextFile,
     TicketFile,
     parse_ticket_file,
 )
-from mightymodels_core.workspace.ticket_text import with_context
+from mightymodels_core.workspace.ticket_text import render_ticket, with_context
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -24,7 +34,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.investigations import InvestigationRepository
     from mightymodels_core.primitives import Clock, Slug
-    from mightymodels_core.tickets.records import TicketRecord
+    from mightymodels_core.tickets.records import TicketAnswers, TicketRecord, TicketSlot
     from mightymodels_core.tickets.repository import TicketRepository
 
 
@@ -69,14 +79,63 @@ class TicketService:
         if not isinstance(parsed, TicketFile):
             raise parsed
 
+        self.check(slug, parsed)
         declared = parsed.investigations or ()
+        section = create_section(parsed, path=source.path, validated_at=self.clock.now())
+        return self.tickets.stage(slug, section, declared)
+
+    def check(self, slug: Slug, ticket: TicketFile) -> None:
+        declared = ticket.investigations or ()
         unrecorded = self.investigations.unrecorded(declared_slugs(declared))
-        policy = TicketPolicy(ticket=parsed, slug=slug, unrecorded=unrecorded, options=self.options)
+        policy = TicketPolicy(ticket=ticket, slug=slug, unrecorded=unrecorded, options=self.options)
         if problem := policy.get_ticket_problem():
             raise problem
 
-        section = create_section(parsed, path=source.path, validated_at=self.clock.now())
-        return self.tickets.stage(slug, section, declared)
+    def models(self) -> dict[str, str | None]:
+        routing = self.options.routing
+        fixed = {
+            agent: None if agent in REVIEWER_AGENTS else routing.fixed_model(agent)
+            for agent in routing.models
+        }
+        return {PRIMARY_AGENT: None, **fixed}
+
+    def write(self, slug: Slug, answers: TicketAnswers, slot: TicketSlot) -> str:
+        if slot.exists:
+            raise TicketExistsError(path=slot.path)
+
+        ticket = TicketFile(
+            task=str(slug),
+            summary=answers.summary,
+            triaged_at=self.clock.now().isoformat(),
+            context=answers.context,
+            companion_docs=CompanionDocsFile(
+                issue_number=answers.issue,
+                jira_key=answers.jira,
+                reference_urls=answers.reference_urls,
+            ),
+            subagent_models=self.models(),
+            handoff_context=HandoffContextFile(
+                scope=answers.scope,
+                plan_first=answers.plan_first,
+                branch_name=answers.branch,
+                worktrees_okay=False,
+            ),
+            investigations=answers.investigations,
+        )
+        self.check(slug, ticket)
+        return render_ticket(ticket)
+
+    def branch_named(self, choice: BranchChoice, *, name: str, current: str | None) -> str:
+        if choice is BranchChoice.NEW:
+            if not name.strip():
+                raise BranchNameRequiredError
+
+            return name.strip()
+
+        if current is None:
+            raise DetachedHeadError
+
+        return current
 
     def show(self, slug: Slug) -> TicketRecord:
         return self.tickets.staged_ticket(slug)
