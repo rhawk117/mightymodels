@@ -13,10 +13,14 @@ if TYPE_CHECKING:
 
 pytestmark = pytest.mark.integration
 
-BLOCKS = parse_blocks(
-    files('mightymodels_core.sql').joinpath('statements.sql').read_text(encoding='utf-8')
-)
 EXEMPT_SCAN_TARGETS = ('json_each', 'json_tree', '(subquery', 'subquery')
+
+
+@pytest.fixture(scope='module')
+def blocks() -> dict[str, str]:
+    return parse_blocks(
+        files('mightymodels_core.sql').joinpath('statements.sql').read_text(encoding='utf-8')
+    )
 
 
 def is_base_table_scan(detail: str) -> bool:
@@ -33,10 +37,10 @@ def unbound_fields(declaration: Declaration) -> dict[str, None]:
 
 @pytest.mark.parametrize('declaration', DECLARATIONS, ids=lambda declaration: declaration.name)
 def test_declared_statement_is_served_by_an_index(
-    plan_connection: sqlite3.Connection, declaration: Declaration
+    plan_connection: sqlite3.Connection, blocks: dict[str, str], declaration: Declaration
 ) -> None:
     plan = plan_connection.execute(
-        f'EXPLAIN QUERY PLAN {BLOCKS[declaration.name]}', unbound_fields(declaration)
+        f'EXPLAIN QUERY PLAN {blocks[declaration.name]}', unbound_fields(declaration)
     ).fetchall()
 
     scans = [row[3] for row in plan if is_base_table_scan(row[3])]
@@ -44,5 +48,5 @@ def test_declared_statement_is_served_by_an_index(
     assert scans == []
 
 
-def test_every_block_has_a_declaration() -> None:
-    assert set(BLOCKS) == {declaration.name for declaration in DECLARATIONS}
+def test_every_block_has_a_declaration(blocks: dict[str, str]) -> None:
+    assert set(blocks) == {declaration.name for declaration in DECLARATIONS}

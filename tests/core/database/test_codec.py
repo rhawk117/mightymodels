@@ -1,8 +1,7 @@
 import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime
-from enum import StrEnum, auto
-from typing import Any
+from typing import Any, Literal, get_args
 
 import pytest
 from hypothesis import example, given
@@ -19,9 +18,7 @@ from msgspec import Struct
 pytestmark = pytest.mark.integration
 
 
-class Color(StrEnum):
-    RED = auto()
-    GREEN = auto()
+type Color = Literal['red', 'green']
 
 
 class EchoParams(Struct, frozen=True, kw_only=True):
@@ -72,7 +69,7 @@ class TestRoundTrip:
         items=st.lists(json_values, max_size=4),
         mapping=st.dictionaries(st.text(), json_values, max_size=4),
         at=st.datetimes(timezones=st.just(UTC)),
-        color=st.sampled_from(Color),
+        color=st.sampled_from(get_args(Color.__value__)),
         flag=st.booleans(),
     )
 
@@ -83,7 +80,7 @@ class TestRoundTrip:
             items=[],
             mapping={},
             at=datetime(3059, 1, 1, 0, 0, 0, 999997, tzinfo=UTC),
-            color=Color.RED,
+            color='red',
             flag=False,
         )
     )
@@ -93,22 +90,24 @@ class TestRoundTrip:
         assert row.items == params.items
         assert row.mapping == params.mapping
         assert row.at == params.at.replace(microsecond=0)
-        assert row.color is params.color
-        assert row.flag is params.flag
+        assert row.color == params.color
+        assert row.flag == params.flag
 
 
 class TestBindParams:
-    def test_a_datetime_without_a_timezone_is_rejected(self) -> None:
-        params = EchoParams(
+    @pytest.fixture
+    def naive_params(self) -> EchoParams:
+        return EchoParams(
             items=[],
             mapping={},
             at=datetime.fromisoformat('2024-01-01T00:00:00'),
-            color=Color.RED,
+            color='red',
             flag=True,
         )
 
+    def test_a_datetime_without_a_timezone_is_rejected(self, naive_params: EchoParams) -> None:
         with pytest.raises(NaiveTimestampError) as raised:
-            bind_params(params)
+            bind_params(naive_params)
 
         assert raised.value.field == 'at'
 
