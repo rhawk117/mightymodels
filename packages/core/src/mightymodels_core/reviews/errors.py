@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.primitives import RunId
+    from mightymodels_core.schemas.reviews import Scope
 
 
 class RunNotFoundError(StateError):
@@ -105,3 +106,40 @@ class UnsupportedQualityError(StateError):
                 sources,
             )
         )
+
+
+class WeightsMissingError(StateError):
+    def __init__(self) -> None:
+        super().__init__('weights: custom emphasis needs weights')
+
+
+class WeightRangeError(StateError):
+    def __init__(self) -> None:
+        super().__init__('weights: give both personas a weight between 0 and 1')
+
+
+class WeightSumError(StateError):
+    def __init__(self) -> None:
+        super().__init__('weights: the weights must sum to 1')
+
+
+class PersonaChoiceError(StateError):
+    def __init__(self) -> None:
+        super().__init__('quick depth runs one persona and the weights tie; pass persona')
+
+
+class BaseRequiredError(StateError):
+    def __init__(self, *, scope: Scope) -> None:
+        self.scope = scope
+        super().__init__(f'{scope} scope needs base, the ref it is reviewed against')
+
+
+class SlugRequiredError(StateError):
+    def __init__(self) -> None:
+        super().__init__('ticket scope needs slug')
+
+
+class OverrideSpentError(StateError):
+    def __init__(self, *, run: RunId) -> None:
+        self.run = run
+        super().__init__(f'review run {run} has used its one reviewer override')

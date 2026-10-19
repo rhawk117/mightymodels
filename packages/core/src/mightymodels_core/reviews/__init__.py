@@ -1,19 +1,37 @@
 """The review records, their repository seams and the sqlite stores behind them."""
 
 from .errors import (
+    BaseRequiredError,
     FieldRequiredError,
     LineBelowOneError,
     LocationShapeError,
     MalformedSourceError,
+    OverrideSpentError,
+    PersonaChoiceError,
     ReversedRangeError,
     RunExistsError,
     RunNotFoundError,
+    SlugRequiredError,
     SourcesRequiredError,
     UndecidedFindingError,
     UnknownFindingError,
     UnsupportedQualityError,
+    WeightRangeError,
+    WeightsMissingError,
+    WeightSumError,
 )
 from .findings import FindingOptions, fold_findings
+from .policy import (
+    GatePolicy,
+    OverridePolicy,
+    Persona,
+    ReviewOptions,
+    StartPolicy,
+    StartRequest,
+    Verdict,
+    create_gate_policy,
+    reopened_keys,
+)
 from .records import (
     DecidedFinding,
     Evidence,
@@ -24,32 +42,54 @@ from .records import (
     ReviewRunRecord,
 )
 from .repository import ReviewDecisionRepository, ReviewRepository
+from .services import AddedFindings, ReviewReport, ReviewService, RunListing, RunSummary
 from .sqlite_decisions import SqliteReviewDecisionRepository
 from .sqlite_runs import SqliteReviewRepository
 
 __all__ = [
+    'AddedFindings',
+    'BaseRequiredError',
     'DecidedFinding',
     'Evidence',
     'FieldRequiredError',
     'FindingOptions',
     'FindingRecord',
+    'GatePolicy',
     'IncomingEvidence',
     'IncomingFinding',
     'LineBelowOneError',
     'LocationShapeError',
     'MalformedSourceError',
+    'OverridePolicy',
+    'OverrideSpentError',
+    'Persona',
+    'PersonaChoiceError',
     'ResolvedFinding',
     'ReversedRangeError',
     'ReviewDecisionRepository',
+    'ReviewOptions',
+    'ReviewReport',
     'ReviewRepository',
     'ReviewRunRecord',
+    'ReviewService',
     'RunExistsError',
+    'RunListing',
     'RunNotFoundError',
+    'RunSummary',
+    'SlugRequiredError',
     'SourcesRequiredError',
     'SqliteReviewDecisionRepository',
     'SqliteReviewRepository',
+    'StartPolicy',
+    'StartRequest',
     'UndecidedFindingError',
     'UnknownFindingError',
     'UnsupportedQualityError',
+    'Verdict',
+    'WeightRangeError',
+    'WeightSumError',
+    'WeightsMissingError',
+    'create_gate_policy',
     'fold_findings',
+    'reopened_keys',
 ]
