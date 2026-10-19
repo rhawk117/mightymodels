@@ -78,3 +78,13 @@ class FixNotUnderwayError(StateError):
             f'{task_key} is {current}; a failed fix is recorded on a task in progress, started '
             'by the dispatching primary'
         )
+
+
+class TaskMovedError(StateError):
+    def __init__(self, *, task_key: TaskId, changed: Sequence[str]) -> None:
+        self.task_key = task_key
+        self.changed = tuple(changed)
+        super().__init__(
+            f'{task_key} changed while git was asked ({", ".join(changed)}); nothing was written, '
+            'verify the task again'
+        )
