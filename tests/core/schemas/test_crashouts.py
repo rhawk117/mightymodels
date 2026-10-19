@@ -77,6 +77,7 @@ class TestCrashouts:
         assert row.branch == 'main'
         assert row.severity == 'heated'
         assert row.verdict == 'split'
+        assert row.root_cause == 'cause'
         assert row.rant == 'a rant'
         assert row.failures == ['one', 'two']
         assert row.corrective_action == 'fix it'
