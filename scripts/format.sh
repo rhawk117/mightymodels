@@ -2,6 +2,7 @@
 set -euo pipefail
 
 readonly LOGGING_UTILS="./scripts/log.sh"
+readonly SHARED_UTILS="./scripts/lib.sh"
 
 FAILURES=()
 
@@ -12,6 +13,8 @@ setup_environment() {
 
   # shellcheck disable=SC1090
   source "$LOGGING_UTILS"
+  # shellcheck disable=SC1090
+  source "$SHARED_UTILS"
 }
 
 run_step() {
@@ -30,11 +33,20 @@ run_step() {
   return 0
 }
 
+ruff_format_tracked() {
+  local pattern
+  local status=0
+  for pattern in '*.py' '*.pyi' '*.ipynb' '*.md'; do
+    files_with_extension "$pattern" uv run ruff format --force-exclude || status=$?
+  done
+  return "$status"
+}
+
 write_format() {
-  run_step "ruff format" uv run ruff format .
+  run_step "ruff format" ruff_format_tracked
   run_step "ruff lint autofix" uv run ruff check --fix --unsafe-fixes --fix-only .
-  run_step "shfmt" uv run shfmt -w -i 2 -ci .
-  run_step "mdformat" uv run mdformat .
+  run_step "shfmt" files_with_extension '*.sh' uv run shfmt -w -i 2 -ci
+  run_step "mdformat" files_with_extension '*.md' uv run mdformat
 }
 
 main() {

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 readonly LOGGING_UTILS="./scripts/log.sh"
+readonly SHARED_UTILS="./scripts/lib.sh"
 
 FAILURES=()
 
@@ -12,6 +13,8 @@ setup_environment() {
 
   # shellcheck disable=SC1090
   source "$LOGGING_UTILS"
+  # shellcheck disable=SC1090
+  source "$SHARED_UTILS"
 }
 
 run_step() {
@@ -28,12 +31,6 @@ run_step() {
   fi
 
   return 0
-}
-
-files_with_extension() {
-  local pattern=$1
-  shift
-  git ls-files -z -- "$pattern" | xargs -0 -r -- "$@" --
 }
 
 linter_checks() {

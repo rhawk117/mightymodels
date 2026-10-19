@@ -259,20 +259,13 @@ async def drain(inbox: asyncio.Queue[Job | None], handler: JobHandler) -> None:
 - Make the safe path the only path: anything that must run inside a guard is handed out only by that guard.
 
 ```python
-def sqlite_connection(path: Path) -> AbstractContextManager[sqlite3.Connection]:
-    return closing(sqlite3.connect(path, autocommit=False))
-
-
-@contextmanager
-def open_ledger(path: Path) -> Generator[Ledger]:
-    with sqlite_connection(path) as connection:
+def add_entry(path: Path, spec: DatabaseSpec, entry: NewEntry) -> None:
+    with closing(open_database(path, spec)) as database:
         try:
-            yield Ledger(connection=connection)
-        except sqlite3.IntegrityError as error:
-            connection.rollback()
+            with database.write() as unit:
+                unit.run(INSERT_ENTRY, entry)
+        except DuplicateRowError as error:
             raise DuplicateEntryError(path=path) from error
-
-        connection.commit()
 ```
 
 - `main()` returns an exit code; the module guard does `raise SystemExit(main())`.

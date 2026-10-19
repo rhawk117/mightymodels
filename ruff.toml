@@ -70,6 +70,9 @@ ignore = [
 
 
 [lint.per-file-ignores]
+"packages/core/src/mightymodels_core/process.py" = [
+    "async-function-with-timeout", # run functions take a timeout parameter and enforce it themselves
+]
 "**/tests/**/*.py" = [
     "S101",    # tests are written as bare assert statements
     "PLR2004", # tests compare against literal expected values

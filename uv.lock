@@ -4,6 +4,7 @@ requires-python = ">=3.14"
 
 [manifest]
 members = [
+    "mightymodels-core",
     "mightymodels-hooks",
     "mightymodels-mcp",
     "mightymodels-plugin",
@@ -285,6 +286,21 @@ wheels = [
 ]
 
 [[package]]
+name = "mightymodels-core"
+version = "0.1.0"
+source = { editable = "packages/core" }
+dependencies = [
+    { name = "anyio" },
+    { name = "msgspec" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anyio", specifier = ">=4.15.1" },
+    { name = "msgspec", specifier = ">=0.22.0" },
+]
+
+[[package]]
 name = "mightymodels-hooks"
 version = "0.1.0"
 source = { editable = "packages/hooks" }
@@ -296,7 +312,7 @@ source = { editable = "packages/mcp" }
 
 [[package]]
 name = "mightymodels-plugin"
-version = "0.1.0"
+version = "1.0.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
