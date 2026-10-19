@@ -56,3 +56,9 @@ class NaiveClockTimeError(StateError):
     def __init__(self, *, moment: datetime) -> None:
         self.moment = moment
         super().__init__(f'clock time {moment.isoformat()} has no timezone')
+
+
+class UnreadableJsonError(StateError):
+    def __init__(self, *, detail: str) -> None:
+        self.detail = detail
+        super().__init__(f'the text is not JSON the codec reads: {detail}')

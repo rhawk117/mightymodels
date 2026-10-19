@@ -1,6 +1,7 @@
 """The state error root and the value types every other package builds on."""
 
 from .clock import Clock, SystemClock, from_unixepoch
+from .codec import INDENT, decode_text, encode_compact, encode_indented
 from .errors import (
     InvalidRepositoryKeyError,
     InvalidRunIdError,
@@ -9,6 +10,18 @@ from .errors import (
     NaiveClockTimeError,
     ReservedSlugError,
     StateError,
+    UnreadableJsonError,
+)
+from .head import SHORT_SHA, short_head
+from .routing import (
+    REVIEWER_AGENTS,
+    AgentFolder,
+    AgentName,
+    Effort,
+    Model,
+    RoutingTable,
+    ScopeSize,
+    create_routing_table,
 )
 from .value_types import (
     RepositoryKey,
@@ -28,23 +41,37 @@ from .value_types import (
 )
 
 __all__ = [
+    'INDENT',
+    'REVIEWER_AGENTS',
+    'SHORT_SHA',
+    'AgentFolder',
+    'AgentName',
     'Clock',
+    'Effort',
     'InvalidRepositoryKeyError',
     'InvalidRunIdError',
     'InvalidSlugError',
     'InvalidTaskIdError',
+    'Model',
     'NaiveClockTimeError',
     'RepositoryKey',
     'RepositoryKeyText',
     'ReservedSlugError',
+    'RoutingTable',
     'RunId',
     'RunIdText',
+    'ScopeSize',
     'Slug',
     'SlugText',
     'StateError',
     'SystemClock',
     'TaskId',
     'TaskIdText',
+    'UnreadableJsonError',
+    'create_routing_table',
+    'decode_text',
+    'encode_compact',
+    'encode_indented',
     'from_unixepoch',
     'local_key',
     'origin_key',
@@ -52,4 +79,5 @@ __all__ = [
     'parse_run_id',
     'parse_slug',
     'parse_task_id',
+    'short_head',
 ]
