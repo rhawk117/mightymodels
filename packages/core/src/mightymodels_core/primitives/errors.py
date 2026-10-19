@@ -62,3 +62,14 @@ class UnreadableJsonError(StateError):
     def __init__(self, *, detail: str) -> None:
         self.detail = detail
         super().__init__(f'the text is not JSON the codec reads: {detail}')
+
+
+class RedactedTextTooLongError(StateError):
+    def __init__(self, *, field: str, limit: int, length: int) -> None:
+        self.field = field
+        self.limit = limit
+        self.length = length
+        super().__init__(
+            f'{field}: {length} characters once its secrets are redacted, and at most {limit} '
+            'are stored; shorten the text; nothing was written'
+        )
