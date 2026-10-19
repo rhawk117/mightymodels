@@ -23,21 +23,13 @@ from mightymodels_core.schemas.reviews import (
     UPSERT_REVIEW_DISPOSITION,
     UPSERT_REVIEW_FINDING,
     UPSERT_REVIEW_OUTCOME,
-    Decision,
-    Depth,
-    Emphasis,
-    EvidenceKind,
     FindingKeysParams,
-    FindingKind,
     LatestReviewRunsParams,
     RecordReviewModelsParams,
     RecordReviewRunParams,
-    Result,
     ReviewRunParams,
     RunLimitParams,
     RunParams,
-    Scope,
-    Severity,
     TicketReviewRunParams,
     UpsertReviewDispositionParams,
     UpsertReviewFindingParams,
@@ -46,6 +38,7 @@ from mightymodels_core.schemas.reviews import (
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
+    from mightymodels_core.schemas.reviews import Decision, Result
 
 pytestmark = pytest.mark.integration
 
@@ -58,11 +51,11 @@ def run(repository_id: int, run_key: str, ticket_key: str | None = None) -> Reco
         repository_id=repository_id,
         run_key=run_key,
         ticket_key=ticket_key,
-        scope=Scope.BRANCH,
+        scope='branch',
         base='main',
         head='abc1234',
-        depth=Depth.STANDARD,
-        emphasis=Emphasis.BALANCED,
+        depth='standard',
+        emphasis='balanced',
         weights={'merge-vader': 0.6, 'uncle-bob': 0.4},
         personas=['merge-vader', 'uncle-bob'],
         models={'merge-vader': 'opus', 'uncle-bob': None},
@@ -77,21 +70,21 @@ def finding(
         review_run_id=review_run_id,
         finding_key=finding_key,
         sources=['merge-vader'],
-        severity=Severity.HIGH,
-        kind=FindingKind.DEFECT,
+        severity='High',
+        kind='defect',
         security=True,
         title=title,
         location='src/app.py:1',
         fix='fix it',
         verify='run it',
-        evidence_kind=EvidenceKind.METRIC,
+        evidence_kind='metric',
         evidence_cite='churn',
         conflict=None,
     )
 
 
 def disposition(
-    review_run_id: int, finding_key: str, decision: Decision = Decision.FIX
+    review_run_id: int, finding_key: str, decision: Decision = 'fix'
 ) -> UpsertReviewDispositionParams:
     return UpsertReviewDispositionParams(
         review_run_id=review_run_id,
@@ -104,7 +97,7 @@ def disposition(
 
 
 def outcome(
-    review_run_id: int, finding_key: str, result: Result = Result.FIXED
+    review_run_id: int, finding_key: str, result: Result = 'fixed'
 ) -> UpsertReviewOutcomeParams:
     return UpsertReviewOutcomeParams(
         review_run_id=review_run_id,
@@ -142,11 +135,11 @@ class TestReviewRuns:
         assert row.id == recorded
         assert row.run_key == 'r-1'
         assert row.ticket_key == 'staged'
-        assert row.scope is Scope.BRANCH
+        assert row.scope == 'branch'
         assert row.base == 'main'
         assert row.head == 'abc1234'
-        assert row.depth is Depth.STANDARD
-        assert row.emphasis is Emphasis.BALANCED
+        assert row.depth == 'standard'
+        assert row.emphasis == 'balanced'
         assert row.weights == {'merge-vader': 0.6, 'uncle-bob': 0.4}
         assert row.personas == ['merge-vader', 'uncle-bob']
         assert row.models == {'merge-vader': 'opus', 'uncle-bob': None}
@@ -249,14 +242,14 @@ class TestReviewFindings:
         row = rows[0]
         assert row.finding_key == 'F1'
         assert row.sources == ['merge-vader']
-        assert row.severity is Severity.HIGH
-        assert row.kind is FindingKind.DEFECT
+        assert row.severity == 'High'
+        assert row.kind == 'defect'
         assert row.security is True
         assert row.title == 'a title'
         assert row.location == 'src/app.py:1'
         assert row.fix == 'fix it'
         assert row.verify == 'run it'
-        assert row.evidence_kind is EvidenceKind.METRIC
+        assert row.evidence_kind == 'metric'
         assert row.evidence_cite == 'churn'
         assert row.conflict is None
 
@@ -328,7 +321,7 @@ class TestReviewDecisions:
             count = unit.one(REVIEW_DISPOSITION_COUNT, RunParams(review_run_id=run_id))
 
         assert [row.finding_key for row in rows] == ['F1', 'F2']
-        assert rows[0].decision is Decision.FIX
+        assert rows[0].decision == 'fix'
         assert rows[0].reason == 'because'
         assert rows[0].by == 'user'
         assert rows[0].at == RECORDED_AT
@@ -346,7 +339,7 @@ class TestReviewDecisions:
 
         assert len(rows) == 1
         assert rows[0].finding_key == 'F1'
-        assert rows[0].result is Result.FIXED
+        assert rows[0].result == 'fixed'
         assert rows[0].commit == 'deadbee'
         assert rows[0].reason == 'done'
         assert rows[0].at == RECORDED_AT
@@ -358,8 +351,8 @@ class TestReviewDecisions:
     ) -> None:
         run_id = self.decided_run(database, repository_id)
         with database.write() as unit:
-            unit.run_many(UPSERT_REVIEW_DISPOSITION, [disposition(run_id, 'F1', Decision.DISMISS)])
-            unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(run_id, 'F1', Result.BLOCKED)])
+            unit.run_many(UPSERT_REVIEW_DISPOSITION, [disposition(run_id, 'F1', 'dismiss')])
+            unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(run_id, 'F1', 'blocked')])
 
         with database.read() as unit:
             dispositions = unit.all(
@@ -369,8 +362,8 @@ class TestReviewDecisions:
                 REVIEW_OUTCOMES_OF_RUN, RunLimitParams(review_run_id=run_id, limit=LIMIT)
             )
 
-        assert [row.decision for row in dispositions] == [Decision.DISMISS, Decision.FIX]
-        assert [row.result for row in outcomes] == [Result.BLOCKED]
+        assert [row.decision for row in dispositions] == ['dismiss', 'fix']
+        assert [row.result for row in outcomes] == ['blocked']
 
     def test_a_decision_without_its_finding_or_disposition_stores_nothing(
         self, database: Database, repository_id: int

@@ -1,8 +1,7 @@
 """The crashout journal of a repository."""
 
 from datetime import datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -12,17 +11,10 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class Severity(StrEnum):
-    MILD_TILT = 'mild-tilt'
-    HEATED = 'heated'
-    CRASHOUT = 'crashout'
-    FULL_MELTDOWN = 'full-meltdown'
+type CrashoutSeverity = Literal['mild-tilt', 'heated', 'crashout', 'full-meltdown']
 
 
-class Verdict(StrEnum):
-    DESERVED = 'deserved'
-    SPLIT = 'split'
-    UNREASONABLE = 'unreasonable'
+type Verdict = Literal['deserved', 'split', 'unreasonable']
 
 
 class JournalCrashoutParams(Struct, frozen=True, kw_only=True):
@@ -30,7 +22,7 @@ class JournalCrashoutParams(Struct, frozen=True, kw_only=True):
     at: datetime
     ticket_key: str | None
     branch: str | None
-    severity: Severity
+    severity: CrashoutSeverity
     verdict: Verdict
     rant: str
     failures: list[str]
@@ -57,7 +49,7 @@ class CrashoutRow(Struct, frozen=True, kw_only=True):
     at: datetime
     ticket_key: str | None
     branch: str | None
-    severity: Severity
+    severity: CrashoutSeverity
     verdict: Verdict
     rant: str
     failures: list[str]

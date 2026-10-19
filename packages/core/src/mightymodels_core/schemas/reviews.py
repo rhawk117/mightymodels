@@ -1,8 +1,7 @@
 """Review runs, their findings, and the dispositions and outcomes recorded against findings."""
 
 from datetime import datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -12,56 +11,28 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class Scope(StrEnum):
-    DIFF = 'diff'
-    BRANCH = 'branch'
-    TICKET = 'ticket'
-    CODEBASE = 'codebase'
+type Scope = Literal['diff', 'branch', 'ticket', 'codebase']
 
 
-class Depth(StrEnum):
-    QUICK = 'quick'
-    STANDARD = 'standard'
-    DEEP = 'deep'
+type Depth = Literal['quick', 'standard', 'deep']
 
 
-class Emphasis(StrEnum):
-    RELEASE_READINESS = 'release-readiness'
-    MAINTAINABILITY = 'maintainability'
-    BALANCED = 'balanced'
-    CUSTOM = 'custom'
+type Emphasis = Literal['release-readiness', 'maintainability', 'balanced', 'custom']
 
 
-class Severity(StrEnum):
-    BLOCKER = 'Blocker'
-    CRITICAL = 'Critical'
-    HIGH = 'High'
-    MEDIUM = 'Medium'
-    LOW = 'Low'
+type FindingSeverity = Literal['Blocker', 'Critical', 'High', 'Medium', 'Low']
 
 
-class FindingKind(StrEnum):
-    DEFECT = 'defect'
-    QUALITY = 'quality'
+type FindingKind = Literal['defect', 'quality']
 
 
-class EvidenceKind(StrEnum):
-    METRIC = 'metric'
-    IDIOM = 'idiom'
-    CONVENTION = 'convention'
+type EvidenceKind = Literal['metric', 'idiom', 'convention']
 
 
-class Decision(StrEnum):
-    FIX = 'fix'
-    DEFER = 'defer'
-    ACCEPT_RISK = 'accept-risk'
-    DISMISS = 'dismiss'
+type Decision = Literal['fix', 'defer', 'accept-risk', 'dismiss']
 
 
-class Result(StrEnum):
-    FIXED = 'fixed'
-    FAILED = 'failed'
-    BLOCKED = 'blocked'
+type Result = Literal['fixed', 'failed', 'blocked']
 
 
 class RecordReviewRunParams(Struct, frozen=True, kw_only=True):
@@ -104,7 +75,7 @@ class UpsertReviewFindingParams(Struct, frozen=True, kw_only=True):
     review_run_id: int
     finding_key: str
     sources: list[str]
-    severity: Severity
+    severity: FindingSeverity
     kind: FindingKind
     security: bool
     title: str
@@ -170,7 +141,7 @@ class ReviewRunRow(Struct, frozen=True, kw_only=True):
 class ReviewFindingRow(Struct, frozen=True, kw_only=True):
     finding_key: str
     sources: list[str]
-    severity: Severity
+    severity: FindingSeverity
     kind: FindingKind
     security: bool
     title: str

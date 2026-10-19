@@ -10,8 +10,6 @@ from mightymodels_core.schemas.crashouts import (
     CrashoutCountParams,
     JournalCrashoutParams,
     LatestCrashoutsParams,
-    Severity,
-    Verdict,
 )
 
 if TYPE_CHECKING:
@@ -30,8 +28,8 @@ def crashout(
         at=JOURNALED_AT,
         ticket_key=None,
         branch='main',
-        severity=Severity.HEATED,
-        verdict=Verdict.SPLIT,
+        severity='heated',
+        verdict='split',
         rant='a rant',
         failures=['one', 'two'],
         root_cause=root_cause,
@@ -77,8 +75,8 @@ class TestCrashouts:
         assert row.at == JOURNALED_AT
         assert row.ticket_key is None
         assert row.branch == 'main'
-        assert row.severity is Severity.HEATED
-        assert row.verdict is Verdict.SPLIT
+        assert row.severity == 'heated'
+        assert row.verdict == 'split'
         assert row.rant == 'a rant'
         assert row.failures == ['one', 'two']
         assert row.corrective_action == 'fix it'

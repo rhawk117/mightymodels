@@ -1,7 +1,6 @@
 """The reports a scout has returned for a target."""
 
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -11,9 +10,7 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class Scout(StrEnum):
-    CODE_SCOUT = 'code-scout'
-    WEB_SCOUT = 'web-scout'
+type Scout = Literal['code-scout', 'web-scout']
 
 
 class AddScoutReportParams(Struct, frozen=True, kw_only=True, gc=False):

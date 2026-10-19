@@ -12,13 +12,12 @@ from mightymodels_core.schemas.contract import (
     ApproveContractCommandParams,
     ContractCommandCountParams,
     ContractCommandsParams,
-    Outcome,
-    Phase,
     RecordReceiptParams,
 )
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
+    from mightymodels_core.schemas.contract import Outcome
 
 pytestmark = pytest.mark.integration
 
@@ -45,13 +44,13 @@ def receipt(command_id: int, outcome: Outcome, stdout_tail: str) -> RecordReceip
         contract_command_id=command_id,
         argv=['uv', 'run', 'pytest', '-q'],
         outcome=outcome,
-        exit=None if outcome is Outcome.TIMEOUT else 0,
+        exit=None if outcome == 'timeout' else 0,
         duration_ms=120,
         stdout_tail=stdout_tail,
         stderr_tail='',
         digest='sha256:abc',
         head='abc123',
-        phase=Phase.TASK,
+        phase='task',
         at=RAN_AT,
     )
 
@@ -116,9 +115,9 @@ class TestReceipts:
         self, database: Database, ticket_id: int, command_ids: dict[str, int]
     ) -> None:
         batch = [
-            receipt(command_ids['I1'], Outcome.FAIL, 'first run'),
-            receipt(command_ids['I2'], Outcome.TIMEOUT, 'only run'),
-            receipt(command_ids['I1'], Outcome.PASSED, 'second run'),
+            receipt(command_ids['I1'], 'fail', 'first run'),
+            receipt(command_ids['I2'], 'timeout', 'only run'),
+            receipt(command_ids['I1'], 'pass', 'second run'),
         ]
         with database.write() as unit:
             recorded = unit.run_many(RECORD_RECEIPT, batch)
@@ -131,23 +130,23 @@ class TestReceipts:
         by_key = {row.command_key: row for row in latest}
         assert recorded == 3
         assert set(by_key) == {'I1', 'I2'}
-        assert by_key['I1'].outcome is Outcome.PASSED
+        assert by_key['I1'].outcome == 'pass'
         assert by_key['I1'].stdout_tail == 'second run'
         assert by_key['I1'].argv == ['uv', 'run', 'pytest', '-q']
         assert by_key['I1'].exit == 0
         assert by_key['I1'].duration_ms == 120
         assert by_key['I1'].digest == 'sha256:abc'
         assert by_key['I1'].head == 'abc123'
-        assert by_key['I1'].phase is Phase.TASK
+        assert by_key['I1'].phase == 'task'
         assert by_key['I1'].at == RAN_AT
-        assert by_key['I2'].outcome is Outcome.TIMEOUT
+        assert by_key['I2'].outcome == 'timeout'
         assert by_key['I2'].exit is None
 
     def test_a_command_without_receipts_has_no_latest_receipt(
         self, database: Database, ticket_id: int, command_ids: dict[str, int]
     ) -> None:
         with database.write() as unit:
-            unit.run_many(RECORD_RECEIPT, [receipt(command_ids['I1'], Outcome.PASSED, 'ran')])
+            unit.run_many(RECORD_RECEIPT, [receipt(command_ids['I1'], 'pass', 'ran')])
 
         with database.read() as unit:
             latest = unit.all(
@@ -158,4 +157,4 @@ class TestReceipts:
 
     def test_a_receipt_needs_its_command(self, database: Database) -> None:
         with pytest.raises(MissingParentError), database.write() as unit:
-            unit.run_many(RECORD_RECEIPT, [receipt(999, Outcome.PASSED, 'ran')])
+            unit.run_many(RECORD_RECEIPT, [receipt(999, 'pass', 'ran')])

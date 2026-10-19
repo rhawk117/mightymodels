@@ -6,12 +6,12 @@ from mightymodels_core.schemas.scout_reports import (
     ADD_SCOUT_REPORT,
     SCOUT_REPORT_OF_TARGET,
     AddScoutReportParams,
-    Scout,
     ScoutReportTargetParams,
 )
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
+    from mightymodels_core.schemas.scout_reports import Scout
 
 pytestmark = pytest.mark.integration
 
@@ -33,13 +33,13 @@ class TestScoutReports:
     def test_a_report_is_found_by_its_repository_scout_and_target(
         self, database: Database, repository_id: int
     ) -> None:
-        added = add(database, report(repository_id, Scout.CODE_SCOUT, 'src/app.py'))
+        added = add(database, report(repository_id, 'code-scout', 'src/app.py'))
 
         with database.read() as unit:
             found = unit.one(
                 SCOUT_REPORT_OF_TARGET,
                 ScoutReportTargetParams(
-                    repository_id=repository_id, scout=Scout.CODE_SCOUT, target='src/app.py'
+                    repository_id=repository_id, scout='code-scout', target='src/app.py'
                 ),
             )
 
@@ -49,25 +49,25 @@ class TestScoutReports:
     def test_a_report_for_another_scout_or_target_is_not_found(
         self, database: Database, repository_id: int
     ) -> None:
-        add(database, report(repository_id, Scout.CODE_SCOUT, 'src/app.py'))
+        add(database, report(repository_id, 'code-scout', 'src/app.py'))
 
         with database.read() as unit:
             other_scout = unit.one(
                 SCOUT_REPORT_OF_TARGET,
                 ScoutReportTargetParams(
-                    repository_id=repository_id, scout=Scout.WEB_SCOUT, target='src/app.py'
+                    repository_id=repository_id, scout='web-scout', target='src/app.py'
                 ),
             )
             other_target = unit.one(
                 SCOUT_REPORT_OF_TARGET,
                 ScoutReportTargetParams(
-                    repository_id=repository_id, scout=Scout.CODE_SCOUT, target='src/other.py'
+                    repository_id=repository_id, scout='code-scout', target='src/other.py'
                 ),
             )
             other_repository = unit.one(
                 SCOUT_REPORT_OF_TARGET,
                 ScoutReportTargetParams(
-                    repository_id=repository_id + 1, scout=Scout.CODE_SCOUT, target='src/app.py'
+                    repository_id=repository_id + 1, scout='code-scout', target='src/app.py'
                 ),
             )
 
@@ -78,11 +78,11 @@ class TestScoutReports:
     def test_the_same_target_can_be_reported_again(
         self, database: Database, repository_id: int
     ) -> None:
-        first = add(database, report(repository_id, Scout.CODE_SCOUT, 'src/app.py'))
-        second = add(database, report(repository_id, Scout.CODE_SCOUT, 'src/app.py'))
+        first = add(database, report(repository_id, 'code-scout', 'src/app.py'))
+        second = add(database, report(repository_id, 'code-scout', 'src/app.py'))
 
         assert second > first
 
     def test_a_report_needs_a_repository(self, database: Database) -> None:
         with pytest.raises(MissingParentError), database.write() as unit:
-            unit.one(ADD_SCOUT_REPORT, report(999, Scout.CODE_SCOUT, 'src/app.py'))
+            unit.one(ADD_SCOUT_REPORT, report(999, 'code-scout', 'src/app.py'))

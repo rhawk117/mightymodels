@@ -1,8 +1,7 @@
 """The approved contract commands of a ticket and the receipts recorded against them."""
 
 from datetime import datetime
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from msgspec import Struct
 
@@ -12,20 +11,10 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-class Outcome(StrEnum):
-    PASSED = 'pass'
-    FAIL = 'fail'
-    TIMEOUT = 'timeout'
-    NOT_FOUND = 'not-found'
-    REFUSED = 'refused'
-    UNDECODABLE = 'undecodable'
+type Outcome = Literal['pass', 'fail', 'timeout', 'not-found', 'refused', 'undecodable']
 
 
-class Phase(StrEnum):
-    PLANNING = 'planning'
-    TASK = 'task'
-    REVIEW = 'review'
-    LANDING = 'landing'
+type Phase = Literal['planning', 'task', 'review', 'landing']
 
 
 class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):
