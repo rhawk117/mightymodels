@@ -12,56 +12,10 @@ FROM repositories
 WHERE repository_key = :repository_key;
 
 -- name: ticket_by_id
-SELECT json_object(
-  'id', t.id,
-  'slug', t.slug,
-  'status', t.status,
-  'ticket', t.ticket,
-  'summary', t.summary,
-  'branch', t.branch,
-  'scope', t.scope,
-  'plan_first', t.plan_first,
-  'auto_escalate', t.auto_escalate,
-  'issue', t.issue,
-  'jira', t.jira,
-  'models', json(t.models),
-  'context', json(t.context),
-  'validated_at', t.validated_at,
-  'investigations', json((
-    SELECT json_group_array(i.investigation_key ORDER BY ti.id)
-    FROM ticket_investigations AS ti
-    JOIN investigations AS i ON i.id = ti.investigation_id
-    WHERE ti.ticket_id = t.id
-  ))
-)
-FROM tickets AS t
-WHERE t.id = :id;
+SELECT projection FROM ticket_rows WHERE id = :id;
 
 -- name: ticket_by_slug
-SELECT json_object(
-  'id', t.id,
-  'slug', t.slug,
-  'status', t.status,
-  'ticket', t.ticket,
-  'summary', t.summary,
-  'branch', t.branch,
-  'scope', t.scope,
-  'plan_first', t.plan_first,
-  'auto_escalate', t.auto_escalate,
-  'issue', t.issue,
-  'jira', t.jira,
-  'models', json(t.models),
-  'context', json(t.context),
-  'validated_at', t.validated_at,
-  'investigations', json((
-    SELECT json_group_array(i.investigation_key ORDER BY ti.id)
-    FROM ticket_investigations AS ti
-    JOIN investigations AS i ON i.id = ti.investigation_id
-    WHERE ti.ticket_id = t.id
-  ))
-)
-FROM tickets AS t
-WHERE t.repository_id = :repository_id AND t.slug = :slug;
+SELECT projection FROM ticket_rows WHERE repository_id = :repository_id AND slug = :slug;
 
 -- name: stage_ticket
 INSERT INTO tickets (

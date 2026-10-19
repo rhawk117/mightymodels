@@ -1,12 +1,17 @@
 import re
+import sqlite3
+from contextlib import closing
 from typing import TYPE_CHECKING
 
 import pytest
+from mightymodels_core.database import ConnectionOptions, SchemaVersionError, open_database
 
 from .conftest import SCHEMA
 
 if TYPE_CHECKING:
-    import sqlite3
+    from pathlib import Path
+
+    from mightymodels_core.database import DatabaseSpec
 
 pytestmark = pytest.mark.integration
 
@@ -117,3 +122,12 @@ class TestShape:
         assert match is not None
         stored = schema_inspection.execute('PRAGMA user_version').fetchone()
         assert stored == (int(match.group(1)),)
+
+    def test_database_stamped_by_the_old_plugin_is_refused(
+        self, database_path: Path, database_spec: DatabaseSpec
+    ) -> None:
+        with closing(sqlite3.connect(database_path)) as old_plugin:
+            old_plugin.execute('PRAGMA user_version = 1')
+        with pytest.raises(SchemaVersionError) as refused:
+            open_database(database_path, database_spec, ConnectionOptions())
+        assert refused.value.found == 1

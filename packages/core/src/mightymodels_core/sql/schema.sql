@@ -346,4 +346,33 @@ CREATE TABLE closings (
   CONSTRAINT ck_closings_gotchas CHECK (json_valid(gotchas))
 ) STRICT;
 
-PRAGMA user_version = 1;
+CREATE VIEW ticket_rows AS
+SELECT
+  t.id,
+  t.repository_id,
+  t.slug,
+  json_object(
+    'id', t.id,
+    'slug', t.slug,
+    'status', t.status,
+    'ticket', t.ticket,
+    'summary', t.summary,
+    'branch', t.branch,
+    'scope', t.scope,
+    'plan_first', t.plan_first,
+    'auto_escalate', t.auto_escalate,
+    'issue', t.issue,
+    'jira', t.jira,
+    'models', json(t.models),
+    'context', json(t.context),
+    'validated_at', t.validated_at,
+    'investigations', json((
+      SELECT json_group_array(i.investigation_key ORDER BY ti.id)
+      FROM ticket_investigations AS ti
+      JOIN investigations AS i ON i.id = ti.investigation_id
+      WHERE ti.ticket_id = t.id
+    ))
+  ) AS projection
+FROM tickets AS t;
+
+PRAGMA user_version = 2;
