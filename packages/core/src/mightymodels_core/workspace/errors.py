@@ -30,4 +30,12 @@ class TicketFileTypeError(StateError):
         super().__init__(f'{where}: {key_path}: {reason}')
 
 
+class LoneSurrogateError(StateError):
+    def __init__(self, *, character: str) -> None:
+        self.character = character
+        super().__init__(
+            f'U+{ord(character):04X} is a lone surrogate and cannot be written to ticket.yml'
+        )
+
+
 type TicketFileIssue = TicketFileSyntaxError | TicketFileTypeError

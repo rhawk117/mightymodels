@@ -11,7 +11,7 @@ from mightymodels_core.tickets import (
     TicketExistsError,
     TicketSource,
 )
-from mightymodels_core.workspace import TicketFile, parse_ticket_file
+from mightymodels_core.workspace import LoneSurrogateError, TicketFile, parse_ticket_file
 
 from .conftest import SERVICE_MOMENT, create_answers
 
@@ -210,6 +210,15 @@ class TestWrite:
     ) -> None:
         with pytest.raises(InvalidTicketError):
             service.write(SLUG, create_answers(summary=''), free_slot)
+
+    def test_a_lone_surrogate_is_refused_with_its_character(
+        self, service: TicketService, free_slot: TicketSlot, surrogate_answers: TicketAnswers
+    ) -> None:
+        with pytest.raises(LoneSurrogateError) as raised:
+            service.write(SLUG, surrogate_answers, free_slot)
+
+        assert raised.value.character == '\ud800'
+        assert 'U+D800' in str(raised.value)
 
     def test_an_investigation_without_a_ledger_is_refused(
         self, service: TicketService, free_slot: TicketSlot, unrecorded_answers: TicketAnswers

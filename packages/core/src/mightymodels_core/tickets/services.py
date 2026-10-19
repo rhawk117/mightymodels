@@ -23,6 +23,7 @@ from mightymodels_core.tickets.records import BranchChoice, TicketSection, Track
 from mightymodels_core.workspace import (
     CompanionDocsFile,
     HandoffContextFile,
+    LoneSurrogateError,
     TicketFile,
     parse_ticket_file,
 )
@@ -123,7 +124,11 @@ class TicketService:
             investigations=answers.investigations,
         )
         self.check(slug, ticket)
-        return render_ticket(ticket)
+        rendered = render_ticket(ticket)
+        if isinstance(rendered, LoneSurrogateError):
+            raise rendered
+
+        return rendered
 
     def branch_named(self, choice: BranchChoice, *, name: str, current: str | None) -> str:
         if choice is BranchChoice.NEW:
@@ -144,6 +149,9 @@ class TicketService:
         self, slug: Slug, source: TicketSource, context: Sequence[str]
     ) -> ContextUpdate:
         text = with_context(source.text, context)
+        if isinstance(text, LoneSurrogateError):
+            raise text
+
         record = self.stage(slug, TicketSource(path=source.path, text=text))
         return ContextUpdate(record=record, text=text)
 

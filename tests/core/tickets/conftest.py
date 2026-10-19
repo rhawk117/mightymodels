@@ -162,6 +162,11 @@ def answers() -> TicketAnswers:
 
 
 @pytest.fixture
+def surrogate_answers() -> TicketAnswers:
+    return create_answers(summary='broken \ud800 text')
+
+
+@pytest.fixture
 def unrecorded_answers() -> TicketAnswers:
     return create_answers(investigations=('never-added',))
 

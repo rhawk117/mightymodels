@@ -1,6 +1,7 @@
 """The workspace: state-directory paths, handoff files, containment and the exclude entry."""
 
 from .errors import (
+    LoneSurrogateError,
     OutsideStateDirectoryError,
     TicketFileIssue,
     TicketFileSyntaxError,
@@ -45,6 +46,7 @@ __all__ = [
     'CompanionDocsFile',
     'HandoffContextFile',
     'HandoffFiles',
+    'LoneSurrogateError',
     'OutsideStateDirectoryError',
     'PersonaReport',
     'RecordFiles',

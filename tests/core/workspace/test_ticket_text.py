@@ -5,6 +5,7 @@ import pytest
 from mightymodels_core.workspace import (
     CompanionDocsFile,
     HandoffContextFile,
+    LoneSurrogateError,
     TicketFile,
     parse_ticket_file,
 )
@@ -70,6 +71,20 @@ def context_quoting_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('line', [pytest.param(line, id=line[:6]) for line in lines])
 
 
+def lone_surrogate_cases() -> pytest.MarkDecorator:
+    surrogates = ['\ud800', '\udbff', '\udc00', '\udfff']
+    return pytest.mark.parametrize(
+        'surrogate', [pytest.param(char, id=ascii(char)) for char in surrogates]
+    )
+
+
+def noncharacter_cases() -> pytest.MarkDecorator:
+    noncharacters = {'u-fffe': '\ufffe', 'u-ffff': '\uffff'}
+    return pytest.mark.parametrize(
+        'noncharacter', [pytest.param(char, id=name) for name, char in noncharacters.items()]
+    )
+
+
 class TestWithContext:
     @context_rewrite_cases()
     def test_only_the_context_block_is_rewritten(self, rewrite: ContextRewrite) -> None:
@@ -79,10 +94,18 @@ class TestWithContext:
     def test_a_line_reads_back_as_written(self, line: str) -> None:
         text = with_context(f'{HEAD}context:\n  - "old"\n', (line,))
 
+        assert isinstance(text, str)
         parsed = parse_ticket_file(text)
 
         assert isinstance(parsed, TicketFile)
         assert parsed.context == (line,)
+
+    @lone_surrogate_cases()
+    def test_a_lone_surrogate_is_returned_as_the_refusal(self, surrogate: str) -> None:
+        refusal = with_context(f'{HEAD}context:\n  - "old"\n', (f'a{surrogate}b',))
+
+        assert isinstance(refusal, LoneSurrogateError)
+        assert refusal.character == surrogate
 
 
 def ticket_escape_cases() -> pytest.MarkDecorator:
@@ -123,7 +146,10 @@ class TestRenderTicket:
         )
 
     def test_the_rendered_text_reads_back(self, ticket: TicketFile) -> None:
-        assert parse_ticket_file(render_ticket(ticket)) == ticket
+        rendered = render_ticket(ticket)
+
+        assert isinstance(rendered, str)
+        assert parse_ticket_file(rendered) == ticket
 
     @ticket_escape_cases()
     def test_a_refused_character_is_escaped_and_reads_back(
@@ -131,8 +157,39 @@ class TestRenderTicket:
     ) -> None:
         rendered = render_ticket(TicketFile(task=ticket.task, summary=text, context=ticket.context))
 
+        assert isinstance(rendered, str)
         parsed = parse_ticket_file(rendered)
 
         assert text not in rendered
         assert isinstance(parsed, TicketFile)
         assert parsed.summary == text
+
+    @noncharacter_cases()
+    def test_a_noncharacter_is_escaped_and_reads_back(
+        self, ticket: TicketFile, noncharacter: str
+    ) -> None:
+        text = f'a{noncharacter}b'
+        rendered = render_ticket(TicketFile(task=ticket.task, summary=text, context=ticket.context))
+
+        assert isinstance(rendered, str)
+        parsed = parse_ticket_file(rendered)
+        assert noncharacter not in rendered
+        assert isinstance(parsed, TicketFile)
+        assert parsed.summary == text
+
+    @lone_surrogate_cases()
+    def test_a_lone_surrogate_is_returned_as_the_refusal(
+        self, ticket: TicketFile, surrogate: str
+    ) -> None:
+        refusal = render_ticket(TicketFile(task=ticket.task, summary=f'a{surrogate}b'))
+
+        assert isinstance(refusal, LoneSurrogateError)
+        assert refusal.character == surrogate
+        assert f'U+{ord(surrogate):04X}' in str(refusal)
+
+    def test_a_lone_surrogate_in_a_list_value_is_returned_as_the_refusal(
+        self, ticket: TicketFile
+    ) -> None:
+        refusal = render_ticket(TicketFile(task=ticket.task, context=('ok', '\ud800')))
+
+        assert isinstance(refusal, LoneSurrogateError)

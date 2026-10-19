@@ -9,26 +9,56 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import INDENT, encode_compact
 
+from .errors import LoneSurrogateError
 from .ticket_file import CompanionDocsFile, HandoffContextFile
 from .ticket_scan import LIST_MARK, SourceLine, source_line, split_lines
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
     from .ticket_file import TicketFile
 
 type Scalar = str | int | bool | None
 
 CONTEXT_KEY = 'context'
-RAW_LINE_BREAKS = re.compile('[\x7f-\x9f\u2028\u2029]')
+UNREADABLE_CHARACTERS = re.compile('[\x7f-\x9f\u2028\u2029\ufffe\uffff]')
+LONE_SURROGATE = re.compile('[\ud800-\udfff]')
 
 
-def escape_raw_break(match: re.Match[str]) -> str:
+def escape_unreadable(match: re.Match[str]) -> str:
     return f'\\u{ord(match[0]):04x}'
 
 
+def find_lone_surrogate(texts: Iterable[str]) -> LoneSurrogateError | None:
+    found = next(filter(None, map(LONE_SURROGATE.search, texts)), None)
+    if found is None:
+        return None
+
+    return LoneSurrogateError(character=found[0])
+
+
+def ticket_strings(ticket: TicketFile) -> list[str]:
+    handoff = ticket.handoff_context or HandoffContextFile()
+    companions = ticket.companion_docs or CompanionDocsFile()
+    models = ticket.subagent_models or {}
+    values = [
+        ticket.task,
+        ticket.summary,
+        ticket.triaged_at,
+        handoff.scope,
+        handoff.branch_name,
+        companions.jira_key,
+        *models,
+        *models.values(),
+        *(ticket.context or ()),
+        *(companions.reference_urls or ()),
+        *(ticket.investigations or ()),
+    ]
+    return [value for value in values if value is not None]
+
+
 def quoted(value: str) -> str:
-    return RAW_LINE_BREAKS.sub(escape_raw_break, encode_compact(value).decode())
+    return UNREADABLE_CHARACTERS.sub(escape_unreadable, encode_compact(value).decode())
 
 
 def scalar_text(value: Scalar) -> str:
@@ -64,7 +94,10 @@ def block_end(lines: Sequence[SourceLine], key: str, line_count: int) -> tuple[i
     return start, last
 
 
-def with_context(source: str, context: Sequence[str]) -> str:
+def with_context(source: str, context: Sequence[str]) -> str | LoneSurrogateError:
+    if problem := find_lone_surrogate(context):
+        return problem
+
     raw = split_lines(source)
     numbered = (source_line(number, text) for number, text in enumerate(raw, 1))
     lines = [line for line in numbered if isinstance(line, SourceLine)]
@@ -73,7 +106,10 @@ def with_context(source: str, context: Sequence[str]) -> str:
     return '\n'.join(updated) + '\n'
 
 
-def render_ticket(ticket: TicketFile) -> str:
+def render_ticket(ticket: TicketFile) -> str | LoneSurrogateError:
+    if problem := find_lone_surrogate(ticket_strings(ticket)):
+        return problem
+
     handoff = ticket.handoff_context or HandoffContextFile()
     companions = ticket.companion_docs or CompanionDocsFile()
     models = ticket.subagent_models or {}

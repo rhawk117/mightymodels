@@ -4,7 +4,11 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.primitives import Slug
 from mightymodels_core.tickets import InvalidTicketError, NotStagedError, TicketSource
-from mightymodels_core.workspace import TicketFileSyntaxError, TicketFileTypeError
+from mightymodels_core.workspace import (
+    LoneSurrogateError,
+    TicketFileSyntaxError,
+    TicketFileTypeError,
+)
 
 from .conftest import RECORDED_INVESTIGATIONS, SERVICE_MOMENT
 
@@ -182,6 +186,16 @@ class TestUpdateContext:
 
         with pytest.raises(InvalidTicketError):
             service.update_context(SLUG, create_source(TICKET_TEXT), tuple(map(str, range(7))))
+
+        assert service.show(SLUG) == staged
+
+    def test_a_lone_surrogate_is_refused_and_the_stage_is_kept(
+        self, service: TicketService
+    ) -> None:
+        staged = service.stage(SLUG, create_source(TICKET_TEXT))
+
+        with pytest.raises(LoneSurrogateError):
+            service.update_context(SLUG, create_source(TICKET_TEXT), ('bad \ud800',))
 
         assert service.show(SLUG) == staged
 
