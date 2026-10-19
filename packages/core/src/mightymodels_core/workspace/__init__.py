@@ -1,6 +1,11 @@
 """The workspace: state-directory paths, handoff files, containment and the exclude entry."""
 
-from .errors import OutsideStateDirectoryError
+from .errors import (
+    OutsideStateDirectoryError,
+    TicketFileIssue,
+    TicketFileSyntaxError,
+    TicketFileTypeError,
+)
 from .exclude import EXCLUDE_LINE, exclude_state
 from .handoffs import (
     HANDOFFS_DIRECTORY,
@@ -19,6 +24,12 @@ from .paths import (
     find_root,
     review_parts,
 )
+from .ticket_file import (
+    CompanionDocsFile,
+    HandoffContextFile,
+    TicketFile,
+    parse_ticket_file,
+)
 from .workspace import PersonaReport, Workspace, workspace_at, workspace_of
 
 __all__ = [
@@ -31,14 +42,21 @@ __all__ = [
     'STATE_DIRECTORY',
     'TICKET_DRAFT',
     'TICKET_FILE',
+    'CompanionDocsFile',
+    'HandoffContextFile',
     'HandoffFiles',
     'OutsideStateDirectoryError',
     'PersonaReport',
     'RecordFiles',
+    'TicketFile',
+    'TicketFileIssue',
+    'TicketFileSyntaxError',
+    'TicketFileTypeError',
     'Workspace',
     'contained_in',
     'exclude_state',
     'find_root',
+    'parse_ticket_file',
     'review_parts',
     'workspace_at',
     'workspace_of',

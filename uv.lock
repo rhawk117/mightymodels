@@ -292,12 +292,14 @@ source = { editable = "packages/core" }
 dependencies = [
     { name = "anyio" },
     { name = "msgspec" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=4.15.1" },
     { name = "msgspec", specifier = ">=0.22.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [[package]]

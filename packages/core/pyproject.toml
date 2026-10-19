@@ -10,8 +10,12 @@ requires-python = ">=3.14"
 dependencies = [
     "anyio>=4.15.1",
     "msgspec>=0.22.0",
+    "pyyaml>=6.0.3",
 ]
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+wheel-exclude = ["tests"]
