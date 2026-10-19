@@ -71,6 +71,19 @@ class TestAddInvestigation:
             added.investigations.add_investigation(create_investigation(FIRST))
 
 
+class TestInvestigation:
+    @pytest.fixture
+    def added(self, harness: InvestigationHarness) -> InvestigationHarness:
+        harness.investigations.add_investigation(create_investigation(FIRST))
+        return harness
+
+    def test_added_investigation_is_read_back_by_key(self, added: InvestigationHarness) -> None:
+        assert added.investigations.investigation(FIRST) == create_investigation(FIRST)
+
+    def test_unknown_key_has_no_investigation(self, added: InvestigationHarness) -> None:
+        assert added.investigations.investigation(UNADDED) is None
+
+
 class TestUnrecorded:
     @pytest.fixture
     def added(self, harness: InvestigationHarness) -> InvestigationHarness:

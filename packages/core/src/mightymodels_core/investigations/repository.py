@@ -5,8 +5,9 @@
 `InvestigationNotFoundError`, a seq the ledger already holds, or one twice in the batch, with
 `DuplicateEntryError`, and a batch that leaves the ledger with more entries than one read returns
 with `WriteLimitError`. `entries` refuses to answer from part of the rows. A key that was never
-added has no entries. `unrecorded` answers which of the keys it is given were never added, with or
-without entries. `latest_rounds` lists the newest investigations that hold entries.
+added has no entries and no investigation. `unrecorded` answers which of the keys it is given were
+never added, with or without entries. `latest_rounds` lists the newest investigations that hold
+entries.
 """
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
 @runtime_checkable
 class InvestigationRepository(Protocol):
     def add_investigation(self, investigation: InvestigationRecord) -> None: ...
+
+    def investigation(self, key: Slug) -> InvestigationRecord | None: ...
 
     def has_entries(self, investigation: Slug) -> bool: ...
 

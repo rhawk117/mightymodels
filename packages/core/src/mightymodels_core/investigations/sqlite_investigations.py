@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from msgspec import convert
+
 from mightymodels_core.investigations.errors import (
     DuplicateInvestigationError,
     InvestigationNotFoundError,
@@ -10,7 +12,9 @@ from mightymodels_core.investigations.errors import (
 from mightymodels_core.investigations.records import (
     ENTRIES,
     INVESTIGATIONS_LISTED,
+    InvestigationRecord,
     LedgerRecord,
+    TargetKind,
     duplicate_entry_error,
 )
 from mightymodels_core.primitives import Slug, redact
@@ -35,9 +39,9 @@ if TYPE_CHECKING:
     from collections.abc import Collection, Sequence
 
     from mightymodels_core.database import Unit
-    from mightymodels_core.investigations.records import InvestigationRecord, LatestRound
+    from mightymodels_core.investigations.records import LatestRound
     from mightymodels_core.primitives import Latest
-    from mightymodels_core.schemas.investigations import LedgerEntryRow
+    from mightymodels_core.schemas.investigations import InvestigationRow, LedgerEntryRow
 
 
 def record_of(row: LedgerEntryRow) -> LedgerRecord:
@@ -85,6 +89,15 @@ class SqliteInvestigationRepository:
             kind=investigation.kind,
         )
         self.unit.one(ADD_INVESTIGATION, params)
+
+    def investigation(self, key: Slug) -> InvestigationRecord | None:
+        row = self.investigation_row(key)
+        if row is None:
+            return None
+
+        return InvestigationRecord(
+            key=key, target=redact(row.target), kind=convert(row.kind, TargetKind)
+        )
 
     def has_entries(self, investigation: Slug) -> bool:
         investigation_id = self.investigation_id(investigation)
@@ -141,11 +154,14 @@ class SqliteInvestigationRepository:
         self.unit.run_many(APPEND_LEDGER_ENTRY, batch)
 
     def investigation_id(self, investigation: Slug) -> int | None:
+        row = self.investigation_row(investigation)
+        return None if row is None else row.id
+
+    def investigation_row(self, investigation: Slug) -> InvestigationRow | None:
         params = InvestigationKeyParams(
             repository_id=self.repository_id, investigation_key=investigation
         )
-        row = self.unit.one(INVESTIGATION_BY_KEY, params)
-        return None if row is None else row.id
+        return self.unit.one(INVESTIGATION_BY_KEY, params)
 
     def entry_rows(self, investigation: Slug, investigation_id: int) -> list[LedgerEntryRow]:
         params = LedgerEntriesParams(investigation_id=investigation_id, limit=ENTRIES.fetched)

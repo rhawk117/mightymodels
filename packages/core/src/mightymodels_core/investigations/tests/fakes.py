@@ -41,6 +41,9 @@ class FakeInvestigationRepository:
         self.ledger.investigations[investigation.key] = investigation
         self.ledger.entries[investigation.key] = []
 
+    def investigation(self, key: Slug) -> InvestigationRecord | None:
+        return self.ledger.investigations.get(key)
+
     def has_entries(self, investigation: Slug) -> bool:
         return bool(self.ledger.entries.get(investigation))
 
