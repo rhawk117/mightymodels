@@ -30,3 +30,9 @@ class UnknownInvestigationError(StateError):
         super().__init__(
             f'{slug} declares investigation {investigation_key!r}, which has no record'
         )
+
+
+class InvalidTicketError(StateError):
+    def __init__(self, *, problems: tuple[str, ...]) -> None:
+        self.problems = problems
+        super().__init__('ticket.yml is invalid:\n  ' + '\n  '.join(problems))

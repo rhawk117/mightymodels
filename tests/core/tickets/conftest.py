@@ -6,11 +6,22 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
-from mightymodels_core.primitives import redact
+from mightymodels_core.investigations import InvestigationRecord
+from mightymodels_core.investigations.tests.fakes import (
+    FakeInvestigationRepository,
+    InvestigationLedger,
+)
+from mightymodels_core.primitives import Slug, redact
+from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.investigations import ADD_INVESTIGATION, AddInvestigationParams
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
-from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
+from mightymodels_core.tickets import (
+    SqliteTicketRepository,
+    TicketSection,
+    TicketService,
+    Tracker,
+)
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
@@ -20,11 +31,12 @@ if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
     from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
-    from mightymodels_core.primitives import Slug
+    from mightymodels_core.primitives.tests.clock import FakeClock
     from mightymodels_core.tickets import TicketRepository
 
 SQL = files('mightymodels_core.sql')
 RECORDED_INVESTIGATIONS = ('first-look', 'second-look')
+SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 
 
 def create_section(slug: Slug, branch: str) -> TicketSection:
@@ -97,3 +109,27 @@ def fake_repository() -> TicketRepository:
 @pytest.fixture(params=repository_implementation_params())
 def repository(request: SubRequest) -> TicketRepository:
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def fake_investigations() -> FakeInvestigationRepository:
+    ledger = InvestigationLedger()
+    investigations = FakeInvestigationRepository(ledger=ledger)
+    for key in RECORDED_INVESTIGATIONS:
+        record = InvestigationRecord(key=Slug(key), target=redact(key), kind='behavior')
+        investigations.add_investigation(record)
+    return investigations
+
+
+@pytest.fixture
+def clock() -> FakeClock:
+    return create_fake_clock(SERVICE_MOMENT)
+
+
+@pytest.fixture
+def service(
+    fake_repository: TicketRepository,
+    fake_investigations: FakeInvestigationRepository,
+    clock: FakeClock,
+) -> TicketService:
+    return TicketService(tickets=fake_repository, investigations=fake_investigations, clock=clock)
