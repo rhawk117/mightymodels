@@ -3,6 +3,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import anyio
 import pytest
 from mightymodels_core.process import CompletedRun, FailedRun, SubprocessRunner
 
@@ -30,8 +31,25 @@ def is_same_directory(printed: str, expected: Path) -> bool:
     return Path(printed.strip()).resolve() == expected.resolve()
 
 
+HEARTBEAT_SCRIPT = """
+import time
+with open({path!r}, 'ab', buffering=0) as heartbeat:
+    for _ in range({ticks}):
+        heartbeat.write(b'.')
+        time.sleep(0.05)
+"""
+
+
+def heartbeat_ticks(heartbeat: Path) -> int:
+    return heartbeat.stat().st_size if heartbeat.exists() else 0
+
+
 class TestSubprocessRunner:
     runner = SubprocessRunner()
+    timeout = 1
+    child_ticks = 40
+    child_lifetime = 2
+    margin = 1
 
     async def test_completed_run_carries_exit_and_both_streams(self) -> None:
         child = ChildPython(
@@ -76,16 +94,24 @@ class TestSubprocessRunner:
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'refused'
 
-    async def test_run_past_the_timeout_is_timed_out_and_the_child_is_gone(self) -> None:
+    @pytest.fixture
+    def heartbeat(self, tmp_path: Path) -> Path:
+        return tmp_path.joinpath('heartbeat')
+
+    async def test_run_past_the_timeout_is_timed_out_and_the_child_is_gone(
+        self, heartbeat: Path
+    ) -> None:
         child = ChildPython(
-            script='import os, time; print(os.getpid(), flush=True); time.sleep(60)'
+            script=HEARTBEAT_SCRIPT.format(path=str(heartbeat), ticks=self.child_ticks)
         )
 
-        outcome = await self.runner.run(child.argv, timeout=2)
+        outcome = await self.runner.run(child.argv, timeout=self.timeout)
+        ticks_at_return = heartbeat_ticks(heartbeat)
+        await anyio.sleep(self.child_lifetime + self.margin)
 
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'timed_out'
-        assert not process_is_alive(int(outcome.stdout))
+        assert heartbeat_ticks(heartbeat) == ticks_at_return
 
     async def test_output_that_is_not_text_is_undecodable(self) -> None:
         child = ChildPython(script='import sys; sys.stdout.buffer.write(b"\\xff\\xfe\\xfd")')
