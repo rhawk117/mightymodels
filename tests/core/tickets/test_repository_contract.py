@@ -155,6 +155,38 @@ class TestStatus:
             repository.mark_closed(FIRST)
 
 
+class TestTicketId:
+    @pytest.fixture
+    def staged(self, repository: TicketRepository) -> TicketRepository:
+        repository.stage(FIRST, create_section(FIRST, 'main'), ())
+        return repository
+
+    def test_every_lookup_names_the_same_id(self, repository: TicketRepository) -> None:
+        staged_id = repository.stage(FIRST, create_section(FIRST, 'main'), ()).id
+
+        assert repository.staged_ticket(FIRST).id == staged_id
+        assert repository.unclosed_ticket(FIRST).id == staged_id
+
+    def test_restage_keeps_the_id(self, staged: TicketRepository) -> None:
+        before = staged.staged_ticket(FIRST).id
+
+        restaged = staged.stage(FIRST, create_section(FIRST, 'feature'), ())
+
+        assert restaged.id == before
+
+    def test_status_change_keeps_the_id(self, staged: TicketRepository) -> None:
+        before = staged.staged_ticket(FIRST).id
+
+        staged.mark_in_progress(FIRST)
+
+        assert staged.staged_ticket(FIRST).id == before
+
+    def test_two_tickets_have_different_ids(self, staged: TicketRepository) -> None:
+        second = staged.stage(SECOND, create_section(SECOND, 'main'), ())
+
+        assert second.id != staged.staged_ticket(FIRST).id
+
+
 class TestBranchQueries:
     @pytest.fixture
     def busy(self, repository: TicketRepository) -> TicketRepository:

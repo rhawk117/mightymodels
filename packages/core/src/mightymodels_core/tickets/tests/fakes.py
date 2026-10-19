@@ -45,7 +45,9 @@ class FakeTicketRepository:
 
         existing = self.ticket(slug)
         previous = () if existing is None else existing.investigations
+        ticket_id = len(self.records) + 1 if existing is None else existing.id
         record = TicketRecord(
+            id=ticket_id,
             slug=slug,
             status='staged' if existing is None else existing.status,
             section=section,

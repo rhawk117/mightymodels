@@ -37,6 +37,7 @@ class TicketSection:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TicketRecord:
+    id: int
     slug: Slug
     status: TicketStatus
     section: TicketSection

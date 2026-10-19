@@ -46,6 +46,7 @@ def record_of(row: TicketRow) -> TicketRecord:
         validated_at=row.validated_at,
     )
     return TicketRecord(
+        id=row.id,
         slug=Slug(row.slug),
         status=row.status,
         section=section,
