@@ -65,7 +65,7 @@ def create_receipt(key: str, outcome: Outcome = 'pass', *, day: int = 3) -> Rece
 
 def create_ticket_section(slug: Slug) -> TicketSection:
     return TicketSection(
-        ticket=redact(f'ticket {slug}'),
+        ticket=f'.mightymodels/{slug}/ticket.yml',
         summary=redact('a summary'),
         branch='main',
         scope='med',

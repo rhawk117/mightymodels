@@ -29,7 +29,7 @@ RECORDED_INVESTIGATIONS = ('first-look', 'second-look')
 
 def create_section(slug: Slug, branch: str) -> TicketSection:
     return TicketSection(
-        ticket=redact(f'ticket {slug}'),
+        ticket=f'.mightymodels/{slug}/ticket.yml',
         summary=redact(f'summary of {slug}'),
         branch=branch,
         scope='med',

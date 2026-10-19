@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 def record_of(row: TicketRow) -> TicketRecord:
     section = TicketSection(
-        ticket=redact(row.ticket),
+        ticket=row.ticket,
         summary=redact(row.summary),
         branch=row.branch,
         scope=row.scope,

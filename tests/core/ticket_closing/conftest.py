@@ -48,7 +48,7 @@ def create_closing(shipped: str, *, closed_day: int = 2) -> ClosingRecord:
 
 def create_ticket_section() -> TicketSection:
     return TicketSection(
-        ticket=redact('a ticket'),
+        ticket='.mightymodels/a-ticket/ticket.yml',
         summary=redact('a summary'),
         branch='main',
         scope='med',

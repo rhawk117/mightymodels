@@ -1,6 +1,6 @@
 """The ticket records the repository hands out: frozen values, never a database row.
 
-A title and a summary are redacted text, which only `redact` produces, so a secret cannot reach
+A summary is redacted text, which only `redact` produces, so a secret cannot reach
 a ticket by the type alone.
 """
 
@@ -22,7 +22,7 @@ class Tracker:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TicketSection:
-    ticket: RedactedText
+    ticket: str
     summary: RedactedText
     branch: str
     scope: TicketScope

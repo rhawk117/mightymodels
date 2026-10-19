@@ -74,7 +74,7 @@ def create_attempt(*, owned: tuple[str, ...] = ('src/a.py',)) -> Attempt:
 
 def create_ticket_section(slug: Slug) -> TicketSection:
     return TicketSection(
-        ticket=redact(f'ticket {slug}'),
+        ticket=f'.mightymodels/{slug}/ticket.yml',
         summary=redact('a summary'),
         branch='main',
         scope='med',
