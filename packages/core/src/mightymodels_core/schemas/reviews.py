@@ -97,8 +97,7 @@ class RunLimitParams(Struct, frozen=True, kw_only=True, gc=False):
 
 
 class UpsertReviewDispositionParams(Struct, frozen=True, kw_only=True, gc=False):
-    review_run_id: int
-    finding_key: str
+    review_finding_id: int
     decision: Decision
     reason: str
     by: str
@@ -106,8 +105,7 @@ class UpsertReviewDispositionParams(Struct, frozen=True, kw_only=True, gc=False)
 
 
 class UpsertReviewOutcomeParams(Struct, frozen=True, kw_only=True, gc=False):
-    review_run_id: int
-    finding_key: str
+    review_disposition_id: int
     result: Result
     commit: str
     reason: str
@@ -139,6 +137,7 @@ class ReviewRunRow(Struct, frozen=True, kw_only=True):
 
 
 class ReviewFindingRow(Struct, frozen=True, kw_only=True):
+    id: int
     finding_key: str
     sources: list[str]
     severity: FindingSeverity
@@ -154,6 +153,7 @@ class ReviewFindingRow(Struct, frozen=True, kw_only=True):
 
 
 class ReviewDispositionRow(Struct, frozen=True, kw_only=True, gc=False):
+    id: int
     finding_key: str
     decision: Decision
     reason: str

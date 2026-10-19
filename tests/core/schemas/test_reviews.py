@@ -84,11 +84,10 @@ def finding(
 
 
 def disposition(
-    review_run_id: int, finding_key: str, decision: Decision = 'fix'
+    review_finding_id: int, decision: Decision = 'fix'
 ) -> UpsertReviewDispositionParams:
     return UpsertReviewDispositionParams(
-        review_run_id=review_run_id,
-        finding_key=finding_key,
+        review_finding_id=review_finding_id,
         decision=decision,
         reason='because',
         by='user',
@@ -96,12 +95,9 @@ def disposition(
     )
 
 
-def outcome(
-    review_run_id: int, finding_key: str, result: Result = 'fixed'
-) -> UpsertReviewOutcomeParams:
+def outcome(review_disposition_id: int, result: Result = 'fixed') -> UpsertReviewOutcomeParams:
     return UpsertReviewOutcomeParams(
-        review_run_id=review_run_id,
-        finding_key=finding_key,
+        review_disposition_id=review_disposition_id,
         result=result,
         commit='deadbee',
         reason='done',
@@ -122,6 +118,22 @@ def finding_keys(database: Database, review_run_id: int) -> list[str]:
             REVIEW_FINDINGS_OF_RUN, RunLimitParams(review_run_id=review_run_id, limit=LIMIT)
         )
     return [row.finding_key for row in rows]
+
+
+def finding_ids(database: Database, review_run_id: int) -> dict[str, int]:
+    with database.read() as unit:
+        rows = unit.all(
+            REVIEW_FINDINGS_OF_RUN, RunLimitParams(review_run_id=review_run_id, limit=LIMIT)
+        )
+    return {row.finding_key: row.id for row in rows}
+
+
+def disposition_ids(database: Database, review_run_id: int) -> dict[str, int]:
+    with database.read() as unit:
+        rows = unit.all(
+            REVIEW_DISPOSITIONS_OF_RUN, RunLimitParams(review_run_id=review_run_id, limit=LIMIT)
+        )
+    return {row.finding_key: row.id for row in rows}
 
 
 class TestReviewRuns:
@@ -303,10 +315,15 @@ class TestReviewDecisions:
         run_id = record(database, run(repository_id, 'r-1'))
         with database.write() as unit:
             unit.run_many(UPSERT_REVIEW_FINDING, [finding(run_id, 'F1'), finding(run_id, 'F2')])
+        findings = finding_ids(database, run_id)
+        with database.write() as unit:
             unit.run_many(
-                UPSERT_REVIEW_DISPOSITION, [disposition(run_id, 'F1'), disposition(run_id, 'F2')]
+                UPSERT_REVIEW_DISPOSITION,
+                [disposition(findings['F1']), disposition(findings['F2'])],
             )
-            unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(run_id, 'F1')])
+        first_disposition_id = disposition_ids(database, run_id)['F1']
+        with database.write() as unit:
+            unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(first_disposition_id)])
         return run_id
 
     def test_dispositions_read_back_every_column_in_finding_order(
@@ -350,9 +367,11 @@ class TestReviewDecisions:
         self, database: Database, repository_id: int
     ) -> None:
         run_id = self.decided_run(database, repository_id)
+        finding_id = finding_ids(database, run_id)['F1']
+        disposition_id = disposition_ids(database, run_id)['F1']
         with database.write() as unit:
-            unit.run_many(UPSERT_REVIEW_DISPOSITION, [disposition(run_id, 'F1', 'dismiss')])
-            unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(run_id, 'F1', 'blocked')])
+            unit.run_many(UPSERT_REVIEW_DISPOSITION, [disposition(finding_id, 'dismiss')])
+            unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(disposition_id, 'blocked')])
 
         with database.read() as unit:
             dispositions = unit.all(
@@ -365,17 +384,17 @@ class TestReviewDecisions:
         assert [row.decision for row in dispositions] == ['dismiss', 'fix']
         assert [row.result for row in outcomes] == ['blocked']
 
-    def test_a_decision_without_its_finding_or_disposition_stores_nothing(
-        self, database: Database, repository_id: int
+    def test_a_disposition_with_a_missing_parent_finding_is_refused(
+        self, database: Database
     ) -> None:
-        run_id = self.decided_run(database, repository_id)
-        with database.write() as unit:
-            decided = unit.run_many(UPSERT_REVIEW_DISPOSITION, [disposition(run_id, 'F9')])
-            unit.run_many(UPSERT_REVIEW_FINDING, [finding(run_id, 'F3')])
-            resolved = unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(run_id, 'F3')])
+        with pytest.raises(MissingParentError), database.write() as unit:
+            unit.run_many(UPSERT_REVIEW_DISPOSITION, [disposition(999)])
 
-        assert decided == 0
-        assert resolved == 0
+    def test_an_outcome_with_a_missing_parent_disposition_is_refused(
+        self, database: Database
+    ) -> None:
+        with pytest.raises(MissingParentError), database.write() as unit:
+            unit.run_many(UPSERT_REVIEW_OUTCOME, [outcome(999)])
 
     def test_reopening_deletes_only_the_named_findings(
         self, database: Database, repository_id: int

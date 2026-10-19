@@ -471,6 +471,7 @@ ON CONFLICT (review_run_id, finding_key) DO UPDATE SET
 
 -- name: review_findings_of_run
 SELECT json_object(
+  'id', id,
   'finding_key', finding_key,
   'sources', json(sources),
   'severity', severity,
@@ -496,9 +497,7 @@ WHERE review_run_id = :review_run_id;
 
 -- name: upsert_review_disposition
 INSERT INTO review_dispositions (review_finding_id, decision, reason, by, at)
-SELECT f.id, :decision, :reason, :by, :at
-FROM review_findings AS f
-WHERE f.review_run_id = :review_run_id AND f.finding_key = :finding_key
+VALUES (:review_finding_id, :decision, :reason, :by, :at)
 ON CONFLICT (review_finding_id) DO UPDATE SET
   decision = excluded.decision,
   reason = excluded.reason,
@@ -507,6 +506,7 @@ ON CONFLICT (review_finding_id) DO UPDATE SET
 
 -- name: review_dispositions_of_run
 SELECT json_object(
+  'id', d.id,
   'finding_key', f.finding_key,
   'decision', d.decision,
   'reason', d.reason,
@@ -536,10 +536,7 @@ WHERE review_finding_id IN (
 
 -- name: upsert_review_outcome
 INSERT INTO review_outcomes (review_disposition_id, result, "commit", reason, at)
-SELECT d.id, :result, :commit, :reason, :at
-FROM review_findings AS f
-JOIN review_dispositions AS d ON d.review_finding_id = f.id
-WHERE f.review_run_id = :review_run_id AND f.finding_key = :finding_key
+VALUES (:review_disposition_id, :result, :commit, :reason, :at)
 ON CONFLICT (review_disposition_id) DO UPDATE SET
   result = excluded.result,
   "commit" = excluded."commit",
