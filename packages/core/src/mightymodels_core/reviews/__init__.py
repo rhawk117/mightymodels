@@ -2,10 +2,13 @@
 
 from .errors import (
     BaseRequiredError,
+    EvidenceKindError,
     FieldRequiredError,
+    ForeignSourceError,
     LineBelowOneError,
     LocationShapeError,
     MalformedSourceError,
+    NoFindingsSectionError,
     OverrideSpentError,
     PersonaChoiceError,
     ReversedRangeError,
@@ -14,7 +17,11 @@ from .errors import (
     SlugRequiredError,
     SourcesRequiredError,
     UndecidedFindingError,
+    UnknownDimensionError,
     UnknownFindingError,
+    UnknownSeverityHeadingError,
+    UnplacedFindingError,
+    UnreadableHeadingError,
     UnsupportedQualityError,
     WeightRangeError,
     WeightsMissingError,
@@ -41,6 +48,7 @@ from .records import (
     ResolvedFinding,
     ReviewRunRecord,
 )
+from .reports import parse_report
 from .repository import ReviewDecisionRepository, ReviewRepository
 from .services import AddedFindings, ReviewReport, ReviewService, RunListing, RunSummary
 from .sqlite_decisions import SqliteReviewDecisionRepository
@@ -51,15 +59,18 @@ __all__ = [
     'BaseRequiredError',
     'DecidedFinding',
     'Evidence',
+    'EvidenceKindError',
     'FieldRequiredError',
     'FindingOptions',
     'FindingRecord',
+    'ForeignSourceError',
     'GatePolicy',
     'IncomingEvidence',
     'IncomingFinding',
     'LineBelowOneError',
     'LocationShapeError',
     'MalformedSourceError',
+    'NoFindingsSectionError',
     'OverridePolicy',
     'OverrideSpentError',
     'Persona',
@@ -83,7 +94,11 @@ __all__ = [
     'StartPolicy',
     'StartRequest',
     'UndecidedFindingError',
+    'UnknownDimensionError',
     'UnknownFindingError',
+    'UnknownSeverityHeadingError',
+    'UnplacedFindingError',
+    'UnreadableHeadingError',
     'UnsupportedQualityError',
     'Verdict',
     'WeightRangeError',
@@ -91,5 +106,6 @@ __all__ = [
     'WeightsMissingError',
     'create_gate_policy',
     'fold_findings',
+    'parse_report',
     'reopened_keys',
 ]

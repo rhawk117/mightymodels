@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.primitives import RunId
+    from mightymodels_core.reviews.policy import Persona
     from mightymodels_core.schemas.reviews import Scope
 
 
@@ -143,3 +144,66 @@ class OverrideSpentError(StateError):
     def __init__(self, *, run: RunId) -> None:
         self.run = run
         super().__init__(f'review run {run} has used its one reviewer override')
+
+
+def report_refusal(problem: str) -> str:
+    return f'report: {problem}; nothing was written'
+
+
+class NoFindingsSectionError(StateError):
+    def __init__(self) -> None:
+        super().__init__(report_refusal('there is no "## Findings" section'))
+
+
+class UnknownSeverityHeadingError(StateError):
+    def __init__(self, *, heading: str) -> None:
+        self.heading = heading
+        super().__init__(report_refusal(f'{heading!r} is not a severity heading'))
+
+
+class UnreadableHeadingError(StateError):
+    def __init__(self, *, heading: str) -> None:
+        self.heading = heading
+        super().__init__(report_refusal(f'{heading!r} is not a finding heading'))
+
+
+class UnplacedFindingError(StateError):
+    def __init__(self, *, heading: str) -> None:
+        self.heading = heading
+        super().__init__(report_refusal(f'{heading!r} comes before any severity heading'))
+
+
+class ForeignSourceError(StateError):
+    def __init__(self, *, index: int, sources: Sequence[str], persona: Persona) -> None:
+        self.index = index
+        self.sources = tuple(sources)
+        self.persona = persona
+        super().__init__(
+            finding_refusal(index, f'a {persona} report holds only its own finding ids', sources)
+        )
+
+
+class EvidenceKindError(StateError):
+    def __init__(self, *, index: int, sources: Sequence[str], kind: str) -> None:
+        self.index = index
+        self.sources = tuple(sources)
+        self.kind = kind
+        super().__init__(
+            finding_refusal(
+                index, f'evidence kind {kind!r} is not metric, idiom or convention', sources
+            )
+        )
+
+
+class UnknownDimensionError(StateError):
+    def __init__(self, *, index: int, sources: Sequence[str], dimension: str) -> None:
+        self.index = index
+        self.sources = tuple(sources)
+        self.dimension = dimension
+        super().__init__(
+            finding_refusal(
+                index,
+                f'dimension {dimension!r} is not security, sdlc, quality, docs or plan',
+                sources,
+            )
+        )
