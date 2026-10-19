@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import pytest
+from mightymodels_core.primitives import RunId
 from mightymodels_core.reviews import (
     BaseRequiredError,
     OverrideSpentError,
@@ -11,9 +12,11 @@ from mightymodels_core.reviews import (
     RunNotFoundError,
     SourcesRequiredError,
 )
+from mightymodels_core.reviews.records import RUNS_LISTED
 
 from .conftest import (
     HEAD,
+    OTHER_SLUG,
     SERVICE_MOMENT,
     SERVICE_RUN,
     UNSTARTED_RUN,
@@ -23,6 +26,7 @@ from .conftest import (
     create_incoming,
     create_request,
     create_resolved,
+    create_run,
 )
 
 if TYPE_CHECKING:
@@ -251,3 +255,32 @@ class TestListing:
             1,
             'BLOCK',
         )
+
+    @pytest.fixture
+    def overfull_harness(self, service_harness: ServiceHarness) -> ServiceHarness:
+        for number in range(1, RUNS_LISTED.rows + 2):
+            service_harness.reviews.record_run(create_run(RunId(f'20260101-{number:06d}')))
+        return service_harness
+
+    @pytest.fixture
+    def described_harness(self, service_harness: ServiceHarness) -> ServiceHarness:
+        described = replace(create_run(), slug=OTHER_SLUG, depth='deep')
+        service_harness.reviews.record_run(described)
+        return service_harness
+
+    def test_runs_past_the_limit_are_left_out_and_flagged(
+        self, overfull_harness: ServiceHarness
+    ) -> None:
+        listing = overfull_harness.service.listing()
+
+        listed = sorted(summary.run.run_id for summary in listing.runs)
+        newest_first = sorted(overfull_harness.reviews.ledger.runs, reverse=True)
+        assert (listed, listing.older_left_out) == (sorted(newest_first[: RUNS_LISTED.rows]), True)
+
+    def test_runs_within_the_limit_are_not_flagged(self, described_harness: ServiceHarness) -> None:
+        assert described_harness.service.listing().older_left_out is False
+
+    def test_listed_run_carries_its_slug_and_depth(self, described_harness: ServiceHarness) -> None:
+        (summary,) = described_harness.service.listing().runs
+
+        assert (summary.run.slug, summary.run.depth) == (OTHER_SLUG, 'deep')
