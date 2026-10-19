@@ -41,6 +41,25 @@ class Evidence:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class IncomingEvidence:
+    kind: EvidenceKind
+    cite: str
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class IncomingFinding:
+    sources: tuple[str, ...]
+    severity: FindingSeverity
+    kind: FindingKind
+    security: bool
+    title: str
+    location: str
+    fix: str
+    verify: str
+    evidence: IncomingEvidence | None
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class FindingRecord:
     key: str
     sources: tuple[str, ...]
