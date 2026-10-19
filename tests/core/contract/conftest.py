@@ -9,16 +9,19 @@ import pytest
 from mightymodels_core.contract import (
     Approval,
     ApprovedCommand,
+    ContractService,
     Receipt,
     SqliteContractRepository,
 )
 from mightymodels_core.contract.tests.fakes import ContractLedger, FakeContractRepository
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.primitives import Slug, redact
+from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
 from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
+from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -34,6 +37,11 @@ SQL = files('mightymodels_core.sql')
 TICKET_SLUGS = (Slug('contract-subject'), Slug('other-subject'))
 FAKE_TICKET_IDS = (1, 2)
 APPROVAL = Approval(at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC), head='abc1234')
+SERVICE_SLUG = Slug('service-subject')
+SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
+HEAD = 'abc1234'
+FIRST_KEY = 'T1.AC-1'
+SECOND_KEY = 'T1.AC-2'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -76,6 +84,25 @@ def create_ticket_section(slug: Slug) -> TicketSection:
         context=(),
         validated_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ServiceHarness:
+    service: ContractService
+    ledger: ContractLedger
+    contracts: FakeContractRepository
+    ticket_id: int
+
+
+def create_service_harness() -> ServiceHarness:
+    ledger = ContractLedger()
+    contracts = FakeContractRepository(ledger=ledger)
+    tickets = FakeTicketRepository()
+    ticket_id = tickets.stage(SERVICE_SLUG, create_ticket_section(SERVICE_SLUG), ()).id
+    service = ContractService(
+        tickets=tickets, contracts=contracts, clock=create_fake_clock(SERVICE_MOMENT)
+    )
+    return ServiceHarness(service=service, ledger=ledger, contracts=contracts, ticket_id=ticket_id)
 
 
 def contract_implementation_cases() -> list[ParameterSet]:
@@ -148,3 +175,15 @@ def fake_harness() -> ContractHarness:
 @pytest.fixture(params=contract_implementation_cases())
 def harness(request: SubRequest) -> ContractHarness:
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def service_harness() -> ServiceHarness:
+    return create_service_harness()
+
+
+@pytest.fixture
+def stocked_service_harness(service_harness: ServiceHarness) -> ServiceHarness:
+    commands = [create_command(FIRST_KEY), create_command(SECOND_KEY)]
+    service_harness.contracts.approve(service_harness.ticket_id, commands, APPROVAL)
+    return service_harness
