@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.investigations import (
+    IncomingEntry,
     InvestigationRecord,
+    InvestigationService,
+    Ledger,
     LedgerRecord,
     SqliteInvestigationRepository,
 )
@@ -17,8 +20,10 @@ from mightymodels_core.investigations.tests.fakes import (
     InvestigationLedger,
 )
 from mightymodels_core.primitives import Slug, redact
+from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
+from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -28,16 +33,40 @@ if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
     from mightymodels_core.investigations import InvestigationRepository
+    from mightymodels_core.primitives.tests.clock import FakeClock
+    from mightymodels_core.schemas.investigations import EntryKind, EntrySource
 
 SQL = files('mightymodels_core.sql')
 FIRST = Slug('first-look')
 SECOND = Slug('second-look')
 UNADDED = Slug('never-added')
+STARTED = Slug('20260506-retry-policy')
+MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
+HEAD = 'abc1234'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class InvestigationHarness:
     investigations: InvestigationRepository
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ServiceHarness:
+    service: InvestigationService
+    investigations: FakeInvestigationRepository
+    similarity: FakeSimilarityRepository
+    clock: FakeClock
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Case[Given, Expected]:
+    name: str
+    given: Given
+    expected: Expected
+
+    @property
+    def param(self) -> ParameterSet:
+        return pytest.param(self, id=self.name)
 
 
 def create_investigation(key: Slug) -> InvestigationRecord:
@@ -56,6 +85,21 @@ def create_entry(seq: int, *, round_number: int = 1, day: int = 2) -> LedgerReco
         at=datetime(2026, 1, day, 3, 4, 5, tzinfo=UTC),
         head='abc1234',
     )
+
+
+def create_incoming(
+    kind: EntryKind = 'known',
+    *,
+    text: str = 'a fact',
+    source: EntrySource = 'code-scout',
+    cite: str | None = 'src/a.py:1',
+    supersedes: tuple[int, ...] = (),
+) -> IncomingEntry:
+    return IncomingEntry(kind=kind, text=text, source=source, cite=cite, supersedes=supersedes)
+
+
+def create_ledger(*records: LedgerRecord) -> Ledger:
+    return Ledger(investigation=create_investigation(FIRST), records=records)
 
 
 def investigation_implementation_cases() -> list[ParameterSet]:
@@ -112,3 +156,16 @@ def fake_harness() -> InvestigationHarness:
 @pytest.fixture(params=investigation_implementation_cases())
 def harness(request: SubRequest) -> InvestigationHarness:
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def service_harness() -> ServiceHarness:
+    investigations = FakeInvestigationRepository(ledger=InvestigationLedger())
+    similarity = FakeSimilarityRepository()
+    clock = create_fake_clock(MOMENT)
+    service = InvestigationService(
+        investigations=investigations, similarity=similarity, clock=clock
+    )
+    return ServiceHarness(
+        service=service, investigations=investigations, similarity=similarity, clock=clock
+    )

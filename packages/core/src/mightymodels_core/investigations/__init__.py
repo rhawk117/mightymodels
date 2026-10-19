@@ -1,18 +1,82 @@
-"""The investigation records, their repository seam and the sqlite store behind them."""
+"""The investigation records, rules, ledger and service, and the sqlite store behind them."""
 
-from .errors import DuplicateEntryError, DuplicateInvestigationError, InvestigationNotFoundError
+from .errors import (
+    CiteRequiredError,
+    DuplicateEntryError,
+    DuplicateInvestigationError,
+    EmptyTextError,
+    InvalidEntryError,
+    InvestigationNotFoundError,
+    RoundRegressionError,
+    SourceNotAllowedError,
+    UnknownInvestigationError,
+    UnknownSupersededError,
+)
+from .ledger import (
+    KnownRow,
+    Knowns,
+    KnownsSelection,
+    Ledger,
+    LedgerSection,
+    LinkedLedgers,
+    entry_status,
+    ledger_of,
+    linked_ledgers,
+    recorded_ledger,
+)
+from .policy import (
+    BatchPolicy,
+    EntryPolicy,
+    EntryRule,
+    EntryStamp,
+    IncomingEntry,
+    InvestigationOptions,
+    NamePolicy,
+    RedactedRecord,
+)
 from .records import InvestigationRecord, LatestRound, LedgerRecord, TargetKind
 from .repository import InvestigationRepository
+from .services import Added, AddRequest, InvestigationService, Started, StartRequest
 from .sqlite_investigations import SqliteInvestigationRepository
 
 __all__ = [
+    'AddRequest',
+    'Added',
+    'BatchPolicy',
+    'CiteRequiredError',
     'DuplicateEntryError',
     'DuplicateInvestigationError',
+    'EmptyTextError',
+    'EntryPolicy',
+    'EntryRule',
+    'EntryStamp',
+    'IncomingEntry',
+    'InvalidEntryError',
     'InvestigationNotFoundError',
+    'InvestigationOptions',
     'InvestigationRecord',
     'InvestigationRepository',
+    'InvestigationService',
+    'KnownRow',
+    'Knowns',
+    'KnownsSelection',
     'LatestRound',
+    'Ledger',
     'LedgerRecord',
+    'LedgerSection',
+    'LinkedLedgers',
+    'NamePolicy',
+    'RedactedRecord',
+    'RoundRegressionError',
+    'SourceNotAllowedError',
     'SqliteInvestigationRepository',
+    'StartRequest',
+    'Started',
     'TargetKind',
+    'UnknownInvestigationError',
+    'UnknownSupersededError',
+    'entry_status',
+    'ledger_of',
+    'linked_ledgers',
+    'recorded_ledger',
 ]
