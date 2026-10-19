@@ -15,6 +15,7 @@ from mightymodels_core.reviews import (
     FindingRecord,
     IncomingFinding,
     ResolvedFinding,
+    ReviewDecisionService,
     ReviewRunRecord,
     ReviewService,
     SqliteReviewDecisionRepository,
@@ -258,3 +259,29 @@ def service_harness() -> ServiceHarness:
 def started_harness(service_harness: ServiceHarness) -> ServiceHarness:
     service_harness.service.start(create_request(emphasis='release-readiness'), HEAD)
     return service_harness
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class DecisionHarness:
+    service: ReviewDecisionService
+    reviews: FakeReviewRepository
+    decisions: FakeReviewDecisionRepository
+
+
+@pytest.fixture
+def decision_harness() -> DecisionHarness:
+    ledger = ReviewLedger()
+    reviews = FakeReviewRepository(ledger=ledger)
+    decisions = FakeReviewDecisionRepository(ledger=ledger)
+    clock = create_fake_clock(SERVICE_MOMENT)
+    reviews.record_run(create_run(FIRST_RUN))
+    reviews.record_findings(FIRST_RUN, [create_finding(f'MV-{number}') for number in (1, 2, 3)])
+    service = ReviewDecisionService(reviews=reviews, decisions=decisions, clock=clock)
+    return DecisionHarness(service=service, reviews=reviews, decisions=decisions)
+
+
+@pytest.fixture
+def chosen_harness(decision_harness: DecisionHarness) -> DecisionHarness:
+    decided = [create_decided('MV-1', decision='fix'), create_decided('MV-2', decision='defer')]
+    decision_harness.decisions.record_dispositions(FIRST_RUN, decided)
+    return decision_harness

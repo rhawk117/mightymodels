@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.primitives import RunId
     from mightymodels_core.reviews.policy import Persona
-    from mightymodels_core.schemas.reviews import Scope
+    from mightymodels_core.schemas.reviews import Decision, Result, Scope
 
 
 class RunNotFoundError(StateError):
@@ -207,3 +207,29 @@ class UnknownDimensionError(StateError):
                 sources,
             )
         )
+
+
+class ReasonRequiredError(StateError):
+    def __init__(self, *, finding_key: str, decision: Decision) -> None:
+        self.finding_key = finding_key
+        self.decision = decision
+        super().__init__(f'{finding_key}: {decision} needs a reason; nothing was written')
+
+
+class NotChosenError(StateError):
+    def __init__(self, *, finding_key: str) -> None:
+        self.finding_key = finding_key
+        super().__init__(f'{finding_key}: only a finding the user chose to fix is resolved')
+
+
+class CommitRequiredError(StateError):
+    def __init__(self, *, finding_key: str) -> None:
+        self.finding_key = finding_key
+        super().__init__(f'{finding_key}: fixed needs commit')
+
+
+class ResultReasonError(StateError):
+    def __init__(self, *, finding_key: str, result: Result) -> None:
+        self.finding_key = finding_key
+        self.result = result
+        super().__init__(f'{finding_key}: {result} needs reason')

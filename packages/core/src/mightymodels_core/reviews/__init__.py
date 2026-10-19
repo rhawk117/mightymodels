@@ -2,6 +2,7 @@
 
 from .errors import (
     BaseRequiredError,
+    CommitRequiredError,
     EvidenceKindError,
     FieldRequiredError,
     ForeignSourceError,
@@ -9,8 +10,11 @@ from .errors import (
     LocationShapeError,
     MalformedSourceError,
     NoFindingsSectionError,
+    NotChosenError,
     OverrideSpentError,
     PersonaChoiceError,
+    ReasonRequiredError,
+    ResultReasonError,
     ReversedRangeError,
     RunExistsError,
     RunNotFoundError,
@@ -29,9 +33,14 @@ from .errors import (
 )
 from .findings import FindingOptions, fold_findings
 from .policy import (
+    DecisionOptions,
+    DisposePolicy,
     GatePolicy,
+    IncomingDisposition,
     OverridePolicy,
     Persona,
+    ResolvePolicy,
+    ResolveRequest,
     ReviewOptions,
     StartPolicy,
     StartRequest,
@@ -50,14 +59,27 @@ from .records import (
 )
 from .reports import parse_report
 from .repository import ReviewDecisionRepository, ReviewRepository
-from .services import AddedFindings, ReviewReport, ReviewService, RunListing, RunSummary
+from .services import (
+    AddedFindings,
+    Disposed,
+    LatestReview,
+    ReviewDecisionService,
+    ReviewReport,
+    ReviewService,
+    RunListing,
+    RunSummary,
+)
 from .sqlite_decisions import SqliteReviewDecisionRepository
 from .sqlite_runs import SqliteReviewRepository
 
 __all__ = [
     'AddedFindings',
     'BaseRequiredError',
+    'CommitRequiredError',
     'DecidedFinding',
+    'DecisionOptions',
+    'DisposePolicy',
+    'Disposed',
     'Evidence',
     'EvidenceKindError',
     'FieldRequiredError',
@@ -65,19 +87,27 @@ __all__ = [
     'FindingRecord',
     'ForeignSourceError',
     'GatePolicy',
+    'IncomingDisposition',
     'IncomingEvidence',
     'IncomingFinding',
+    'LatestReview',
     'LineBelowOneError',
     'LocationShapeError',
     'MalformedSourceError',
     'NoFindingsSectionError',
+    'NotChosenError',
     'OverridePolicy',
     'OverrideSpentError',
     'Persona',
     'PersonaChoiceError',
+    'ReasonRequiredError',
+    'ResolvePolicy',
+    'ResolveRequest',
     'ResolvedFinding',
+    'ResultReasonError',
     'ReversedRangeError',
     'ReviewDecisionRepository',
+    'ReviewDecisionService',
     'ReviewOptions',
     'ReviewReport',
     'ReviewRepository',
