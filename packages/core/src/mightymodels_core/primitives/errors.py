@@ -73,3 +73,25 @@ class RedactedTextTooLongError(StateError):
             f'{field}: {length} characters once its secrets are redacted, and at most {limit} '
             'are stored; shorten the text; nothing was written'
         )
+
+
+class ReadLimitError(StateError):
+    def __init__(self, *, owner: str, rows: int, kept: str) -> None:
+        self.owner = owner
+        self.rows = rows
+        self.kept = kept
+        super().__init__(
+            f'{owner} holds more than {rows} {kept}, the most one read returns; the read is '
+            'refused, because an answer from a part of them would be wrong'
+        )
+
+
+class WriteLimitError(StateError):
+    def __init__(self, *, owner: str, rows: int, kept: str) -> None:
+        self.owner = owner
+        self.rows = rows
+        self.kept = kept
+        super().__init__(
+            f'{owner} would hold more than {rows} {kept}, the most one read returns; the write '
+            'is refused and none of it is stored, so what is held stays readable'
+        )
