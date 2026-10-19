@@ -23,10 +23,13 @@ type ModelNames = dict[str, str | None]
 
 KEY_PATH_SUFFIX = re.compile(r' - at `(?P<path>[^`]+)`$')
 MAPPING_VALUE = '[...]'
+UNKNOWN_FIELD = re.compile(r'^Object contains unknown field `(?P<field>[^`]+)`')
 SYNTAX_LINE = re.compile(r'line (?P<line>\d+)')
 
 
-class HandoffContextFile(Struct, frozen=True, kw_only=True, gc=False, rename='kebab'):
+class HandoffContextFile(
+    Struct, frozen=True, kw_only=True, gc=False, rename='kebab', forbid_unknown_fields=True
+):
     branch_name: str | None = None
     scope: TicketScope | None = None
     plan_first: bool | None = None
@@ -34,12 +37,15 @@ class HandoffContextFile(Struct, frozen=True, kw_only=True, gc=False, rename='ke
     worktrees_okay: bool | None = None
 
 
-class CompanionDocsFile(Struct, frozen=True, kw_only=True, gc=False, rename='kebab'):
+class CompanionDocsFile(
+    Struct, frozen=True, kw_only=True, gc=False, rename='kebab', forbid_unknown_fields=True
+):
     issue_number: int | None = None
     jira_key: str | None = None
+    reference_urls: tuple[str, ...] | None = None
 
 
-class TicketFile(Struct, frozen=True, kw_only=True, rename='kebab'):
+class TicketFile(Struct, frozen=True, kw_only=True, rename='kebab', forbid_unknown_fields=True):
     task: str | None = None
     summary: str | None = None
     triaged_at: str | None = None
@@ -55,6 +61,8 @@ def get_type_issue(error: ValidationError, scan: TicketScan) -> TicketFileTypeEr
     suffix = KEY_PATH_SUFFIX.search(message)
     key_path = suffix['path'] if suffix else ROOT_PATH
     reason = message.removesuffix(suffix[0]) if suffix else message
+    if unknown := UNKNOWN_FIELD.match(message):
+        key_path = f'{key_path}.{unknown["field"]}'
     return TicketFileTypeError(
         key_path=key_path, line=scan.line_of(key_path.removesuffix(MAPPING_VALUE)), reason=reason
     )

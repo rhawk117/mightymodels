@@ -3,11 +3,14 @@
 The subset is two levels of mappings, scalars and lists of scalars, with trailing comments, every
 line indented with spaces in steps of two. PyYAML accepts more than that and keeps the last of a
 duplicate key, so the scan refuses what it would read differently from the file's author. A line
-ends at a newline, a carriage return or the pair and nowhere else. The scan also records the
-line of every key path, so a type refusal that only names a path can point at its line.
+ends at a newline, a carriage return or the pair and nowhere else; PyYAML also breaks a line at
+U+0085, U+2028 and U+2029 and refuses control characters without naming a line, so the scan
+refuses all of those with the line they sit on. The scan also records the line of every key path,
+so a type refusal that only names a path can point at its line.
 """
 
 import io
+import re
 from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -20,6 +23,9 @@ if TYPE_CHECKING:
 INDENT = 2
 LIST_MARK = '- '
 ROOT_PATH = '$'
+UNREADABLE = re.compile(
+    '[^\t\n\r\x20-\x7e\xa0-\u2027\u202a-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]'
+)
 UNSUPPORTED_STARTS = ("'", '[', '{', '&', '*', '!', '|', '>')
 
 
@@ -67,6 +73,12 @@ def source_line(number: int, raw: str) -> SourceLine | TicketFileSyntaxError | N
                 f'the indentation holds U+{ord(character):04X}, which is not a space; '
                 'indent with two spaces per level'
             ),
+        )
+
+    if unreadable := UNREADABLE.search(raw):
+        return TicketFileSyntaxError(
+            line=number,
+            reason=f'the line holds U+{ord(unreadable[0]):04X}, which a ticket file cannot hold',
         )
 
     if not stripped.strip() or stripped.startswith('#'):

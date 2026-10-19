@@ -207,6 +207,59 @@ def ticket_blank_line_refusal_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('refusal', [case.param for case in cases])
 
 
+def ticket_unreadable_character_cases() -> pytest.MarkDecorator:
+    cases = [
+        SyntaxRefusal(
+            name='line-separator-smuggling-a-duplicate-key',
+            source='task: t\nsummary: a\u2028task: evil\n',
+            line=2,
+            reason='U+2028',
+        ),
+        SyntaxRefusal(
+            name='paragraph-separator', source='task: a\u2029b\n', line=1, reason='U+2029'
+        ),
+        SyntaxRefusal(
+            name='next-line-in-a-comment', source='task: a\n# x\x85y\n', line=2, reason='U+0085'
+        ),
+        SyntaxRefusal(
+            name='form-feed-in-a-value',
+            source='task: a\nsummary: b\x0cc\n',
+            line=2,
+            reason='U+000C',
+        ),
+        SyntaxRefusal(name='delete', source='task: a\x7f\n', line=1, reason='U+007F'),
+        SyntaxRefusal(
+            name='c1-control', source='task: a\nsummary: \x9f\n', line=2, reason='U+009F'
+        ),
+        SyntaxRefusal(name='noncharacter', source='task: a\n\n\ufffe\n', line=3, reason='U+FFFE'),
+    ]
+    return pytest.mark.parametrize('refusal', [case.param for case in cases])
+
+
+def ticket_unknown_key_cases() -> pytest.MarkDecorator:
+    cases = [
+        TypeRefusal(
+            name='top-level',
+            source='task: t\nbogus: 1\nhandoff-context:\n  wat: x\n',
+            key_path='$.bogus',
+            line=2,
+        ),
+        TypeRefusal(
+            name='handoff-context',
+            source='task: t\nhandoff-context:\n  scope: med\n  wat: x\n',
+            key_path='$.handoff-context.wat',
+            line=4,
+        ),
+        TypeRefusal(
+            name='companion-docs',
+            source='companion-docs:\n  issue-number: 4\n  ticket-url: x\n',
+            key_path='$.companion-docs.ticket-url',
+            line=3,
+        ),
+    ]
+    return pytest.mark.parametrize('refusal', [case.param for case in cases])
+
+
 def ticket_line_end_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(
         'source',
@@ -264,8 +317,12 @@ class TestParseTicketFile:
     def test_a_file_without_keys_is_an_empty_ticket(self) -> None:
         assert parse_ticket_file('# nothing yet\n\n') == TicketFile()
 
-    def test_a_key_the_ticket_does_not_know_is_ignored(self) -> None:
-        assert parse_ticket_file('task: a\nreference-urls:\n') == TicketFile(task='a')
+    def test_reference_urls_are_a_list_of_text(self) -> None:
+        source = 'companion-docs:\n  reference-urls:\n    - https://example.com/a\n    - other\n'
+
+        assert parse_ticket_file(source) == TicketFile(
+            companion_docs=CompanionDocsFile(reference_urls=('https://example.com/a', 'other'))
+        )
 
     @ticket_line_end_cases()
     def test_a_carriage_return_ends_a_line_with_or_without_a_newline_after_it(
@@ -302,6 +359,26 @@ class TestRefuseTicketFile:
         assert isinstance(issue, TicketFileSyntaxError)
         assert issue.line == refusal.line
         assert refusal.reason in issue.reason
+
+    @ticket_unreadable_character_cases()
+    def test_a_line_break_or_control_character_pyyaml_reads_differently_is_refused_with_its_line(
+        self, refusal: SyntaxRefusal
+    ) -> None:
+        issue = parse_ticket_file(refusal.source)
+
+        assert isinstance(issue, TicketFileSyntaxError)
+        assert issue.line == refusal.line
+        assert refusal.reason in issue.reason
+
+    @ticket_unknown_key_cases()
+    def test_a_key_the_ticket_does_not_know_is_refused_with_its_key_path_and_line(
+        self, refusal: TypeRefusal
+    ) -> None:
+        issue = parse_ticket_file(refusal.source)
+
+        assert isinstance(issue, TicketFileTypeError)
+        assert issue.key_path == refusal.key_path
+        assert issue.line == refusal.line
 
     @ticket_type_refusal_cases()
     def test_a_value_of_the_wrong_type_is_refused_with_its_key_path(
