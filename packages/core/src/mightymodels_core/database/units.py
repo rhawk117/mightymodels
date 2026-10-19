@@ -6,7 +6,7 @@ at a time. COMMIT and ROLLBACK run as SQL because the connection stays in autoco
 
 from dataclasses import dataclass, field
 from threading import Lock, get_ident
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from msgspec import Struct
 
@@ -14,7 +14,9 @@ from .codec import bind_params, decode_row, decode_rows
 from .errors import (
     DatabaseClosedError,
     DatabaseError,
+    DatabaseInUseError,
     NestedUnitError,
+    SqliteErrorTranslator,
     UnitExitedError,
     UnitReusedError,
     translate_errors,
@@ -37,34 +39,76 @@ class Channel:
     holder: int | None = None
     is_closed: bool = False
 
+    def claim(self) -> None:
+        if self.holder == get_ident():
+            raise NestedUnitError
+
+        self.lock.acquire()
+        if self.is_closed:
+            self.lock.release()
+            raise DatabaseClosedError
+
+        self.holder = get_ident()
+
+    def release(self) -> None:
+        self.holder = None
+        self.lock.release()
+
+    def close(self) -> None:
+        if not self.lock.acquire(blocking=False):
+            raise DatabaseInUseError
+
+        try:
+            self.is_closed = True
+            with translate_errors('close'):
+                self.connection.close()
+        finally:
+            self.lock.release()
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class UnitKind:
     begin: str
     is_read_only: bool
+    errors: SqliteErrorTranslator
 
 
-READ_UNIT = UnitKind(begin='BEGIN DEFERRED', is_read_only=True)
-WRITE_UNIT = UnitKind(begin='BEGIN IMMEDIATE', is_read_only=False)
+READ_UNIT = UnitKind(
+    begin='BEGIN DEFERRED', is_read_only=True, errors=SqliteErrorTranslator.for_read_unit()
+)
+WRITE_UNIT = UnitKind(
+    begin='BEGIN IMMEDIATE', is_read_only=False, errors=SqliteErrorTranslator.for_database()
+)
+
+
+@runtime_checkable
+class Unit(Protocol):
+    def one[P: Struct, R: Struct](self, query: Query[P, R], params: P) -> R | None: ...
+
+    def all[P: Struct, R: Struct](self, query: Query[P, R], params: P) -> list[R]: ...
+
+    def run[P: Struct](self, command: Command[P], params: P) -> int: ...
+
+    def run_many[P: Struct](self, command: Command[P], batch: Iterable[P]) -> int: ...
 
 
 @dataclass(slots=True, kw_only=True)
-class Unit:
+class SqliteUnit:
     channel: Channel
+    errors: SqliteErrorTranslator
     is_active: bool = True
 
-    def execute(self, declaration: Declaration, params: Struct) -> sqlite3.Cursor:
+    def sql_for(self, declaration: Declaration) -> str:
         if not self.is_active:
             raise UnitExitedError
 
-        sql = self.channel.catalogue.sql_for(declaration)
-        bound = bind_params(params)
-        with translate_errors(declaration.name):
-            return self.channel.connection.execute(sql, bound)
+        return self.channel.catalogue.sql_for(declaration)
 
     def fetch_rows[P: Struct, R: Struct](self, query: Query[P, R], params: P) -> list[str]:
-        cursor = self.execute(query, params)
-        with translate_errors(query.name):
+        sql = self.sql_for(query)
+        bound = bind_params(params)
+        with self.errors.translate(query.name):
+            cursor = self.channel.connection.execute(sql, bound)
             return [row[0] for row in cursor.fetchall()]
 
     def one[P: Struct, R: Struct](self, query: Query[P, R], params: P) -> R | None:
@@ -75,15 +119,15 @@ class Unit:
         return decode_rows(query, self.fetch_rows(query, params))
 
     def run[P: Struct](self, command: Command[P], params: P) -> int:
-        return self.execute(command, params).rowcount
+        sql = self.sql_for(command)
+        bound = bind_params(params)
+        with self.errors.translate(command.name):
+            return self.channel.connection.execute(sql, bound).rowcount
 
     def run_many[P: Struct](self, command: Command[P], batch: Iterable[P]) -> int:
-        if not self.is_active:
-            raise UnitExitedError
-
-        sql = self.channel.catalogue.sql_for(command)
+        sql = self.sql_for(command)
         bound = [bind_params(params) for params in batch]
-        with translate_errors(command.name):
+        with self.errors.translate(command.name):
             return self.channel.connection.executemany(sql, bound).rowcount
 
 
@@ -92,29 +136,21 @@ class UnitScope:
     channel: Channel
     kind: UnitKind
     is_spent: bool = False
-    unit: Unit | None = None
+    unit: SqliteUnit | None = None
 
     def __enter__(self) -> Unit:
         if self.is_spent:
             raise UnitReusedError
 
         self.is_spent = True
-        if self.channel.holder == get_ident():
-            raise NestedUnitError
-
-        self.channel.lock.acquire()
-        if self.channel.is_closed:
-            self.channel.lock.release()
-            raise DatabaseClosedError
-
-        self.channel.holder = get_ident()
+        self.channel.claim()
         try:
             self.begin()
         except BaseException:
             self.release()
             raise
 
-        self.unit = Unit(channel=self.channel)
+        self.unit = SqliteUnit(channel=self.channel, errors=self.kind.errors)
         return self.unit
 
     def __exit__(
@@ -127,12 +163,16 @@ class UnitScope:
             self.unit.is_active = False
 
         try:
-            self.finish(commit=exc_type is None)
+            if exc_type is not None:
+                self.rollback()
+                return
+
+            self.commit()
         finally:
             self.release()
 
     def run_sql(self, sql: str) -> None:
-        with translate_errors(sql):
+        with self.kind.errors.translate(sql):
             self.channel.connection.execute(sql)
 
     def begin(self) -> None:
@@ -145,11 +185,7 @@ class UnitScope:
         if self.channel.connection.in_transaction:
             self.run_sql('ROLLBACK')
 
-    def finish(self, *, commit: bool) -> None:
-        if not commit:
-            self.rollback()
-            return
-
+    def commit(self) -> None:
         try:
             self.run_sql('COMMIT')
         except DatabaseError:
@@ -167,5 +203,4 @@ class UnitScope:
             if self.kind.is_read_only:
                 self.end_read_only()
         finally:
-            self.channel.holder = None
-            self.channel.lock.release()
+            self.channel.release()

@@ -1,5 +1,6 @@
 import sqlite3
 from contextlib import closing
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -8,7 +9,7 @@ from mightymodels_core.database import (
     DatabaseClosedError,
     DatabaseInUseError,
     DatabaseSpec,
-    JournalMode,
+    PragmaNotAppliedError,
     SchemaVersionError,
     StatementFailedError,
     UnversionedSchemaError,
@@ -31,8 +32,6 @@ from .conftest import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from mightymodels_core.database import Database
 
     from .conftest import Statements
@@ -56,7 +55,7 @@ class TestOpen:
     def test_options_override_the_defaults(
         self, database_path: Path, database_spec: DatabaseSpec, statements: Statements
     ) -> None:
-        options = ConnectionOptions(foreign_keys=False, journal_mode=JournalMode.DELETE)
+        options = ConnectionOptions(foreign_keys=False, journal_mode='DELETE')
         with (
             closing(open_database(database_path, database_spec, options)) as opened,
             opened.read() as unit,
@@ -131,6 +130,29 @@ class TestOpen:
         with pytest.raises(StatementFailedError) as failed:
             open_database(missing_directory, database_spec, ConnectionOptions())
         assert failed.value.statement == 'open'
+
+
+class TestPragmaReadBack:
+    def test_a_journal_mode_that_falls_back_refuses_to_open(
+        self, database_spec: DatabaseSpec
+    ) -> None:
+        with pytest.raises(PragmaNotAppliedError) as refused:
+            open_database(Path(':memory:'), database_spec, ConnectionOptions())
+        assert refused.value.pragma == 'journal_mode'
+        assert refused.value.expected == 'WAL'
+        assert refused.value.found == 'MEMORY'
+
+    def test_a_requested_journal_mode_that_takes_effect_opens(
+        self, database_spec: DatabaseSpec, statements: Statements
+    ) -> None:
+        options = ConnectionOptions(journal_mode='MEMORY')
+        with (
+            closing(open_database(Path(':memory:'), database_spec, options)) as opened,
+            opened.read() as unit,
+        ):
+            row = unit.one(statements.journal_mode, NoPart())
+        assert row is not None
+        assert row.value == 'memory'
 
 
 class TestFailureTranslation:

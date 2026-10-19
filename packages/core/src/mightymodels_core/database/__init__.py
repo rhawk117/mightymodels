@@ -23,6 +23,8 @@ from .errors import (
     MissingParentError,
     NaiveTimestampError,
     NestedUnitError,
+    PragmaNotAppliedError,
+    ReadOnlyDatabaseError,
     ReadOnlyUnitError,
     RejectedValueError,
     RowDecodeError,
@@ -35,7 +37,7 @@ from .errors import (
     UnversionedSchemaError,
 )
 from .statements import Command, Declaration, Query
-from .units import Unit, UnitScope
+from .units import Unit
 
 __all__ = [
     'BusyError',
@@ -57,7 +59,9 @@ __all__ = [
     'MissingParentError',
     'NaiveTimestampError',
     'NestedUnitError',
+    'PragmaNotAppliedError',
     'Query',
+    'ReadOnlyDatabaseError',
     'ReadOnlyUnitError',
     'RejectedValueError',
     'RowDecodeError',
@@ -68,7 +72,6 @@ __all__ = [
     'Unit',
     'UnitExitedError',
     'UnitReusedError',
-    'UnitScope',
     'UnknownStatementError',
     'UnversionedSchemaError',
     'bind_catalogue',

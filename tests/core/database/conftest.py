@@ -147,11 +147,12 @@ def create_statements() -> Statements:
 class RollbackFailingConnection(sqlite3.Connection):
     @override
     def execute(self, sql: str, parameters: Any = (), /) -> sqlite3.Cursor:
+        cursor = super().execute(sql, parameters)
         if sql == 'ROLLBACK':
             message = 'injected rollback failure'
             raise sqlite3.OperationalError(message)
 
-        return super().execute(sql, parameters)
+        return cursor
 
 
 class CloseFailingConnection(sqlite3.Connection):

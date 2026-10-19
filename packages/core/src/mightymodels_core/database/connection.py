@@ -7,12 +7,11 @@ The connection runs in autocommit mode for life and is shared behind an instance
 import re
 import sqlite3
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 from .catalogue import bind_catalogue
 from .errors import (
-    DatabaseInUseError,
+    PragmaNotAppliedError,
     SchemaVersionError,
     UnversionedSchemaError,
     translate_errors,
@@ -20,10 +19,12 @@ from .errors import (
 from .units import READ_UNIT, WRITE_UNIT, Channel, UnitScope
 
 if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
     from importlib.resources.abc import Traversable
     from pathlib import Path
 
     from .statements import Declaration
+    from .units import Unit
 
 SCRIPT_VERSION = re.compile(
     r'^[ \t]*PRAGMA[ \t]+user_version[ \t]*=[ \t]*(?P<version>\d+)[ \t]*;?[ \t]*$',
@@ -31,28 +32,17 @@ SCRIPT_VERSION = re.compile(
 )
 
 
-class JournalMode(StrEnum):
-    DELETE = 'DELETE'
-    TRUNCATE = 'TRUNCATE'
-    PERSIST = 'PERSIST'
-    MEMORY = 'MEMORY'
-    WAL = 'WAL'
-    OFF = 'OFF'
-
-
-class Synchronous(StrEnum):
-    OFF = 'OFF'
-    NORMAL = 'NORMAL'
-    FULL = 'FULL'
-    EXTRA = 'EXTRA'
+type JournalMode = Literal['DELETE', 'TRUNCATE', 'PERSIST', 'MEMORY', 'WAL', 'OFF']
+type Synchronous = Literal['OFF', 'NORMAL', 'FULL', 'EXTRA']
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ConnectionOptions:
     foreign_keys: bool = True
-    journal_mode: JournalMode = JournalMode.WAL
-    synchronous: Synchronous = Synchronous.NORMAL
+    journal_mode: JournalMode = 'WAL'
+    synchronous: Synchronous = 'NORMAL'
     busy_timeout_seconds: float = 10.0
+    connection_class: type[sqlite3.Connection] = sqlite3.Connection
 
     @property
     def foreign_keys_pragma(self) -> str:
@@ -108,6 +98,12 @@ def run_install(connection: sqlite3.Connection, script: str) -> None:
         connection.execute('COMMIT')
 
 
+def rollback_if_open(connection: sqlite3.Connection) -> None:
+    if connection.in_transaction:
+        with translate_errors('ROLLBACK'):
+            connection.execute('ROLLBACK')
+
+
 def install_schema(connection: sqlite3.Connection, script: str) -> None:
     with translate_errors('BEGIN IMMEDIATE'):
         connection.execute('BEGIN IMMEDIATE')
@@ -115,9 +111,7 @@ def install_schema(connection: sqlite3.Connection, script: str) -> None:
     try:
         run_install(connection, script)
     except BaseException:
-        if connection.in_transaction:
-            with translate_errors('ROLLBACK'):
-                connection.execute('ROLLBACK')
+        rollback_if_open(connection)
         raise
 
 
@@ -130,8 +124,34 @@ def apply_schema(connection: sqlite3.Connection, schema: Schema) -> None:
         raise SchemaVersionError(found=found, expected=schema.version)
 
 
+def read_pragma(connection: sqlite3.Connection, pragma: str) -> str:
+    with translate_errors(f'PRAGMA {pragma}'):
+        return str(connection.execute(f'PRAGMA {pragma}').fetchone()[0]).upper()
+
+
+def get_pragma_problem(
+    connection: sqlite3.Connection, options: ConnectionOptions
+) -> PragmaNotAppliedError | None:
+    foreign_keys = 'ON' if read_pragma(connection, 'foreign_keys') == '1' else 'OFF'
+    if foreign_keys != options.foreign_keys_pragma:
+        return PragmaNotAppliedError(
+            pragma='foreign_keys', expected=options.foreign_keys_pragma, found=foreign_keys
+        )
+
+    journal_mode = read_pragma(connection, 'journal_mode')
+    if journal_mode != options.journal_mode:
+        return PragmaNotAppliedError(
+            pragma='journal_mode', expected=options.journal_mode, found=journal_mode
+        )
+
+    return None
+
+
 def prepare(connection: sqlite3.Connection, schema: Schema, options: ConnectionOptions) -> None:
     configure(connection, options)
+    if problem := get_pragma_problem(connection, options):
+        raise problem
+
     apply_schema(connection, schema)
 
 
@@ -146,8 +166,17 @@ def prepare_or_close(
         raise
 
 
-@dataclass(slots=True, kw_only=True)
-class Database:
+@runtime_checkable
+class Database(Protocol):
+    def read(self) -> AbstractContextManager[Unit]: ...
+
+    def write(self) -> AbstractContextManager[Unit]: ...
+
+    def close(self) -> None: ...
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class SqliteDatabase:
     channel: Channel
 
     def read(self) -> UnitScope:
@@ -157,15 +186,7 @@ class Database:
         return UnitScope(channel=self.channel, kind=WRITE_UNIT)
 
     def close(self) -> None:
-        if not self.channel.lock.acquire(blocking=False):
-            raise DatabaseInUseError
-
-        try:
-            self.channel.is_closed = True
-            with translate_errors('close'):
-                self.channel.connection.close()
-        finally:
-            self.channel.lock.release()
+        self.channel.close()
 
 
 def open_database(
@@ -181,7 +202,8 @@ def open_database(
             timeout=options.busy_timeout_seconds,
             autocommit=True,
             check_same_thread=False,
+            factory=options.connection_class,
         )
 
     prepare_or_close(connection, schema, options)
-    return Database(channel=Channel(connection=connection, catalogue=catalogue))
+    return SqliteDatabase(channel=Channel(connection=connection, catalogue=catalogue))

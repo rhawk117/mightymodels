@@ -2,10 +2,13 @@
 
 import sqlite3
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Generator, Mapping
+    from contextlib import AbstractContextManager
 
 
 class DatabaseError(Exception):
@@ -90,6 +93,13 @@ class ReadOnlyUnitError(DatabaseError):
         super().__init__(f'statement {statement!r} wrote inside a read unit: {detail}')
 
 
+class ReadOnlyDatabaseError(DatabaseError):
+    def __init__(self, *, statement: str, detail: str) -> None:
+        self.statement = statement
+        self.detail = detail
+        super().__init__(f'statement {statement!r} wrote to a read-only database: {detail}')
+
+
 class StatementFailedError(DatabaseError):
     def __init__(self, *, statement: str, detail: str) -> None:
         self.statement = statement
@@ -133,6 +143,14 @@ class UnversionedSchemaError(DatabaseError):
         super().__init__('the schema script does not end with a PRAGMA user_version statement')
 
 
+class PragmaNotAppliedError(DatabaseError):
+    def __init__(self, *, pragma: str, expected: str, found: str) -> None:
+        self.pragma = pragma
+        self.expected = expected
+        self.found = found
+        super().__init__(f'PRAGMA {pragma} is {found}, the options ask for {expected}')
+
+
 class SchemaVersionError(DatabaseError):
     def __init__(self, *, found: int, expected: int) -> None:
         self.found = found
@@ -145,44 +163,67 @@ type SqliteFailure = (
     | MissingParentError
     | RejectedValueError
     | BusyError
+    | ReadOnlyDatabaseError
     | ReadOnlyUnitError
     | StatementFailedError
 )
 
-FAILURE_BY_NAME: dict[str, type[SqliteFailure]] = {
-    'SQLITE_CONSTRAINT_UNIQUE': DuplicateRowError,
-    'SQLITE_CONSTRAINT_PRIMARYKEY': DuplicateRowError,
-    'SQLITE_CONSTRAINT_ROWID': DuplicateRowError,
-    'SQLITE_CONSTRAINT_FOREIGNKEY': MissingParentError,
-    'SQLITE_CONSTRAINT_CHECK': RejectedValueError,
-    'SQLITE_CONSTRAINT_NOTNULL': RejectedValueError,
-    'SQLITE_BUSY': BusyError,
-    'SQLITE_READONLY': ReadOnlyUnitError,
-}
-
 SQLITE_CONSTRAINT_DATATYPE = 3091
 
-FAILURE_BY_CODE: dict[int, type[SqliteFailure]] = {
-    SQLITE_CONSTRAINT_DATATYPE: RejectedValueError,
-}
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class SqliteErrorTranslator:
+    failure_by_name: Mapping[str, type[SqliteFailure]]
+    failure_by_code: Mapping[int, type[SqliteFailure]]
+
+    @classmethod
+    def with_read_only(cls, read_only: type[SqliteFailure]) -> Self:
+        by_name: dict[str, type[SqliteFailure]] = {
+            'SQLITE_CONSTRAINT_UNIQUE': DuplicateRowError,
+            'SQLITE_CONSTRAINT_PRIMARYKEY': DuplicateRowError,
+            'SQLITE_CONSTRAINT_ROWID': DuplicateRowError,
+            'SQLITE_CONSTRAINT_FOREIGNKEY': MissingParentError,
+            'SQLITE_CONSTRAINT_CHECK': RejectedValueError,
+            'SQLITE_CONSTRAINT_NOTNULL': RejectedValueError,
+            'SQLITE_BUSY': BusyError,
+            'SQLITE_READONLY': read_only,
+        }
+        by_code: dict[int, type[SqliteFailure]] = {SQLITE_CONSTRAINT_DATATYPE: RejectedValueError}
+        return cls(
+            failure_by_name=MappingProxyType(by_name),
+            failure_by_code=MappingProxyType(by_code),
+        )
+
+    @classmethod
+    def for_database(cls) -> Self:
+        return cls.with_read_only(ReadOnlyDatabaseError)
+
+    @classmethod
+    def for_read_unit(cls) -> Self:
+        return cls.with_read_only(ReadOnlyUnitError)
+
+    def create_error(self, error: sqlite3.Error, *, statement: str) -> SqliteFailure:
+        name = getattr(error, 'sqlite_errorname', '')
+        primary = '_'.join(name.split('_')[:2])
+        code = getattr(error, 'sqlite_errorcode', 0)
+        failure = (
+            self.failure_by_name.get(name)
+            or self.failure_by_code.get(code)
+            or self.failure_by_name.get(primary)
+            or StatementFailedError
+        )
+        return failure(statement=statement, detail=str(error))
+
+    @contextmanager
+    def translate(self, statement: str) -> Generator[None]:
+        try:
+            yield
+        except sqlite3.Error as error:
+            raise self.create_error(error, statement=statement) from error
 
 
-def create_sqlite_error(error: sqlite3.Error, *, statement: str) -> SqliteFailure:
-    name = getattr(error, 'sqlite_errorname', '')
-    primary = '_'.join(name.split('_')[:2])
-    code = getattr(error, 'sqlite_errorcode', 0)
-    failure = (
-        FAILURE_BY_NAME.get(name)
-        or FAILURE_BY_CODE.get(code)
-        or FAILURE_BY_NAME.get(primary)
-        or StatementFailedError
-    )
-    return failure(statement=statement, detail=str(error))
+DATABASE_ERRORS = SqliteErrorTranslator.for_database()
 
 
-@contextmanager
-def translate_errors(statement: str) -> Generator[None]:
-    try:
-        yield
-    except sqlite3.Error as error:
-        raise create_sqlite_error(error, statement=statement) from error
+def translate_errors(statement: str) -> AbstractContextManager[None]:
+    return DATABASE_ERRORS.translate(statement)

@@ -1,4 +1,3 @@
-import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from dataclasses import dataclass
@@ -13,18 +12,15 @@ from mightymodels_core.database import (
     DuplicateRowError,
     MissingParentError,
     NestedUnitError,
+    ReadOnlyDatabaseError,
     ReadOnlyUnitError,
     RejectedValueError,
     StatementFailedError,
     UnitExitedError,
     UnitReusedError,
-    UnitScope,
     UnknownStatementError,
-    bind_catalogue,
     open_database,
 )
-from mightymodels_core.database.connection import install_schema
-from mightymodels_core.database.units import READ_UNIT, WRITE_UNIT, Channel
 
 from .conftest import (
     NamePart,
@@ -36,12 +32,13 @@ from .conftest import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
     from concurrent.futures import Future
+    from contextlib import AbstractContextManager
     from pathlib import Path
 
     from _pytest.mark import ParameterSet
-    from mightymodels_core.database import Command, Database, DatabaseSpec
+    from mightymodels_core.database import Command, Database, DatabaseSpec, Unit
     from mightymodels_core.database.errors import SqliteFailure
     from msgspec import Struct
 
@@ -115,8 +112,8 @@ def failing_statement_cases() -> pytest.MarkDecorator:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Opener:
     name: str
-    outer: Callable[[Database], UnitScope]
-    inner: Callable[[Database], UnitScope]
+    outer: Callable[[Database], AbstractContextManager[Unit]]
+    inner: Callable[[Database], AbstractContextManager[Unit]]
 
     @property
     def param(self) -> ParameterSet:
@@ -213,31 +210,45 @@ class TestReadUnit:
 
 class TestReadUnitRollbackFailure:
     def test_query_only_is_off_and_a_write_unit_works_afterwards(
-        self, tmp_path: Path, database_spec: DatabaseSpec, statements: Statements
+        self, database_path: Path, database_spec: DatabaseSpec, statements: Statements
     ) -> None:
-        connection = sqlite3.connect(
-            tmp_path.joinpath('flaky.db'),
-            factory=RollbackFailingConnection,
-            autocommit=True,
-            check_same_thread=False,
-        )
-        with closing(connection):
-            install_schema(connection, database_spec.schema.read_text(encoding='utf-8'))
-            catalogue = bind_catalogue(
-                database_spec.statements.read_text(encoding='utf-8'), database_spec.declarations
-            )
-            channel = Channel(connection=connection, catalogue=catalogue)
-
-            with pytest.raises(StatementFailedError), UnitScope(channel=channel, kind=READ_UNIT):
+        options = ConnectionOptions(connection_class=RollbackFailingConnection)
+        with closing(open_database(database_path, database_spec, options)) as flaky:
+            with pytest.raises(StatementFailedError), flaky.read():
                 raise RollbackTriggerError
-            query_only = connection.execute('PRAGMA query_only').fetchone()[0]
-            sqlite3.Connection.execute(connection, 'ROLLBACK')
 
-            with UnitScope(channel=channel, kind=WRITE_UNIT) as unit:
+            with flaky.write() as unit:
                 added = unit.run(statements.add_person, ADA)
 
-        assert query_only == 0
         assert added == 1
+
+
+class TestReadOnlyErrors:
+    @pytest.fixture
+    def read_only_database(
+        self, database_path: Path, database_spec: DatabaseSpec
+    ) -> Generator[Database]:
+        open_database(database_path, database_spec, ConnectionOptions()).close()
+        database_path.chmod(0o444)
+        opened = open_database(database_path, database_spec, ConnectionOptions())
+        yield opened
+        opened.close()
+
+    def test_write_unit_on_a_read_only_file_raises_read_only_database_error(
+        self, read_only_database: Database, statements: Statements
+    ) -> None:
+        with pytest.raises(ReadOnlyDatabaseError) as raised, read_only_database.write() as unit:
+            unit.run(statements.add_person, ADA)
+        assert raised.value.statement == statements.add_person.name
+        assert raised.value.detail == 'attempt to write a readonly database'
+
+    def test_write_in_a_read_unit_raises_read_only_unit_error_with_its_statement(
+        self, database: Database, statements: Statements
+    ) -> None:
+        with pytest.raises(ReadOnlyUnitError) as raised, database.read() as unit:
+            unit.run(statements.add_person, ADA)
+        assert raised.value.statement == statements.add_person.name
+        assert raised.value.detail
 
 
 class TestUnitLifecycle:
