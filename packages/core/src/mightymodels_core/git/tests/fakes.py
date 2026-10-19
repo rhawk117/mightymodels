@@ -10,7 +10,7 @@ commit to `is_ancestor` and `changed_files` as `GitUnavailableError`, and so doe
 import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, NotRequired, TypedDict, Unpack
+from typing import TYPE_CHECKING
 
 from mightymodels_core.git.errors import GitUnavailableError
 from mightymodels_core.git.records import Checkout, UntrackedFiles
@@ -146,17 +146,18 @@ class RecordedRun:
     cwd: Path | None
 
 
-class RunOptions(TypedDict):
-    timeout: float
-    cwd: NotRequired[Path | None]
-
-
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ScriptedRunner:
     reply: RunOutcome = ANSWERED
     runs: list[RecordedRun] = field(default_factory=list)
 
-    async def run(self, argv: Sequence[str], **options: Unpack[RunOptions]) -> RunOutcome:
-        recorded = RecordedRun(argv=tuple(argv), timeout=options['timeout'], cwd=options.get('cwd'))
+    async def run(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout: float,  # noqa: ASYNC109  the ProcessRunner Protocol fixes this signature; the fake records the timeout, never enforces it
+        cwd: Path | None = None,
+    ) -> RunOutcome:
+        recorded = RecordedRun(argv=tuple(argv), timeout=timeout, cwd=cwd)
         self.runs.append(recorded)
         return self.reply
