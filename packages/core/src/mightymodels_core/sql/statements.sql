@@ -11,9 +11,6 @@ SELECT json_object('id', id, 'repository_key', repository_key)
 FROM repositories
 WHERE repository_key = :repository_key;
 
--- name: ticket_by_id
-SELECT projection FROM ticket_rows WHERE id = :id;
-
 -- name: ticket_by_slug
 SELECT projection FROM ticket_rows WHERE repository_id = :repository_id AND slug = :slug;
 
@@ -304,11 +301,6 @@ WHERE ticket_id = :ticket_id
 ORDER BY command_key
 LIMIT :limit;
 
--- name: contract_command_count
-SELECT json_object('count', count(*))
-FROM contract_commands
-WHERE ticket_id = :ticket_id;
-
 -- name: record_receipt
 INSERT INTO receipts (
   contract_command_id, argv, outcome, exit, duration_ms, stdout_tail, stderr_tail, digest, head,
@@ -490,11 +482,6 @@ WHERE review_run_id = :review_run_id
 ORDER BY length(finding_key), finding_key
 LIMIT :limit;
 
--- name: review_finding_count
-SELECT json_object('count', count(*))
-FROM review_findings
-WHERE review_run_id = :review_run_id;
-
 -- name: upsert_review_disposition
 INSERT INTO review_dispositions (review_finding_id, decision, reason, by, at)
 VALUES (:review_finding_id, :decision, :reason, :by, :at)
@@ -518,12 +505,6 @@ JOIN review_dispositions AS d ON d.review_finding_id = f.id
 WHERE f.review_run_id = :review_run_id
 ORDER BY length(f.finding_key), f.finding_key
 LIMIT :limit;
-
--- name: review_disposition_count
-SELECT json_object('count', count(*))
-FROM review_findings AS f
-JOIN review_dispositions AS d ON d.review_finding_id = f.id
-WHERE f.review_run_id = :review_run_id;
 
 -- name: delete_review_dispositions
 DELETE FROM review_dispositions
@@ -557,13 +538,6 @@ JOIN review_outcomes AS o ON o.review_disposition_id = d.id
 WHERE f.review_run_id = :review_run_id
 ORDER BY length(f.finding_key), f.finding_key
 LIMIT :limit;
-
--- name: review_outcome_count
-SELECT json_object('count', count(*))
-FROM review_findings AS f
-JOIN review_dispositions AS d ON d.review_finding_id = f.id
-JOIN review_outcomes AS o ON o.review_disposition_id = d.id
-WHERE f.review_run_id = :review_run_id;
 
 -- name: delete_review_outcomes
 DELETE FROM review_outcomes

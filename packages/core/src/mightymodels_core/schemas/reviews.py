@@ -87,10 +87,6 @@ class UpsertReviewFindingParams(Struct, frozen=True, kw_only=True):
     conflict: str | None
 
 
-class RunParams(Struct, frozen=True, kw_only=True, gc=False):
-    review_run_id: int
-
-
 class RunLimitParams(Struct, frozen=True, kw_only=True, gc=False):
     review_run_id: int
     limit: int
@@ -169,10 +165,6 @@ class ReviewOutcomeRow(Struct, frozen=True, kw_only=True, gc=False):
     at: datetime
 
 
-class ReviewCountRow(Struct, frozen=True, kw_only=True, gc=False):
-    count: int
-
-
 RECORD_REVIEW_RUN = Query(
     name='record_review_run', params=RecordReviewRunParams, row=ReviewRunIdRow
 )
@@ -188,22 +180,17 @@ UPSERT_REVIEW_FINDING = Command(name='upsert_review_finding', params=UpsertRevie
 REVIEW_FINDINGS_OF_RUN = Query(
     name='review_findings_of_run', params=RunLimitParams, row=ReviewFindingRow
 )
-REVIEW_FINDING_COUNT = Query(name='review_finding_count', params=RunParams, row=ReviewCountRow)
 UPSERT_REVIEW_DISPOSITION = Command(
     name='upsert_review_disposition', params=UpsertReviewDispositionParams
 )
 REVIEW_DISPOSITIONS_OF_RUN = Query(
     name='review_dispositions_of_run', params=RunLimitParams, row=ReviewDispositionRow
 )
-REVIEW_DISPOSITION_COUNT = Query(
-    name='review_disposition_count', params=RunParams, row=ReviewCountRow
-)
 DELETE_REVIEW_DISPOSITIONS = Command(name='delete_review_dispositions', params=FindingKeysParams)
 UPSERT_REVIEW_OUTCOME = Command(name='upsert_review_outcome', params=UpsertReviewOutcomeParams)
 REVIEW_OUTCOMES_OF_RUN = Query(
     name='review_outcomes_of_run', params=RunLimitParams, row=ReviewOutcomeRow
 )
-REVIEW_OUTCOME_COUNT = Query(name='review_outcome_count', params=RunParams, row=ReviewCountRow)
 DELETE_REVIEW_OUTCOMES = Command(name='delete_review_outcomes', params=FindingKeysParams)
 
 DECLARATIONS: tuple[Declaration, ...] = (
@@ -214,13 +201,10 @@ DECLARATIONS: tuple[Declaration, ...] = (
     LATEST_REVIEW_RUN_OF_TICKET,
     UPSERT_REVIEW_FINDING,
     REVIEW_FINDINGS_OF_RUN,
-    REVIEW_FINDING_COUNT,
     UPSERT_REVIEW_DISPOSITION,
     REVIEW_DISPOSITIONS_OF_RUN,
-    REVIEW_DISPOSITION_COUNT,
     DELETE_REVIEW_DISPOSITIONS,
     UPSERT_REVIEW_OUTCOME,
     REVIEW_OUTCOMES_OF_RUN,
-    REVIEW_OUTCOME_COUNT,
     DELETE_REVIEW_OUTCOMES,
 )
