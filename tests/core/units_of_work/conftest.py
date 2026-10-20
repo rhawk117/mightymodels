@@ -7,7 +7,13 @@ from mightymodels_core.edge import create_database_spec
 from mightymodels_core.primitives import RepositoryKey, Slug
 from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.tickets import TicketAnswers
-from mightymodels_core.units_of_work import TicketWork
+from mightymodels_core.units_of_work import (
+    InvestigationWork,
+    JournalWork,
+    ReviewWork,
+    TaskWork,
+    TicketWork,
+)
 from mightymodels_core.workspace import workspace_at
 
 if TYPE_CHECKING:
@@ -15,6 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.database import Database
+    from mightymodels_core.primitives import Clock
     from mightymodels_core.workspace import Workspace
 
 
@@ -43,15 +50,39 @@ def workspace(tmp_path: Path) -> Workspace:
 
 
 @pytest.fixture
+def clock() -> Clock:
+    return create_fake_clock(datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC))
+
+
+@pytest.fixture
 def ticket_work(
-    database: Database, repository_key: RepositoryKey, workspace: Workspace
+    database: Database, repository_key: RepositoryKey, workspace: Workspace, clock: Clock
 ) -> TicketWork:
     return TicketWork(
-        database=database,
-        repository_key=repository_key,
-        workspace=workspace,
-        clock=create_fake_clock(datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)),
+        database=database, repository_key=repository_key, workspace=workspace, clock=clock
     )
+
+
+@pytest.fixture
+def investigation_work(
+    database: Database, repository_key: RepositoryKey, clock: Clock
+) -> InvestigationWork:
+    return InvestigationWork(database=database, repository_key=repository_key, clock=clock)
+
+
+@pytest.fixture
+def task_work(database: Database, repository_key: RepositoryKey, clock: Clock) -> TaskWork:
+    return TaskWork(database=database, repository_key=repository_key, clock=clock)
+
+
+@pytest.fixture
+def review_work(database: Database, repository_key: RepositoryKey, clock: Clock) -> ReviewWork:
+    return ReviewWork(database=database, repository_key=repository_key, clock=clock)
+
+
+@pytest.fixture
+def journal_work(database: Database, repository_key: RepositoryKey, clock: Clock) -> JournalWork:
+    return JournalWork(database=database, repository_key=repository_key, clock=clock)
 
 
 @pytest.fixture
