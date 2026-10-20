@@ -13,6 +13,7 @@ from .archive import (
     archived_review,
     create_archive_record,
 )
+from .archive_markdown import archive_markdown
 from .errors import (
     LiveWorkRemainsError,
     ShippedRequiredError,
@@ -67,6 +68,7 @@ __all__ = [
     'SqliteClosingRepository',
     'TicketMovedError',
     'TooManyGotchasError',
+    'archive_markdown',
     'archived_command',
     'archived_decisions',
     'archived_review',
