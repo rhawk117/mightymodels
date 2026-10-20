@@ -1,4 +1,4 @@
-"""The refusal a read unit of work adds to the ones the database already raises."""
+"""The refusals a unit of work adds to the ones the database already raises."""
 
 from mightymodels_core.primitives import StateError
 
@@ -10,3 +10,9 @@ class UnknownRepositoryError(StateError):
             f'no repository is recorded for {repository_key!r}; a write unit of work '
             'records it on first use'
         )
+
+
+class MissingTicketError(StateError):
+    def __init__(self, *, path: str) -> None:
+        self.path = path
+        super().__init__(f'{path} does not exist; run write first')
