@@ -163,10 +163,10 @@ class TestTaskBlockers:
 
         assert find_live_work(tasks=(VERIFIED, superseded)) == []
 
-    def test_a_residual_task_that_is_not_verified_is_not_a_plan_task_blocker(self) -> None:
+    def test_a_blocked_residual_task_blocks_closing(self) -> None:
         residual = create_task('R1', 'blocked')
 
-        assert find_live_work(tasks=(VERIFIED, residual)) == []
+        assert find_live_work(tasks=(VERIFIED, residual)) == ['R1 is blocked, not verified']
 
 
 class TestFactBlockers:

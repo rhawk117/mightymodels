@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.git.revisions import revision_error
 from mightymodels_core.primitives import redact_within
-from mightymodels_core.tasks.gates import get_plan_task_problem, is_plan_task
+from mightymodels_core.tasks.gates import get_plan_task_problem
 from mightymodels_core.ticket_closing.errors import ShippedRequiredError, TooManyGotchasError
 from mightymodels_core.ticket_closing.records import OneLinedClosing
 
@@ -72,13 +72,9 @@ class LiveWorkPolicy:
     review: LatestReview | None
     facts: CloseFacts
 
-    @property
-    def planned(self) -> list[TaskRecord]:
-        return [task for task in self.tasks if is_plan_task(task.key)]
-
     def get_task_blockers(self) -> list[str]:
-        never_started = [task for task in self.planned if task.status == 'pending']
-        started = [task for task in self.planned if task.status != 'pending']
+        never_started = [task for task in self.tasks if task.status == 'pending']
+        started = [task for task in self.tasks if task.status != 'pending']
         return [
             *problems_of(never_started),
             *([] if started else [NO_VERIFIED_WORK]),
