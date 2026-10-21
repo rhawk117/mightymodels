@@ -72,17 +72,28 @@ def stage_params_of(repository_id: int, slug: Slug, section: TicketSection) -> S
     )
 
 
+def row_of(unit: Unit, repository_id: int, slug: Slug) -> TicketRow | None:
+    return unit.one(TICKET_BY_SLUG, TicketSlugParams(repository_id=repository_id, slug=slug))
+
+
+def staged_row(unit: Unit, repository_id: int, slug: Slug) -> TicketRow:
+    row = row_of(unit, repository_id, slug)
+    if row is None:
+        raise NotStagedError(slug=slug)
+    return row
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class SqliteTicketRepository:
     unit: Unit
     repository_id: int
 
     def ticket(self, slug: Slug) -> TicketRecord | None:
-        row = self._row(slug)
+        row = row_of(self.unit, self.repository_id, slug)
         return None if row is None else record_of(row)
 
     def staged_ticket(self, slug: Slug) -> TicketRecord:
-        return record_of(self._staged_row(slug))
+        return record_of(staged_row(self.unit, self.repository_id, slug))
 
     def unclosed_ticket(self, slug: Slug) -> TicketRecord:
         record = self.staged_ticket(slug)
@@ -91,9 +102,9 @@ class SqliteTicketRepository:
         return record
 
     def stage(self, slug: Slug, section: TicketSection, declared: Sequence[str]) -> TicketRecord:
-        investigation_ids = [self._investigation_id(slug, key) for key in dict.fromkeys(declared)]
+        investigation_ids = [self.investigation_id(slug, key) for key in dict.fromkeys(declared)]
         self.unit.one(STAGE_TICKET, stage_params_of(self.repository_id, slug, section))
-        ticket_id = self._staged_row(slug).id
+        ticket_id = staged_row(self.unit, self.repository_id, slug).id
         links = [
             LinkTicketInvestigationParams(ticket_id=ticket_id, investigation_id=investigation_id)
             for investigation_id in investigation_ids
@@ -103,11 +114,11 @@ class SqliteTicketRepository:
 
     def mark_in_progress(self, slug: Slug) -> None:
         self.unclosed_ticket(slug)
-        self._set_status(slug, 'in-progress')
+        self.set_status(slug, 'in-progress')
 
     def mark_closed(self, slug: Slug) -> None:
         self.staged_ticket(slug)
-        self._set_status(slug, 'closed')
+        self.set_status(slug, 'closed')
 
     def unclosed_on_branch(self, branch: str) -> Slug | None:
         pair = self.unit.all(
@@ -122,18 +133,7 @@ class SqliteTicketRepository:
         )
         return [Slug(row.slug) for row in rows]
 
-    def _row(self, slug: Slug) -> TicketRow | None:
-        return self.unit.one(
-            TICKET_BY_SLUG, TicketSlugParams(repository_id=self.repository_id, slug=slug)
-        )
-
-    def _staged_row(self, slug: Slug) -> TicketRow:
-        row = self._row(slug)
-        if row is None:
-            raise NotStagedError(slug=slug)
-        return row
-
-    def _investigation_id(self, slug: Slug, investigation_key: str) -> int:
+    def investigation_id(self, slug: Slug, investigation_key: str) -> int:
         row = self.unit.one(
             INVESTIGATION_BY_KEY,
             InvestigationKeyParams(
@@ -144,7 +144,7 @@ class SqliteTicketRepository:
             raise UnknownInvestigationError(slug=slug, investigation_key=investigation_key)
         return row.id
 
-    def _set_status(self, slug: Slug, status: TicketStatus) -> None:
+    def set_status(self, slug: Slug, status: TicketStatus) -> None:
         self.unit.run(
             SET_TICKET_STATUS,
             SetTicketStatusParams(repository_id=self.repository_id, slug=slug, status=status),
