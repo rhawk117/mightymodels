@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mightymodels_core.investigations.ledger import linked_ledgers
-from mightymodels_core.reviews.services import ReviewDecisionService
 from mightymodels_core.ticket_closing.archive import ArchiveSources, create_archive_record
 from mightymodels_core.ticket_closing.errors import LiveWorkRemainsError, TicketMovedError
 from mightymodels_core.ticket_closing.policy import (
@@ -30,8 +29,7 @@ if TYPE_CHECKING:
     from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.investigations.repository import InvestigationRepository
     from mightymodels_core.primitives import Clock, Slug
-    from mightymodels_core.reviews.repository import ReviewDecisionRepository, ReviewRepository
-    from mightymodels_core.reviews.services import LatestReview
+    from mightymodels_core.reviews.services import LatestReview, ReviewDecisionService
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
     from mightymodels_core.ticket_closing.archive import ArchiveRecord
     from mightymodels_core.ticket_closing.records import CloseFacts, ClosingLines
@@ -70,8 +68,7 @@ class ClosingService:
     tasks: TaskRepository
     attempts: AttemptRepository
     contracts: ContractRepository
-    reviews: ReviewRepository
-    decisions: ReviewDecisionRepository
+    review_decisions: ReviewDecisionService
     investigations: InvestigationRepository
     closings: ClosingRepository
     clock: Clock
@@ -114,10 +111,7 @@ class ClosingService:
         return ClosedTicket(closing=closing, archive=archive)
 
     def latest_review(self, slug: Slug) -> LatestReview | None:
-        service = ReviewDecisionService(
-            reviews=self.reviews, decisions=self.decisions, clock=self.clock
-        )
-        return service.latest_review(slug)
+        return self.review_decisions.latest_review(slug)
 
     def live_work(
         self, ticket: TicketRecord, facts: CloseFacts, review: LatestReview | None

@@ -11,6 +11,7 @@ from mightymodels_core.investigations.tests.fakes import (
 )
 from mightymodels_core.primitives import RedactedTextTooLongError, Slug, redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
+from mightymodels_core.reviews.services import ReviewDecisionService
 from mightymodels_core.reviews.tests.fakes import (
     FakeReviewDecisionRepository,
     FakeReviewRepository,
@@ -121,8 +122,9 @@ def seed_investigation(ledger: InvestigationLedger) -> None:
 @pytest.fixture
 def service_harness() -> ServiceHarness:
     tickets = FakeTicketRepository(recorded_investigations=(LINKED,))
-    section = replace(create_ticket_section(), branch=SERVICE_BRANCH)
-    record = tickets.stage(SERVICE_SLUG, section, (LINKED,))
+    record = tickets.stage(
+        SERVICE_SLUG, replace(create_ticket_section(), branch=SERVICE_BRANCH), (LINKED,)
+    )
     task_ledger, review_ledger = TaskLedger(), ReviewLedger()
     investigation_ledger = InvestigationLedger()
     task_ledger.held[record.id, PLAN_TASK] = create_task()
@@ -134,16 +136,20 @@ def service_harness() -> ServiceHarness:
     )
     contracts.approve(record.id, [command], Approval(at=SERVICE_MOMENT, head='base001'))
     closings = FakeClosingRepository()
+    clock = create_fake_clock(SERVICE_MOMENT)
     service = ClosingService(
         tickets=tickets,
         tasks=FakeTaskRepository(ledger=task_ledger),
         attempts=FakeAttemptRepository(ledger=task_ledger),
         contracts=contracts,
-        reviews=FakeReviewRepository(ledger=review_ledger),
-        decisions=FakeReviewDecisionRepository(ledger=review_ledger),
+        review_decisions=ReviewDecisionService(
+            reviews=FakeReviewRepository(ledger=review_ledger),
+            decisions=FakeReviewDecisionRepository(ledger=review_ledger),
+            clock=clock,
+        ),
         investigations=FakeInvestigationRepository(ledger=investigation_ledger),
         closings=closings,
-        clock=create_fake_clock(SERVICE_MOMENT),
+        clock=clock,
     )
     return ServiceHarness(service=service, tickets=tickets, closings=closings, ticket_id=record.id)
 

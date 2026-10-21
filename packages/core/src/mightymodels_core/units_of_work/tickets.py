@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.investigations import SqliteInvestigationRepository
 from mightymodels_core.reviews import SqliteReviewDecisionRepository, SqliteReviewRepository
+from mightymodels_core.reviews.services import ReviewDecisionService
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository
 from mightymodels_core.ticket_closing import ClosingService, SqliteClosingRepository
 from mightymodels_core.tickets import (
@@ -104,13 +105,17 @@ class TicketWork:
         tickets = TicketService(
             tickets=ticket_store, investigations=investigations, clock=self.clock
         )
+        review_decisions = ReviewDecisionService(
+            reviews=SqliteReviewRepository(unit=unit, repository_id=repository_id),
+            decisions=SqliteReviewDecisionRepository(unit=unit, repository_id=repository_id),
+            clock=self.clock,
+        )
         closing = ClosingService(
             tickets=ticket_store,
             tasks=SqliteTaskRepository(unit=unit),
             attempts=SqliteAttemptRepository(unit=unit),
             contracts=SqliteContractRepository(unit=unit),
-            reviews=SqliteReviewRepository(unit=unit, repository_id=repository_id),
-            decisions=SqliteReviewDecisionRepository(unit=unit, repository_id=repository_id),
+            review_decisions=review_decisions,
             investigations=investigations,
             closings=SqliteClosingRepository(unit=unit),
             clock=self.clock,

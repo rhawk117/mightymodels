@@ -76,9 +76,9 @@ def write_review_stores(unit: TicketWriteUnit, slug: Slug) -> None:
         by=redact('owner'),
         at=MOMENT,
     )
-    unit.closing.reviews.record_run(run)
-    unit.closing.reviews.record_findings(REVIEW_RUN, [finding])
-    unit.closing.decisions.record_dispositions(REVIEW_RUN, [decided])
+    unit.closing.review_decisions.reviews.record_run(run)
+    unit.closing.review_decisions.reviews.record_findings(REVIEW_RUN, [finding])
+    unit.closing.review_decisions.decisions.record_dispositions(REVIEW_RUN, [decided])
 
 
 def fail_after_writes(ticket_work: TicketWork, slug: Slug) -> None:
@@ -121,8 +121,8 @@ class TestWriteUnitRollback:
             assert unit.closing.tasks.task(failed_ticket_id, TASK) is None
             assert unit.closing.attempts.failed_fixes(failed_ticket_id, TASK) == []
             assert unit.closing.contracts.commands(failed_ticket_id) == []
-            assert unit.closing.reviews.run(REVIEW_RUN) is None
-            assert unit.closing.decisions.dispositions(REVIEW_RUN) == []
+            assert unit.closing.review_decisions.reviews.run(REVIEW_RUN) is None
+            assert unit.closing.review_decisions.decisions.dispositions(REVIEW_RUN) == []
             assert unit.closing.closings.closing(failed_ticket_id) is None
 
     @pytest.mark.usefixtures('failed_ticket_id')
