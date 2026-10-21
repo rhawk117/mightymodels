@@ -5,6 +5,7 @@ from .errors import MissingTicketError, UnknownRepositoryError
 from .investigations import InvestigationUnit, InvestigationWork
 from .journal import JournalUnit, JournalWork
 from .reviews import ReviewUnit, ReviewWork
+from .snapshot import SnapshotRead, SnapshotUnit
 from .tasks import TaskUnit, TaskWork
 from .tickets import TicketFiles, TicketReadUnit, TicketWork, TicketWriteUnit
 
@@ -17,6 +18,8 @@ __all__ = [
     'MissingTicketError',
     'ReviewUnit',
     'ReviewWork',
+    'SnapshotRead',
+    'SnapshotUnit',
     'TaskUnit',
     'TaskWork',
     'TicketFiles',
