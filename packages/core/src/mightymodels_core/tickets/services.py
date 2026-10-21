@@ -8,18 +8,14 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import REVIEWER_AGENTS, redact
-from mightymodels_core.tickets.errors import (
-    BranchNameRequiredError,
-    DetachedHeadError,
-    TicketExistsError,
-)
+from mightymodels_core.tickets.errors import TicketExistsError
 from mightymodels_core.tickets.policy import (
     PRIMARY_AGENT,
     TicketOptions,
     TicketPolicy,
     declared_slugs,
 )
-from mightymodels_core.tickets.records import BranchChoice, TicketSection, Tracker
+from mightymodels_core.tickets.records import TicketSection, Tracker
 from mightymodels_core.workspace import (
     CompanionDocsFile,
     HandoffContextFile,
@@ -129,18 +125,6 @@ class TicketService:
             raise rendered
 
         return rendered
-
-    def branch_named(self, choice: BranchChoice, *, name: str, current: str | None) -> str:
-        if choice is BranchChoice.NEW:
-            if not name.strip():
-                raise BranchNameRequiredError
-
-            return name.strip()
-
-        if current is None:
-            raise DetachedHeadError
-
-        return current
 
     def show(self, slug: Slug) -> TicketRecord:
         return self.tickets.staged_ticket(slug)

@@ -5,8 +5,7 @@ a ticket by the type alone.
 """
 
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -44,9 +43,7 @@ class TicketRecord:
     investigations: tuple[str, ...]
 
 
-class BranchChoice(StrEnum):
-    CURRENT = 'current'
-    NEW = 'new'
+type BranchChoice = Literal['current', 'new']
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

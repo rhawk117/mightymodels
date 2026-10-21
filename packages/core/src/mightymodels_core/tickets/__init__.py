@@ -9,7 +9,13 @@ from .errors import (
     TicketExistsError,
     UnknownInvestigationError,
 )
-from .policy import TicketOptions, TicketPolicy, declared_slugs
+from .policy import (
+    TicketOptions,
+    TicketPolicy,
+    branch_of,
+    declared_slugs,
+    get_branch_problem,
+)
 from .records import (
     BranchChoice,
     TicketAnswers,
@@ -43,5 +49,7 @@ __all__ = [
     'TicketSource',
     'Tracker',
     'UnknownInvestigationError',
+    'branch_of',
     'declared_slugs',
+    'get_branch_problem',
 ]

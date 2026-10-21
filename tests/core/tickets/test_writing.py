@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.primitives import Slug
 from mightymodels_core.tickets import (
-    BranchChoice,
     BranchNameRequiredError,
     DetachedHeadError,
     InvalidTicketError,
     TicketExistsError,
     TicketSource,
+    branch_of,
+    get_branch_problem,
 )
 from mightymodels_core.workspace import LoneSurrogateError, TicketFile, parse_ticket_file
 
@@ -18,6 +19,7 @@ from .conftest import SERVICE_MOMENT, create_answers
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.tickets import TicketAnswers, TicketService, TicketSlot
+    from mightymodels_core.tickets.records import BranchChoice
 
 SLUG = Slug('add-widget')
 SOURCE_PATH = '.mightymodels/add-widget/ticket.yml'
@@ -85,21 +87,21 @@ def branch_named_cases() -> pytest.MarkDecorator:
     scenarios = [
         BranchRequest(
             name='new-name-is-stripped',
-            choice=BranchChoice.NEW,
+            choice='new',
             typed='  feat/new  ',
             current='main',
             expected='feat/new',
         ),
         BranchRequest(
             name='new-ignores-a-detached-head',
-            choice=BranchChoice.NEW,
+            choice='new',
             typed='feat/new',
             current=None,
             expected='feat/new',
         ),
         BranchRequest(
             name='current-takes-git-branch',
-            choice=BranchChoice.CURRENT,
+            choice='current',
             typed='',
             current='main',
             expected='main',
@@ -112,21 +114,21 @@ def branch_refusal_cases() -> pytest.MarkDecorator:
     scenarios = [
         BranchRefusal(
             name='new-blank-name',
-            choice=BranchChoice.NEW,
+            choice='new',
             typed='   ',
             current='main',
             error_type=BranchNameRequiredError,
         ),
         BranchRefusal(
             name='new-empty-name',
-            choice=BranchChoice.NEW,
+            choice='new',
             typed='',
             current='main',
             error_type=BranchNameRequiredError,
         ),
         BranchRefusal(
             name='current-on-a-detached-head',
-            choice=BranchChoice.CURRENT,
+            choice='current',
             typed='',
             current=None,
             error_type=DetachedHeadError,
@@ -229,14 +231,14 @@ class TestWrite:
 
 class TestBranchNamed:
     @branch_named_cases()
-    def test_the_branch_is_named(self, service: TicketService, named: BranchRequest) -> None:
-        branch = service.branch_named(named.choice, name=named.typed, current=named.current)
+    def test_the_branch_is_named(self, named: BranchRequest) -> None:
+        problem = get_branch_problem(named.choice, named.typed, named.current)
 
-        assert branch == named.expected
+        assert problem is None
+        assert branch_of(named.choice, named.typed, named.current) == named.expected
 
     @branch_refusal_cases()
-    def test_an_unnameable_branch_is_refused(
-        self, service: TicketService, refused: BranchRefusal
-    ) -> None:
-        with pytest.raises(refused.error_type):
-            service.branch_named(refused.choice, name=refused.typed, current=refused.current)
+    def test_an_unnameable_branch_is_refused(self, refused: BranchRefusal) -> None:
+        problem = get_branch_problem(refused.choice, refused.typed, refused.current)
+
+        assert type(problem) is refused.error_type

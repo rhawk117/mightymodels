@@ -15,12 +15,17 @@ from mightymodels_core.primitives import (
     parse_slug,
 )
 from mightymodels_core.primitives.routing import create_routing_table
-from mightymodels_core.tickets.errors import InvalidTicketError
+from mightymodels_core.tickets.errors import (
+    BranchNameRequiredError,
+    DetachedHeadError,
+    InvalidTicketError,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterable
 
     from mightymodels_core.primitives import AgentName, RoutingTable, Slug
+    from mightymodels_core.tickets.records import BranchChoice
     from mightymodels_core.workspace import TicketFile
 
 PRIMARY_AGENT = 'primary-agent'
@@ -55,6 +60,22 @@ def get_investigation_problem(key: str, unrecorded: Collection[Slug]) -> str | N
         return f'investigation {key} has no ledger'
 
     return None
+
+
+def get_branch_problem(
+    choice: BranchChoice, name: str, current: str | None
+) -> BranchNameRequiredError | DetachedHeadError | None:
+    if choice == 'new':
+        return None if name.strip() else BranchNameRequiredError()
+
+    return None if current is not None else DetachedHeadError()
+
+
+def branch_of(choice: BranchChoice, name: str, current: str | None) -> str:
+    if choice == 'new':
+        return name.strip()
+
+    return current or ''
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
