@@ -21,9 +21,9 @@ if TYPE_CHECKING:
     from mightymodels_core.crashouts.records import CrashoutRecord
     from mightymodels_core.crashouts.repository import CrashoutRepository
     from mightymodels_core.primitives import Clock, RedactedText
-    from mightymodels_core.schemas.crashouts import CrashoutSeverity, Verdict
     from mightymodels_core.similarity.records import Duplicate
     from mightymodels_core.similarity.repository import SimilarityRepository
+    from mightymodels_core.vocabulary.crashouts import CrashoutSeverity, Verdict
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

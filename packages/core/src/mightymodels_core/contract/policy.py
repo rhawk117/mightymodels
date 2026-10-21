@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.contract.records import ApprovedCommand, Receipt, RecordedCommand
     from mightymodels_core.primitives import Slug
-    from mightymodels_core.schemas.contract import Outcome
+    from mightymodels_core.vocabulary.contract import Outcome
 
 type ReceiptState = Literal['never-run', 'stale', 'at-head']
 type CommandShapeIssue = (

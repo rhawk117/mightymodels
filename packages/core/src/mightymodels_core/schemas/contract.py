@@ -1,20 +1,15 @@
 """The approved contract commands of a ticket and the receipts recorded against them."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.contract import Outcome, Phase
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type Outcome = Literal['pass', 'fail', 'timeout', 'not-found', 'refused', 'undecodable']
-
-
-type Phase = Literal['planning', 'task', 'review', 'landing']
 
 
 class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText
-    from mightymodels_core.schemas.crashouts import CrashoutSeverity, Verdict
+    from mightymodels_core.vocabulary.crashouts import CrashoutSeverity, Verdict
 
 JOURNAL_WINDOW = ReadLimit(rows=100, kept='crashouts')
 

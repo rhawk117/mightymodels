@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText, TaskId
-    from mightymodels_core.schemas.contract import Outcome, Phase
+    from mightymodels_core.vocabulary.contract import Outcome, Phase
 
 COMMANDS = ReadLimit(rows=1000, kept='contract commands')
 
