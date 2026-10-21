@@ -52,10 +52,10 @@ class SourcesRequiredError(StateError):
 
 
 class MalformedSourceError(StateError):
-    def __init__(self, *, index: int, source: str) -> None:
+    def __init__(self, *, index: int, source: str, expected: str) -> None:
         self.index = index
         self.source = source
-        super().__init__(finding_refusal(index, f'source {source!r} must look like MV-1 or UB-1'))
+        super().__init__(finding_refusal(index, f'source {source!r} must look like {expected}'))
 
 
 class FieldRequiredError(StateError):

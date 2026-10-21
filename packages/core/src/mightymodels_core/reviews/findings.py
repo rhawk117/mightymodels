@@ -42,7 +42,6 @@ type FindingProblem = (
     | UnsupportedQualityError
 )
 
-SOURCE_ID = re.compile(r'^(MV|UB)-\d+$')
 LOCATION = re.compile(r'^(?P<path>[^\s:]+):(?P<start>\d+)(?:-(?P<end>\d+))?$')
 UNNUMBERED = 'F0'
 
@@ -57,6 +56,15 @@ class FindingOptions:
     conflict_gap: int = 2
     first_line: int = 1
     ladder: tuple[StoredSeverity, ...] = ('Critical', 'High', 'Medium', 'Low')
+    source_prefixes: tuple[str, ...]
+
+    @property
+    def source_id(self) -> re.Pattern[str]:
+        return re.compile(rf'^({"|".join(map(re.escape, self.source_prefixes))})-\d+$')
+
+    @property
+    def source_example(self) -> str:
+        return ' or '.join(f'{prefix}-1' for prefix in self.source_prefixes)
 
     def rank(self, severity: StoredSeverity) -> int:
         return self.ladder.index(severity)
@@ -113,9 +121,13 @@ class FindingCheck:
         if not self.sources:
             return SourcesRequiredError(index=self.index)
 
-        malformed = next((item for item in self.sources if not SOURCE_ID.match(item)), None)
+        malformed = next(
+            (item for item in self.sources if not self.options.source_id.match(item)), None
+        )
         if malformed is not None:
-            return MalformedSourceError(index=self.index, source=malformed)
+            return MalformedSourceError(
+                index=self.index, source=malformed, expected=self.options.source_example
+            )
 
         return None
 
@@ -236,9 +248,8 @@ class FindingMerge:
 def fold_findings(
     held: Sequence[FindingRecord],
     incoming: Sequence[IncomingFinding],
-    options: FindingOptions | None = None,
+    options: FindingOptions,
 ) -> list[FindingRecord]:
-    options = options or FindingOptions()
     checks = [
         FindingCheck(index=index, finding=finding, options=options)
         for index, finding in enumerate(incoming)

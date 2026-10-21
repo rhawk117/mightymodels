@@ -7,7 +7,6 @@ import pytest
 from mightymodels_core.primitives import RedactedTextTooLongError, redact
 from mightymodels_core.reviews import (
     FieldRequiredError,
-    FindingOptions,
     FindingRecord,
     IncomingEvidence,
     IncomingFinding,
@@ -21,7 +20,11 @@ from mightymodels_core.reviews import (
     stored_severity,
 )
 from mightymodels_core.reviews.findings import finding_number
-from mightymodels_core.reviews.policy.review import create_source_personas, persona_of_source
+from mightymodels_core.reviews.policy.review import (
+    create_finding_options,
+    create_source_personas,
+    persona_of_source,
+)
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -103,7 +106,7 @@ def sources_cases() -> pytest.MarkDecorator:
 
 
 def fold_one(held: list[FindingRecord], finding: IncomingFinding) -> list[FindingRecord]:
-    return fold_findings(held, [finding])
+    return fold_findings(held, [finding], create_finding_options())
 
 
 class TestFindingChecks:
@@ -120,7 +123,11 @@ class TestFindingChecks:
 
     def test_the_refusal_names_the_finding_and_its_sources(self) -> None:
         with pytest.raises(LineBelowOneError) as raised:
-            fold_findings([], [incoming_finding(), incoming_finding(location='src/q.py:0')])
+            fold_findings(
+                [],
+                [incoming_finding(), incoming_finding(location='src/q.py:0')],
+                create_finding_options(),
+            )
 
         assert str(raised.value) == (
             'finding 1: location line 0 is below 1 (UB-1); nothing was written'
@@ -144,7 +151,7 @@ class TestTextChecks:
         assert raised.value.field == 'evidence cite'
 
     def test_text_that_redaction_lengthens_past_the_limit_is_refused(self) -> None:
-        options = FindingOptions(prose_limit=15)
+        options = replace(create_finding_options(), prose_limit=15)
         short_secret = incoming_finding(title='password=abcd')
 
         with pytest.raises(RedactedTextTooLongError):
@@ -190,12 +197,17 @@ class TestSourceAndQualityChecks:
 
     def test_a_refused_batch_places_nothing(self) -> None:
         with pytest.raises(LocationShapeError):
-            fold_findings([], [incoming_finding(), incoming_finding(location='nowhere')])
+            fold_findings(
+                [],
+                [incoming_finding(), incoming_finding(location='nowhere')],
+                create_finding_options(),
+            )
 
 
 class TestStoredSeverity:
     def test_a_blocker_ranks_without_raising(self) -> None:
-        assert FindingOptions().rank(stored_severity('Blocker')) == FindingOptions().rank('High')
+        options = create_finding_options()
+        assert options.rank(stored_severity('Blocker')) == options.rank('High')
 
 
 class TestFindingNumbering:
@@ -310,7 +322,7 @@ class TestFindingMerge:
         first = incoming_finding(sources=('UB-1',), location='src/q.py:1-5')
         second = incoming_finding(sources=('UB-2',), location='src/q.py:5-9')
 
-        (stored,) = fold_findings([], [first, second])
+        (stored,) = fold_findings([], [first, second], create_finding_options())
 
         assert (stored.key, stored.sources) == ('F1', ('UB-1', 'UB-2'))
 
@@ -321,6 +333,6 @@ class TestFindingMerge:
             incoming_finding(location='src/a.py:1', sources=('UB-3',)),
         ]
 
-        stored = fold_findings(held, batch)
+        stored = fold_findings(held, batch, create_finding_options())
 
         assert [finding.key for finding in stored] == ['F2', 'F3']

@@ -17,6 +17,7 @@ from mightymodels_core.reviews import (
     UnreadableHeadingError,
     parse_report,
 )
+from mightymodels_core.reviews.policy.review import create_persona_specs
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -47,11 +48,15 @@ def merge_vader_block(
 
 def uncle_bob_block() -> str:
     return dedent("""\
-        #### UB-1 | [SRP] Mixed duties — `src/b.py:5-9`
+        #### UB-1 | [SRP] Mixed duties \u2014 `src/b.py:5-9`
         - Evidence (metric): fan-out 14
         - Fix: split it
         - Verify: run the tests
         """)
+
+
+def read_report(text: str, persona: Persona) -> list[IncomingFinding]:
+    return parse_report(text, persona, create_persona_specs())
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -79,7 +84,7 @@ def dimension_cases() -> pytest.MarkDecorator:
 
 class TestParseReport:
     def parse_merge_vader(self, *blocks: str, severity: str = 'High') -> list[IncomingFinding]:
-        return parse_report(merge_vader_report(*blocks, severity=severity), 'merge-vader')
+        return read_report(merge_vader_report(*blocks, severity=severity), 'merge-vader')
 
     def test_merge_vader_finding_is_read_field_for_field(self) -> None:
         findings = self.parse_merge_vader(merge_vader_block())
@@ -101,7 +106,7 @@ class TestParseReport:
     def test_uncle_bob_finding_is_read_field_for_field(self) -> None:
         report = merge_vader_report(uncle_bob_block(), severity='Medium')
 
-        findings = parse_report(report, 'uncle-bob')
+        findings = read_report(report, 'uncle-bob')
 
         assert findings == [
             IncomingFinding(
@@ -126,7 +131,7 @@ class TestParseReport:
     def test_uncle_bob_heading_without_location_leaves_it_empty(self) -> None:
         block = '#### UB-2 | Mixed duties\n'
 
-        [finding] = parse_report(merge_vader_report(block), 'uncle-bob')
+        [finding] = read_report(merge_vader_report(block), 'uncle-bob')
 
         assert finding.location == ''
 
@@ -142,7 +147,7 @@ class TestParseReport:
             '## Findings\n### Low\n#### MV-1 | sdlc | One\n### blocker\n#### MV-2 | sdlc | Two\n'
         )
 
-        findings = parse_report(report, 'merge-vader')
+        findings = read_report(report, 'merge-vader')
 
         assert [finding.severity for finding in findings] == ['Low', 'Blocker']
 
@@ -151,13 +156,13 @@ class TestParseReport:
             '## Summary\n#### not a finding\n## Findings\n### High\n## Verdict\n#### MV-9 | x\n'
         )
 
-        assert parse_report(report, 'merge-vader') == []
+        assert read_report(report, 'merge-vader') == []
 
 
 class TestRefusedReports:
     def refusal(self, report: str, persona: Persona = 'merge-vader') -> Exception:
         with pytest.raises(Exception, match='nothing was written') as caught:
-            parse_report(report, persona)
+            read_report(report, persona)
         return caught.value
 
     def test_report_without_a_findings_section_is_refused(self) -> None:

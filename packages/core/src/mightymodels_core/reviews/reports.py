@@ -14,7 +14,7 @@ review service adds it.
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from mightymodels_core.reviews.errors import (
     EvidenceKindError,
@@ -30,8 +30,13 @@ from mightymodels_core.reviews.records import IncomingEvidence, IncomingFinding
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from mightymodels_core.reviews.policy import Persona
-    from mightymodels_core.schemas.reviews import EvidenceKind, FindingKind, FindingSeverity
+    from mightymodels_core.reviews.policy.review import Persona, PersonaSpecs
+    from mightymodels_core.schemas.reviews import (
+        Emphasis,
+        EvidenceKind,
+        FindingKind,
+        FindingSeverity,
+    )
 
 FINDINGS_HEADING = '## Findings'
 SECTION_HEADING = '## '
@@ -41,7 +46,9 @@ BLOCK_HEADING = re.compile(r'^####\s+(?P<id>[A-Z]+-\d+)\s*\|\s*(?P<rest>.+?)\s*$
 BULLET = re.compile(
     r'^-\s+(?P<key>[A-Za-z][A-Za-z ]*?)(?:\s+\((?P<kind>[^)]*)\))?:\s*(?P<value>.*)$'
 )
-BOB_HEADING = re.compile(r'^(?:\[[^\]]+\]\s*)?(?P<title>.+)\s+[—–-]+\s+`(?P<location>[^`]+)`$')
+BOB_HEADING = re.compile(
+    r'^(?:\[[^\]]+\]\s*)?(?P<title>.+)\s+[\u2014\u2013-]+\s+`(?P<location>[^`]+)`$'
+)
 
 SEVERITIES: tuple[FindingSeverity, ...] = ('Blocker', 'Critical', 'High', 'Medium', 'Low')
 EVIDENCE_KINDS: tuple[EvidenceKind, ...] = ('metric', 'idiom', 'convention')
@@ -74,10 +81,6 @@ class Basis:
     location: str
     kind: FindingKind
     security: bool
-
-
-def id_prefix(persona: Persona) -> str:
-    return 'MV-' if persona == 'merge-vader' else 'UB-'
 
 
 def findings_section(lines: Sequence[str]) -> Sequence[str]:
@@ -159,32 +162,47 @@ def dimension_kind(dimension: str) -> tuple[FindingKind, bool] | None:
     return None
 
 
-def merge_vader_basis(heading: Heading, bullets: Bullets) -> Basis:
-    dimension, separator, title = heading.rest.partition('|')
-    if not separator:
-        raise UnreadableHeadingError(heading=f'#### {heading.source} | {heading.rest}')
-
-    named = dimension.strip().lower()
-    kind_and_security = dimension_kind(named)
-    if kind_and_security is None:
-        raise UnknownDimensionError(index=heading.index, sources=[heading.source], dimension=named)
-
-    kind, security = kind_and_security
-    location = pointer_location(bullets.get(LOCATION_KEY, ''))
-    return Basis(title=title.strip(), location=location, kind=kind, security=security)
+class BasisParser(Protocol):
+    def basis(self, heading: Heading, bullets: Bullets, /) -> Basis: ...
 
 
-def uncle_bob_basis(heading: Heading) -> Basis:
-    named = BOB_HEADING.match(heading.rest)
-    if named is None:
-        return Basis(title=heading.rest, location='', kind='quality', security=False)
+@dataclass(slots=True, kw_only=True, frozen=True)
+class PersonaSpec:
+    prefix: str
+    parser: BasisParser
+    weights: Mapping[Emphasis, float]
 
-    return Basis(
-        title=named['title'].strip(),
-        location=named['location'].strip(),
-        kind='quality',
-        security=False,
-    )
+
+class MergeVaderBasis:
+    def basis(self, heading: Heading, bullets: Bullets, /) -> Basis:
+        dimension, separator, title = heading.rest.partition('|')
+        if not separator:
+            raise UnreadableHeadingError(heading=f'#### {heading.source} | {heading.rest}')
+
+        named = dimension.strip().lower()
+        kind_and_security = dimension_kind(named)
+        if kind_and_security is None:
+            raise UnknownDimensionError(
+                index=heading.index, sources=[heading.source], dimension=named
+            )
+
+        kind, security = kind_and_security
+        location = pointer_location(bullets.get(LOCATION_KEY, ''))
+        return Basis(title=title.strip(), location=location, kind=kind, security=security)
+
+
+class UncleBobBasis:
+    def basis(self, heading: Heading, _bullets: Bullets, /) -> Basis:
+        named = BOB_HEADING.match(heading.rest)
+        if named is None:
+            return Basis(title=heading.rest, location='', kind='quality', security=False)
+
+        return Basis(
+            title=named['title'].strip(),
+            location=named['location'].strip(),
+            kind='quality',
+            security=False,
+        )
 
 
 def typed_evidence(heading: Heading, bullets: Bullets) -> IncomingEvidence | None:
@@ -203,32 +221,36 @@ def typed_evidence(heading: Heading, bullets: Bullets) -> IncomingEvidence | Non
     return IncomingEvidence(kind=named, cite=cite)
 
 
-def finding_of(index: int, block: Block, persona: Persona) -> IncomingFinding:
-    named = BLOCK_HEADING.match(block.heading)
-    if named is None:
-        raise UnreadableHeadingError(heading=block.heading)
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ReportReader:
+    persona: Persona
+    spec: PersonaSpec
 
-    if not named['id'].startswith(id_prefix(persona)):
-        raise ForeignSourceError(index=index, sources=[named['id']], persona=persona)
+    def finding_of(self, index: int, block: Block) -> IncomingFinding:
+        named = BLOCK_HEADING.match(block.heading)
+        if named is None:
+            raise UnreadableHeadingError(heading=block.heading)
 
-    heading = Heading(index=index, source=named['id'], rest=named['rest'])
-    bullets = bullets_of(block.body)
-    basis = (
-        uncle_bob_basis(heading) if persona == 'uncle-bob' else merge_vader_basis(heading, bullets)
-    )
-    return IncomingFinding(
-        sources=(heading.source,),
-        severity=block.severity,
-        kind=basis.kind,
-        security=basis.security,
-        title=basis.title,
-        location=basis.location,
-        fix=bullets.get(FIX_KEY, ''),
-        verify=bullets.get(VERIFY_KEY, ''),
-        evidence=typed_evidence(heading, bullets),
-    )
+        if not named['id'].startswith(f'{self.spec.prefix}-'):
+            raise ForeignSourceError(index=index, sources=[named['id']], persona=self.persona)
+
+        heading = Heading(index=index, source=named['id'], rest=named['rest'])
+        bullets = bullets_of(block.body)
+        basis = self.spec.parser.basis(heading, bullets)
+        return IncomingFinding(
+            sources=(heading.source,),
+            severity=block.severity,
+            kind=basis.kind,
+            security=basis.security,
+            title=basis.title,
+            location=basis.location,
+            fix=bullets.get(FIX_KEY, ''),
+            verify=bullets.get(VERIFY_KEY, ''),
+            evidence=typed_evidence(heading, bullets),
+        )
 
 
-def parse_report(text: str, persona: Persona) -> list[IncomingFinding]:
+def parse_report(text: str, persona: Persona, specs: PersonaSpecs) -> list[IncomingFinding]:
+    reader = ReportReader(persona=persona, spec=specs[persona])
     blocks = blocks_of(findings_section(text.splitlines()))
-    return [finding_of(index, block, persona) for index, block in enumerate(blocks)]
+    return [reader.finding_of(index, block) for index, block in enumerate(blocks)]

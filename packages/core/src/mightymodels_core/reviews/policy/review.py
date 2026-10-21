@@ -23,6 +23,7 @@ from mightymodels_core.reviews.errors import (
 )
 from mightymodels_core.reviews.findings import FindingOptions, number_of
 from mightymodels_core.reviews.records import ReviewRunRecord
+from mightymodels_core.reviews.reports import MergeVaderBasis, PersonaSpec, UncleBobBasis
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, Sequence
@@ -40,23 +41,40 @@ type WeightsIssue = WeightsMissingError | WeightRangeError | WeightSumError
 type StartIssue = TargetIssue | WeightsIssue | PersonaChoiceError
 type Presets = dict[Emphasis, dict[str, float]]
 type SourcePersonas = dict[str, Persona]
+type PersonaSpecs = dict[Persona, PersonaSpec]
 
 
-def create_presets() -> Presets:
+def create_persona_specs() -> PersonaSpecs:
     return {
-        'release-readiness': {'merge-vader': 0.7, 'uncle-bob': 0.3},
-        'maintainability': {'merge-vader': 0.3, 'uncle-bob': 0.7},
-        'balanced': {'merge-vader': 0.5, 'uncle-bob': 0.5},
+        'merge-vader': PersonaSpec(
+            prefix='MV',
+            parser=MergeVaderBasis(),
+            weights={'release-readiness': 0.7, 'maintainability': 0.3, 'balanced': 0.5},
+        ),
+        'uncle-bob': PersonaSpec(
+            prefix='UB',
+            parser=UncleBobBasis(),
+            weights={'release-readiness': 0.3, 'maintainability': 0.7, 'balanced': 0.5},
+        ),
     }
 
 
+def create_presets() -> Presets:
+    specs = create_persona_specs()
+    emphases = ('release-readiness', 'maintainability', 'balanced')
+    return {e: {persona: spec.weights[e] for persona, spec in specs.items()} for e in emphases}
+
+
 def create_source_personas() -> SourcePersonas:
-    return {'MV': 'merge-vader', 'UB': 'uncle-bob'}
+    return {spec.prefix: persona for persona, spec in create_persona_specs().items()}
+
+
+def create_finding_options() -> FindingOptions:
+    return FindingOptions(source_prefixes=tuple(s.prefix for s in create_persona_specs().values()))
 
 
 def persona_of_source(source: str, personas: SourcePersonas) -> Persona:
-    prefix, _, _ = source.partition('-')
-    return personas[prefix]
+    return personas[source.partition('-')[0]]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -69,7 +87,8 @@ class ReviewOptions:
     closed_by_decision: tuple[Decision, ...] = ('dismiss',)
     presets: Presets = field(default_factory=create_presets)
     source_personas: SourcePersonas = field(default_factory=create_source_personas)
-    findings: FindingOptions = field(default_factory=FindingOptions)
+    specs: PersonaSpecs = field(default_factory=create_persona_specs)
+    findings: FindingOptions = field(default_factory=create_finding_options)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
