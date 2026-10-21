@@ -84,8 +84,7 @@ def key_of(line: SourceLine) -> str:
     return line.text.partition(':')[0]
 
 
-def block_end(lines: Sequence[SourceLine], key: str, line_count: int) -> tuple[int, int]:
-    """Return the line the key's block starts on and the last line it holds."""
+def block_span(lines: Sequence[SourceLine], key: str, line_count: int) -> tuple[int, int]:
     after_file = line_count + 1
     top_level = [line for line in lines if not line.indent]
     start = next((line.number for line in top_level if key_of(line) == key), after_file)
@@ -101,7 +100,7 @@ def with_context(source: str, context: Sequence[str]) -> str | LoneSurrogateErro
     raw = split_lines(source)
     numbered = (source_line(number, text) for number, text in enumerate(raw, 1))
     lines = [line for line in numbered if isinstance(line, SourceLine)]
-    start, last = block_end(lines, CONTEXT_KEY, len(raw))
+    start, last = block_span(lines, CONTEXT_KEY, len(raw))
     updated = [*raw[: start - 1], *list_lines(CONTEXT_KEY, context), *raw[last:]]
     return '\n'.join(updated) + '\n'
 

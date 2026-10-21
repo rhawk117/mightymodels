@@ -1,5 +1,6 @@
 import re
 import time
+from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, get_args
@@ -16,6 +17,7 @@ from mightymodels_core.primitives import (
     redaction_of,
     redaction_within,
 )
+from mightymodels_core.primitives.redaction import default_secret_patterns
 
 if TYPE_CHECKING:
     from _pytest.mark.structures import ParameterSet
@@ -131,6 +133,12 @@ class TestEachPattern:
             'assignment',
         ]
 
+    def test_default_patterns_cannot_be_changed(self) -> None:
+        patterns = default_secret_patterns()
+
+        assert not isinstance(patterns.by_name, MutableMapping)
+        assert 'add' not in dir(patterns)
+
     def test_leaves_text_without_a_secret_alone(self) -> None:
         assert redact('nothing to hide here') == 'nothing to hide here'
 
@@ -216,11 +224,11 @@ class TestRedactionWithinALimit:
 
 class TestRedactedTextConstruction:
     def test_redact_is_the_only_constructor_in_the_source(self) -> None:
-        constructors = [
+        constructors = {
             path.name
             for path in SOURCE.rglob('*.py')
             for line in path.read_text().splitlines()
             if 'RedactedText(' in line and 'NewType(' not in line
-        ]
+        }
 
-        assert constructors == ['redaction.py']
+        assert constructors == {'redaction.py'}

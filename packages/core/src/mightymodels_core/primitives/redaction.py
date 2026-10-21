@@ -7,11 +7,15 @@ is never cut to fit and the secret is never kept.
 """
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cache
-from typing import Literal, NewType
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Literal, NewType
 
 from .errors import RedactedTextTooLongError
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 RedactedText = NewType('RedactedText', str)
 
@@ -31,12 +35,7 @@ type PatternName = Literal[
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class SecretPatterns:
-    """The secret patterns by name; they apply in the order they were added."""
-
-    by_name: dict[PatternName, re.Pattern[str]] = field(default_factory=dict)
-
-    def add(self, name: PatternName, source: str, flags: int = 0) -> None:
-        self.by_name[name] = re.compile(source, flags)
+    by_name: Mapping[PatternName, re.Pattern[str]]
 
     def scrub(self, text: str) -> tuple[str, int]:
         hits = 0
@@ -47,28 +46,27 @@ class SecretPatterns:
 
 
 def create_secret_patterns() -> SecretPatterns:
-    patterns = SecretPatterns()
-    patterns.add(
-        'private-key',
-        r'-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----',
-        re.DOTALL,
-    )
-    patterns.add('aws-key', r'\b(?:AKIA|ASIA)[0-9A-Z]{16}\b')
-    patterns.add('github-token', r'\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_\w{20,})')
-    patterns.add('slack-token', r'\bxox[abposr]-[A-Za-z0-9-]{10,}')
-    patterns.add('stripe-key', r'\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}\b')
-    patterns.add('api-key', r'\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}')
-    patterns.add('jwt', r'\beyJ[\w-]+\.[\w-]+\.[\w-]+')
-    patterns.add('bearer', r'\bBearer [A-Za-z0-9._~+/-]{12,}=*')
-    patterns.add('url-credentials', r'(?<=://)[^/\s:@]+:[^@\s]+(?=@)')
-    patterns.add(
-        'assignment',
-        r'(?i)(?<![A-Z0-9_])'
-        r'(?:(?>[A-Z0-9_]*?(?:password|passwd|secret|token|api_?key))[A-Z0-9_]*+'
-        r'|[A-Z0-9_]*+(?<=api)-key[A-Z0-9_]*+)'
-        r'["\']?\s*[:=]\s*["\']?[^\s,;"\']+',
-    )
-    return patterns
+    by_name: dict[PatternName, re.Pattern[str]] = {
+        'private-key': re.compile(
+            r'-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----',
+            re.DOTALL,
+        ),
+        'aws-key': re.compile(r'\b(?:AKIA|ASIA)[0-9A-Z]{16}\b'),
+        'github-token': re.compile(r'\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_\w{20,})'),
+        'slack-token': re.compile(r'\bxox[abposr]-[A-Za-z0-9-]{10,}'),
+        'stripe-key': re.compile(r'\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}\b'),
+        'api-key': re.compile(r'\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}'),
+        'jwt': re.compile(r'\beyJ[\w-]+\.[\w-]+\.[\w-]+'),
+        'bearer': re.compile(r'\bBearer [A-Za-z0-9._~+/-]{12,}=*'),
+        'url-credentials': re.compile(r'(?<=://)[^/\s:@]+:[^@\s]+(?=@)'),
+        'assignment': re.compile(
+            r'(?i)(?<![A-Z0-9_])'
+            r'(?:(?>[A-Z0-9_]*?(?:password|passwd|secret|token|api_?key))[A-Z0-9_]*+'
+            r'|[A-Z0-9_]*+(?<=api)-key[A-Z0-9_]*+)'
+            r'["\']?\s*[:=]\s*["\']?[^\s,;"\']+'
+        ),
+    }
+    return SecretPatterns(by_name=MappingProxyType(by_name))
 
 
 @cache
@@ -93,8 +91,8 @@ def redact(text: str) -> RedactedText:
 
 
 def redaction_of(text: str) -> Redaction:
-    _, hits = default_secret_patterns().scrub(text)
-    return Redaction(text=redact(text), hits=hits)
+    scrubbed, hits = default_secret_patterns().scrub(text)
+    return Redaction(text=RedactedText(scrubbed), hits=hits)
 
 
 def redaction_within(text: str, field: str, limit: int) -> Redaction:
