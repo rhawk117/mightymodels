@@ -118,15 +118,8 @@ class ReviewService:
         return create_gate_policy(run, dispositions, outcomes)
 
     def gate(self, run_id: RunId) -> ReviewReport:
-        run = self.reviews.started_run(run_id)
-        gate = self.gate_of(run)
-        findings = self.reviews.findings(run_id)
-        return ReviewReport(
-            run=run,
-            findings=tuple(gate.ordered(findings)),
-            gate=gate,
-            verdict=gate.verdict_of(findings),
-        )
+        report = self.report(run_id)
+        return replace(report, findings=tuple(report.gate.ordered(report.findings)))
 
     def report(self, run_id: RunId) -> ReviewReport:
         run = self.reviews.started_run(run_id)
