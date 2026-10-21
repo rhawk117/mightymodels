@@ -1,20 +1,15 @@
 """The investigation rows and their ledger entries."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.investigations import EntryKind, EntrySource
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type EntryKind = Literal['known', 'open', 'decision', 'resource', 'next']
-
-
-type EntrySource = Literal['code-scout', 'web-scout', 'user', 'primary']
 
 
 class AddInvestigationParams(Struct, frozen=True, kw_only=True, gc=False):

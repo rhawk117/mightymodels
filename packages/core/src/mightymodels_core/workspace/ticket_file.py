@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import msgspec.yaml
 from msgspec import DecodeError, Struct, ValidationError
 
-from mightymodels_core.schemas.tickets import TicketScope
+from mightymodels_core.vocabulary.tickets import TicketScope
 
 from .errors import TicketFileSyntaxError, TicketFileTypeError
 from .ticket_scan import ROOT_PATH, is_skipped_line, scan_ticket, split_lines

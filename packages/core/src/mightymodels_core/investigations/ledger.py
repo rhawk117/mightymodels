@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from mightymodels_core.investigations.records import InvestigationRecord, LedgerRecord
     from mightymodels_core.investigations.repository import InvestigationRepository
     from mightymodels_core.primitives import RedactedText
-    from mightymodels_core.schemas.investigations import EntryKind
+    from mightymodels_core.vocabulary.investigations import EntryKind
 
 type EntryStatus = Literal['current', 'lead']
 

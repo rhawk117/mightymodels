@@ -7,7 +7,7 @@ from mightymodels_core.primitives import StateError
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from mightymodels_core.schemas.investigations import EntryKind, EntrySource
+    from mightymodels_core.vocabulary.investigations import EntryKind, EntrySource
 
 
 class InvestigationNotFoundError(StateError):

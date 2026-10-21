@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText, Slug
-    from mightymodels_core.schemas.tickets import TicketScope, TicketStatus
+    from mightymodels_core.vocabulary.tickets import TicketScope, TicketStatus
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

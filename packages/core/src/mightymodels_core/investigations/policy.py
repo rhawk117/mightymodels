@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.investigations.errors import InvalidEntryError
-    from mightymodels_core.schemas.investigations import EntryKind, EntrySource
+    from mightymodels_core.vocabulary.investigations import EntryKind, EntrySource
 
 type EntryRules = dict[EntryKind, EntryRule]
 type BatchIssue = RoundRegressionError | InvalidEntryError

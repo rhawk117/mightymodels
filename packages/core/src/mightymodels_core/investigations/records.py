@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText, Slug
-    from mightymodels_core.schemas.investigations import EntryKind, EntrySource
+    from mightymodels_core.vocabulary.investigations import EntryKind, EntrySource
 
 type TargetKind = Literal['behavior', 'claim', 'research', 'change']
 type LatestRound = tuple[Slug, int]
