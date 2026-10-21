@@ -1,38 +1,24 @@
 """Review runs, their findings, and the dispositions and outcomes recorded against findings."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.reviews import (
+    Decision,
+    Depth,
+    Emphasis,
+    EvidenceKind,
+    FindingKind,
+    FindingSeverity,
+    Result,
+    Scope,
+)
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type Scope = Literal['diff', 'branch', 'ticket', 'codebase']
-
-
-type Depth = Literal['quick', 'standard', 'deep']
-
-
-type Emphasis = Literal['release-readiness', 'maintainability', 'balanced', 'custom']
-
-
-type FindingSeverity = Literal['Blocker', 'Critical', 'High', 'Medium', 'Low']
-
-
-type FindingKind = Literal['defect', 'quality']
-
-
-type EvidenceKind = Literal['metric', 'idiom', 'convention']
-
-
-type Decision = Literal['fix', 'defer', 'accept-risk', 'dismiss']
-
-
-type Result = Literal['fixed', 'failed', 'blocked']
 
 
 class RecordReviewRunParams(Struct, frozen=True, kw_only=True):

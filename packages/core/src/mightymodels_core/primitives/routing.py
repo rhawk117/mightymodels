@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from mightymodels_core.schemas.reviews import Depth
+    from mightymodels_core.vocabulary.reviews import Depth
 
 type Model = Literal['haiku', 'sonnet', 'opus', 'fable']
 

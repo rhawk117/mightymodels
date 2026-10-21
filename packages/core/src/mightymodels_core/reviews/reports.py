@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from mightymodels_core.reviews.policy.review import Persona, PersonaSpecs
-    from mightymodels_core.schemas.reviews import (
+    from mightymodels_core.vocabulary.reviews import (
         Emphasis,
         EvidenceKind,
         FindingKind,

@@ -31,7 +31,7 @@ if TYPE_CHECKING:
         IncomingFinding,
         StoredSeverity,
     )
-    from mightymodels_core.schemas.reviews import FindingSeverity
+    from mightymodels_core.vocabulary.reviews import FindingSeverity
 
 type FindingProblem = (
     SourcesRequiredError

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.git import UnsafeRevisionError
     from mightymodels_core.primitives import RunId
-    from mightymodels_core.schemas.reviews import Decision, Result
+    from mightymodels_core.vocabulary.reviews import Decision, Result
 
 type DisposeIssue = UnknownFindingError | ReasonRequiredError
 type ChoiceIssue = UnknownFindingError | NotChosenError

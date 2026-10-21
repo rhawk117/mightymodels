@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText, RunId, Slug, WriteLimitError
-    from mightymodels_core.schemas.reviews import (
+    from mightymodels_core.vocabulary.reviews import (
         Decision,
         Depth,
         Emphasis,

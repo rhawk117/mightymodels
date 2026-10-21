@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.primitives import RunId
     from mightymodels_core.reviews.policy import Persona
-    from mightymodels_core.schemas.reviews import Decision, Result, Scope
+    from mightymodels_core.vocabulary.reviews import Decision, Result, Scope
 
 
 class RunNotFoundError(StateError):
