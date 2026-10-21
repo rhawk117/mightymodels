@@ -88,6 +88,16 @@ def create_parts(
     )
 
 
+def decision_limit_cases() -> pytest.MarkDecorator:
+    cases = [
+        pytest.param(0, 4, id='no-ledger'),
+        pytest.param(2, 2, id='ledger-below-limit'),
+        pytest.param(4, 0, id='ledger-at-limit'),
+        pytest.param(5, 0, id='ledger-over-limit'),
+    ]
+    return pytest.mark.parametrize(('ledger_count', 'reason_count'), cases)
+
+
 class TestArchiveMarkdown:
     shipped_parts = (
         'shipped: Retry queue drains',
@@ -103,6 +113,27 @@ class TestArchiveMarkdown:
             tracker=Tracker(issue=42, jira='ABC-7'),
             decisions=create_decisions(1),
             review=create_review(['worth doing', 'later']),
+        )
+
+    @pytest.fixture
+    def empty_parts(self) -> ArchiveParts:
+        return ArchiveParts(
+            tracker=Tracker(issue=None, jira=None),
+            tasks={},
+            verification=(),
+            decisions=(),
+            review=None,
+        )
+
+    @pytest.fixture
+    def never_run_parts(self) -> ArchiveParts:
+        parts = create_parts()
+        return ArchiveParts(
+            tracker=parts.tracker,
+            tasks=parts.tasks,
+            verification=(create_command('T1.AC-1', 'never-run'),),
+            decisions=(),
+            review=None,
         )
 
     def render(self, parts: ArchiveParts, decision_limit: int = DECISION_LIMIT) -> list[str]:
@@ -127,15 +158,8 @@ class TestArchiveMarkdown:
             'details: archives/closing-subject-2.json',
         ]
 
-    def test_empty_parts_print_none_recorded(self) -> None:
-        parts = ArchiveParts(
-            tracker=Tracker(issue=None, jira=None),
-            tasks={},
-            verification=(),
-            decisions=(),
-            review=None,
-        )
-        lines = self.render(parts)
+    def test_empty_parts_print_none_recorded(self, empty_parts: ArchiveParts) -> None:
+        lines = self.render(empty_parts)
         assert lines[1].split(' · ')[2] == 'tracker: none'
         assert lines[2:7] == [
             'tasks: none recorded',
@@ -145,18 +169,12 @@ class TestArchiveMarkdown:
             '- none recorded',
         ]
 
-    def test_never_run_command_is_not_passing(self) -> None:
-        parts = create_parts()
-        parts = ArchiveParts(
-            tracker=parts.tracker,
-            tasks=parts.tasks,
-            verification=(create_command('T1.AC-1', 'never-run'),),
-            decisions=(),
-            review=None,
+    def test_never_run_command_is_not_passing(self, never_run_parts: ArchiveParts) -> None:
+        assert self.render(never_run_parts)[3].endswith(
+            '0 passing at last run; not passing: T1.AC-1'
         )
-        assert self.render(parts)[3].endswith('0 passing at last run; not passing: T1.AC-1')
 
-    @pytest.mark.parametrize(('ledger_count', 'reason_count'), [(0, 4), (2, 2), (4, 0), (5, 0)])
+    @decision_limit_cases()
     def test_decisions_stay_within_the_limit(self, ledger_count: int, reason_count: int) -> None:
         parts = create_parts(
             decisions=create_decisions(ledger_count),

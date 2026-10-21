@@ -50,10 +50,11 @@ ALLOWED_MOVES: frozenset[tuple[TaskStatus, TaskStatus]] = frozenset({
 class Move:
     before: TaskStatus
     after: TaskStatus
+    marks: tuple[pytest.MarkDecorator, ...] = ()
 
     @property
     def param(self) -> ParameterSet:
-        return pytest.param(self, id=f'{self.before}-to-{self.after}')
+        return pytest.param(self, id=f'{self.before}-to-{self.after}', marks=self.marks)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -211,6 +212,16 @@ def start_reasons_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('scenario', 'reasons'), cases)
 
 
+def fix_outside_in_progress_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'before', [status for status in STATUSES if status != 'in-progress']
+    )
+
+
+def fix_under_the_limit_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('tried', [(), ('one',), ('one', 'two')])
+
+
 class TestTransitionPolicy:
     def find_problem(self, move: Move) -> TransitionError | None:
         policy = TransitionPolicy(task_key=TASK, before=move.before, after=move.after)
@@ -230,6 +241,10 @@ class TestTransitionPolicy:
 
 
 class TestStartPolicy:
+    @pytest.fixture
+    def oversized_owned(self) -> StartScenario:
+        return StartScenario(name='big', owned_count=11)
+
     @start_accepted_cases()
     def test_start_is_accepted(self, scenario: StartScenario) -> None:
         assert scenario.policy.get_start_problem() is None
@@ -246,32 +261,34 @@ class TestStartPolicy:
     ) -> None:
         assert scenario.policy.reasons == reasons
 
-    def test_size_problem_names_what_is_counted(self) -> None:
-        problem = StartScenario(name='big', owned_count=11).policy.get_size_problem()
+    def test_size_problem_names_what_is_counted(self, oversized_owned: StartScenario) -> None:
+        problem = oversized_owned.policy.get_size_problem()
 
         assert isinstance(problem, TaskTooLargeError)
         assert (problem.counted, problem.count, problem.limit) == ('owned files', 11, 10)
 
 
 class TestFixPolicy:
+    @pytest.fixture
+    def spent_tries(self) -> tuple[str, ...]:
+        return ('one', 'two', 'three')
+
     def find_problem(
         self, before: TaskStatus, tried: tuple[str, ...]
     ) -> FixNotUnderwayError | FixesSpentError | None:
         return FixPolicy(task_key=TASK, before=before, tried=tried).get_fix_problem()
 
-    @pytest.mark.parametrize('before', [status for status in STATUSES if status != 'in-progress'])
+    @fix_outside_in_progress_cases()
     def test_fix_outside_in_progress_is_refused(self, before: TaskStatus) -> None:
         assert isinstance(self.find_problem(before, ()), FixNotUnderwayError)
 
-    @pytest.mark.parametrize('tried', [(), ('one',), ('one', 'two')])
+    @fix_under_the_limit_cases()
     def test_fix_under_the_limit_is_accepted(self, tried: tuple[str, ...]) -> None:
         assert self.find_problem('in-progress', tried) is None
 
-    def test_third_failed_fix_spends_the_limit(self) -> None:
-        tried = ('one', 'two', 'three')
-
-        problem = self.find_problem('in-progress', tried)
+    def test_third_failed_fix_spends_the_limit(self, spent_tries: tuple[str, ...]) -> None:
+        problem = self.find_problem('in-progress', spent_tries)
 
         assert isinstance(problem, FixesSpentError)
-        assert problem.tried == tried
+        assert problem.tried == spent_tries
         assert '1. one\n  2. two\n  3. three' in str(problem)

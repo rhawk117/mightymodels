@@ -34,10 +34,11 @@ class PolicyScenario:
     ticket: TicketFile
     problems: tuple[str, ...]
     unrecorded: tuple[Slug, ...] = ()
+    marks: tuple[pytest.MarkDecorator, ...] = ()
 
     @property
     def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
+        return pytest.param(self, id=self.name, marks=self.marks)
 
 
 def create_ticket(**changes: object) -> TicketFile:
@@ -234,11 +235,13 @@ class TestTicketPolicy:
     def test_investigation_key_and_ledger_rules_are_refused(self, scenario: PolicyScenario) -> None:
         assert find_problems(scenario) == scenario.problems
 
-    def test_every_broken_rule_is_reported_together(self) -> None:
-        scenario = PolicyScenario(
+    @pytest.fixture
+    def two_rules(self) -> PolicyScenario:
+        return PolicyScenario(
             name='two-rules',
             ticket=create_ticket(summary='', context=()),
             problems=('summary is empty', 'context must be a list of 1 to 6 lines'),
         )
 
-        assert find_problems(scenario) == scenario.problems
+    def test_every_broken_rule_is_reported_together(self, two_rules: PolicyScenario) -> None:
+        assert find_problems(two_rules) == two_rules.problems

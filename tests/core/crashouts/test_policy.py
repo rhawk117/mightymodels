@@ -48,16 +48,21 @@ def too_long_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('entry', 'field'), cases)
 
 
-@pytest.mark.parametrize(
-    ('rant', 'expected'),
-    [
+def rant_line_ending_cases() -> pytest.MarkDecorator:
+    cases: list[ParameterSet] = [
         pytest.param('a  \r\nb\r\n', 'a\nb', id='crlf'),
         pytest.param('a\rb', 'a\nb', id='cr'),
         pytest.param('\n\n  a\n   b  \n\n', '  a\n   b', id='indent-kept'),
-    ],
-)
-def test_the_rant_loses_its_line_endings_and_keeps_its_words(rant: str, expected: str) -> None:
-    assert normalized_rant(rant) == expected
+    ]
+    return pytest.mark.parametrize(('rant', 'expected'), cases)
+
+
+class TestNormalizedRant:
+    @rant_line_ending_cases()
+    def test_the_rant_loses_its_line_endings_and_keeps_its_words(
+        self, rant: str, expected: str
+    ) -> None:
+        assert normalized_rant(rant) == expected
 
 
 class TestEntryProblem:
@@ -87,29 +92,46 @@ class TestEntryProblem:
             policy.crashout_record(MOMENT)
         assert raised.value.field == field
 
-    def test_text_at_the_limit_is_kept(self) -> None:
-        entry = replace(SHORT_ENTRY, rant='r' * 5, branch='b' * 5)
-        record = CrashoutPolicy(entry=entry, options=self.options).crashout_record(MOMENT)
+    @pytest.fixture
+    def entry_at_the_limit(self) -> CrashoutEntry:
+        return replace(SHORT_ENTRY, rant='r' * 5, branch='b' * 5)
+
+    def test_text_at_the_limit_is_kept(self, entry_at_the_limit: CrashoutEntry) -> None:
+        record = CrashoutPolicy(entry=entry_at_the_limit, options=self.options).crashout_record(
+            MOMENT
+        )
         assert (record.rant, record.branch) == ('r' * 5, 'b' * 5)
 
 
 class TestCrashoutRecord:
+    secret = 'ghp_' + 'a' * 36
+
+    @pytest.fixture
+    def padded_entry(self) -> CrashoutEntry:
+        return create_entry(root_cause='  why \n', corrective_action=' a  b ')
+
+    @pytest.fixture
+    def untidy_rant_entry(self) -> CrashoutEntry:
+        return create_entry(rant='a  \r\n  b\r\n')
+
+    @pytest.fixture
+    def leaked_entry(self) -> CrashoutEntry:
+        return replace(create_entry(), root_cause=f'leaked {self.secret}')
+
     def build_record(self, entry: CrashoutEntry) -> CrashoutRecord:
         return CrashoutPolicy(entry=entry, options=CrashoutOptions()).crashout_record(MOMENT)
 
-    def test_the_root_cause_and_the_action_are_stripped(self) -> None:
-        entry = create_entry(root_cause='  why \n', corrective_action=' a  b ')
-        record = self.build_record(entry)
+    def test_the_root_cause_and_the_action_are_stripped(self, padded_entry: CrashoutEntry) -> None:
+        record = self.build_record(padded_entry)
         assert (record.root_cause, record.corrective_action) == ('why', 'a  b')
 
-    def test_the_rant_is_normalized_in_the_record(self) -> None:
-        record = self.build_record(create_entry(rant='a  \r\n  b\r\n'))
+    def test_the_rant_is_normalized_in_the_record(self, untidy_rant_entry: CrashoutEntry) -> None:
+        record = self.build_record(untidy_rant_entry)
         assert record.rant == 'a\n  b'
 
-    def test_a_secret_is_redacted_before_it_is_stored(self) -> None:
-        secret = 'ghp_' + 'a' * 36
-        record = self.build_record(replace(create_entry(), root_cause=f'leaked {secret}'))
-        assert secret not in record.root_cause
+    def test_a_secret_is_redacted_before_it_is_stored(self, leaked_entry: CrashoutEntry) -> None:
+        record = self.build_record(leaked_entry)
+        assert self.secret not in record.root_cause
 
     def test_the_record_carries_the_time_it_was_given(self) -> None:
         assert self.build_record(create_entry()).at == MOMENT

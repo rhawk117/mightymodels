@@ -8,6 +8,15 @@ from mightymodels_core.primitives.errors import NaiveClockTimeError
 from mightymodels_core.primitives.tests.clock import FakeClock, create_fake_clock
 
 
+def clock_protocol_cases() -> pytest.MarkDecorator:
+    moment = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
+    clocks = [
+        pytest.param(SystemClock(), id='system'),
+        pytest.param(FakeClock(moments=[moment]), id='fake'),
+    ]
+    return pytest.mark.parametrize('clock', clocks)
+
+
 class TestFromUnixepoch:
     moment = datetime(2026, 10, 19, 12, 30, 45, 999_999, tzinfo=UTC)
     offset_moment = datetime(2026, 10, 19, 14, 30, 45, tzinfo=timezone(timedelta(hours=2)))
@@ -33,6 +42,11 @@ class TestFromUnixepoch:
 
 class TestClocks:
     moment = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
+    naive_moment = datetime.fromisoformat('2026-10-19T12:00:00')
+
+    @pytest.fixture
+    def fake_clock(self) -> FakeClock:
+        return create_fake_clock(self.moment)
 
     def test_system_clock_returns_a_utc_aware_datetime(self) -> None:
         reading = SystemClock().now()
@@ -40,19 +54,16 @@ class TestClocks:
         assert reading.tzinfo is UTC
 
     def test_fake_clock_refuses_a_naive_datetime(self) -> None:
-        naive = datetime.fromisoformat('2026-10-19T12:00:00')
-
         with pytest.raises(NaiveClockTimeError):
-            create_fake_clock(naive)
+            create_fake_clock(self.naive_moment)
 
-    def test_fake_clock_reads_the_time_last_set(self) -> None:
-        clock = create_fake_clock(self.moment)
+    def test_fake_clock_reads_the_time_last_set(self, fake_clock: FakeClock) -> None:
         later = self.moment + timedelta(hours=1)
 
-        clock.set_now(later)
+        fake_clock.set_now(later)
 
-        assert clock.now() == later
+        assert fake_clock.now() == later
 
-    @pytest.mark.parametrize('clock', [SystemClock(), FakeClock(moments=[moment])])
+    @clock_protocol_cases()
     def test_clocks_satisfy_the_protocol(self, clock: object) -> None:
         assert isinstance(clock, Clock)
