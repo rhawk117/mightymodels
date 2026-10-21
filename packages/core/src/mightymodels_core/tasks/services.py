@@ -27,6 +27,7 @@ from mightymodels_core.tasks.policy import (
     TransitionPolicy,
 )
 from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
+from mightymodels_core.tickets.policy import get_closed_problem
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -129,6 +130,14 @@ def start_policy_for(service: TaskService, ticket_id: int, request: StartRequest
     )
 
 
+def unclosed_ticket_id(tickets: TicketRepository, slug: Slug) -> int:
+    record = tickets.staged_ticket(slug)
+    if problem := get_closed_problem(record):
+        raise problem
+
+    return record.id
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TaskService:
     tickets: TicketRepository
@@ -139,7 +148,7 @@ class TaskService:
     options: TaskOptions = field(default_factory=TaskOptions)
 
     def start(self, slug: Slug, request: StartRequest) -> TaskRecord:
-        ticket_id = self.tickets.unclosed_ticket(slug).id
+        ticket_id = unclosed_ticket_id(self.tickets, slug)
         policy = start_policy_for(self, ticket_id, request)
         if problem := policy.get_start_problem():
             raise problem
@@ -156,7 +165,7 @@ class TaskService:
         return self.task_held(ticket_id, request.task_key)
 
     def prepare_verification(self, slug: Slug, task_key: TaskId) -> TaskRecord:
-        ticket_id = self.tickets.unclosed_ticket(slug).id
+        ticket_id = unclosed_ticket_id(self.tickets, slug)
         task = self.tasks.task(ticket_id, task_key)
         if task is None:
             raise TransitionError(task_key=task_key, current='pending', target='verified')
@@ -172,7 +181,7 @@ class TaskService:
             raise problem
 
     def verify(self, slug: Slug, request: VerifyRequest) -> TaskRecord:
-        ticket_id = self.tickets.unclosed_ticket(slug).id
+        ticket_id = unclosed_ticket_id(self.tickets, slug)
         task_key = request.seen.key
         current = self.task_held(ticket_id, task_key)
         if moved := get_moved_fields(request.seen, current):
@@ -210,7 +219,7 @@ class TaskService:
         )
 
     def mark(self, slug: Slug, request: MarkRequest) -> TaskRecord:
-        ticket_id = self.tickets.unclosed_ticket(slug).id
+        ticket_id = unclosed_ticket_id(self.tickets, slug)
         task_key = request.task_key
         before = status_of(self.tasks.task(ticket_id, task_key))
         policy = TransitionPolicy(
@@ -233,7 +242,7 @@ class TaskService:
 
     def record_failed_fix(self, slug: Slug, task_key: TaskId, hypothesis: str) -> FixRecorded:
         redacted = redact_within(hypothesis, 'hypothesis', self.options.hypothesis_limit)
-        ticket_id = self.tickets.unclosed_ticket(slug).id
+        ticket_id = unclosed_ticket_id(self.tickets, slug)
         tried = self.attempts.failed_fixes(ticket_id, task_key)
         policy = FixPolicy(
             task_key=task_key,

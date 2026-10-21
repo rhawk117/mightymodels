@@ -4,7 +4,6 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 from mightymodels_core.tickets.errors import (
-    ClosedTicketError,
     NotStagedError,
     UnknownInvestigationError,
 )
@@ -32,12 +31,6 @@ class FakeTicketRepository:
             raise NotStagedError(slug=slug)
         return record
 
-    def unclosed_ticket(self, slug: Slug) -> TicketRecord:
-        record = self.staged_ticket(slug)
-        if record.status == 'closed':
-            raise ClosedTicketError(slug=slug)
-        return record
-
     def stage(self, slug: Slug, section: TicketSection, declared: Sequence[str]) -> TicketRecord:
         for key in declared:
             if key not in self.recorded_investigations:
@@ -60,7 +53,7 @@ class FakeTicketRepository:
         return record
 
     def mark_in_progress(self, slug: Slug) -> None:
-        self._set_status(self.unclosed_ticket(slug), 'in-progress')
+        self._set_status(self.staged_ticket(slug), 'in-progress')
 
     def mark_closed(self, slug: Slug) -> None:
         self._set_status(self.staged_ticket(slug), 'closed')

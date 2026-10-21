@@ -24,6 +24,7 @@ from mightymodels_core.ticket_closing.policy import (
     get_moved_fields,
 )
 from mightymodels_core.ticket_closing.records import ClosingRecord
+from mightymodels_core.tickets.policy import get_closed_problem
 
 if TYPE_CHECKING:
     from mightymodels_core.contract.repository import ContractRepository
@@ -83,7 +84,10 @@ class ClosingService:
         return CloseCheck(blockers=tuple(blockers), git_refusal=facts.git_refusal)
 
     def close(self, slug: Slug, request: CloseRequest) -> ClosedTicket:
-        ticket = self.tickets.unclosed_ticket(slug)
+        ticket = self.tickets.staged_ticket(slug)
+        if problem := get_closed_problem(ticket):
+            raise problem
+
         if moved := get_moved_fields(request.seen, ticket):
             raise TicketMovedError(slug=slug, changed=moved)
 

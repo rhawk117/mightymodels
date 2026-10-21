@@ -19,7 +19,6 @@ from mightymodels_core.schemas.tickets import (
     TicketSlugParams,
 )
 from mightymodels_core.tickets.errors import (
-    ClosedTicketError,
     NotStagedError,
     UnknownInvestigationError,
 )
@@ -95,12 +94,6 @@ class SqliteTicketRepository:
     def staged_ticket(self, slug: Slug) -> TicketRecord:
         return record_of(staged_row(self.unit, self.repository_id, slug))
 
-    def unclosed_ticket(self, slug: Slug) -> TicketRecord:
-        record = self.staged_ticket(slug)
-        if record.status == 'closed':
-            raise ClosedTicketError(slug=slug)
-        return record
-
     def stage(self, slug: Slug, section: TicketSection, declared: Sequence[str]) -> TicketRecord:
         investigation_ids = [self.investigation_id(slug, key) for key in dict.fromkeys(declared)]
         self.unit.one(STAGE_TICKET, stage_params_of(self.repository_id, slug, section))
@@ -113,7 +106,7 @@ class SqliteTicketRepository:
         return self.staged_ticket(slug)
 
     def mark_in_progress(self, slug: Slug) -> None:
-        self.unclosed_ticket(slug)
+        self.staged_ticket(slug)
         self.set_status(slug, 'in-progress')
 
     def mark_closed(self, slug: Slug) -> None:

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.tickets import (
-    ClosedTicketError,
     NotStagedError,
     TicketRepository,
     UnknownInvestigationError,
@@ -53,16 +52,6 @@ class TestLookup:
     def test_staged_ticket_refuses_an_unstaged_slug(self, repository: TicketRepository) -> None:
         with pytest.raises(NotStagedError):
             repository.staged_ticket(FIRST)
-
-    def test_unclosed_ticket_refuses_an_unstaged_slug(self, repository: TicketRepository) -> None:
-        with pytest.raises(NotStagedError):
-            repository.unclosed_ticket(FIRST)
-
-    def test_unclosed_ticket_refuses_a_closed_ticket(self, staged: TicketRepository) -> None:
-        staged.mark_closed(FIRST)
-
-        with pytest.raises(ClosedTicketError):
-            staged.unclosed_ticket(FIRST)
 
     def test_staged_ticket_still_finds_a_closed_ticket(self, staged: TicketRepository) -> None:
         staged.mark_closed(FIRST)
@@ -133,12 +122,6 @@ class TestStatus:
 
         assert staged.staged_ticket(FIRST).status == 'in-progress'
 
-    def test_mark_in_progress_refuses_a_closed_ticket(self, staged: TicketRepository) -> None:
-        staged.mark_closed(FIRST)
-
-        with pytest.raises(ClosedTicketError):
-            staged.mark_in_progress(FIRST)
-
     def test_mark_in_progress_refuses_an_unstaged_slug(self, repository: TicketRepository) -> None:
         with pytest.raises(NotStagedError):
             repository.mark_in_progress(FIRST)
@@ -165,7 +148,6 @@ class TestTicketId:
         staged_id = repository.stage(FIRST, create_section(FIRST, 'main'), ()).id
 
         assert repository.staged_ticket(FIRST).id == staged_id
-        assert repository.unclosed_ticket(FIRST).id == staged_id
 
     def test_restage_keeps_the_id(self, staged: TicketRepository) -> None:
         before = staged.staged_ticket(FIRST).id

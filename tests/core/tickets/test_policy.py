@@ -1,11 +1,20 @@
 from dataclasses import dataclass
+from dataclasses import replace as replace_record
 from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.primitives import Slug
-from mightymodels_core.tickets import InvalidTicketError, TicketPolicy
+from mightymodels_core.tickets import (
+    ClosedTicketError,
+    InvalidTicketError,
+    TicketPolicy,
+    TicketRecord,
+)
+from mightymodels_core.tickets.policy import get_closed_problem
 from mightymodels_core.workspace import CompanionDocsFile, HandoffContextFile, TicketFile
 from msgspec.structs import replace
+
+from .conftest import create_section
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -245,3 +254,24 @@ class TestTicketPolicy:
 
     def test_every_broken_rule_is_reported_together(self, two_rules: PolicyScenario) -> None:
         assert find_problems(two_rules) == two_rules.problems
+
+
+class TestClosedProblem:
+    @pytest.fixture
+    def open_record(self) -> TicketRecord:
+        return TicketRecord(
+            id=1,
+            slug=SLUG,
+            status='in-progress',
+            section=create_section(SLUG, 'main'),
+            investigations=(),
+        )
+
+    def test_a_closed_record_gives_the_problem(self, open_record: TicketRecord) -> None:
+        problem = get_closed_problem(replace_record(open_record, status='closed'))
+
+        assert isinstance(problem, ClosedTicketError)
+        assert problem.slug == SLUG
+
+    def test_an_open_record_gives_no_problem(self, open_record: TicketRecord) -> None:
+        assert get_closed_problem(open_record) is None

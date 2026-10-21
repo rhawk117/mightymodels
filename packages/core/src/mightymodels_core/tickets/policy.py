@@ -17,6 +17,7 @@ from mightymodels_core.primitives import (
 from mightymodels_core.primitives.routing import create_routing_table
 from mightymodels_core.tickets.errors import (
     BranchNameRequiredError,
+    ClosedTicketError,
     DetachedHeadError,
     InvalidTicketError,
 )
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
     from collections.abc import Collection, Iterable
 
     from mightymodels_core.primitives import AgentName, RoutingTable, Slug
-    from mightymodels_core.tickets.records import BranchChoice
+    from mightymodels_core.tickets.records import BranchChoice, TicketRecord
     from mightymodels_core.workspace import TicketFile
 
 PRIMARY_AGENT = 'primary-agent'
@@ -69,6 +70,10 @@ def get_branch_problem(
         return None if name.strip() else BranchNameRequiredError()
 
     return None if current is not None else DetachedHeadError()
+
+
+def get_closed_problem(record: TicketRecord) -> ClosedTicketError | None:
+    return ClosedTicketError(slug=record.slug) if record.status == 'closed' else None
 
 
 def branch_of(choice: BranchChoice, name: str, current: str | None) -> str:
