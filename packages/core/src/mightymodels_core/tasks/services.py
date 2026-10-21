@@ -16,7 +16,7 @@ from mightymodels_core.tasks.gates import (
     Evidence,
     VerificationGate,
     get_readiness_problems,
-    get_receipt_problem,
+    get_receipt_problems,
     is_plan_task,
 )
 from mightymodels_core.tasks.policy import (
@@ -29,9 +29,8 @@ from mightymodels_core.tasks.policy import (
 from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Mapping
 
-    from mightymodels_core.contract.records import Receipt, RecordedCommand
     from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
     from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
@@ -98,15 +97,6 @@ def get_moved_fields(seen: TaskRecord, current: TaskRecord) -> list[str]:
         'owned set': seen.owned != current.owned,
     }
     return [field_name for field_name, changed in moved.items() if changed]
-
-
-def get_receipt_problems(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
-) -> list[str]:
-    problems = (
-        get_receipt_problem(command.key, receipts.get(command.key), head) for command in commands
-    )
-    return [problem for problem in problems if problem is not None]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

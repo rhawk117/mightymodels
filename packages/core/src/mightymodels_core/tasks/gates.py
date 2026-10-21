@@ -78,6 +78,15 @@ def get_receipt_problem(command_key: str, receipt: Receipt | None, head: str | N
     return None
 
 
+def get_receipt_problems(
+    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
+) -> list[str]:
+    problems = (
+        get_receipt_problem(command.key, receipts.get(command.key), head) for command in commands
+    )
+    return [problem for problem in problems if problem is not None]
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class VerificationGate:
     task: TaskRecord
@@ -107,12 +116,7 @@ class VerificationGate:
         return []
 
     def receipt_problems(self) -> list[str]:
-        receipts = self.evidence.receipts
-        problems = (
-            get_receipt_problem(command.key, receipts.get(command.key), self.git.head)
-            for command in self.evidence.commands
-        )
-        return [problem for problem in problems if problem is not None]
+        return get_receipt_problems(self.evidence.commands, self.evidence.receipts, self.git.head)
 
     def brief_problems(self) -> list[str]:
         if self.evidence.brief is None:
