@@ -35,11 +35,11 @@ if TYPE_CHECKING:
 
     from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
-    from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
     from mightymodels_core.tasks.gates import Brief, GitFacts
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
     from mightymodels_core.tickets.repository import TicketRepository
+    from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus, Worker
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

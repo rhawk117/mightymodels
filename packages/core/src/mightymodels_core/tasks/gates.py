@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 
     from mightymodels_core.contract.records import Receipt, RecordedCommand
     from mightymodels_core.primitives import TaskId
-    from mightymodels_core.schemas.tasks import TaskStatus
     from mightymodels_core.tasks.records import TaskRecord
+    from mightymodels_core.vocabulary.tasks import TaskStatus
 
 DONE_HEADING = '## DONE'
 ASKED_CRITERION = re.compile(r'^\s*-\s*(AC-\d+)\s*:', re.MULTILINE)

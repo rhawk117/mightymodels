@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.primitives import TaskId
-    from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus
+    from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus
 
 
 class UnknownTaskError(StateError):

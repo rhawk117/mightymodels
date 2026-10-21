@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from mightymodels_core.primitives import TaskId
-    from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
+    from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus, Worker
 
 type Transitions = dict[TaskStatus, frozenset[TaskStatus]]
 type StartProblem = (

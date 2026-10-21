@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, get_args
 
 from mightymodels_core.primitives import ReadLimit
-from mightymodels_core.schemas.tasks import Worker
+from mightymodels_core.vocabulary.tasks import Worker
 
 if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText, TaskId
-    from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus
+    from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus
 
 type AttemptCounts = dict[TaskId, dict[Worker, int]]
 

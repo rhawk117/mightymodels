@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from collections.abc import Collection
 
     from mightymodels_core.primitives import RedactedText, TaskId
-    from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
     from mightymodels_core.tasks.records import (
         Attempt,
         AttemptCounts,
@@ -25,6 +24,7 @@ if TYPE_CHECKING:
         TaskRecord,
         Transition,
     )
+    from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus, Worker
 
 
 @runtime_checkable
