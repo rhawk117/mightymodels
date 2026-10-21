@@ -187,6 +187,62 @@ def reviewed(
 
 
 @pytest.fixture
+def crowded(
+    database: Database,
+    repository_key: RepositoryKey,
+    clock: Clock,
+    reviewed: RunId,
+    investigation: Slug,
+    slug: Slug,
+) -> Slug:
+    invest = InvestigationWork(database=database, repository_key=repository_key, clock=clock)
+    entries = [
+        IncomingEntry(kind='decision', text='use wal mode', source='user'),
+        IncomingEntry(kind='open', text='which retention', source='primary'),
+    ]
+    with invest.write() as unit:
+        unit.investigations.add(investigation, AddRequest(round=2, entries=entries, head=HEAD))
+
+    tasks = TaskWork(database=database, repository_key=repository_key, clock=clock)
+    start = TaskStartRequest(
+        task_key=TaskId('T2'),
+        worker='engineer',
+        mode=None,
+        owned=('src/b.py',),
+        acceptance_count=1,
+        head=HEAD,
+    )
+    with tasks.write() as unit:
+        unit.contracts.record(
+            slug,
+            [
+                create_receipt('T1.AC-2', outcome='pass', head=HEAD),
+                create_receipt('T2.AC-1', outcome='pass', head=HEAD),
+            ],
+        )
+        unit.tasks.start(slug, start)
+        unit.tasks.mark(slug, MarkRequest(task_key=TaskId('T2'), to='blocked', reason='a wall'))
+
+    third = IncomingFinding(
+        sources=('MV-3',),
+        severity='High',
+        kind='defect',
+        security=False,
+        title='defect found by MV-3',
+        location='src/MV-3.py:10',
+        fix='fix it',
+        verify='pytest -q',
+        evidence=None,
+    )
+    reviews = ReviewWork(database=database, repository_key=repository_key, clock=clock)
+    with reviews.write() as unit:
+        added = unit.reviews.add_findings(reviewed, [third])
+        decided = {added.changed[0].key: IncomingDisposition(decision='defer', reason='later')}
+        unit.decisions.dispose(reviewed, decided, 'owner')
+    return slug
+
+
+@pytest.fixture
 def other_seeded(
     database: Database, other_repository_key: RepositoryKey, clock: Clock, slug: Slug
 ) -> Slug:

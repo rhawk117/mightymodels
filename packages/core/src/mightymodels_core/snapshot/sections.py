@@ -127,6 +127,9 @@ def ledger_lines(ledgers: Sequence[Ledger], kind: EntryKind, limit: int) -> tupl
         for ledger in ledgers
         for record in ledger.live_of_kind(kind)
     ]
+    if limit <= 0:
+        return ()
+
     return tuple(lines[-limit:])
 
 
