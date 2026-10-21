@@ -75,12 +75,7 @@ def is_skipped_line(raw: str) -> bool:
     return not stripped.strip() or stripped.startswith('#')
 
 
-def source_line(number: int, raw: str) -> SourceLine | TicketFileSyntaxError | None:
-    stripped = raw.lstrip()
-    if is_skipped_line(raw):
-        return get_unreadable_problem(number, raw)
-
-    leading = raw.removesuffix(stripped)
+def indentation_problem(number: int, leading: str) -> TicketFileSyntaxError | None:
     if '\t' in leading:
         return TicketFileSyntaxError(
             line=number, reason='the indentation holds a tab; indent with two spaces per level'
@@ -94,6 +89,18 @@ def source_line(number: int, raw: str) -> SourceLine | TicketFileSyntaxError | N
                 'indent with two spaces per level'
             ),
         )
+
+    return None
+
+
+def source_line(number: int, raw: str) -> SourceLine | TicketFileSyntaxError | None:
+    stripped = raw.lstrip()
+    if is_skipped_line(raw):
+        return get_unreadable_problem(number, raw)
+
+    leading = raw.removesuffix(stripped)
+    if problem := indentation_problem(number, leading):
+        return problem
 
     if problem := get_unreadable_problem(number, raw):
         return problem

@@ -30,6 +30,7 @@ from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from datetime import datetime
 
     from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
@@ -99,6 +100,35 @@ def get_moved_fields(seen: TaskRecord, current: TaskRecord) -> list[str]:
     return [field_name for field_name, changed in moved.items() if changed]
 
 
+def start_transition(policy: StartPolicy, request: StartRequest, at: datetime) -> Transition:
+    return Transition(
+        task_key=request.task_key,
+        before=policy.before,
+        after='in-progress',
+        reasons=tuple(map(redact, policy.reasons)),
+        head=request.head,
+        at=at,
+    )
+
+
+def start_policy_for(service: TaskService, ticket_id: int, request: StartRequest) -> StartPolicy:
+    task_key = request.task_key
+    return StartPolicy(
+        task_key=task_key,
+        before=status_of(service.tasks.task(ticket_id, task_key)),
+        worker=request.worker,
+        mode=request.mode,
+        attempts=service.attempts.attempts_by_worker(ticket_id).get(task_key, {}),
+        implementation_spent=service.attempts.attempts_in_modes(
+            ticket_id, task_key, IMPLEMENTATION_MODES
+        ),
+        acceptance_count=request.acceptance_count,
+        owned_count=len(set(request.owned)),
+        too_large_approved=request.too_large_approved,
+        options=service.options,
+    )
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TaskService:
     tickets: TicketRepository
@@ -110,40 +140,20 @@ class TaskService:
 
     def start(self, slug: Slug, request: StartRequest) -> TaskRecord:
         ticket_id = self.tickets.unclosed_ticket(slug).id
-        task_key = request.task_key
-        policy = StartPolicy(
-            task_key=task_key,
-            before=status_of(self.tasks.task(ticket_id, task_key)),
-            worker=request.worker,
-            mode=request.mode,
-            attempts=self.attempts.attempts_by_worker(ticket_id).get(task_key, {}),
-            implementation_spent=self.attempts.attempts_in_modes(
-                ticket_id, task_key, IMPLEMENTATION_MODES
-            ),
-            acceptance_count=request.acceptance_count,
-            owned_count=len(set(request.owned)),
-            too_large_approved=request.too_large_approved,
-            options=self.options,
-        )
+        policy = start_policy_for(self, ticket_id, request)
         if problem := policy.get_start_problem():
             raise problem
 
-        transition = Transition(
-            task_key=task_key,
-            before=policy.before,
-            after='in-progress',
-            reasons=tuple(map(redact, policy.reasons)),
-            head=request.head,
-            at=self.clock.now(),
-        )
         attempt = Attempt(
             worker=request.worker,
             mode=policy.architect_mode,
             owned=tuple(sorted(set(request.owned))),
         )
         self.tickets.mark_in_progress(slug)
-        self.tasks.record_start(ticket_id, transition, attempt)
-        return self.task_held(ticket_id, task_key)
+        self.tasks.record_start(
+            ticket_id, start_transition(policy, request, self.clock.now()), attempt
+        )
+        return self.task_held(ticket_id, request.task_key)
 
     def prepare_verification(self, slug: Slug, task_key: TaskId) -> TaskRecord:
         ticket_id = self.tickets.unclosed_ticket(slug).id

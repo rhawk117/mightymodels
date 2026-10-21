@@ -24,6 +24,13 @@ if TYPE_CHECKING:
     from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
 
 type Transitions = dict[TaskStatus, frozenset[TaskStatus]]
+type StartProblem = (
+    ModeNeedsArchitectError
+    | TaskTooLargeError
+    | ArchitectSpentError
+    | InternSpentError
+    | TransitionError
+)
 
 IMPLEMENTATION_MODES: frozenset[ArchitectMode] = frozenset({
     'recovery-implementation',
@@ -149,16 +156,7 @@ class StartPolicy:
 
         return None
 
-    def get_start_problem(
-        self,
-    ) -> (
-        ModeNeedsArchitectError
-        | TaskTooLargeError
-        | ArchitectSpentError
-        | InternSpentError
-        | TransitionError
-        | None
-    ):
+    def get_start_problem(self) -> StartProblem | None:
         if problem := self.get_mode_problem():
             return problem
 

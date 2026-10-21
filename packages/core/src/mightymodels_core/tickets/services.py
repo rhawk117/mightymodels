@@ -100,7 +100,16 @@ class TicketService:
         if slot.exists:
             raise TicketExistsError(path=slot.path)
 
-        ticket = TicketFile(
+        ticket = self.ticket_file_of(slug, answers)
+        self.check(slug, ticket)
+        rendered = render_ticket(ticket)
+        if isinstance(rendered, LoneSurrogateError):
+            raise rendered
+
+        return rendered
+
+    def ticket_file_of(self, slug: Slug, answers: TicketAnswers) -> TicketFile:
+        return TicketFile(
             task=str(slug),
             summary=answers.summary,
             triaged_at=self.clock.now().isoformat(),
@@ -119,12 +128,6 @@ class TicketService:
             ),
             investigations=answers.investigations,
         )
-        self.check(slug, ticket)
-        rendered = render_ticket(ticket)
-        if isinstance(rendered, LoneSurrogateError):
-            raise rendered
-
-        return rendered
 
     def show(self, slug: Slug) -> TicketRecord:
         return self.tickets.staged_ticket(slug)

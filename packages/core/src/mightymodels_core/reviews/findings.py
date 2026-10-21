@@ -167,7 +167,7 @@ class FindingCheck:
 
         return Evidence(kind=evidence.kind, cite=self.required_text('evidence cite', evidence.cite))
 
-    def record(self) -> FindingRecord:
+    def checked_location(self) -> RedactedText:
         if problem := self.get_source_problem():
             raise problem
 
@@ -175,13 +175,21 @@ class FindingCheck:
         if problem := self.get_location_problem(location):
             raise problem
 
-        title = self.required_text('title', self.finding.title)
-        fix = self.required_text('fix', self.finding.fix)
-        verify = self.required_text('verify', self.finding.verify)
+        return location
+
+    def checked_evidence(self) -> Evidence | None:
         evidence = self.evidence_of(self.finding.evidence)
         if problem := self.get_quality_problem(evidence):
             raise problem
 
+        return evidence
+
+    def record(self) -> FindingRecord:
+        location = self.checked_location()
+        title = self.required_text('title', self.finding.title)
+        fix = self.required_text('fix', self.finding.fix)
+        verify = self.required_text('verify', self.finding.verify)
+        evidence = self.checked_evidence()
         return FindingRecord(
             key=UNNUMBERED,
             sources=self.sources,

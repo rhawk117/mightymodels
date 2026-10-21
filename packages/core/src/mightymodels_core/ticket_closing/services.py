@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from mightymodels_core.reviews.services import LatestReview, ReviewDecisionService
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
     from mightymodels_core.ticket_closing.archive import ArchiveRecord
-    from mightymodels_core.ticket_closing.records import CloseFacts, ClosingLines
+    from mightymodels_core.ticket_closing.records import CloseFacts, ClosingLines, OneLinedClosing
     from mightymodels_core.ticket_closing.repository import ClosingRepository
     from mightymodels_core.tickets.records import TicketRecord
     from mightymodels_core.tickets.repository import TicketRepository
@@ -97,7 +97,14 @@ class ClosingService:
         if problem := ClosingPolicy(closing=lines, options=self.options).get_closing_problem():
             raise problem
 
-        closing = ClosingRecord(
+        closing = self.closing_record_of(request, lines)
+        archive = create_archive_record(self.archive_sources(ticket, closing, review))
+        self.tickets.mark_closed(slug)
+        self.closings.record_closing(ticket.id, closing)
+        return ClosedTicket(closing=closing, archive=archive)
+
+    def closing_record_of(self, request: CloseRequest, lines: OneLinedClosing) -> ClosingRecord:
+        return ClosingRecord(
             closed_at=self.clock.now(),
             head=request.facts.head,
             shipped=lines.shipped,
@@ -105,10 +112,6 @@ class ClosingService:
             gotchas=lines.gotchas,
             archive=request.archive,
         )
-        archive = create_archive_record(self.archive_sources(ticket, closing, review))
-        self.tickets.mark_closed(slug)
-        self.closings.record_closing(ticket.id, closing)
-        return ClosedTicket(closing=closing, archive=archive)
 
     def latest_review(self, slug: Slug) -> LatestReview | None:
         return self.review_decisions.latest_review(slug)

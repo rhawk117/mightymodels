@@ -105,29 +105,41 @@ def with_context(source: str, context: Sequence[str]) -> str | LoneSurrogateErro
     return '\n'.join(updated) + '\n'
 
 
+def companion_lines(companions: CompanionDocsFile) -> list[str]:
+    return [
+        'companion-docs:',
+        entry_line('issue-number', companions.issue_number, depth=1),
+        entry_line('jira-key', companions.jira_key, depth=1),
+        *list_lines('reference-urls', companions.reference_urls or (), depth=1),
+    ]
+
+
+def handoff_lines(handoff: HandoffContextFile) -> list[str]:
+    return [
+        'handoff-context:',
+        entry_line('scope', handoff.scope, depth=1),
+        entry_line('plan-first', handoff.plan_first, depth=1),
+        entry_line('branch-name', handoff.branch_name, depth=1),
+        entry_line('worktrees-okay', handoff.worktrees_okay, depth=1),
+    ]
+
+
 def render_ticket(ticket: TicketFile) -> str | LoneSurrogateError:
     if problem := find_lone_surrogate(ticket_strings(ticket)):
         return problem
 
-    handoff = ticket.handoff_context or HandoffContextFile()
     companions = ticket.companion_docs or CompanionDocsFile()
+    handoff = ticket.handoff_context or HandoffContextFile()
     models = ticket.subagent_models or {}
     lines = [
         entry_line('task', ticket.task),
         entry_line('summary', ticket.summary),
         entry_line('triaged-at', ticket.triaged_at),
         *list_lines(CONTEXT_KEY, ticket.context or ()),
-        'companion-docs:',
-        entry_line('issue-number', companions.issue_number, depth=1),
-        entry_line('jira-key', companions.jira_key, depth=1),
-        *list_lines('reference-urls', companions.reference_urls or (), depth=1),
+        *companion_lines(companions),
         'subagent-models:',
         *(entry_line(worker, model, depth=1) for worker, model in models.items()),
-        'handoff-context:',
-        entry_line('scope', handoff.scope, depth=1),
-        entry_line('plan-first', handoff.plan_first, depth=1),
-        entry_line('branch-name', handoff.branch_name, depth=1),
-        entry_line('worktrees-okay', handoff.worktrees_okay, depth=1),
+        *handoff_lines(handoff),
         *list_lines('investigations', ticket.investigations or ()),
     ]
     return '\n'.join(lines) + '\n'
