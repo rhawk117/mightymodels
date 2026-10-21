@@ -6,17 +6,17 @@ otherwise the (`excluded_kind`, `excluded_reference`) pair is left out.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.similarity import SimilarityKind
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
 
 
-type SimilarityKind = Literal['ledger-entry', 'scout-report', 'review-finding', 'crashout']
 type FtsMatchExpression = str
 
 

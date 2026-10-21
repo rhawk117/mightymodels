@@ -29,10 +29,10 @@ if TYPE_CHECKING:
     from mightymodels_core.git import GitRefusal
     from mightymodels_core.investigations.ledger import Ledger, LinkedLedgers
     from mightymodels_core.reviews.services import LatestReview
-    from mightymodels_core.schemas.investigations import EntryKind
     from mightymodels_core.snapshot.records import RepositoryFacts
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord, Transition
     from mightymodels_core.tickets.records import TicketRecord
+    from mightymodels_core.vocabulary.investigations import EntryKind
 
 NOT_STARTED = 'not started'
 NEVER_RUN = 'never-run'

@@ -19,12 +19,12 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives import RedactedText, RunId, Slug, TaskId
     from mightymodels_core.reviews.records import DecidedFinding
     from mightymodels_core.reviews.services import LatestReview
-    from mightymodels_core.schemas.contract import Outcome
-    from mightymodels_core.schemas.reviews import Depth
-    from mightymodels_core.schemas.tasks import TaskStatus, Worker
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
     from mightymodels_core.ticket_closing.records import ClosingRecord
     from mightymodels_core.tickets.records import TicketRecord, Tracker
+    from mightymodels_core.vocabulary.contract import Outcome
+    from mightymodels_core.vocabulary.reviews import Depth
+    from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
 
 type CommandOutcome = Outcome | Literal['never-run']
 

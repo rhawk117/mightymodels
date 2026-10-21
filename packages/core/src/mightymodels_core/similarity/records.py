@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mightymodels_core.primitives import RedactedText
-    from mightymodels_core.schemas.scout_reports import Scout
-    from mightymodels_core.schemas.similarity import SimilarityKind
+    from mightymodels_core.vocabulary.similarity import Scout, SimilarityKind
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

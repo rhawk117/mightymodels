@@ -14,11 +14,11 @@ if TYPE_CHECKING:
 
     from mightymodels_core.git import GitRefusal
     from mightymodels_core.primitives import RunId, Slug, TaskId
-    from mightymodels_core.schemas.investigations import EntryKind
-    from mightymodels_core.schemas.reviews import Decision, Depth
-    from mightymodels_core.schemas.tasks import TaskStatus, Worker
-    from mightymodels_core.schemas.tickets import TicketScope, TicketStatus
     from mightymodels_core.tickets.records import Tracker
+    from mightymodels_core.vocabulary.investigations import EntryKind
+    from mightymodels_core.vocabulary.reviews import Decision, Depth
+    from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
+    from mightymodels_core.vocabulary.tickets import TicketScope, TicketStatus
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100

@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from mightymodels_core.schemas.similarity import SimilarityKind
     from mightymodels_core.similarity.records import Duplicate, Match, ScoutReport, Written
+    from mightymodels_core.vocabulary.similarity import SimilarityKind
 
 
 @runtime_checkable

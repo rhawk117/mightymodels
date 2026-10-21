@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
     from mightymodels_core.primitives import TaskId
-    from mightymodels_core.schemas.tasks import Worker
     from mightymodels_core.ticket_closing.archive import (
         ArchivedCommand,
         ArchivedReview,
@@ -24,6 +23,7 @@ if TYPE_CHECKING:
         ArchiveRecord,
     )
     from mightymodels_core.tickets.records import Tracker
+    from mightymodels_core.vocabulary.tasks import Worker
 
 NONE_RECORDED = 'none recorded'
 
