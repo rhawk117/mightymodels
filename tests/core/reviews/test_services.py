@@ -56,6 +56,10 @@ def one(severity: FindingSeverity) -> list[FindingRecord]:
     return [create_gate_finding('F1', 'MV-1', severity)]
 
 
+def unknown_run_read_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('read', ['gate', 'report'])
+
+
 def gate_order_cases() -> pytest.MarkDecorator:
     def finding(key: str, source: str, **changes: object) -> FindingRecord:
         return replace(create_gate_finding(key, source), **changes)
@@ -204,7 +208,7 @@ class TestAddFindings:
 
 
 class TestGateAndReport:
-    @pytest.mark.parametrize('read', ['gate', 'report'])
+    @unknown_run_read_cases()
     def test_unknown_run_is_refused(self, service_harness: ServiceHarness, read: str) -> None:
         with pytest.raises(RunNotFoundError):
             getattr(service_harness.service, read)(UNSTARTED_RUN)

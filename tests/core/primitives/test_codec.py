@@ -14,6 +14,10 @@ def value() -> dict[str, object]:
     return {'name': 'café', 'items': [1, 2]}
 
 
+def malformed_json_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('text', ['{"a":', 'NaN', '[1] [2]', ''])
+
+
 class TestEncoding:
     def test_compact_has_nothing_between_tokens(self, value: dict[str, object]) -> None:
         assert encode_compact(value) == '{"name":"café","items":[1,2]}'.encode()
@@ -30,7 +34,7 @@ class TestEncoding:
 
 
 class TestDecodeFailure:
-    @pytest.mark.parametrize('text', ['{"a":', 'NaN', '[1] [2]', ''])
+    @malformed_json_cases()
     def test_malformed_json_raises_unreadable_json(self, text: str) -> None:
         with pytest.raises(UnreadableJsonError) as raised:
             decode_text(text)

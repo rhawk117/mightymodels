@@ -40,6 +40,27 @@ def create_record(repository: RepositoryState, *, warnings: tuple[str, ...] = ()
     )
 
 
+def section_line_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'line',
+        [
+            '- T1 blocked (engineer 2 | a wall)',
+            '- T2 not started',
+            '- T1.AC-1 never-run',
+            '- T1.AC-2: `pytest -q`',
+            '- use sqlite [doc] (cache e1)',
+            '- which size (cache e2)',
+            '- T1 blocked at aaaaaaaaaaaa: a wall',
+            '- run 20260506-070809 (standard) at aaaaaaaaaaaa: 3 findings',
+            '- undecided: F2',
+            '- remediation open: F1, F3',
+            '- F4 defer: later',
+            '- F5 dismiss: no reason',
+            '- git was not consulted: it did not answer',
+        ],
+    )
+
+
 class TestEmptySnapshot:
     @pytest.fixture
     def markdown(self) -> str:
@@ -158,24 +179,7 @@ class TestFilledSnapshot:
         assert lines[4] == f'Repository: feat/widget at {"a" * 12}; tree 2 changed.'
         assert lines[5:7] == ['- changed: src/a.py', '- changed: src/b.py']
 
-    @pytest.mark.parametrize(
-        'line',
-        [
-            '- T1 blocked (engineer 2 | a wall)',
-            '- T2 not started',
-            '- T1.AC-1 never-run',
-            '- T1.AC-2: `pytest -q`',
-            '- use sqlite [doc] (cache e1)',
-            '- which size (cache e2)',
-            '- T1 blocked at aaaaaaaaaaaa: a wall',
-            '- run 20260506-070809 (standard) at aaaaaaaaaaaa: 3 findings',
-            '- undecided: F2',
-            '- remediation open: F1, F3',
-            '- F4 defer: later',
-            '- F5 dismiss: no reason',
-            '- git was not consulted: it did not answer',
-        ],
-    )
+    @section_line_cases()
     def test_section_line_is_worded_from_the_record(self, markdown: str, line: str) -> None:
         assert line in markdown.splitlines()
 

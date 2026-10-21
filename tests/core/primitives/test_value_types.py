@@ -159,16 +159,8 @@ class TestSlug:
         assert decodes(SlugText, 'archives-2')
 
 
-class TestRepositoryKey:
-    toplevel = Path('/work/project')
-
-    def test_local_key_is_the_prefix_and_the_path_digest(self) -> None:
-        digest = hashlib.sha256(b'/work/project').hexdigest()
-
-        assert local_key(self.toplevel) == f'local:{digest}'
-        assert parse_repository_key(local_key(self.toplevel)) == local_key(self.toplevel)
-
-    @pytest.mark.parametrize(
+def origin_url_key_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         'url',
         [
             pytest.param('https://github.com/Owner/Name.git', id='https'),
@@ -176,10 +168,10 @@ class TestRepositoryKey:
             pytest.param('ssh://git@example.com:22/owner/name', id='ssh-with-port'),
         ],
     )
-    def test_origin_key_is_the_lowercased_owner_and_name(self, url: str) -> None:
-        assert origin_key(url) == 'owner/name'
 
-    @pytest.mark.parametrize(
+
+def origin_url_without_key_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         'url',
         [
             pytest.param('https://github.com/group/sub/name', id='subgroup'),
@@ -189,5 +181,21 @@ class TestRepositoryKey:
             pytest.param('https://github.com/owner/name\n', id='trailing-newline'),
         ],
     )
+
+
+class TestRepositoryKey:
+    toplevel = Path('/work/project')
+
+    def test_local_key_is_the_prefix_and_the_path_digest(self) -> None:
+        digest = hashlib.sha256(b'/work/project').hexdigest()
+
+        assert local_key(self.toplevel) == f'local:{digest}'
+        assert parse_repository_key(local_key(self.toplevel)) == local_key(self.toplevel)
+
+    @origin_url_key_cases()
+    def test_origin_key_is_the_lowercased_owner_and_name(self, url: str) -> None:
+        assert origin_key(url) == 'owner/name'
+
+    @origin_url_without_key_cases()
     def test_origin_that_is_not_an_owner_and_a_name_has_no_key(self, url: str) -> None:
         assert origin_key(url) is None

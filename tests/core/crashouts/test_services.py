@@ -22,6 +22,17 @@ DAY = timedelta(days=1)
 ROOT_CAUSE = 'the retry loop drops the connection pool after a timeout'
 
 
+def refused_entry_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'entry',
+        [
+            pytest.param(create_entry(failures=()), id='no-failures'),
+            pytest.param(create_entry(rant=' '), id='blank-rant'),
+            pytest.param(create_entry(rant='r' * 4_001), id='too-long'),
+        ],
+    )
+
+
 class TestAdd:
     def test_the_first_crashout_is_number_one(self, service_harness: ServiceHarness) -> None:
         assert service_harness.service.add(create_entry()).number == 1
@@ -54,14 +65,7 @@ class TestAdd:
         journaled = service_harness.service.add(create_entry(root_cause=ROOT_CAUSE))
         assert [duplicate.earlier.reference for duplicate in journaled.duplicates] == ['#1']
 
-    @pytest.mark.parametrize(
-        'entry',
-        [
-            pytest.param(create_entry(failures=()), id='no-failures'),
-            pytest.param(create_entry(rant=' '), id='blank-rant'),
-            pytest.param(create_entry(rant='r' * 4_001), id='too-long'),
-        ],
-    )
+    @refused_entry_cases()
     def test_a_refused_entry_writes_nothing(
         self, service_harness: ServiceHarness, entry: CrashoutEntry
     ) -> None:
