@@ -18,6 +18,7 @@ from mightymodels_core.reviews import (
     SourcesRequiredError,
     UnsupportedQualityError,
     fold_findings,
+    stored_severity,
 )
 
 if TYPE_CHECKING:
@@ -188,6 +189,11 @@ class TestSourceAndQualityChecks:
     def test_a_refused_batch_places_nothing(self) -> None:
         with pytest.raises(LocationShapeError):
             fold_findings([], [incoming_finding(), incoming_finding(location='nowhere')])
+
+
+class TestStoredSeverity:
+    def test_a_blocker_ranks_without_raising(self) -> None:
+        assert FindingOptions().rank(stored_severity('Blocker')) == FindingOptions().rank('High')
 
 
 class TestFindingNumbering:

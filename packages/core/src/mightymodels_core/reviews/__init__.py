@@ -31,7 +31,7 @@ from .errors import (
     WeightsMissingError,
     WeightSumError,
 )
-from .findings import FindingOptions, fold_findings
+from .findings import FindingOptions, fold_findings, stored_severity
 from .policy import (
     DecisionOptions,
     DisposePolicy,
@@ -56,6 +56,7 @@ from .records import (
     IncomingFinding,
     ResolvedFinding,
     ReviewRunRecord,
+    StoredSeverity,
 )
 from .reports import parse_report
 from .repository import ReviewDecisionRepository, ReviewRepository
@@ -123,6 +124,7 @@ __all__ = [
     'SqliteReviewRepository',
     'StartPolicy',
     'StartRequest',
+    'StoredSeverity',
     'UndecidedFindingError',
     'UnknownDimensionError',
     'UnknownFindingError',
@@ -138,4 +140,5 @@ __all__ = [
     'fold_findings',
     'parse_report',
     'reopened_keys',
+    'stored_severity',
 ]

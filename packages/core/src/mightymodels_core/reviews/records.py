@@ -6,7 +6,7 @@ models are plain.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from mightymodels_core.primitives import ReadLimit
 from mightymodels_core.reviews.errors import (
@@ -29,6 +29,8 @@ if TYPE_CHECKING:
         Result,
         Scope,
     )
+
+type StoredSeverity = Literal['Critical', 'High', 'Medium', 'Low']
 
 FINDINGS = ReadLimit(rows=1000, kept='findings')
 RUNS_LISTED = ReadLimit(rows=50, kept='review runs')
@@ -63,7 +65,7 @@ class IncomingFinding:
 class FindingRecord:
     key: str
     sources: tuple[str, ...]
-    severity: FindingSeverity
+    severity: StoredSeverity
     kind: FindingKind
     security: bool
     title: RedactedText

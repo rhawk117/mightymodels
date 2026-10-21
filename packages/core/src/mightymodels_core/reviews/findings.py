@@ -26,7 +26,11 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.primitives import RedactedText
-    from mightymodels_core.reviews.records import IncomingEvidence, IncomingFinding
+    from mightymodels_core.reviews.records import (
+        IncomingEvidence,
+        IncomingFinding,
+        StoredSeverity,
+    )
     from mightymodels_core.schemas.reviews import FindingSeverity
 
 type FindingProblem = (
@@ -43,17 +47,18 @@ LOCATION = re.compile(r'^(?P<path>[^\s:]+):(?P<start>\d+)(?:-(?P<end>\d+))?$')
 UNNUMBERED = 'F0'
 
 
+def stored_severity(severity: FindingSeverity) -> StoredSeverity:
+    return 'High' if severity == 'Blocker' else severity
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class FindingOptions:
     prose_limit: int = 4000
     conflict_gap: int = 2
     first_line: int = 1
-    ladder: tuple[FindingSeverity, ...] = ('Critical', 'High', 'Medium', 'Low')
+    ladder: tuple[StoredSeverity, ...] = ('Critical', 'High', 'Medium', 'Low')
 
-    def stored(self, severity: FindingSeverity) -> FindingSeverity:
-        return 'High' if severity == 'Blocker' else severity
-
-    def rank(self, severity: FindingSeverity) -> int:
+    def rank(self, severity: StoredSeverity) -> int:
         return self.ladder.index(severity)
 
 
@@ -127,7 +132,7 @@ class FindingCheck:
         return None
 
     def get_quality_problem(self, evidence: Evidence | None) -> UnsupportedQualityError | None:
-        severity = self.options.stored(self.finding.severity)
+        severity = stored_severity(self.finding.severity)
         if self.finding.kind != 'quality' or evidence is not None or severity == 'Low':
             return None
 
@@ -164,7 +169,7 @@ class FindingCheck:
         return FindingRecord(
             key=UNNUMBERED,
             sources=self.sources,
-            severity=self.options.stored(self.finding.severity),
+            severity=stored_severity(self.finding.severity),
             kind=self.finding.kind,
             security=self.finding.security,
             title=title,
