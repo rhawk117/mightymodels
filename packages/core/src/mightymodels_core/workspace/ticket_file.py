@@ -13,7 +13,7 @@ from msgspec import DecodeError, Struct, ValidationError
 from mightymodels_core.schemas.tickets import TicketScope
 
 from .errors import TicketFileSyntaxError, TicketFileTypeError
-from .ticket_scan import ROOT_PATH, scan_ticket
+from .ticket_scan import ROOT_PATH, is_skipped_line, scan_ticket, split_lines
 
 if TYPE_CHECKING:
     from .errors import TicketFileIssue
@@ -75,6 +75,10 @@ def get_syntax_issue(error: DecodeError) -> TicketFileSyntaxError:
     return TicketFileSyntaxError(line=line, reason=message.splitlines()[0])
 
 
+def blank_skipped_lines(source: str) -> str:
+    return '\n'.join('' if is_skipped_line(line) else line for line in split_lines(source))
+
+
 def parse_ticket_file(source: str) -> TicketFile | TicketFileIssue:
     scan = scan_ticket(source)
     if isinstance(scan, TicketFileSyntaxError):
@@ -84,7 +88,7 @@ def parse_ticket_file(source: str) -> TicketFile | TicketFileIssue:
         return TicketFile()
 
     try:
-        return msgspec.yaml.decode(source, type=TicketFile)
+        return msgspec.yaml.decode(blank_skipped_lines(source), type=TicketFile)
     except ValidationError as error:
         return get_type_issue(error, scan)
     except DecodeError as error:

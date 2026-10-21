@@ -75,6 +75,18 @@ def ticket_syntax_refusal_cases() -> pytest.MarkDecorator:
             reason='duplicate key b',
         ),
         SyntaxRefusal(
+            name='duplicate-key-spelled-with-a-space-before-the-colon',
+            source='task: t\ntask : evil\n',
+            line=2,
+            reason='a key holds no whitespace',
+        ),
+        SyntaxRefusal(
+            name='duplicate-key-spelled-with-quotes',
+            source='task: t\n"task": evil\n',
+            line=2,
+            reason='a key holds no whitespace and no quote',
+        ),
+        SyntaxRefusal(
             name='flow-mapping', source='a: {b: 1}\n', line=1, reason='unsupported YAML syntax'
         ),
         SyntaxRefusal(
@@ -177,34 +189,16 @@ def ticket_bool_word_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('refusal', [case.param for case in cases])
 
 
-def ticket_blank_line_refusal_cases() -> pytest.MarkDecorator:
-    cases = [
-        SyntaxRefusal(
-            name='tab-in-a-blank-line',
-            source='task: a\n\t\nsummary: b\n',
-            line=2,
-            reason='indentation holds a tab',
-        ),
-        SyntaxRefusal(
-            name='tab-in-a-comment-line',
-            source='task: a\n\t# note\nsummary: b\n',
-            line=2,
-            reason='indentation holds a tab',
-        ),
-        SyntaxRefusal(
-            name='no-break-space-in-a-blank-line',
-            source='task: a\n\xa0\nsummary: b\n',
-            line=2,
-            reason='indentation holds U+00A0',
-        ),
-        SyntaxRefusal(
-            name='no-break-space-in-a-comment-line',
-            source='task: a\n\xa0# note\nsummary: b\n',
-            line=2,
-            reason='indentation holds U+00A0',
-        ),
-    ]
-    return pytest.mark.parametrize('refusal', [case.param for case in cases])
+def ticket_blank_line_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'source',
+        [
+            pytest.param('task: t\n\t\n# c\n', id='tab-in-a-blank-line'),
+            pytest.param('task: t\n\t# c\n', id='tab-in-a-comment-line'),
+            pytest.param('task: t\n\xa0\n# c\n', id='no-break-space-in-a-blank-line'),
+            pytest.param('task: t\n\xa0# c\n', id='no-break-space-in-a-comment-line'),
+        ],
+    )
 
 
 def ticket_unreadable_character_cases() -> pytest.MarkDecorator:
@@ -230,6 +224,12 @@ def ticket_unreadable_character_cases() -> pytest.MarkDecorator:
         SyntaxRefusal(name='delete', source='task: a\x7f\n', line=1, reason='U+007F'),
         SyntaxRefusal(
             name='c1-control', source='task: a\nsummary: \x9f\n', line=2, reason='U+009F'
+        ),
+        SyntaxRefusal(
+            name='control-character-in-a-blank-line',
+            source='task: a\n\x0c\n',
+            line=2,
+            reason='U+000C',
         ),
         SyntaxRefusal(name='noncharacter', source='task: a\n\n\ufffe\n', line=3, reason='U+FFFE'),
     ]
@@ -330,15 +330,11 @@ class TestParseTicketFile:
     ) -> None:
         assert parse_ticket_file(source) == TicketFile(task='a', summary='b')
 
-    @ticket_blank_line_refusal_cases()
-    def test_a_tab_or_no_break_space_before_a_blank_or_comment_line_is_refused_with_its_line(
-        self, refusal: SyntaxRefusal
+    @ticket_blank_line_cases()
+    def test_a_blank_or_comment_line_holding_a_tab_or_no_break_space_is_skipped(
+        self, source: str
     ) -> None:
-        issue = parse_ticket_file(refusal.source)
-
-        assert isinstance(issue, TicketFileSyntaxError)
-        assert issue.line == refusal.line
-        assert refusal.reason in issue.reason
+        assert parse_ticket_file(source) == TicketFile(task='t')
 
     @pytest.mark.parametrize(
         ('source', 'task'),

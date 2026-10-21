@@ -26,6 +26,7 @@ ROOT_PATH = '$'
 UNREADABLE = re.compile(
     '[^\t\n\r\x20-\x7e\xa0-\u2027\u202a-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]'
 )
+KEY_QUOTES = ('"', "'")
 UNSUPPORTED_STARTS = ("'", '[', '{', '&', '*', '!', '|', '>')
 
 
@@ -58,8 +59,27 @@ def split_lines(source: str) -> list[str]:
     return [line.removesuffix('\n') for line in io.StringIO(source, newline=None)]
 
 
+def get_unreadable_problem(number: int, raw: str) -> TicketFileSyntaxError | None:
+    unreadable = UNREADABLE.search(raw)
+    if not unreadable:
+        return None
+
+    return TicketFileSyntaxError(
+        line=number,
+        reason=f'the line holds U+{ord(unreadable[0]):04X}, which a ticket file cannot hold',
+    )
+
+
+def is_skipped_line(raw: str) -> bool:
+    stripped = raw.lstrip()
+    return not stripped.strip() or stripped.startswith('#')
+
+
 def source_line(number: int, raw: str) -> SourceLine | TicketFileSyntaxError | None:
     stripped = raw.lstrip()
+    if is_skipped_line(raw):
+        return get_unreadable_problem(number, raw)
+
     leading = raw.removesuffix(stripped)
     if '\t' in leading:
         return TicketFileSyntaxError(
@@ -75,14 +95,8 @@ def source_line(number: int, raw: str) -> SourceLine | TicketFileSyntaxError | N
             ),
         )
 
-    if unreadable := UNREADABLE.search(raw):
-        return TicketFileSyntaxError(
-            line=number,
-            reason=f'the line holds U+{ord(unreadable[0]):04X}, which a ticket file cannot hold',
-        )
-
-    if not stripped.strip() or stripped.startswith('#'):
-        return None
+    if problem := get_unreadable_problem(number, raw):
+        return problem
 
     content = raw.rstrip()
     indent = len(content) - len(content.lstrip(' '))
@@ -100,6 +114,11 @@ def value_of(text: str) -> str:
     return text.partition(':')[2].strip()
 
 
+def has_unsupported_key(text: str) -> bool:
+    key = text.partition(':')[0]
+    return key.startswith(KEY_QUOTES) or any(char.isspace() for char in key)
+
+
 def get_line_problem(line: SourceLine) -> TicketFileSyntaxError | None:
     is_item = line.text.startswith(LIST_MARK)
     if is_item and not line.indent:
@@ -110,6 +129,12 @@ def get_line_problem(line: SourceLine) -> TicketFileSyntaxError | None:
     if not is_item and ':' not in line.text:
         return TicketFileSyntaxError(
             line=line.number, reason=f'expected "key: value", got {line.text}'
+        )
+
+    if not is_item and has_unsupported_key(line.text):
+        return TicketFileSyntaxError(
+            line=line.number,
+            reason=f'a key holds no whitespace and no quote, got {line.text}',
         )
 
     value = value_of(line.text)
