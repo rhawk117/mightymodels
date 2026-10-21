@@ -126,6 +126,21 @@ def has_unsupported_key(text: str) -> bool:
     return key.startswith(KEY_QUOTES) or any(char.isspace() for char in key)
 
 
+def get_key_problem(line: SourceLine) -> TicketFileSyntaxError | None:
+    if ':' not in line.text:
+        return TicketFileSyntaxError(
+            line=line.number, reason=f'expected "key: value", got {line.text}'
+        )
+
+    if has_unsupported_key(line.text):
+        return TicketFileSyntaxError(
+            line=line.number,
+            reason=f'a key holds no whitespace and no quote, got {line.text}',
+        )
+
+    return None
+
+
 def get_line_problem(line: SourceLine) -> TicketFileSyntaxError | None:
     is_item = line.text.startswith(LIST_MARK)
     if is_item and not line.indent:
@@ -133,16 +148,8 @@ def get_line_problem(line: SourceLine) -> TicketFileSyntaxError | None:
             line=line.number, reason='a list item is indented under its key'
         )
 
-    if not is_item and ':' not in line.text:
-        return TicketFileSyntaxError(
-            line=line.number, reason=f'expected "key: value", got {line.text}'
-        )
-
-    if not is_item and has_unsupported_key(line.text):
-        return TicketFileSyntaxError(
-            line=line.number,
-            reason=f'a key holds no whitespace and no quote, got {line.text}',
-        )
+    if not is_item and (problem := get_key_problem(line)):
+        return problem
 
     value = value_of(line.text)
     if value.startswith(UNSUPPORTED_STARTS):

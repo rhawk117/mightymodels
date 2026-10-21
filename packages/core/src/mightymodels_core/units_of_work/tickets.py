@@ -74,6 +74,16 @@ class TicketWriteUnit:
         draft.replace(workspace.ticket_file(slug))
 
 
+def review_decisions_of(entry: Entry, clock: Clock) -> ReviewDecisionService:
+    return ReviewDecisionService(
+        reviews=SqliteReviewRepository(unit=entry.unit, repository_id=entry.repository_id),
+        decisions=SqliteReviewDecisionRepository(
+            unit=entry.unit, repository_id=entry.repository_id
+        ),
+        clock=clock,
+    )
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TicketWork:
     database: Database
@@ -105,11 +115,7 @@ class TicketWork:
         tickets = TicketService(
             tickets=ticket_store, investigations=investigations, clock=self.clock
         )
-        review_decisions = ReviewDecisionService(
-            reviews=SqliteReviewRepository(unit=unit, repository_id=repository_id),
-            decisions=SqliteReviewDecisionRepository(unit=unit, repository_id=repository_id),
-            clock=self.clock,
-        )
+        review_decisions = review_decisions_of(entry, self.clock)
         closing = ClosingService(
             tickets=ticket_store,
             tasks=SqliteTaskRepository(unit=unit),
