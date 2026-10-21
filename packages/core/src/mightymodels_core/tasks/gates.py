@@ -40,6 +40,11 @@ def done_commit(brief_text: str) -> str | None:
     return str(named[1]) if separator and named else None
 
 
+def criterion_of_command(key: str) -> str | None:
+    _, separator, criterion = key.partition('.')
+    return criterion if separator else None
+
+
 def criteria_in_brief(brief_text: str) -> list[str]:
     asked = brief_text.split(DONE_HEADING, 1)[0]
     return [found[1] for found in ASKED_CRITERION.finditer(asked)]
@@ -100,7 +105,8 @@ class VerificationGate:
 
     @property
     def proven_criteria(self) -> set[str]:
-        by_command = {command.key.split('.', 1)[1] for command in self.evidence.commands}
+        criteria = (criterion_of_command(command.key) for command in self.evidence.commands)
+        by_command = {criterion for criterion in criteria if criterion is not None}
         return by_command | set(self.evidence.assertions)
 
     def commit_problems(self) -> list[str]:

@@ -54,6 +54,11 @@ def create_source_personas() -> SourcePersonas:
     return {'MV': 'merge-vader', 'UB': 'uncle-bob'}
 
 
+def persona_of_source(source: str, personas: SourcePersonas) -> Persona:
+    prefix, _, _ = source.partition('-')
+    return personas[prefix]
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ReviewOptions:
     standard_threshold: float = 0.25
@@ -240,7 +245,8 @@ class GatePolicy:
         return finding.severity == 'High' and self.decision_of(finding) != 'accept-risk'
 
     def heaviest_weight(self, finding: FindingRecord) -> float:
-        personas = (self.options.source_personas[source[:2]] for source in finding.sources)
+        table = self.options.source_personas
+        personas = (persona_of_source(source, table) for source in finding.sources)
         return max(self.weights.get(persona, 0) for persona in personas)
 
     def gate_key(self, finding: FindingRecord) -> tuple[int, bool, float, int]:

@@ -91,8 +91,12 @@ def overlaps(left: FindingRecord, right: FindingRecord) -> bool:
     )
 
 
+def finding_number(key: str) -> int:
+    return int(key.removeprefix('F'))
+
+
 def number_of(finding: FindingRecord) -> int:
-    return int(finding.key[1:])
+    return finding_number(finding.key)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

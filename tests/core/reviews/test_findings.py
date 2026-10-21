@@ -20,6 +20,8 @@ from mightymodels_core.reviews import (
     fold_findings,
     stored_severity,
 )
+from mightymodels_core.reviews.findings import finding_number
+from mightymodels_core.reviews.policy.review import create_source_personas, persona_of_source
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -206,6 +208,18 @@ class TestFindingNumbering:
         (stored,) = fold_one([], incoming_finding())
 
         assert stored.key == 'F1'
+
+
+class TestKeyParsing:
+    @pytest.mark.parametrize(('key', 'number'), [('F1', 1), ('F12', 12)])
+    def test_finding_number_reads_the_digits(self, key: str, number: int) -> None:
+        assert finding_number(key) == number
+
+    @pytest.mark.parametrize(
+        ('source', 'persona'), [('MV-3', 'merge-vader'), ('UB-16', 'uncle-bob')]
+    )
+    def test_persona_of_source_reads_the_prefix(self, source: str, persona: str) -> None:
+        assert persona_of_source(source, create_source_personas()) == persona
 
 
 class TestFindingOverlap:

@@ -18,6 +18,7 @@ from mightymodels_core.tasks import (
     get_readiness_problems,
     is_plan_task,
 )
+from mightymodels_core.tasks.gates import criterion_of_command
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -223,6 +224,14 @@ class TestDoneCommit:
     )
     def test_done_commit(self, brief_text: str, named: str | None) -> None:
         assert done_commit(brief_text) == named
+
+
+class TestCriterionOfCommand:
+    @pytest.mark.parametrize(
+        ('key', 'criterion'), [('T7.AC-1', 'AC-1'), ('R17.AC-2', 'AC-2'), ('nodot', None)]
+    )
+    def test_criterion_of_command(self, key: str, criterion: str | None) -> None:
+        assert criterion_of_command(key) == criterion
 
 
 class TestPlanTask:
