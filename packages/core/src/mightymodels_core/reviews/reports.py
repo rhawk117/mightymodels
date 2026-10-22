@@ -30,12 +30,12 @@ from mightymodels_core.reviews.records import IncomingEvidence, IncomingFinding
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from mightymodels_core.reviews.policy.review import Persona, PersonaSpecs
     from mightymodels_core.vocabulary.reviews import (
         Emphasis,
         EvidenceKind,
         FindingKind,
         FindingSeverity,
+        Persona,
     )
 
 FINDINGS_HEADING = '## Findings'
@@ -250,7 +250,9 @@ class ReportReader:
         )
 
 
-def parse_report(text: str, persona: Persona, specs: PersonaSpecs) -> list[IncomingFinding]:
+def parse_report(
+    text: str, persona: Persona, specs: Mapping[Persona, PersonaSpec]
+) -> list[IncomingFinding]:
     reader = ReportReader(persona=persona, spec=specs[persona])
     blocks = blocks_of(findings_section(text.splitlines()))
     return [reader.finding_of(index, block) for index, block in enumerate(blocks)]

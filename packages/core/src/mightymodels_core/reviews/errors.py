@@ -8,8 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.primitives import RunId
-    from mightymodels_core.reviews.policy import Persona
-    from mightymodels_core.vocabulary.reviews import Decision, Result, Scope
+    from mightymodels_core.vocabulary.reviews import Decision, Persona, Result, Scope
 
 
 class RunNotFoundError(StateError):

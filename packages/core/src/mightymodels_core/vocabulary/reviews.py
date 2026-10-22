@@ -20,6 +20,9 @@ type FindingKind = Literal['defect', 'quality']
 type EvidenceKind = Literal['metric', 'idiom', 'convention']
 
 
+type Persona = Literal['merge-vader', 'uncle-bob']
+
+
 type Decision = Literal['fix', 'defer', 'accept-risk', 'dismiss']
 
 

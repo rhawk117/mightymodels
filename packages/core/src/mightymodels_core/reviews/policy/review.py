@@ -32,9 +32,15 @@ if TYPE_CHECKING:
     from mightymodels_core.git import UnsafeRevisionError
     from mightymodels_core.primitives import RoutingTable, Slug
     from mightymodels_core.reviews.records import DecidedFinding, FindingRecord, ResolvedFinding
-    from mightymodels_core.vocabulary.reviews import Decision, Depth, Emphasis, Result, Scope
+    from mightymodels_core.vocabulary.reviews import (
+        Decision,
+        Depth,
+        Emphasis,
+        Persona,
+        Result,
+        Scope,
+    )
 
-type Persona = Literal['merge-vader', 'uncle-bob']
 type Verdict = Literal['BLOCK', 'MERGE WITH CONDITIONS', 'CLEAR']
 type TargetIssue = BaseRequiredError | SlugRequiredError | UnsafeRevisionError
 type WeightsIssue = WeightsMissingError | WeightRangeError | WeightSumError

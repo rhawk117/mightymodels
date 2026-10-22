@@ -1,5 +1,7 @@
 """The review policies: the start, override and gate rules, and the decision rules."""
 
+from mightymodels_core.vocabulary.reviews import Persona
+
 from .decisions import (
     DecisionOptions,
     DisposeIssue,
@@ -12,7 +14,6 @@ from .decisions import (
 from .review import (
     GatePolicy,
     OverridePolicy,
-    Persona,
     Presets,
     ReviewOptions,
     SourcePersonas,
