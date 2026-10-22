@@ -49,7 +49,7 @@ class TestMark:
             service_harness.service.mark(SERVICE_SLUG, request)
 
     def test_mark_refuses_a_closed_ticket(self, started_harness: ServiceHarness) -> None:
-        started_harness.tickets.mark_closed(SERVICE_SLUG)
+        started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
         request = MarkRequest(task_key=FIRST_TASK, to='failed', reason='no')
 
         with pytest.raises(ClosedTicketError):
@@ -109,7 +109,7 @@ class TestRecordFailedFix:
     def test_a_failed_fix_is_refused_on_a_closed_ticket(
         self, started_harness: ServiceHarness
     ) -> None:
-        started_harness.tickets.mark_closed(SERVICE_SLUG)
+        started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         with pytest.raises(ClosedTicketError):
             started_harness.service.record_failed_fix(SERVICE_SLUG, FIRST_TASK, 'a guess')

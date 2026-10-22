@@ -125,7 +125,7 @@ class TestStart:
             service_harness.service.start(OTHER_SLUG, create_start_request())
 
     def test_start_refuses_a_closed_ticket(self, service_harness: ServiceHarness) -> None:
-        service_harness.tickets.mark_closed(SERVICE_SLUG)
+        service_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         with pytest.raises(ClosedTicketError):
             service_harness.service.start(SERVICE_SLUG, create_start_request())

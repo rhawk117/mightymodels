@@ -28,7 +28,7 @@ class TestShow:
         assert (listing.records, listing.attempts) == ([], {})
 
     def test_show_works_on_a_closed_ticket(self, started_harness: ServiceHarness) -> None:
-        started_harness.tickets.mark_closed(SERVICE_SLUG)
+        started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         assert started_harness.service.show(SERVICE_SLUG).records
 

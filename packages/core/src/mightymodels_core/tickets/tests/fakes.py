@@ -58,6 +58,9 @@ class FakeTicketRepository:
     def mark_closed(self, slug: Slug) -> None:
         self._set_status(self.staged_ticket(slug), 'closed')
 
+    def seed_status(self, slug: Slug, status: TicketStatus) -> None:
+        self._set_status(self.staged_ticket(slug), status)
+
     def unclosed_on_branch(self, branch: str) -> Slug | None:
         on_branch = self.all_unclosed_on_branch(branch)
         return on_branch[0] if len(on_branch) == 1 else None

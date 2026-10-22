@@ -10,7 +10,7 @@ from mightymodels_core.tickets import (
     TicketPolicy,
     TicketRecord,
 )
-from mightymodels_core.tickets.policy import get_closed_problem
+from mightymodels_core.tickets.policy import OpenTicket, get_closed_problem, open_ticket
 from mightymodels_core.workspace import CompanionDocsFile, HandoffContextFile, TicketFile
 from msgspec.structs import replace
 
@@ -275,3 +275,11 @@ class TestClosedProblem:
 
     def test_an_open_record_gives_no_problem(self, open_record: TicketRecord) -> None:
         assert get_closed_problem(open_record) is None
+
+    def test_a_closed_record_gives_no_open_ticket(self, open_record: TicketRecord) -> None:
+        result = open_ticket(replace_record(open_record, status='closed'))
+
+        assert isinstance(result, ClosedTicketError)
+
+    def test_an_open_record_gives_an_open_ticket(self, open_record: TicketRecord) -> None:
+        assert open_ticket(open_record) == OpenTicket(id=open_record.id, slug=SLUG)

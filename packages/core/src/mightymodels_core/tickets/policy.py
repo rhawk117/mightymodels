@@ -76,6 +76,20 @@ def get_closed_problem(record: TicketRecord) -> ClosedTicketError | None:
     return ClosedTicketError(slug=record.slug) if record.status == 'closed' else None
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class OpenTicket:
+    id: int
+    slug: Slug
+
+
+def open_ticket(record: TicketRecord) -> OpenTicket | ClosedTicketError:
+    closed = get_closed_problem(record)
+    if closed is not None:
+        return closed
+
+    return OpenTicket(id=record.id, slug=record.slug)
+
+
 def branch_of(choice: BranchChoice, name: str, current: str | None) -> str:
     if choice == 'new':
         return name.strip()

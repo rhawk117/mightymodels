@@ -72,7 +72,7 @@ class TestPrepareVerification:
             started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
 
     def test_prepare_refuses_a_closed_ticket(self, started_harness: ServiceHarness) -> None:
-        started_harness.tickets.mark_closed(SERVICE_SLUG)
+        started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         with pytest.raises(ClosedTicketError):
             started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
@@ -134,7 +134,7 @@ class TestVerify:
     ) -> None:
         seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
         request = create_verify_request(seen, changed_files=OWNED_CHANGE)
-        proven_harness.tickets.mark_closed(SERVICE_SLUG)
+        proven_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         with pytest.raises(ClosedTicketError):
             proven_harness.service.verify(SERVICE_SLUG, request)
