@@ -32,22 +32,15 @@ if TYPE_CHECKING:
     from mightymodels_core.git import UnsafeRevisionError
     from mightymodels_core.primitives import RoutingTable, Slug
     from mightymodels_core.reviews.records import DecidedFinding, FindingRecord, ResolvedFinding
-    from mightymodels_core.vocabulary.reviews import (
-        Decision,
-        Depth,
-        Emphasis,
-        Persona,
-        Result,
-        Scope,
-    )
+    from mightymodels_core.vocabulary import reviews
 
 type Verdict = Literal['BLOCK', 'MERGE WITH CONDITIONS', 'CLEAR']
 type TargetIssue = BaseRequiredError | SlugRequiredError | UnsafeRevisionError
 type WeightsIssue = WeightsMissingError | WeightRangeError | WeightSumError
 type StartIssue = TargetIssue | WeightsIssue | PersonaChoiceError
-type Presets = dict[Emphasis, dict[str, float]]
-type SourcePersonas = dict[str, Persona]
-type PersonaSpecs = dict[Persona, PersonaSpec]
+type Presets = dict[reviews.Emphasis, dict[str, float]]
+type SourcePersonas = dict[str, reviews.Persona]
+type PersonaSpecs = dict[reviews.Persona, PersonaSpec]
 
 
 def create_persona_specs() -> PersonaSpecs:
@@ -65,7 +58,7 @@ def create_persona_specs() -> PersonaSpecs:
     }
 
 
-def persona_of_source(source: str, personas: SourcePersonas) -> Persona:
+def persona_of_source(source: str, personas: SourcePersonas) -> reviews.Persona:
     return personas[source.partition('-')[0]]
 
 
@@ -74,14 +67,18 @@ class ReviewOptions:
     standard_threshold: float = 0.25
     weight_tolerance: float = 0.001
     run_id_format: str = '%Y%m%d-%H%M%S'
-    personas: tuple[Persona, ...] = ('merge-vader', 'uncle-bob')
-    scopes_needing_base: tuple[Scope, ...] = ('branch', 'ticket')
-    closed_by_decision: tuple[Decision, ...] = ('dismiss',)
+    personas: tuple[reviews.Persona, ...] = ('merge-vader', 'uncle-bob')
+    scopes_needing_base: tuple[reviews.Scope, ...] = ('branch', 'ticket')
+    closed_by_decision: tuple[reviews.Decision, ...] = ('dismiss',)
     specs: PersonaSpecs = field(default_factory=create_persona_specs)
 
     @property
     def presets(self) -> Presets:
-        emphases: tuple[Emphasis, ...] = ('release-readiness', 'maintainability', 'balanced')
+        emphases: tuple[reviews.Emphasis, ...] = (
+            'release-readiness',
+            'maintainability',
+            'balanced',
+        )
         return {e: {name: spec.weights[e] for name, spec in self.specs.items()} for e in emphases}
 
     @property
@@ -95,13 +92,13 @@ class ReviewOptions:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class StartRequest:
-    scope: Scope
+    scope: reviews.Scope
     base: str | None
     slug: Slug | None
-    depth: Depth
-    emphasis: Emphasis
+    depth: reviews.Depth
+    emphasis: reviews.Emphasis
     weights: Mapping[str, float] | None = None
-    persona: Persona | None = None
+    persona: reviews.Persona | None = None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -122,13 +119,13 @@ class StartPolicy:
         return dict(self.options.presets[self.request.emphasis])
 
     @property
-    def leaders(self) -> list[Persona]:
+    def leaders(self) -> list[reviews.Persona]:
         weights = self.weights
         heaviest = max(weights.values())
         return [persona for persona in self.options.personas if weights[persona] == heaviest]
 
     @property
-    def personas(self) -> list[Persona]:
+    def personas(self) -> list[reviews.Persona]:
         if self.request.depth == 'deep':
             return list(self.options.personas)
 
@@ -246,11 +243,11 @@ def reopened_keys(
 @dataclass(slots=True, kw_only=True, frozen=True)
 class GatePolicy:
     weights: Mapping[str, float]
-    decisions: Mapping[str, Decision]
-    results: Mapping[str, Result]
+    decisions: Mapping[str, reviews.Decision]
+    results: Mapping[str, reviews.Result]
     options: ReviewOptions = field(default_factory=ReviewOptions)
 
-    def decision_of(self, finding: FindingRecord) -> Decision | None:
+    def decision_of(self, finding: FindingRecord) -> reviews.Decision | None:
         return self.decisions.get(finding.key)
 
     def is_open(self, finding: FindingRecord) -> bool:
