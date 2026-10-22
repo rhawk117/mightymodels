@@ -29,9 +29,8 @@ if TYPE_CHECKING:
     from mightymodels_core.reviews.records import (
         IncomingEvidence,
         IncomingFinding,
-        StoredSeverity,
     )
-    from mightymodels_core.vocabulary.reviews import FindingSeverity
+    from mightymodels_core.vocabulary.reviews import FindingSeverity, StoredSeverity
 
 type FindingProblem = (
     SourcesRequiredError

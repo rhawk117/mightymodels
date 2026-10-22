@@ -14,6 +14,9 @@ type Emphasis = Literal['release-readiness', 'maintainability', 'balanced', 'cus
 type FindingSeverity = Literal['Blocker', 'Critical', 'High', 'Medium', 'Low']
 
 
+type StoredSeverity = Literal['Critical', 'High', 'Medium', 'Low']
+
+
 type FindingKind = Literal['defect', 'quality']
 
 

@@ -12,9 +12,9 @@ from mightymodels_core.vocabulary.reviews import (
     Emphasis,
     EvidenceKind,
     FindingKind,
-    FindingSeverity,
     Result,
     Scope,
+    StoredSeverity,
 )
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ class UpsertReviewFindingParams(Struct, frozen=True, kw_only=True):
     review_run_id: int
     finding_key: str
     sources: list[str]
-    severity: FindingSeverity
+    severity: StoredSeverity
     kind: FindingKind
     security: bool
     title: str
@@ -122,7 +122,7 @@ class ReviewFindingRow(Struct, frozen=True, kw_only=True):
     id: int
     finding_key: str
     sources: list[str]
-    severity: FindingSeverity
+    severity: StoredSeverity
     kind: FindingKind
     security: bool
     title: str

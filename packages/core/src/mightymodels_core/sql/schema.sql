@@ -228,7 +228,7 @@ CREATE TABLE review_findings (
   CONSTRAINT uq_review_findings_key UNIQUE (review_run_id, finding_key),
   CONSTRAINT ck_review_findings_sources CHECK (json_valid(sources)),
   CONSTRAINT ck_review_findings_severity
-    CHECK (severity IN ('Blocker', 'Critical', 'High', 'Medium', 'Low')),
+    CHECK (severity IN ('Critical', 'High', 'Medium', 'Low')),
   CONSTRAINT ck_review_findings_kind CHECK (kind IN ('defect', 'quality')),
   CONSTRAINT ck_review_findings_security CHECK (security IN (0, 1)),
   CONSTRAINT ck_review_findings_evidence_kind
@@ -375,4 +375,4 @@ SELECT
   ) AS projection
 FROM tickets AS t;
 
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;

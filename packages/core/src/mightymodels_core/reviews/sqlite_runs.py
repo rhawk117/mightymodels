@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import RunId, Slug, redact
 from mightymodels_core.reviews.errors import RunExistsError, RunNotFoundError
-from mightymodels_core.reviews.findings import stored_severity
 from mightymodels_core.reviews.records import (
     FINDINGS,
     RUNS_LISTED,
@@ -67,7 +66,7 @@ def finding_of(row: ReviewFindingRow) -> FindingRecord:
     return FindingRecord(
         key=row.finding_key,
         sources=tuple(row.sources),
-        severity=stored_severity(row.severity),
+        severity=row.severity,
         kind=row.kind,
         security=row.security,
         title=redact(row.title),

@@ -1,5 +1,7 @@
 """The review records, their repository seams and the sqlite stores behind them."""
 
+from mightymodels_core.vocabulary.reviews import StoredSeverity
+
 from .errors import (
     BaseRequiredError,
     CommitRequiredError,
@@ -56,7 +58,6 @@ from .records import (
     IncomingFinding,
     ResolvedFinding,
     ReviewRunRecord,
-    StoredSeverity,
 )
 from .reports import parse_report
 from .repository import ReviewDecisionRepository, ReviewRepository
