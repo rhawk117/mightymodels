@@ -8,12 +8,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import REVIEWER_AGENTS, redact
-from mightymodels_core.tickets.errors import TicketExistsError
+from mightymodels_core.tickets.errors import ClosedTicketError, TicketExistsError
 from mightymodels_core.tickets.policy import (
     PRIMARY_AGENT,
     TicketOptions,
     TicketPolicy,
     declared_slugs,
+    open_ticket,
 )
 from mightymodels_core.tickets.records import TicketSection, Tracker
 from mightymodels_core.workspace import (
@@ -31,8 +32,17 @@ if TYPE_CHECKING:
 
     from mightymodels_core.investigations import InvestigationRepository
     from mightymodels_core.primitives import Clock, Slug
+    from mightymodels_core.tickets.policy import OpenTicket
     from mightymodels_core.tickets.records import TicketAnswers, TicketRecord, TicketSlot
     from mightymodels_core.tickets.repository import TicketRepository
+
+
+def open_ticket_of(tickets: TicketRepository, slug: Slug) -> OpenTicket:
+    token = open_ticket(tickets.staged_ticket(slug))
+    if isinstance(token, ClosedTicketError):
+        raise token
+
+    return token
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

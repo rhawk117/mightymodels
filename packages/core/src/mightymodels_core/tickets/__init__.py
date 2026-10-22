@@ -25,7 +25,7 @@ from .records import (
     Tracker,
 )
 from .repository import TicketRepository
-from .services import ContextUpdate, TicketService, TicketSource
+from .services import ContextUpdate, TicketService, TicketSource, open_ticket_of
 from .sqlite_tickets import SqliteTicketRepository
 
 __all__ = [
@@ -52,4 +52,5 @@ __all__ = [
     'branch_of',
     'declared_slugs',
     'get_branch_problem',
+    'open_ticket_of',
 ]

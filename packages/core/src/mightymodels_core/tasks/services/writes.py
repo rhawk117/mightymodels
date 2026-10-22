@@ -25,8 +25,7 @@ from mightymodels_core.tasks.policy import (
     TransitionPolicy,
 )
 from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
-from mightymodels_core.tickets.errors import ClosedTicketError
-from mightymodels_core.tickets.policy import open_ticket
+from mightymodels_core.tickets import open_ticket_of
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -37,7 +36,6 @@ if TYPE_CHECKING:
     from mightymodels_core.tasks.gates import Brief, GitFacts
     from mightymodels_core.tasks.records import TaskRecord
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
-    from mightymodels_core.tickets.policy import OpenTicket
     from mightymodels_core.tickets.repository import TicketRepository
     from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus, Worker
 
@@ -98,14 +96,6 @@ def start_transition(policy: StartPolicy, request: StartRequest, at: datetime) -
         head=request.head,
         at=at,
     )
-
-
-def open_ticket_of(tickets: TicketRepository, slug: Slug) -> OpenTicket:
-    token = open_ticket(tickets.staged_ticket(slug))
-    if isinstance(token, ClosedTicketError):
-        raise token
-
-    return token
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
