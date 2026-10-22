@@ -27,7 +27,8 @@ from mightymodels_core.tasks.policy import (
     TransitionPolicy,
 )
 from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
-from mightymodels_core.tickets.policy import get_closed_problem
+from mightymodels_core.tickets.errors import ClosedTicketError
+from mightymodels_core.tickets.policy import open_ticket
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     from mightymodels_core.tasks.gates import Brief, GitFacts
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
+    from mightymodels_core.tickets.policy import OpenTicket
     from mightymodels_core.tickets.repository import TicketRepository
     from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus, Worker
 
@@ -130,12 +132,12 @@ def start_policy_for(service: TaskService, ticket_id: int, request: StartRequest
     )
 
 
-def unclosed_ticket_id(tickets: TicketRepository, slug: Slug) -> int:
-    record = tickets.staged_ticket(slug)
-    if problem := get_closed_problem(record):
-        raise problem
+def open_ticket_of(tickets: TicketRepository, slug: Slug) -> OpenTicket:
+    token = open_ticket(tickets.staged_ticket(slug))
+    if isinstance(token, ClosedTicketError):
+        raise token
 
-    return record.id
+    return token
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -148,7 +150,8 @@ class TaskService:
     options: TaskOptions = field(default_factory=TaskOptions)
 
     def start(self, slug: Slug, request: StartRequest) -> TaskRecord:
-        ticket_id = unclosed_ticket_id(self.tickets, slug)
+        ticket = open_ticket_of(self.tickets, slug)
+        ticket_id = ticket.id
         policy = start_policy_for(self, ticket_id, request)
         if problem := policy.get_start_problem():
             raise problem
@@ -158,14 +161,14 @@ class TaskService:
             mode=policy.architect_mode,
             owned=tuple(sorted(set(request.owned))),
         )
-        self.tickets.mark_in_progress(slug)
+        self.tickets.mark_in_progress(ticket)
         self.tasks.record_start(
             ticket_id, start_transition(policy, request, self.clock.now()), attempt
         )
         return self.task_held(ticket_id, request.task_key)
 
     def prepare_verification(self, slug: Slug, task_key: TaskId) -> TaskRecord:
-        ticket_id = unclosed_ticket_id(self.tickets, slug)
+        ticket_id = open_ticket_of(self.tickets, slug).id
         task = self.tasks.task(ticket_id, task_key)
         if task is None:
             raise TransitionError(task_key=task_key, current='pending', target='verified')
@@ -181,7 +184,8 @@ class TaskService:
             raise problem
 
     def verify(self, slug: Slug, request: VerifyRequest) -> TaskRecord:
-        ticket_id = unclosed_ticket_id(self.tickets, slug)
+        ticket = open_ticket_of(self.tickets, slug)
+        ticket_id = ticket.id
         task_key = request.seen.key
         current = self.task_held(ticket_id, task_key)
         if moved := get_moved_fields(request.seen, current):
@@ -200,7 +204,7 @@ class TaskService:
             head=request.git.head,
             at=self.clock.now(),
         )
-        self.tickets.mark_in_progress(slug)
+        self.tickets.mark_in_progress(ticket)
         self.tasks.record_verification(ticket_id, transition, request.commit)
         return self.task_held(ticket_id, task_key)
 
@@ -219,7 +223,8 @@ class TaskService:
         )
 
     def mark(self, slug: Slug, request: MarkRequest) -> TaskRecord:
-        ticket_id = unclosed_ticket_id(self.tickets, slug)
+        ticket = open_ticket_of(self.tickets, slug)
+        ticket_id = ticket.id
         task_key = request.task_key
         before = status_of(self.tasks.task(ticket_id, task_key))
         policy = TransitionPolicy(
@@ -236,13 +241,13 @@ class TaskService:
             head=None,
             at=self.clock.now(),
         )
-        self.tickets.mark_in_progress(slug)
+        self.tickets.mark_in_progress(ticket)
         self.tasks.record_mark(ticket_id, transition)
         return self.task_held(ticket_id, task_key)
 
     def record_failed_fix(self, slug: Slug, task_key: TaskId, hypothesis: str) -> FixRecorded:
         redacted = redact_within(hypothesis, 'hypothesis', self.options.hypothesis_limit)
-        ticket_id = unclosed_ticket_id(self.tickets, slug)
+        ticket_id = open_ticket_of(self.tickets, slug).id
         tried = self.attempts.failed_fixes(ticket_id, task_key)
         policy = FixPolicy(
             task_key=task_key,

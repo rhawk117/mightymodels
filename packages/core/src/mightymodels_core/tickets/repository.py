@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.primitives import Slug
+    from mightymodels_core.tickets.policy import OpenTicket
     from mightymodels_core.tickets.records import TicketRecord, TicketSection
 
 
@@ -26,9 +27,9 @@ class TicketRepository(Protocol):
         self, slug: Slug, section: TicketSection, declared: Sequence[str]
     ) -> TicketRecord: ...
 
-    def mark_in_progress(self, slug: Slug) -> None: ...
+    def mark_in_progress(self, ticket: OpenTicket) -> None: ...
 
-    def mark_closed(self, slug: Slug) -> None: ...
+    def mark_closed(self, ticket: OpenTicket) -> None: ...
 
     def unclosed_on_branch(self, branch: str) -> Slug | None: ...
 

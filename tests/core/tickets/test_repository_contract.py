@@ -10,11 +10,14 @@ from mightymodels_core.tickets import (
     TicketRepository,
     UnknownInvestigationError,
 )
+from mightymodels_core.tickets.policy import OpenTicket, open_ticket
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 from .conftest import RECORDED_INVESTIGATIONS, create_section
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from mightymodels_core.tickets import TicketSection
 
 FIRST = Slug('first')
@@ -22,6 +25,16 @@ SECOND = Slug('second')
 THIRD = Slug('third')
 FIRST_LOOK, SECOND_LOOK = RECORDED_INVESTIGATIONS
 SECRET_SUMMARY = 'rotate sk-ant-' + 'a' * 24 + ' soon'
+
+
+@pytest.fixture
+def open_of(repository: TicketRepository) -> Callable[[Slug], OpenTicket]:
+    def token(slug: Slug) -> OpenTicket:
+        issued = open_ticket(repository.staged_ticket(slug))
+        assert isinstance(issued, OpenTicket)
+        return issued
+
+    return token
 
 
 class TestImplementations:
@@ -53,8 +66,10 @@ class TestLookup:
         with pytest.raises(NotStagedError):
             repository.staged_ticket(FIRST)
 
-    def test_staged_ticket_still_finds_a_closed_ticket(self, staged: TicketRepository) -> None:
-        staged.mark_closed(FIRST)
+    def test_staged_ticket_still_finds_a_closed_ticket(
+        self, staged: TicketRepository, open_of: Callable[[Slug], OpenTicket]
+    ) -> None:
+        staged.mark_closed(open_of(FIRST))
 
         assert staged.staged_ticket(FIRST).status == 'closed'
 
@@ -84,8 +99,10 @@ class TestStage:
 
         assert linked.staged_ticket(FIRST).section == self.replacement
 
-    def test_restage_keeps_the_status(self, linked: TicketRepository) -> None:
-        linked.mark_in_progress(FIRST)
+    def test_restage_keeps_the_status(
+        self, linked: TicketRepository, open_of: Callable[[Slug], OpenTicket]
+    ) -> None:
+        linked.mark_in_progress(open_of(FIRST))
 
         record = linked.stage(FIRST, self.replacement, ())
 
@@ -117,25 +134,21 @@ class TestStatus:
         repository.stage(FIRST, create_section(FIRST, 'main'), ())
         return repository
 
-    def test_mark_in_progress_moves_a_staged_ticket(self, staged: TicketRepository) -> None:
-        staged.mark_in_progress(FIRST)
+    def test_mark_in_progress_moves_a_staged_ticket(
+        self, staged: TicketRepository, open_of: Callable[[Slug], OpenTicket]
+    ) -> None:
+        staged.mark_in_progress(open_of(FIRST))
 
         assert staged.staged_ticket(FIRST).status == 'in-progress'
 
-    def test_mark_in_progress_refuses_an_unstaged_slug(self, repository: TicketRepository) -> None:
-        with pytest.raises(NotStagedError):
-            repository.mark_in_progress(FIRST)
+    def test_mark_closed_closes_an_in_progress_ticket(
+        self, staged: TicketRepository, open_of: Callable[[Slug], OpenTicket]
+    ) -> None:
+        staged.mark_in_progress(open_of(FIRST))
 
-    def test_mark_closed_closes_an_in_progress_ticket(self, staged: TicketRepository) -> None:
-        staged.mark_in_progress(FIRST)
-
-        staged.mark_closed(FIRST)
+        staged.mark_closed(open_of(FIRST))
 
         assert staged.staged_ticket(FIRST).status == 'closed'
-
-    def test_mark_closed_refuses_an_unstaged_slug(self, repository: TicketRepository) -> None:
-        with pytest.raises(NotStagedError):
-            repository.mark_closed(FIRST)
 
 
 class TestTicketId:
@@ -156,10 +169,12 @@ class TestTicketId:
 
         assert restaged.id == before
 
-    def test_status_change_keeps_the_id(self, staged: TicketRepository) -> None:
+    def test_status_change_keeps_the_id(
+        self, staged: TicketRepository, open_of: Callable[[Slug], OpenTicket]
+    ) -> None:
         before = staged.staged_ticket(FIRST).id
 
-        staged.mark_in_progress(FIRST)
+        staged.mark_in_progress(open_of(FIRST))
 
         assert staged.staged_ticket(FIRST).id == before
 
@@ -178,8 +193,10 @@ class TestBranchQueries:
         return repository
 
     @pytest.fixture
-    def lone(self, busy: TicketRepository) -> TicketRepository:
-        busy.mark_closed(THIRD)
+    def lone(
+        self, busy: TicketRepository, open_of: Callable[[Slug], OpenTicket]
+    ) -> TicketRepository:
+        busy.mark_closed(open_of(THIRD))
         return busy
 
     def test_no_ticket_on_a_branch_names_none(self, busy: TicketRepository) -> None:

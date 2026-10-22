@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.database import Unit
     from mightymodels_core.schemas.tickets import TicketRow, TicketStatus
+    from mightymodels_core.tickets.policy import OpenTicket
 
 
 def record_of(row: TicketRow) -> TicketRecord:
@@ -105,13 +106,11 @@ class SqliteTicketRepository:
         self.unit.run_many(LINK_TICKET_INVESTIGATION, links)
         return self.staged_ticket(slug)
 
-    def mark_in_progress(self, slug: Slug) -> None:
-        self.staged_ticket(slug)
-        self.set_status(slug, 'in-progress')
+    def mark_in_progress(self, ticket: OpenTicket) -> None:
+        self.set_status(ticket.slug, 'in-progress')
 
-    def mark_closed(self, slug: Slug) -> None:
-        self.staged_ticket(slug)
-        self.set_status(slug, 'closed')
+    def mark_closed(self, ticket: OpenTicket) -> None:
+        self.set_status(ticket.slug, 'closed')
 
     def unclosed_on_branch(self, branch: str) -> Slug | None:
         pair = self.unit.all(

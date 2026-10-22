@@ -24,7 +24,8 @@ from mightymodels_core.ticket_closing.policy import (
     get_moved_fields,
 )
 from mightymodels_core.ticket_closing.records import ClosingRecord
-from mightymodels_core.tickets.policy import get_closed_problem
+from mightymodels_core.tickets.errors import ClosedTicketError
+from mightymodels_core.tickets.policy import open_ticket
 
 if TYPE_CHECKING:
     from mightymodels_core.contract.repository import ContractRepository
@@ -85,8 +86,9 @@ class ClosingService:
 
     def close(self, slug: Slug, request: CloseRequest) -> ClosedTicket:
         ticket = self.tickets.staged_ticket(slug)
-        if problem := get_closed_problem(ticket):
-            raise problem
+        token = open_ticket(ticket)
+        if isinstance(token, ClosedTicketError):
+            raise token
 
         if moved := get_moved_fields(request.seen, ticket):
             raise TicketMovedError(slug=slug, changed=moved)
@@ -103,7 +105,7 @@ class ClosingService:
 
         closing = self.closing_record_of(request, lines)
         archive = create_archive_record(self.archive_sources(ticket, closing, review))
-        self.tickets.mark_closed(slug)
+        self.tickets.mark_closed(token)
         self.closings.record_closing(ticket.id, closing)
         return ClosedTicket(closing=closing, archive=archive)
 

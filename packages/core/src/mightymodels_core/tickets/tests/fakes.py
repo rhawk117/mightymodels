@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.primitives import Slug
     from mightymodels_core.schemas.tickets import TicketStatus
+    from mightymodels_core.tickets.policy import OpenTicket
     from mightymodels_core.tickets.records import TicketSection
 
 
@@ -52,11 +53,11 @@ class FakeTicketRepository:
         self.records[slug] = record
         return record
 
-    def mark_in_progress(self, slug: Slug) -> None:
-        self._set_status(self.staged_ticket(slug), 'in-progress')
+    def mark_in_progress(self, ticket: OpenTicket) -> None:
+        self._set_status(self.staged_ticket(ticket.slug), 'in-progress')
 
-    def mark_closed(self, slug: Slug) -> None:
-        self._set_status(self.staged_ticket(slug), 'closed')
+    def mark_closed(self, ticket: OpenTicket) -> None:
+        self._set_status(self.staged_ticket(ticket.slug), 'closed')
 
     def seed_status(self, slug: Slug, status: TicketStatus) -> None:
         self._set_status(self.staged_ticket(slug), status)

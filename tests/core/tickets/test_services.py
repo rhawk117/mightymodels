@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.primitives import Slug
 from mightymodels_core.tickets import InvalidTicketError, NotStagedError, TicketSource
+from mightymodels_core.tickets.policy import OpenTicket, open_ticket
 from mightymodels_core.workspace import (
     LoneSurrogateError,
     TicketFileSyntaxError,
@@ -13,6 +14,8 @@ from mightymodels_core.workspace import (
 from .conftest import RECORDED_INVESTIGATIONS, SERVICE_MOMENT
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from _pytest.mark import ParameterSet
     from mightymodels_core.tickets import TicketRepository, TicketService
 
@@ -88,6 +91,16 @@ def create_source(text: str) -> TicketSource:
     return TicketSource(path=PATH, text=text)
 
 
+@pytest.fixture
+def open_of(fake_repository: TicketRepository) -> Callable[[Slug], OpenTicket]:
+    def token(slug: Slug) -> OpenTicket:
+        issued = open_ticket(fake_repository.staged_ticket(slug))
+        assert isinstance(issued, OpenTicket)
+        return issued
+
+    return token
+
+
 class TestStage:
     def test_a_valid_ticket_is_staged_with_its_section(
         self, service: TicketService, fake_repository: TicketRepository
@@ -120,10 +133,13 @@ class TestStage:
         assert 'ghp_' not in record.section.summary
 
     def test_staging_again_replaces_the_section_and_keeps_the_status(
-        self, service: TicketService, fake_repository: TicketRepository
+        self,
+        service: TicketService,
+        fake_repository: TicketRepository,
+        open_of: Callable[[Slug], OpenTicket],
     ) -> None:
         service.stage(SLUG, create_source(TICKET_TEXT))
-        fake_repository.mark_in_progress(SLUG)
+        fake_repository.mark_in_progress(open_of(SLUG))
 
         record = service.stage(SLUG, create_source(TICKET_TEXT.replace('add the', 'add one')))
 
@@ -206,11 +222,14 @@ class TestUpdateContext:
 
 class TestUnclosedOnBranch:
     def test_the_unclosed_tickets_on_the_branch_come_back_in_slug_order(
-        self, service: TicketService, fake_repository: TicketRepository
+        self,
+        service: TicketService,
+        fake_repository: TicketRepository,
+        open_of: Callable[[Slug], OpenTicket],
     ) -> None:
         service.stage(SLUG, create_source(TICKET_TEXT))
         service.stage(OTHER, create_source(TICKET_TEXT.replace('"add-widget"', '"other-widget"')))
-        fake_repository.mark_closed(OTHER)
+        fake_repository.mark_closed(open_of(OTHER))
 
         assert service.unclosed_on_branch('feat/widget') == [SLUG]
         assert service.unclosed_on_branch('elsewhere') == []
