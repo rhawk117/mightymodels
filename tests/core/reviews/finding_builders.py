@@ -6,9 +6,9 @@ from mightymodels_core.primitives import redact
 from mightymodels_core.reviews import (
     FindingRecord,
     IncomingFinding,
+    ReviewOptions,
     fold_findings,
 )
-from mightymodels_core.reviews.policy.review import create_finding_options
 
 
 def incoming_finding(**changes: object) -> IncomingFinding:
@@ -44,4 +44,4 @@ def held_finding(key: str, **changes: object) -> FindingRecord:
 
 
 def fold_one(held: list[FindingRecord], finding: IncomingFinding) -> list[FindingRecord]:
-    return fold_findings(held, [finding], create_finding_options())
+    return fold_findings(held, [finding], ReviewOptions().findings)

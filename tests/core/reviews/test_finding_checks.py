@@ -12,11 +12,11 @@ from mightymodels_core.reviews import (
     LocationShapeError,
     MalformedSourceError,
     ReversedRangeError,
+    ReviewOptions,
     SourcesRequiredError,
     UnsupportedQualityError,
     fold_findings,
 )
-from mightymodels_core.reviews.policy.review import create_finding_options
 
 from .finding_builders import fold_one, incoming_finding
 
@@ -94,7 +94,7 @@ class TestFindingChecks:
         self, refused_batch: list[IncomingFinding]
     ) -> None:
         with pytest.raises(LineBelowOneError) as raised:
-            fold_findings([], refused_batch, create_finding_options())
+            fold_findings([], refused_batch, ReviewOptions().findings)
 
         assert str(raised.value) == (
             'finding 1: location line 0 is below 1 (UB-1); nothing was written'
@@ -108,7 +108,7 @@ class TestTextChecks:
 
     @pytest.fixture
     def tight_options(self) -> FindingOptions:
-        return replace(create_finding_options(), prose_limit=15)
+        return replace(ReviewOptions().findings, prose_limit=15)
 
     @pytest.fixture
     def short_secret(self) -> IncomingFinding:
@@ -179,4 +179,4 @@ class TestSourceAndQualityChecks:
 
     def test_a_refused_batch_places_nothing(self, misplaced_batch: list[IncomingFinding]) -> None:
         with pytest.raises(LocationShapeError):
-            fold_findings([], misplaced_batch, create_finding_options())
+            fold_findings([], misplaced_batch, ReviewOptions().findings)

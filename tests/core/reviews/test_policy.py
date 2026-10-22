@@ -12,6 +12,7 @@ from mightymodels_core.reviews import (
     OverridePolicy,
     OverrideSpentError,
     PersonaChoiceError,
+    ReviewOptions,
     SlugRequiredError,
     StartPolicy,
     WeightRangeError,
@@ -19,6 +20,7 @@ from mightymodels_core.reviews import (
     WeightSumError,
     reopened_keys,
 )
+from mightymodels_core.reviews.reports import MergeVaderBasis, PersonaSpec, UncleBobBasis
 
 from .conftest import (
     HEAD,
@@ -232,6 +234,31 @@ class TestOverridePolicy:
 
     def test_tied_weights_override_the_first_persona(self) -> None:
         assert self.policy_of().heavier_persona == 'merge-vader'
+
+
+class TestReviewOptions:
+    @pytest.fixture
+    def options(self) -> ReviewOptions:
+        weights: dict[Emphasis, float] = {
+            'release-readiness': 0.6,
+            'maintainability': 0.4,
+            'balanced': 0.5,
+        }
+        return ReviewOptions(
+            specs={
+                'merge-vader': PersonaSpec(prefix='MX', parser=MergeVaderBasis(), weights=weights),
+                'uncle-bob': PersonaSpec(prefix='UB', parser=UncleBobBasis(), weights=weights),
+            }
+        )
+
+    def test_source_personas_follow_the_specs(self, options: ReviewOptions) -> None:
+        assert options.source_personas['MX'] == 'merge-vader'
+
+    def test_finding_sources_follow_the_specs(self, options: ReviewOptions) -> None:
+        assert options.findings.source_id.match('MX-1')
+
+    def test_presets_follow_the_specs(self, options: ReviewOptions) -> None:
+        assert options.presets['release-readiness'] == {'merge-vader': 0.6, 'uncle-bob': 0.6}
 
 
 class TestReopenedKeys:

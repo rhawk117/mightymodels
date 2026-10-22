@@ -7,13 +7,12 @@ import pytest
 from mightymodels_core.primitives import redact
 from mightymodels_core.reviews import (
     IncomingEvidence,
+    ReviewOptions,
     fold_findings,
     stored_severity,
 )
 from mightymodels_core.reviews.findings import finding_number
 from mightymodels_core.reviews.policy.review import (
-    create_finding_options,
-    create_source_personas,
     persona_of_source,
 )
 
@@ -40,7 +39,7 @@ def source_persona_cases() -> pytest.MarkDecorator:
 class TestStoredSeverity:
     @pytest.fixture
     def options(self) -> FindingOptions:
-        return create_finding_options()
+        return ReviewOptions().findings
 
     def test_a_blocker_ranks_without_raising(self, options: FindingOptions) -> None:
         assert options.rank(stored_severity('Blocker')) == options.rank('High')
@@ -65,7 +64,7 @@ class TestKeyParsing:
 
     @source_persona_cases()
     def test_persona_of_source_reads_the_prefix(self, source: str, persona: str) -> None:
-        assert persona_of_source(source, create_source_personas()) == persona
+        assert persona_of_source(source, ReviewOptions().source_personas) == persona
 
 
 class TestFindingOverlap:
@@ -208,13 +207,13 @@ class TestFindingBatch:
     def test_later_findings_in_a_batch_see_earlier_ones(
         self, touching_batch: list[IncomingFinding]
     ) -> None:
-        (stored,) = fold_findings([], touching_batch, create_finding_options())
+        (stored,) = fold_findings([], touching_batch, ReviewOptions().findings)
 
         assert (stored.key, stored.sources) == ('F1', ('UB-1', 'UB-2'))
 
     def test_only_changed_findings_return_in_key_order(
         self, held_pair: list[FindingRecord], mixed_batch: list[IncomingFinding]
     ) -> None:
-        stored = fold_findings(held_pair, mixed_batch, create_finding_options())
+        stored = fold_findings(held_pair, mixed_batch, ReviewOptions().findings)
 
         assert [finding.key for finding in stored] == ['F2', 'F3']

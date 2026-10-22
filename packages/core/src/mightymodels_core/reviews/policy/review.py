@@ -59,20 +59,6 @@ def create_persona_specs() -> PersonaSpecs:
     }
 
 
-def create_presets() -> Presets:
-    specs = create_persona_specs()
-    emphases = ('release-readiness', 'maintainability', 'balanced')
-    return {e: {persona: spec.weights[e] for persona, spec in specs.items()} for e in emphases}
-
-
-def create_source_personas() -> SourcePersonas:
-    return {spec.prefix: persona for persona, spec in create_persona_specs().items()}
-
-
-def create_finding_options() -> FindingOptions:
-    return FindingOptions(source_prefixes=tuple(s.prefix for s in create_persona_specs().values()))
-
-
 def persona_of_source(source: str, personas: SourcePersonas) -> Persona:
     return personas[source.partition('-')[0]]
 
@@ -85,10 +71,20 @@ class ReviewOptions:
     personas: tuple[Persona, ...] = ('merge-vader', 'uncle-bob')
     scopes_needing_base: tuple[Scope, ...] = ('branch', 'ticket')
     closed_by_decision: tuple[Decision, ...] = ('dismiss',)
-    presets: Presets = field(default_factory=create_presets)
-    source_personas: SourcePersonas = field(default_factory=create_source_personas)
     specs: PersonaSpecs = field(default_factory=create_persona_specs)
-    findings: FindingOptions = field(default_factory=create_finding_options)
+
+    @property
+    def presets(self) -> Presets:
+        emphases: tuple[Emphasis, ...] = ('release-readiness', 'maintainability', 'balanced')
+        return {e: {name: spec.weights[e] for name, spec in self.specs.items()} for e in emphases}
+
+    @property
+    def source_personas(self) -> SourcePersonas:
+        return {spec.prefix: name for name, spec in self.specs.items()}
+
+    @property
+    def findings(self) -> FindingOptions:
+        return FindingOptions(source_prefixes=tuple(s.prefix for s in self.specs.values()))
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

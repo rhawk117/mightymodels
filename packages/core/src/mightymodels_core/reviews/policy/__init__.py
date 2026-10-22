@@ -23,8 +23,6 @@ from .review import (
     Verdict,
     WeightsIssue,
     create_gate_policy,
-    create_presets,
-    create_source_personas,
     reopened_keys,
 )
 
@@ -49,7 +47,5 @@ __all__ = [
     'Verdict',
     'WeightsIssue',
     'create_gate_policy',
-    'create_presets',
-    'create_source_personas',
     'reopened_keys',
 ]
