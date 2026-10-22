@@ -1,4 +1,4 @@
-"""The task service: starts, verifies and marks tasks, records failed fixes, shows and readies them.
+"""The task service: starts, verifies and marks tasks, records failed fixes.
 
 It takes values and returns values. The caller asks git and reads the brief, passes HEAD, the git
 facts and the brief text in, and renders the records and problems this service returns; the service
@@ -15,8 +15,6 @@ from mightymodels_core.tasks.errors import TaskMovedError, TransitionError, Unkn
 from mightymodels_core.tasks.gates import (
     Evidence,
     VerificationGate,
-    get_readiness_problems,
-    get_receipt_problems,
     is_plan_task,
 )
 from mightymodels_core.tasks.policy import (
@@ -37,7 +35,7 @@ if TYPE_CHECKING:
     from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
     from mightymodels_core.tasks.gates import Brief, GitFacts
-    from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
+    from mightymodels_core.tasks.records import TaskRecord
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
     from mightymodels_core.tickets.policy import OpenTicket
     from mightymodels_core.tickets.repository import TicketRepository
@@ -78,18 +76,6 @@ class FixRecorded:
     remaining: int
 
 
-@dataclass(slots=True, kw_only=True, frozen=True)
-class TaskListing:
-    records: list[TaskRecord]
-    attempts: AttemptCounts
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Readiness:
-    records: list[TaskRecord]
-    problems: list[str]
-
-
 def status_of(task: TaskRecord | None) -> TaskStatus:
     return 'pending' if task is None else task.status
 
@@ -114,24 +100,6 @@ def start_transition(policy: StartPolicy, request: StartRequest, at: datetime) -
     )
 
 
-def start_policy_for(service: TaskService, ticket_id: int, request: StartRequest) -> StartPolicy:
-    task_key = request.task_key
-    return StartPolicy(
-        task_key=task_key,
-        before=status_of(service.tasks.task(ticket_id, task_key)),
-        worker=request.worker,
-        mode=request.mode,
-        attempts=service.attempts.attempts_by_worker(ticket_id).get(task_key, {}),
-        implementation_spent=service.attempts.attempts_in_modes(
-            ticket_id, task_key, IMPLEMENTATION_MODES
-        ),
-        acceptance_count=request.acceptance_count,
-        owned_count=len(set(request.owned)),
-        too_large_approved=request.too_large_approved,
-        options=service.options,
-    )
-
-
 def open_ticket_of(tickets: TicketRepository, slug: Slug) -> OpenTicket:
     token = open_ticket(tickets.staged_ticket(slug))
     if isinstance(token, ClosedTicketError):
@@ -152,7 +120,7 @@ class TaskService:
     def start(self, slug: Slug, request: StartRequest) -> TaskRecord:
         ticket = open_ticket_of(self.tickets, slug)
         ticket_id = ticket.id
-        policy = start_policy_for(self, ticket_id, request)
+        policy = self.start_policy_for(ticket_id, request)
         if problem := policy.get_start_problem():
             raise problem
 
@@ -265,28 +233,22 @@ class TaskService:
             hypothesis=redacted, number=number, remaining=self.options.failed_fix_limit - number
         )
 
-    def show(self, slug: Slug) -> TaskListing:
-        ticket_id = self.tickets.staged_ticket(slug).id
-        return TaskListing(
-            records=self.tasks.tasks(ticket_id),
-            attempts=self.attempts.attempts_by_worker(ticket_id),
+    def start_policy_for(self, ticket_id: int, request: StartRequest) -> StartPolicy:
+        task_key = request.task_key
+        return StartPolicy(
+            task_key=task_key,
+            before=status_of(self.tasks.task(ticket_id, task_key)),
+            worker=request.worker,
+            mode=request.mode,
+            attempts=self.attempts.attempts_by_worker(ticket_id).get(task_key, {}),
+            implementation_spent=self.attempts.attempts_in_modes(
+                ticket_id, task_key, IMPLEMENTATION_MODES
+            ),
+            acceptance_count=request.acceptance_count,
+            owned_count=len(set(request.owned)),
+            too_large_approved=request.too_large_approved,
+            options=self.options,
         )
-
-    def ready(self, slug: Slug, head: str | None) -> Readiness:
-        ticket_id = self.tickets.staged_ticket(slug).id
-        records = self.tasks.tasks(ticket_id)
-        superseded = {record.key for record in records if record.status == 'superseded'}
-        live = [
-            command
-            for command in self.contracts.commands(ticket_id)
-            if command.task_key not in superseded
-        ]
-        receipts = self.contracts.latest_receipts(ticket_id)
-        problems = [
-            *get_readiness_problems(records),
-            *get_receipt_problems(live, receipts, head),
-        ]
-        return Readiness(records=records, problems=problems)
 
     def task_held(self, ticket_id: int, task_key: TaskId) -> TaskRecord:
         held = self.tasks.task(ticket_id, task_key)

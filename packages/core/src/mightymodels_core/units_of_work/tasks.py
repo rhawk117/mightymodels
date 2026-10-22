@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract import ContractService, SqliteContractRepository
-from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository, TaskService
+from mightymodels_core.tasks import (
+    SqliteAttemptRepository,
+    SqliteTaskRepository,
+    TaskReadService,
+    TaskService,
+)
 from mightymodels_core.tickets import SqliteTicketRepository
 
 from .entry import read_entry, write_entry
@@ -26,6 +31,7 @@ if TYPE_CHECKING:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TaskUnit:
     tasks: TaskService
+    task_reads: TaskReadService
     contracts: ContractService
 
 
@@ -49,12 +55,17 @@ class TaskWork:
         unit = entry.unit
         tickets = SqliteTicketRepository(unit=unit, repository_id=entry.repository_id)
         contracts = SqliteContractRepository(unit=unit)
+        task_repository = SqliteTaskRepository(unit=unit)
+        attempts = SqliteAttemptRepository(unit=unit)
         tasks = TaskService(
             tickets=tickets,
-            tasks=SqliteTaskRepository(unit=unit),
-            attempts=SqliteAttemptRepository(unit=unit),
+            tasks=task_repository,
+            attempts=attempts,
             contracts=contracts,
             clock=self.clock,
         )
+        task_reads = TaskReadService(
+            tickets=tickets, tasks=task_repository, attempts=attempts, contracts=contracts
+        )
         contract_service = ContractService(tickets=tickets, contracts=contracts, clock=self.clock)
-        return TaskUnit(tasks=tasks, contracts=contract_service)
+        return TaskUnit(tasks=tasks, task_reads=task_reads, contracts=contract_service)

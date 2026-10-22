@@ -30,6 +30,7 @@ from .services import (
     Readiness,
     StartRequest,
     TaskListing,
+    TaskReadService,
     TaskService,
     VerifyRequest,
 )
@@ -60,6 +61,7 @@ __all__ = [
     'TaskListing',
     'TaskMovedError',
     'TaskOptions',
+    'TaskReadService',
     'TaskRecord',
     'TaskRepository',
     'TaskService',

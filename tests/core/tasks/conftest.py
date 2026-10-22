@@ -18,6 +18,7 @@ from mightymodels_core.tasks import (
     Attempt,
     SqliteAttemptRepository,
     SqliteTaskRepository,
+    TaskReadService,
     TaskService,
     Transition,
 )
@@ -183,6 +184,7 @@ def harness(request: SubRequest) -> TaskHarness:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ServiceHarness:
     service: TaskService
+    reads: TaskReadService
     tickets: FakeTicketRepository
     task_ledger: TaskLedger
     contracts: FakeContractRepository
@@ -210,15 +212,17 @@ def service_harness() -> ServiceHarness:
     task_ledger = TaskLedger()
     contracts = FakeContractRepository(ledger=ContractLedger())
     clock = create_fake_clock(SERVICE_MOMENT)
+    task_repository = FakeTaskRepository(ledger=task_ledger)
+    attempts = FakeAttemptRepository(ledger=task_ledger)
     service = TaskService(
-        tickets=tickets,
-        tasks=FakeTaskRepository(ledger=task_ledger),
-        attempts=FakeAttemptRepository(ledger=task_ledger),
-        contracts=contracts,
-        clock=clock,
+        tickets=tickets, tasks=task_repository, attempts=attempts, contracts=contracts, clock=clock
+    )
+    reads = TaskReadService(
+        tickets=tickets, tasks=task_repository, attempts=attempts, contracts=contracts
     )
     return ServiceHarness(
         service=service,
+        reads=reads,
         tickets=tickets,
         task_ledger=task_ledger,
         contracts=contracts,
