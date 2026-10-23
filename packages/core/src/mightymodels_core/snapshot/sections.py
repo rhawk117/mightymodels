@@ -120,6 +120,9 @@ def failed_attempts(stuck: Sequence[Transition]) -> tuple[FailedAttempt, ...]:
 
 
 def ledger_lines(ledgers: Sequence[Ledger], kind: EntryKind, limit: int) -> tuple[LedgerLine, ...]:
+    if limit <= 0:
+        return ()
+
     lines = [
         LedgerLine(
             kind=record.kind, text=record.text, cite=record.cite, origin=ledger.origin_of(record)
@@ -127,8 +130,6 @@ def ledger_lines(ledgers: Sequence[Ledger], kind: EntryKind, limit: int) -> tupl
         for ledger in ledgers
         for record in ledger.live_of_kind(kind)
     ]
-    if limit <= 0:
-        return ()
 
     return tuple(lines[-limit:])
 
