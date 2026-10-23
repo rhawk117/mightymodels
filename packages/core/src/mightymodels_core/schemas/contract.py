@@ -1,20 +1,15 @@
 """The approved contract commands of a ticket and the receipts recorded against them."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.contract import Outcome, Phase
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type Outcome = Literal['pass', 'fail', 'timeout', 'not-found', 'refused', 'undecodable']
-
-
-type Phase = Literal['planning', 'task', 'review', 'landing']
 
 
 class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):
@@ -32,10 +27,6 @@ class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):
 class ContractCommandsParams(Struct, frozen=True, kw_only=True, gc=False):
     ticket_id: int
     limit: int
-
-
-class ContractCommandCountParams(Struct, frozen=True, kw_only=True, gc=False):
-    ticket_id: int
 
 
 class RecordReceiptParams(Struct, frozen=True, kw_only=True):
@@ -64,10 +55,6 @@ class ContractCommandRow(Struct, frozen=True, kw_only=True):
     head: str | None
 
 
-class ContractCommandCountRow(Struct, frozen=True, kw_only=True, gc=False):
-    count: int
-
-
 class ReceiptRow(Struct, frozen=True, kw_only=True):
     command_key: str
     argv: list[str]
@@ -88,16 +75,12 @@ APPROVE_CONTRACT_COMMAND = Command(
 CONTRACT_COMMANDS_OF_TICKET = Query(
     name='contract_commands_of_ticket', params=ContractCommandsParams, row=ContractCommandRow
 )
-CONTRACT_COMMAND_COUNT = Query(
-    name='contract_command_count', params=ContractCommandCountParams, row=ContractCommandCountRow
-)
 RECORD_RECEIPT = Command(name='record_receipt', params=RecordReceiptParams)
 LATEST_RECEIPTS = Query(name='latest_receipts', params=ContractCommandsParams, row=ReceiptRow)
 
 DECLARATIONS: tuple[Declaration, ...] = (
     APPROVE_CONTRACT_COMMAND,
     CONTRACT_COMMANDS_OF_TICKET,
-    CONTRACT_COMMAND_COUNT,
     RECORD_RECEIPT,
     LATEST_RECEIPTS,
 )

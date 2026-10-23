@@ -5,12 +5,10 @@ import pytest
 from mightymodels_core.database import DuplicateRowError, MissingParentError
 from mightymodels_core.schemas.contract import (
     APPROVE_CONTRACT_COMMAND,
-    CONTRACT_COMMAND_COUNT,
     CONTRACT_COMMANDS_OF_TICKET,
     LATEST_RECEIPTS,
     RECORD_RECEIPT,
     ApproveContractCommandParams,
-    ContractCommandCountParams,
     ContractCommandsParams,
     RecordReceiptParams,
 )
@@ -67,9 +65,6 @@ class TestCommands:
             commands = unit.all(
                 CONTRACT_COMMANDS_OF_TICKET, ContractCommandsParams(ticket_id=ticket_id, limit=10)
             )
-            count = unit.one(
-                CONTRACT_COMMAND_COUNT, ContractCommandCountParams(ticket_id=ticket_id)
-            )
 
         assert approved == 2
         assert [row.command_key for row in commands] == ['I1', 'T1.AC-2']
@@ -81,8 +76,6 @@ class TestCommands:
         assert commands[0].approved_by == 'owner'
         assert commands[0].approved_at == APPROVED_AT
         assert commands[0].head is None
-        assert count is not None
-        assert count.count == 2
 
     def test_a_command_key_is_unique_within_a_ticket(
         self, database: Database, ticket_id: int

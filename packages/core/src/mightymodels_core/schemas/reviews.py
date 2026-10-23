@@ -1,38 +1,24 @@
 """Review runs, their findings, and the dispositions and outcomes recorded against findings."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.reviews import (
+    Decision,
+    Depth,
+    Emphasis,
+    EvidenceKind,
+    FindingKind,
+    Result,
+    Scope,
+    StoredSeverity,
+)
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type Scope = Literal['diff', 'branch', 'ticket', 'codebase']
-
-
-type Depth = Literal['quick', 'standard', 'deep']
-
-
-type Emphasis = Literal['release-readiness', 'maintainability', 'balanced', 'custom']
-
-
-type FindingSeverity = Literal['Blocker', 'Critical', 'High', 'Medium', 'Low']
-
-
-type FindingKind = Literal['defect', 'quality']
-
-
-type EvidenceKind = Literal['metric', 'idiom', 'convention']
-
-
-type Decision = Literal['fix', 'defer', 'accept-risk', 'dismiss']
-
-
-type Result = Literal['fixed', 'failed', 'blocked']
 
 
 class RecordReviewRunParams(Struct, frozen=True, kw_only=True):
@@ -75,7 +61,7 @@ class UpsertReviewFindingParams(Struct, frozen=True, kw_only=True):
     review_run_id: int
     finding_key: str
     sources: list[str]
-    severity: FindingSeverity
+    severity: StoredSeverity
     kind: FindingKind
     security: bool
     title: str
@@ -85,10 +71,6 @@ class UpsertReviewFindingParams(Struct, frozen=True, kw_only=True):
     evidence_kind: EvidenceKind | None
     evidence_cite: str | None
     conflict: str | None
-
-
-class RunParams(Struct, frozen=True, kw_only=True, gc=False):
-    review_run_id: int
 
 
 class RunLimitParams(Struct, frozen=True, kw_only=True, gc=False):
@@ -140,7 +122,7 @@ class ReviewFindingRow(Struct, frozen=True, kw_only=True):
     id: int
     finding_key: str
     sources: list[str]
-    severity: FindingSeverity
+    severity: StoredSeverity
     kind: FindingKind
     security: bool
     title: str
@@ -169,10 +151,6 @@ class ReviewOutcomeRow(Struct, frozen=True, kw_only=True, gc=False):
     at: datetime
 
 
-class ReviewCountRow(Struct, frozen=True, kw_only=True, gc=False):
-    count: int
-
-
 RECORD_REVIEW_RUN = Query(
     name='record_review_run', params=RecordReviewRunParams, row=ReviewRunIdRow
 )
@@ -188,22 +166,17 @@ UPSERT_REVIEW_FINDING = Command(name='upsert_review_finding', params=UpsertRevie
 REVIEW_FINDINGS_OF_RUN = Query(
     name='review_findings_of_run', params=RunLimitParams, row=ReviewFindingRow
 )
-REVIEW_FINDING_COUNT = Query(name='review_finding_count', params=RunParams, row=ReviewCountRow)
 UPSERT_REVIEW_DISPOSITION = Command(
     name='upsert_review_disposition', params=UpsertReviewDispositionParams
 )
 REVIEW_DISPOSITIONS_OF_RUN = Query(
     name='review_dispositions_of_run', params=RunLimitParams, row=ReviewDispositionRow
 )
-REVIEW_DISPOSITION_COUNT = Query(
-    name='review_disposition_count', params=RunParams, row=ReviewCountRow
-)
 DELETE_REVIEW_DISPOSITIONS = Command(name='delete_review_dispositions', params=FindingKeysParams)
 UPSERT_REVIEW_OUTCOME = Command(name='upsert_review_outcome', params=UpsertReviewOutcomeParams)
 REVIEW_OUTCOMES_OF_RUN = Query(
     name='review_outcomes_of_run', params=RunLimitParams, row=ReviewOutcomeRow
 )
-REVIEW_OUTCOME_COUNT = Query(name='review_outcome_count', params=RunParams, row=ReviewCountRow)
 DELETE_REVIEW_OUTCOMES = Command(name='delete_review_outcomes', params=FindingKeysParams)
 
 DECLARATIONS: tuple[Declaration, ...] = (
@@ -214,13 +187,10 @@ DECLARATIONS: tuple[Declaration, ...] = (
     LATEST_REVIEW_RUN_OF_TICKET,
     UPSERT_REVIEW_FINDING,
     REVIEW_FINDINGS_OF_RUN,
-    REVIEW_FINDING_COUNT,
     UPSERT_REVIEW_DISPOSITION,
     REVIEW_DISPOSITIONS_OF_RUN,
-    REVIEW_DISPOSITION_COUNT,
     DELETE_REVIEW_DISPOSITIONS,
     UPSERT_REVIEW_OUTCOME,
     REVIEW_OUTCOMES_OF_RUN,
-    REVIEW_OUTCOME_COUNT,
     DELETE_REVIEW_OUTCOMES,
 )

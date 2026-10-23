@@ -13,7 +13,6 @@ from mightymodels_core.schemas.tickets import (
     LINK_TICKET_INVESTIGATION,
     SET_TICKET_STATUS,
     STAGE_TICKET,
-    TICKET_BY_ID,
     TICKET_BY_SLUG,
     UNCLOSED_SLUG_PAIR_ON_BRANCH,
     UNCLOSED_SLUGS_ON_BRANCH,
@@ -23,7 +22,6 @@ from mightymodels_core.schemas.tickets import (
     LinkTicketInvestigationParams,
     SetTicketStatusParams,
     StageTicketParams,
-    TicketIdParams,
     TicketSlugParams,
     UpsertClosingParams,
 )
@@ -83,19 +81,17 @@ class TestRepositories:
 
 
 class TestTickets:
-    def test_a_staged_ticket_reads_back_by_slug_and_by_id(
+    def test_a_staged_ticket_reads_back_by_slug(
         self, database: Database, repository_id: int
     ) -> None:
-        ticket_id = stage(database, stage_params(repository_id, 'first'))
+        stage(database, stage_params(repository_id, 'first'))
 
         with database.read() as unit:
             by_slug = unit.one(
                 TICKET_BY_SLUG, TicketSlugParams(repository_id=repository_id, slug='first')
             )
-            by_id = unit.one(TICKET_BY_ID, TicketIdParams(id=ticket_id))
 
         assert by_slug is not None
-        assert by_slug == by_id
         assert by_slug.status == 'staged'
         assert by_slug.scope == 'med'
         assert by_slug.plan_first is True
@@ -162,7 +158,7 @@ class TestTickets:
 
 class TestTicketInvestigations:
     @pytest.fixture
-    def linked(self, database: Database, repository_id: int) -> int:
+    def linked(self, database: Database, repository_id: int) -> None:
         ticket_id = stage(database, stage_params(repository_id, 'first'))
         link_params = []
         with database.write() as unit:
@@ -184,13 +180,15 @@ class TestTicketInvestigations:
                 )
             unit.run_many(LINK_TICKET_INVESTIGATION, link_params)
             unit.run_many(LINK_TICKET_INVESTIGATION, link_params)
-        return ticket_id
 
+    @pytest.mark.usefixtures('linked')
     def test_links_read_back_in_link_order_and_repeat_links_are_ignored(
-        self, database: Database, linked: int
+        self, database: Database, repository_id: int
     ) -> None:
         with database.read() as unit:
-            ticket = unit.one(TICKET_BY_ID, TicketIdParams(id=linked))
+            ticket = unit.one(
+                TICKET_BY_SLUG, TicketSlugParams(repository_id=repository_id, slug='first')
+            )
 
         assert ticket is not None
         assert ticket.investigations == ['probe', 'survey']

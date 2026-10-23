@@ -1,4 +1,5 @@
 import re
+import sqlite3
 from typing import TYPE_CHECKING, get_args
 
 import pytest
@@ -11,9 +12,9 @@ from mightymodels_core.schemas.reviews import (
     Emphasis,
     EvidenceKind,
     FindingKind,
-    FindingSeverity,
     Result,
     Scope,
+    StoredSeverity,
 )
 from mightymodels_core.schemas.scout_reports import Scout
 from mightymodels_core.schemas.similarity import SimilarityKind
@@ -21,7 +22,6 @@ from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
 from mightymodels_core.schemas.tickets import TicketScope, TicketStatus
 
 if TYPE_CHECKING:
-    import sqlite3
     from typing import TypeAliasType
 
 pytestmark = pytest.mark.integration
@@ -50,7 +50,7 @@ STRING_CHECK_PAIRS = (
     pytest.param(
         'review_findings',
         'ck_review_findings_severity',
-        FindingSeverity,
+        StoredSeverity,
         id='review_findings.severity',
     ),
     pytest.param(
@@ -93,3 +93,15 @@ def test_check_list_matches_alias(
     schema_inspection: sqlite3.Connection, table: str, constraint: str, alias: TypeAliasType
 ) -> None:
     assert check_values(schema_inspection, table, constraint) == set(get_args(alias.__value__))
+
+
+INSERT_FINDING = (
+    'INSERT INTO review_findings'
+    ' (review_run_id, finding_key, sources, severity, title, location, fix, verify)'
+    " VALUES (1, 'F1', '[]', ?, 't', 'a.py:1', 'f', 'v')"
+)
+
+
+def test_blocker_severity_is_refused(schema_inspection: sqlite3.Connection) -> None:
+    with pytest.raises(sqlite3.IntegrityError, match='ck_review_findings_severity'):
+        schema_inspection.execute(INSERT_FINDING, ('Blocker',))

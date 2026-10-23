@@ -13,11 +13,8 @@ from mightymodels_core.schemas.reviews import (
     LATEST_REVIEW_RUNS,
     RECORD_REVIEW_MODELS,
     RECORD_REVIEW_RUN,
-    REVIEW_DISPOSITION_COUNT,
     REVIEW_DISPOSITIONS_OF_RUN,
-    REVIEW_FINDING_COUNT,
     REVIEW_FINDINGS_OF_RUN,
-    REVIEW_OUTCOME_COUNT,
     REVIEW_OUTCOMES_OF_RUN,
     REVIEW_RUN,
     UPSERT_REVIEW_DISPOSITION,
@@ -29,7 +26,6 @@ from mightymodels_core.schemas.reviews import (
     RecordReviewRunParams,
     ReviewRunParams,
     RunLimitParams,
-    RunParams,
     TicketReviewRunParams,
     UpsertReviewDispositionParams,
     UpsertReviewFindingParams,
@@ -277,9 +273,7 @@ class TestReviewFindings:
 
         assert finding_keys(database, run_id) == ['F1', 'F2', 'F9', 'F10']
 
-    def test_upserting_a_finding_replaces_it_and_the_count_holds(
-        self, database: Database, repository_id: int
-    ) -> None:
+    def test_upserting_a_finding_replaces_it(self, database: Database, repository_id: int) -> None:
         run_id = record(database, run(repository_id, 'r-1'))
         with database.write() as unit:
             unit.run_many(UPSERT_REVIEW_FINDING, [finding(run_id, 'F1', 'old')])
@@ -290,11 +284,8 @@ class TestReviewFindings:
             rows = unit.all(
                 REVIEW_FINDINGS_OF_RUN, RunLimitParams(review_run_id=run_id, limit=LIMIT)
             )
-            count = unit.one(REVIEW_FINDING_COUNT, RunParams(review_run_id=run_id))
 
         assert [row.title for row in rows] == ['new']
-        assert count is not None
-        assert count.count == 1
 
     def test_findings_are_scoped_to_their_run(self, database: Database, repository_id: int) -> None:
         first = record(database, run(repository_id, 'r-1'))
@@ -335,15 +326,12 @@ class TestReviewDecisions:
             rows = unit.all(
                 REVIEW_DISPOSITIONS_OF_RUN, RunLimitParams(review_run_id=run_id, limit=LIMIT)
             )
-            count = unit.one(REVIEW_DISPOSITION_COUNT, RunParams(review_run_id=run_id))
 
         assert [row.finding_key for row in rows] == ['F1', 'F2']
         assert rows[0].decision == 'fix'
         assert rows[0].reason == 'because'
         assert rows[0].by == 'user'
         assert rows[0].at == RECORDED_AT
-        assert count is not None
-        assert count.count == 2
 
     def test_outcomes_read_back_every_column(self, database: Database, repository_id: int) -> None:
         run_id = self.decided_run(database, repository_id)
@@ -352,7 +340,6 @@ class TestReviewDecisions:
             rows = unit.all(
                 REVIEW_OUTCOMES_OF_RUN, RunLimitParams(review_run_id=run_id, limit=LIMIT)
             )
-            count = unit.one(REVIEW_OUTCOME_COUNT, RunParams(review_run_id=run_id))
 
         assert len(rows) == 1
         assert rows[0].finding_key == 'F1'
@@ -360,8 +347,6 @@ class TestReviewDecisions:
         assert rows[0].commit == 'deadbee'
         assert rows[0].reason == 'done'
         assert rows[0].at == RECORDED_AT
-        assert count is not None
-        assert count.count == 1
 
     def test_deciding_again_replaces_the_decision(
         self, database: Database, repository_id: int
@@ -428,7 +413,8 @@ class TestReviewDecisions:
                 DELETE_REVIEW_OUTCOMES, FindingKeysParams(review_run_id=run_id, finding_keys=['F1'])
             )
         with database.read() as unit:
-            count = unit.one(REVIEW_DISPOSITION_COUNT, RunParams(review_run_id=run_id))
+            dispositions = unit.all(
+                REVIEW_DISPOSITIONS_OF_RUN, RunLimitParams(review_run_id=run_id, limit=LIMIT)
+            )
 
-        assert count is not None
-        assert count.count == 2
+        assert len(dispositions) == 2

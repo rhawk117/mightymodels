@@ -1,16 +1,14 @@
 """The reports a scout has returned for a target."""
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Query
+from mightymodels_core.vocabulary.similarity import Scout
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type Scout = Literal['code-scout', 'web-scout']
 
 
 class AddScoutReportParams(Struct, frozen=True, kw_only=True, gc=False):

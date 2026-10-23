@@ -1,23 +1,15 @@
 """The task rows with their attempts, failed fixes and status transitions."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.tasks import ArchitectMode, TaskStatus, Worker
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type TaskStatus = Literal['pending', 'in-progress', 'verified', 'failed', 'blocked', 'superseded']
-
-
-type Worker = Literal['engineer', 'architect', 'intern']
-
-
-type ArchitectMode = Literal['recovery-implementation', 'systemic-refactor', 'diagnose-replan']
 
 
 class TaskKeyParams(Struct, frozen=True, kw_only=True, gc=False):
