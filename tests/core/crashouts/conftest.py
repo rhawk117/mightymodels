@@ -13,13 +13,14 @@ from mightymodels_core.crashouts import (
     CrashoutService,
     SqliteCrashoutRepository,
 )
-from mightymodels_core.crashouts.tests.fakes import FakeCrashoutRepository
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.primitives import redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
+
+from tests.core.crashouts.fakes import FakeCrashoutRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator
