@@ -11,10 +11,6 @@ from mightymodels_core.investigations import (
     InvestigationRepository,
 )
 from mightymodels_core.investigations.records import ENTRIES, INVESTIGATIONS_LISTED
-from mightymodels_core.investigations.tests.fakes import (
-    FakeInvestigationRepository,
-    InvestigationLedger,
-)
 from mightymodels_core.primitives import Slug, WriteLimitError
 
 from tests.core.investigations.conftest import (
@@ -23,6 +19,10 @@ from tests.core.investigations.conftest import (
     UNADDED,
     create_entry,
     create_investigation,
+)
+from tests.core.investigations.fakes import (
+    FakeInvestigationRepository,
+    InvestigationLedger,
 )
 
 if TYPE_CHECKING:

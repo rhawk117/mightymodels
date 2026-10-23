@@ -7,10 +7,6 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.investigations import InvestigationRecord
-from mightymodels_core.investigations.tests.fakes import (
-    FakeInvestigationRepository,
-    InvestigationLedger,
-)
 from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
@@ -25,6 +21,11 @@ from mightymodels_core.tickets import (
     Tracker,
 )
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
+
+from tests.core.investigations.fakes import (
+    FakeInvestigationRepository,
+    InvestigationLedger,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator

@@ -15,15 +15,16 @@ from mightymodels_core.investigations import (
     LedgerRecord,
     SqliteInvestigationRepository,
 )
-from mightymodels_core.investigations.tests.fakes import (
-    FakeInvestigationRepository,
-    InvestigationLedger,
-)
 from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
+
+from tests.core.investigations.fakes import (
+    FakeInvestigationRepository,
+    InvestigationLedger,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator
