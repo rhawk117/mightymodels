@@ -9,15 +9,11 @@ from mightymodels_core.tasks import TaskRecord, TaskRepository, UnknownTaskError
 from mightymodels_core.tasks.records import TASKS
 from mightymodels_core.tasks.tests.fakes import FakeTaskRepository, TaskLedger
 
-from .conftest import (
-    FIRST_TASK,
-    SECOND_TASK,
-    create_attempt,
-    create_transition,
-)
+from .repository_builders import SECOND_TASK, create_attempt, create_transition
+from .service_builders import FIRST_TASK
 
 if TYPE_CHECKING:
-    from .conftest import TaskHarness
+    from .repository_builders import TaskHarness
 
 
 class TestImplementations:

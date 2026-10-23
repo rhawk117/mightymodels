@@ -4,11 +4,10 @@ import pytest
 from mightymodels_core.tasks import MarkRequest
 from mightymodels_core.tickets import NotStagedError
 
-from .conftest import COMMAND_KEY
-from .service_builders import DONE_COMMIT, FIRST_TASK, OTHER_SLUG, SERVICE_SLUG
+from .service_builders import COMMAND_KEY, DONE_COMMIT, FIRST_TASK, OTHER_SLUG, SERVICE_SLUG
 
 if TYPE_CHECKING:
-    from .conftest import ServiceHarness
+    from .service_builders import ServiceHarness
 
 
 class TestShow:

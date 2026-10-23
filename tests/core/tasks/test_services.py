@@ -11,11 +11,11 @@ from mightymodels_core.tasks import (
 )
 from mightymodels_core.tickets import ClosedTicketError
 
-from .conftest import SECOND_TASK
+from .repository_builders import SECOND_TASK
 from .service_builders import FIRST_TASK, SERVICE_SLUG
 
 if TYPE_CHECKING:
-    from .conftest import ServiceHarness
+    from .service_builders import ServiceHarness
 
 SECRET = 'ghp_' + 'a' * 36
 

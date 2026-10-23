@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.tasks import StartRequest
 
-    from .conftest import ServiceHarness
+    from .service_builders import ServiceHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

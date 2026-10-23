@@ -1,17 +1,21 @@
 """Builders and shared values for the task service tests."""
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import ApprovedCommand, Receipt
 from mightymodels_core.primitives import Slug, TaskId, redact
 from mightymodels_core.tasks import Brief, GitFacts, StartRequest, VerifyRequest
+from mightymodels_core.tasks.tests.fakes import FakeAttemptRepository, FakeTaskRepository
 
 if TYPE_CHECKING:
+    from mightymodels_core.contract.tests.fakes import FakeContractRepository
+    from mightymodels_core.primitives.tests.clock import FakeClock
     from mightymodels_core.schemas.tasks import ArchitectMode, Worker
-    from mightymodels_core.tasks import TaskRecord
-
-    from .conftest import ServiceHarness
+    from mightymodels_core.tasks import TaskReadService, TaskRecord, TaskService
+    from mightymodels_core.tasks.tests.fakes import TaskLedger
+    from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 FIRST_TASK = TaskId('T1')
 SERVICE_SLUG = Slug('service-subject')
@@ -20,6 +24,7 @@ SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 BASE_COMMIT = 'base001'
 DONE_COMMIT = 'abc1234'
 OWNED_FILE = 'src/a.py'
+COMMAND_KEY = f'{FIRST_TASK}.AC-1'
 BRIEF_TEXT = f'## ASKED\nacceptance:\n  - AC-1: it works\n## DONE\ncommit: {DONE_COMMIT}\n'
 
 
@@ -87,3 +92,27 @@ def create_command(key: str) -> ApprovedCommand:
     return ApprovedCommand(
         key=key, argv=('true',), expect_exit=0, timeout=10, approved_by='the user'
     )
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ServiceHarness:
+    service: TaskService
+    reads: TaskReadService
+    tickets: FakeTicketRepository
+    task_ledger: TaskLedger
+    contracts: FakeContractRepository
+    clock: FakeClock
+    ticket_id: int
+
+    @property
+    def tasks(self) -> FakeTaskRepository:
+        return FakeTaskRepository(ledger=self.task_ledger)
+
+    @property
+    def attempts(self) -> FakeAttemptRepository:
+        return FakeAttemptRepository(ledger=self.task_ledger)
+
+    def held(self, task_key: TaskId) -> TaskRecord:
+        record = self.tasks.task(self.ticket_id, task_key)
+        assert record is not None
+        return record

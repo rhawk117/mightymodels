@@ -1,6 +1,5 @@
 """The task and attempt repositories over a real sqlite unit and over the fakes."""
 
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING
@@ -9,18 +8,16 @@ import pytest
 from mightymodels_core.contract.records import Approval
 from mightymodels_core.contract.tests.fakes import ContractLedger, FakeContractRepository
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
-from mightymodels_core.primitives import Slug, TaskId, redact
+from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
 from mightymodels_core.tasks import (
-    Attempt,
     SqliteAttemptRepository,
     SqliteTaskRepository,
     TaskReadService,
     TaskService,
-    Transition,
 )
 from mightymodels_core.tasks.tests.fakes import (
     FakeAttemptRepository,
@@ -30,12 +27,14 @@ from mightymodels_core.tasks.tests.fakes import (
 from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
+from .repository_builders import TaskHarness
 from .service_builders import (
     BASE_COMMIT,
-    FIRST_TASK,
+    COMMAND_KEY,
     OWNED_FILE,
     SERVICE_MOMENT,
     SERVICE_SLUG,
+    ServiceHarness,
     create_command,
     create_receipt,
     create_start_request,
@@ -49,46 +48,10 @@ if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
     from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
-    from mightymodels_core.primitives.tests.clock import FakeClock
-    from mightymodels_core.schemas.tasks import TaskStatus
-    from mightymodels_core.tasks import AttemptRepository, TaskRecord, TaskRepository
 
 SQL = files('mightymodels_core.sql')
 TICKET_SLUGS = (Slug('tasks-subject'), Slug('other-subject'))
 FAKE_TICKET_IDS = (1, 2)
-SECOND_TASK = TaskId('T2')
-COMMAND_KEY = f'{FIRST_TASK}.AC-1'
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class TaskHarness:
-    tasks: TaskRepository
-    attempts: AttemptRepository
-    ticket_id: int
-    other_ticket_id: int
-
-
-def create_transition(
-    task_key: TaskId,
-    before: TaskStatus,
-    after: TaskStatus,
-    *,
-    day: int = 2,
-    head: str | None = 'abc1234',
-    reasons: tuple[str, ...] = (),
-) -> Transition:
-    return Transition(
-        task_key=task_key,
-        before=before,
-        after=after,
-        reasons=tuple(redact(reason) for reason in reasons),
-        head=head,
-        at=datetime(2026, 1, day, 3, 4, 5, tzinfo=UTC),
-    )
-
-
-def create_attempt(*, owned: tuple[str, ...] = ('src/a.py',)) -> Attempt:
-    return Attempt(worker='engineer', mode=None, owned=owned)
 
 
 def create_ticket_section(slug: Slug) -> TicketSection:
@@ -179,30 +142,6 @@ def fake_harness() -> TaskHarness:
 @pytest.fixture(params=task_implementation_cases())
 def harness(request: SubRequest) -> TaskHarness:
     return request.getfixturevalue(request.param)
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ServiceHarness:
-    service: TaskService
-    reads: TaskReadService
-    tickets: FakeTicketRepository
-    task_ledger: TaskLedger
-    contracts: FakeContractRepository
-    clock: FakeClock
-    ticket_id: int
-
-    @property
-    def tasks(self) -> FakeTaskRepository:
-        return FakeTaskRepository(ledger=self.task_ledger)
-
-    @property
-    def attempts(self) -> FakeAttemptRepository:
-        return FakeAttemptRepository(ledger=self.task_ledger)
-
-    def held(self, task_key: TaskId) -> TaskRecord:
-        record = self.tasks.task(self.ticket_id, task_key)
-        assert record is not None
-        return record
 
 
 @pytest.fixture

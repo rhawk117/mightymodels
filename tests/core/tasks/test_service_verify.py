@@ -5,9 +5,9 @@ import pytest
 from mightymodels_core.tasks import MarkRequest, TaskMovedError, TransitionError
 from mightymodels_core.tickets import ClosedTicketError
 
-from .conftest import COMMAND_KEY
 from .service_builders import (
     BASE_COMMIT,
+    COMMAND_KEY,
     DONE_COMMIT,
     FIRST_TASK,
     OWNED_FILE,
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from mightymodels_core.schemas.tasks import TaskStatus
     from mightymodels_core.tasks import TaskRecord
 
-    from .conftest import ServiceHarness
+    from .service_builders import ServiceHarness
 
 OUTSIDE_FILE = 'src/elsewhere.py'
 OWNED_CHANGE = frozenset({OWNED_FILE})
