@@ -1,17 +1,16 @@
 """A real sqlite database with a ticket seeded in two repositories, and a SnapshotRead over each."""
 
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.contract import ApprovedCommand, Receipt
+from mightymodels_core.contract import ApprovedCommand
 from mightymodels_core.database import ConnectionOptions, open_database
 from mightymodels_core.edge import create_database_spec
 from mightymodels_core.git import GitNoAnswerError
 from mightymodels_core.investigations import AddRequest, IncomingEntry, StartRequest
 from mightymodels_core.primitives import RepositoryKey, Slug, TaskId, redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
-from mightymodels_core.reviews import IncomingDisposition, IncomingFinding
+from mightymodels_core.reviews import IncomingDisposition
 from mightymodels_core.reviews import StartRequest as ReviewStartRequest
 from mightymodels_core.snapshot import RepositoryFacts
 from mightymodels_core.tasks import MarkRequest
@@ -19,17 +18,16 @@ from mightymodels_core.tasks import StartRequest as TaskStartRequest
 from mightymodels_core.tickets import TicketSection, Tracker
 from mightymodels_core.units_of_work import InvestigationWork, ReviewWork, SnapshotRead, TaskWork
 
+from .snapshot_builders import HEAD, MOMENT, create_defect, create_receipt
+
 if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
     from mightymodels_core.database import Database
     from mightymodels_core.primitives import Clock, RunId
-    from mightymodels_core.schemas.contract import Outcome
 
-HEAD = 'a' * 40
 OLD_HEAD = 'b' * 40
-MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 FIRST_SUMMARY = 'add the widget'
 OTHER_SUMMARY = 'a ticket of the other repository'
 
@@ -52,22 +50,6 @@ def create_section(summary: str) -> TicketSection:
 def create_command(key: str) -> ApprovedCommand:
     return ApprovedCommand(
         key=key, argv=('pytest', '-q', key), expect_exit=0, timeout=60, approved_by='owner'
-    )
-
-
-def create_receipt(key: str, *, outcome: Outcome, head: str) -> Receipt:
-    return Receipt(
-        key=key,
-        argv=('pytest', '-q', key),
-        outcome=outcome,
-        exit=0,
-        duration_ms=5,
-        stdout_tail=redact(''),
-        stderr_tail=redact(''),
-        digest='digest',
-        head=head,
-        phase='task',
-        at=MOMENT,
     )
 
 
@@ -98,6 +80,23 @@ def slug() -> Slug:
 @pytest.fixture
 def clock() -> Clock:
     return create_fake_clock(MOMENT)
+
+
+@pytest.fixture
+def investigation_work(
+    database: Database, repository_key: RepositoryKey, clock: Clock
+) -> InvestigationWork:
+    return InvestigationWork(database=database, repository_key=repository_key, clock=clock)
+
+
+@pytest.fixture
+def task_work(database: Database, repository_key: RepositoryKey, clock: Clock) -> TaskWork:
+    return TaskWork(database=database, repository_key=repository_key, clock=clock)
+
+
+@pytest.fixture
+def review_work(database: Database, repository_key: RepositoryKey, clock: Clock) -> ReviewWork:
+    return ReviewWork(database=database, repository_key=repository_key, clock=clock)
 
 
 @pytest.fixture
@@ -166,80 +165,11 @@ def reviewed(
     )
     with work.write() as unit:
         run = unit.reviews.start(request, HEAD)
-        findings = [
-            IncomingFinding(
-                sources=(source,),
-                severity='High',
-                kind='defect',
-                security=False,
-                title=f'defect found by {source}',
-                location=f'src/{source}.py:10',
-                fix='fix it',
-                verify='pytest -q',
-                evidence=None,
-            )
-            for source in ('MV-1', 'MV-2')
-        ]
+        findings = [create_defect(source) for source in ('MV-1', 'MV-2')]
         added = unit.reviews.add_findings(run.run_id, findings)
         decided = {added.changed[0].key: IncomingDisposition(decision='defer', reason='later')}
         unit.decisions.dispose(run.run_id, decided, 'owner')
     return run.run_id
-
-
-@pytest.fixture
-def crowded(
-    database: Database,
-    repository_key: RepositoryKey,
-    clock: Clock,
-    reviewed: RunId,
-    investigation: Slug,
-    slug: Slug,
-) -> Slug:
-    invest = InvestigationWork(database=database, repository_key=repository_key, clock=clock)
-    entries = [
-        IncomingEntry(kind='decision', text='use wal mode', source='user'),
-        IncomingEntry(kind='open', text='which retention', source='primary'),
-    ]
-    with invest.write() as unit:
-        unit.investigations.add(investigation, AddRequest(round=2, entries=entries, head=HEAD))
-
-    tasks = TaskWork(database=database, repository_key=repository_key, clock=clock)
-    start = TaskStartRequest(
-        task_key=TaskId('T2'),
-        worker='engineer',
-        mode=None,
-        owned=('src/b.py',),
-        acceptance_count=1,
-        head=HEAD,
-    )
-    with tasks.write() as unit:
-        unit.contracts.record(
-            slug,
-            [
-                create_receipt('T1.AC-2', outcome='pass', head=HEAD),
-                create_receipt('T2.AC-1', outcome='pass', head=HEAD),
-            ],
-        )
-        unit.tasks.start(slug, start)
-        unit.tasks.mark(slug, MarkRequest(task_key=TaskId('T2'), to='blocked', reason='a wall'))
-
-    third = IncomingFinding(
-        sources=('MV-3',),
-        severity='High',
-        kind='defect',
-        security=False,
-        title='defect found by MV-3',
-        location='src/MV-3.py:10',
-        fix='fix it',
-        verify='pytest -q',
-        evidence=None,
-    )
-    reviews = ReviewWork(database=database, repository_key=repository_key, clock=clock)
-    with reviews.write() as unit:
-        added = unit.reviews.add_findings(reviewed, [third])
-        decided = {added.changed[0].key: IncomingDisposition(decision='defer', reason='later')}
-        unit.decisions.dispose(reviewed, decided, 'owner')
-    return slug
 
 
 @pytest.fixture
