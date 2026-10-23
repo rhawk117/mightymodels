@@ -7,8 +7,8 @@ import pytest
 from mightymodels_core.primitives import TaskId, WriteLimitError, redact
 from mightymodels_core.tasks import TaskRecord, TaskRepository, UnknownTaskError
 from mightymodels_core.tasks.records import TASKS
-from mightymodels_core.tasks.tests.fakes import FakeTaskRepository, TaskLedger
 
+from tests.core.tasks.fakes import FakeTaskRepository, TaskLedger
 from tests.core.tasks.repository_builders import SECOND_TASK, create_attempt, create_transition
 from tests.core.tasks.service_builders import FIRST_TASK
 

@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.primitives import ReadLimitError, redact
 from mightymodels_core.tasks import AttemptRepository, FailedFix, UnknownTaskError
-from mightymodels_core.tasks.tests.fakes import FakeAttemptRepository, TaskLedger
 
+from tests.core.tasks.fakes import FakeAttemptRepository, TaskLedger
 from tests.core.tasks.repository_builders import SECOND_TASK, create_attempt, create_transition
 from tests.core.tasks.service_builders import FIRST_TASK
 
