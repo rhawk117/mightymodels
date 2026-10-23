@@ -81,7 +81,7 @@ class ClosingService:
 
     def check(self, slug: Slug, facts: CloseFacts) -> CloseCheck:
         ticket = self.tickets.staged_ticket(slug)
-        blockers = self.live_work(ticket, facts, self.latest_review(slug))
+        blockers = self.live_work(ticket, facts, self.review_decisions.latest_review(slug))
         return CloseCheck(blockers=tuple(blockers), git_refusal=facts.git_refusal)
 
     def close(self, slug: Slug, request: CloseRequest) -> ClosedTicket:
@@ -93,7 +93,7 @@ class ClosingService:
         if moved := get_moved_fields(request.seen, ticket):
             raise TicketMovedError(slug=slug, changed=moved)
 
-        review = self.latest_review(slug)
+        review = self.review_decisions.latest_review(slug)
         if blockers := self.live_work(ticket, request.facts, review):
             raise LiveWorkRemainsError(
                 slug=slug, blockers=blockers, git_refusal=request.facts.git_refusal
@@ -118,9 +118,6 @@ class ClosingService:
             gotchas=lines.gotchas,
             archive=request.archive,
         )
-
-    def latest_review(self, slug: Slug) -> LatestReview | None:
-        return self.review_decisions.latest_review(slug)
 
     def live_work(
         self, ticket: TicketRecord, facts: CloseFacts, review: LatestReview | None
