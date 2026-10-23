@@ -7,13 +7,13 @@ import pytest
 from mightymodels_core.similarity import ScoutReportRepository
 from mightymodels_core.similarity.tests.fakes import FakeScoutReportRepository
 
-from .conftest import STORED_TARGET, create_scout_report
+from tests.core.similarity.conftest import STORED_TARGET, create_scout_report
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.similarity import ScoutReport
 
-    from .conftest import SimilarityHarness
+    from tests.core.similarity.conftest import SimilarityHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

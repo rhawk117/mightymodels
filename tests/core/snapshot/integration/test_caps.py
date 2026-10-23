@@ -10,7 +10,7 @@ from mightymodels_core.snapshot import SnapshotRequest
 from mightymodels_core.tasks import MarkRequest
 from mightymodels_core.tasks import StartRequest as TaskStartRequest
 
-from .snapshot_builders import HEAD, create_defect, create_receipt
+from tests.core.snapshot.snapshot_builders import HEAD, create_defect, create_receipt
 
 if TYPE_CHECKING:
     from mightymodels_core.primitives import RunId, Slug

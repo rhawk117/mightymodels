@@ -16,13 +16,13 @@ from mightymodels_core.similarity import (
 from mightymodels_core.similarity.matching import index_query
 from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
 
-from .conftest import STORED_REFERENCE, STORED_TEXT, create_written
+from tests.core.similarity.conftest import STORED_REFERENCE, STORED_TEXT, create_written
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.similarity import Written
 
-    from .conftest import SimilarityHarness
+    from tests.core.similarity.conftest import SimilarityHarness
 
 NEAR_TEXT = 'retry loop drops connection pool after timeout error'
 SHARES_ONE_WORD_TEXT = 'a timeout in the payment webhook handler'
