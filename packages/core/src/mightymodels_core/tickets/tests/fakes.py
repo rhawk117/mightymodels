@@ -54,13 +54,13 @@ class FakeTicketRepository:
         return record
 
     def mark_in_progress(self, ticket: OpenTicket) -> None:
-        self._set_status(self.staged_ticket(ticket.slug), 'in-progress')
+        self.set_status(self.staged_ticket(ticket.slug), 'in-progress')
 
     def mark_closed(self, ticket: OpenTicket) -> None:
-        self._set_status(self.staged_ticket(ticket.slug), 'closed')
+        self.set_status(self.staged_ticket(ticket.slug), 'closed')
 
     def seed_status(self, slug: Slug, status: TicketStatus) -> None:
-        self._set_status(self.staged_ticket(slug), status)
+        self.set_status(self.staged_ticket(slug), status)
 
     def unclosed_on_branch(self, branch: str) -> Slug | None:
         on_branch = self.all_unclosed_on_branch(branch)
@@ -73,5 +73,5 @@ class FakeTicketRepository:
             if record.section.branch == branch and record.status != 'closed'
         )
 
-    def _set_status(self, record: TicketRecord, status: TicketStatus) -> None:
+    def set_status(self, record: TicketRecord, status: TicketStatus) -> None:
         self.records[record.slug] = replace(record, status=status)
