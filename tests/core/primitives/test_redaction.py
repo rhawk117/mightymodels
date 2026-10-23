@@ -1,9 +1,8 @@
 import re
 import time
-from collections.abc import MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, get_args
+from typing import TYPE_CHECKING, cast, get_args
 
 import pytest
 from hypothesis import given
@@ -20,6 +19,8 @@ from mightymodels_core.primitives import (
 from mightymodels_core.primitives.redaction import default_secret_patterns
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
+
     from _pytest.mark.structures import ParameterSet
 
 LONG_TEXT = 60_000
@@ -135,8 +136,11 @@ class TestEachPattern:
 
     def test_default_patterns_cannot_be_changed(self) -> None:
         patterns = default_secret_patterns()
+        by_name = cast('MutableMapping[PatternName, re.Pattern[str]]', patterns.by_name)
 
-        assert not isinstance(patterns.by_name, MutableMapping)
+        with pytest.raises(TypeError):
+            by_name['jwt'] = re.compile('changed')
+
         assert 'add' not in dir(patterns)
 
     def test_leaves_text_without_a_secret_alone(self) -> None:
@@ -223,7 +227,7 @@ class TestRedactionWithinALimit:
 
 
 class TestRedactedTextConstruction:
-    def test_redact_is_the_only_constructor_in_the_source(self) -> None:
+    def test_redacted_text_is_built_only_in_redaction_py(self) -> None:
         constructors = {
             path.name
             for path in SOURCE.rglob('*.py')

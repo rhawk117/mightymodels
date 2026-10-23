@@ -206,10 +206,28 @@ def readiness_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('records', 'problems'), cases)
 
 
+def proven_criteria_cases() -> pytest.MarkDecorator:
+    dotless = replace(
+        proven().evidence, commands=[create_command('T7.AC-1'), create_command('nodot')]
+    )
+    cases = [
+        pytest.param(
+            GateScenario(name='dotless-command-key', evidence=dotless),
+            {'AC-1', 'AC-2'},
+            id='dotless-command-key',
+        )
+    ]
+    return pytest.mark.parametrize(('scenario', 'criteria'), cases)
+
+
 class TestVerificationGate:
     @verification_cases()
     def test_verification_problems(self, scenario: GateScenario) -> None:
         assert scenario.gate.get_verification_problems() == list(scenario.problems)
+
+    @proven_criteria_cases()
+    def test_proven_criteria(self, scenario: GateScenario, criteria: set[str]) -> None:
+        assert scenario.gate.proven_criteria == criteria
 
 
 class TestDoneCommit:
