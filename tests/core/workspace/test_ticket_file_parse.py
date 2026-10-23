@@ -100,6 +100,9 @@ class TestParseTicketFile:
         [
             pytest.param('task: x\ty\n', 'x\ty', id='tab-inside-a-value'),
             pytest.param('task: x\xa0y\n', 'x\xa0y', id='no-break-space-inside-a-value'),
+            pytest.param('task: "a # b"\n', 'a # b', id='double-quoted-holding-a-hash'),
+            pytest.param('task: "a" # note\n', 'a', id='double-quoted-with-a-trailing-comment'),
+            pytest.param('task: "a\\"b"\n', 'a"b', id='double-quoted-holding-an-escaped-quote'),
         ],
     )
     def test_a_character_inside_a_value_is_kept_in_the_value(self, source: str, task: str) -> None:

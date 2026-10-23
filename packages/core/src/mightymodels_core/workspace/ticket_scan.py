@@ -27,6 +27,7 @@ UNREADABLE = re.compile(
     '[^\t\n\r\x20-\x7e\xa0-\u2027\u202a-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]'
 )
 KEY_QUOTES = ('"', "'")
+CLOSED_DOUBLE_QUOTE = re.compile(r'"(?:[^"\\]|\\.)*"')
 UNSUPPORTED_STARTS = ("'", '[', '{', '&', '*', '!', '|', '>')
 
 
@@ -121,6 +122,10 @@ def value_of(text: str) -> str:
     return text.partition(':')[2].strip()
 
 
+def is_unclosed_double_quote(value: str) -> bool:
+    return value.startswith('"') and not CLOSED_DOUBLE_QUOTE.match(value)
+
+
 def has_unsupported_key(text: str) -> bool:
     key = text.partition(':')[0]
     return key.startswith(KEY_QUOTES) or any(char.isspace() for char in key)
@@ -152,7 +157,7 @@ def get_line_problem(line: SourceLine) -> TicketFileSyntaxError | None:
         return problem
 
     value = value_of(line.text)
-    if value.startswith(UNSUPPORTED_STARTS):
+    if value.startswith(UNSUPPORTED_STARTS) or is_unclosed_double_quote(value):
         return TicketFileSyntaxError(line=line.number, reason=f'unsupported YAML syntax: {value}')
 
     return None

@@ -69,6 +69,12 @@ def ticket_syntax_refusal_cases() -> pytest.MarkDecorator:
             name='single-quoted', source="a: 'x'\n", line=1, reason='unsupported YAML syntax'
         ),
         SyntaxRefusal(
+            name='multi-line-double-quoted',
+            source='task: t\nsummary: "a\n# hidden\n  b: c"\n',
+            line=2,
+            reason='unsupported YAML syntax',
+        ),
+        SyntaxRefusal(
             name='block-scalar', source='a: |\n  x\n', line=1, reason='unsupported YAML syntax'
         ),
         SyntaxRefusal(
@@ -82,7 +88,10 @@ def ticket_syntax_refusal_cases() -> pytest.MarkDecorator:
             name='top-level-list', source='- a\n- b\n', line=1, reason='indented under its key'
         ),
         SyntaxRefusal(
-            name='unterminated-quote', source='a: 1\nb: "open\n', line=2, reason='quoted scalar'
+            name='unterminated-quote',
+            source='a: 1\nb: "open\n',
+            line=2,
+            reason='unsupported YAML syntax',
         ),
         SyntaxRefusal(
             name='indent-after-scalar', source='a: 1\n  b: 2\n', line=2, reason='not allowed'
