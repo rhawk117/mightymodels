@@ -6,7 +6,7 @@ from mightymodels_core.workspace import (
     parse_ticket_file,
 )
 
-from .conftest import SyntaxRefusal, TypeRefusal
+from tests.core.workspace.conftest import SyntaxRefusal, TypeRefusal
 
 
 def ticket_syntax_refusal_cases() -> pytest.MarkDecorator:

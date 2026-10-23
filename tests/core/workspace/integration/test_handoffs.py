@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.workspace import workspace_at
 
-from .conftest import TICKET
+from tests.core.workspace.conftest import TICKET
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from mightymodels_core.edge import OpenState
     from mightymodels_core.git import Git
 
-    from .conftest import StartHarness
+    from tests.core.edge.conftest import StartHarness
 
 pytestmark = pytest.mark.integration
 
