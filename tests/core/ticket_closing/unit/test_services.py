@@ -35,7 +35,7 @@ from mightymodels_core.ticket_closing.tests.fakes import FakeClosingRepository
 from mightymodels_core.tickets import ClosedTicketError, NotStagedError
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
-from .conftest import (
+from tests.core.ticket_closing.conftest import (
     ARCHIVE_PATH,
     PLAN_TASK,
     REVIEW_RUN,

@@ -13,7 +13,7 @@ from mightymodels_core.ticket_closing import (
 )
 from mightymodels_core.tickets import Tracker
 
-from .conftest import REVIEW_RUN, create_closing
+from tests.core.ticket_closing.conftest import REVIEW_RUN, create_closing
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

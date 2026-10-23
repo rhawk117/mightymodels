@@ -13,7 +13,7 @@ from mightymodels_core.tickets import (
 )
 from mightymodels_core.workspace import LoneSurrogateError, TicketFile, parse_ticket_file
 
-from .conftest import SERVICE_MOMENT, create_answers
+from tests.core.tickets.conftest import SERVICE_MOMENT, create_answers
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

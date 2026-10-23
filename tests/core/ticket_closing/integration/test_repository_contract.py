@@ -7,10 +7,10 @@ import pytest
 from mightymodels_core.ticket_closing import ClosingRepository
 from mightymodels_core.ticket_closing.tests.fakes import FakeClosingRepository
 
-from .conftest import create_closing
+from tests.core.ticket_closing.conftest import create_closing
 
 if TYPE_CHECKING:
-    from .conftest import ClosingHarness
+    from tests.core.ticket_closing.conftest import ClosingHarness
 
 
 class TestImplementations:

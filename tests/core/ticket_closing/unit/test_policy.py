@@ -17,7 +17,7 @@ from mightymodels_core.ticket_closing import (
 )
 from mightymodels_core.tickets import TicketRecord
 
-from .conftest import (
+from tests.core.ticket_closing.conftest import (
     SERVICE_BRANCH,
     SERVICE_SLUG,
     create_branch_facts,
