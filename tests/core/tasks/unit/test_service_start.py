@@ -12,7 +12,7 @@ from mightymodels_core.tasks import (
 )
 from mightymodels_core.tickets import ClosedTicketError, NotStagedError
 
-from .service_builders import (
+from tests.core.tasks.service_builders import (
     BASE_COMMIT,
     FIRST_TASK,
     OTHER_SLUG,
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.tasks import StartRequest
 
-    from .service_builders import ServiceHarness
+    from tests.core.tasks.service_builders import ServiceHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

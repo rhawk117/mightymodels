@@ -17,6 +17,19 @@ settings.register_profile('ci', parent=settings.get_profile('ci'), max_examples=
 settings.register_profile('thorough', parent=settings.get_profile('ci'), max_examples=1000)
 settings.load_profile(resolve_hypothesis_profile())
 
+TIER_DEPTH = 2
+TIER_NAMES = frozenset({'unit', 'integration', 'smoke'})
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    core_tests = config.rootpath.joinpath('tests', 'core')
+    for item in items:
+        relative_parts = item.path.relative_to(core_tests, walk_up=True).parts
+        if relative_parts[0] == '..':
+            continue
+        if len(relative_parts) > TIER_DEPTH and relative_parts[1] in TIER_NAMES:
+            item.add_marker(relative_parts[1])
+
 
 @pytest.fixture
 def anyio_backend() -> str:

@@ -9,11 +9,11 @@ from mightymodels_core.primitives import ReadLimitError, redact
 from mightymodels_core.tasks import AttemptRepository, FailedFix, UnknownTaskError
 from mightymodels_core.tasks.tests.fakes import FakeAttemptRepository, TaskLedger
 
-from .repository_builders import SECOND_TASK, create_attempt, create_transition
-from .service_builders import FIRST_TASK
+from tests.core.tasks.repository_builders import SECOND_TASK, create_attempt, create_transition
+from tests.core.tasks.service_builders import FIRST_TASK
 
 if TYPE_CHECKING:
-    from .repository_builders import TaskHarness
+    from tests.core.tasks.repository_builders import TaskHarness
 
 RECOVERY = replace(create_attempt(), worker='architect', mode='recovery-implementation')
 REFACTOR = replace(create_attempt(), worker='architect', mode='systemic-refactor')
