@@ -185,11 +185,10 @@ def origin_url_without_key_cases() -> pytest.MarkDecorator:
 
 class TestRepositoryKey:
     toplevel = Path('/work/project')
+    digest = hashlib.sha256(b'/work/project').hexdigest()
 
     def test_local_key_is_the_prefix_and_the_path_digest(self) -> None:
-        digest = hashlib.sha256(b'/work/project').hexdigest()
-
-        assert local_key(self.toplevel) == f'local:{digest}'
+        assert local_key(self.toplevel) == f'local:{self.digest}'
         assert parse_repository_key(local_key(self.toplevel)) == local_key(self.toplevel)
 
     @origin_url_key_cases()

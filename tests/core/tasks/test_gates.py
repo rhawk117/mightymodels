@@ -230,30 +230,40 @@ class TestVerificationGate:
         assert scenario.gate.proven_criteria == criteria
 
 
+def done_commit_cases() -> pytest.MarkDecorator:
+    cases = [
+        pytest.param(BRIEF, 'abc1234', id='named'),
+        pytest.param('## ASKED\ncommit: abc1234\n', None, id='before-the-done-heading'),
+        pytest.param('## DONE\nno hash\n', None, id='done-without-a-commit'),
+        pytest.param('## DONE\ncommit: xyz\n', None, id='not-a-hash'),
+    ]
+    return pytest.mark.parametrize(('brief_text', 'named'), cases)
+
+
+def criterion_of_command_cases() -> pytest.MarkDecorator:
+    cases = [('T7.AC-1', 'AC-1'), ('R17.AC-2', 'AC-2'), ('nodot', None)]
+    return pytest.mark.parametrize(('key', 'criterion'), cases)
+
+
+def plan_task_cases() -> pytest.MarkDecorator:
+    cases = [('T1', True), ('R1', False), ('C1', False)]
+    return pytest.mark.parametrize(('key', 'expected'), cases)
+
+
 class TestDoneCommit:
-    @pytest.mark.parametrize(
-        ('brief_text', 'named'),
-        [
-            pytest.param(BRIEF, 'abc1234', id='named'),
-            pytest.param('## ASKED\ncommit: abc1234\n', None, id='before-the-done-heading'),
-            pytest.param('## DONE\nno hash\n', None, id='done-without-a-commit'),
-            pytest.param('## DONE\ncommit: xyz\n', None, id='not-a-hash'),
-        ],
-    )
+    @done_commit_cases()
     def test_done_commit(self, brief_text: str, named: str | None) -> None:
         assert done_commit(brief_text) == named
 
 
 class TestCriterionOfCommand:
-    @pytest.mark.parametrize(
-        ('key', 'criterion'), [('T7.AC-1', 'AC-1'), ('R17.AC-2', 'AC-2'), ('nodot', None)]
-    )
+    @criterion_of_command_cases()
     def test_criterion_of_command(self, key: str, criterion: str | None) -> None:
         assert criterion_of_command(key) == criterion
 
 
 class TestPlanTask:
-    @pytest.mark.parametrize(('key', 'expected'), [('T1', True), ('R1', False), ('C1', False)])
+    @plan_task_cases()
     def test_only_the_t_prefix_is_a_plan_task(self, key: str, expected: bool) -> None:
         assert is_plan_task(TaskId(key)) is expected
 

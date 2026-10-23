@@ -70,10 +70,12 @@ class TestJournalWorkRepository:
 class TestSnapshotReadRepository:
     facts = RepositoryFacts(branch='feat/widget', head='a' * 40, dirty=(), refusal=None)
 
-    def test_other_repository_cannot_snapshot_the_staged_ticket(
-        self, other_snapshot_read: SnapshotRead, staged_slug: Slug
-    ) -> None:
-        request = SnapshotRequest(slug=staged_slug, repository=self.facts)
+    @pytest.fixture
+    def request_for_staged_ticket(self, staged_slug: Slug) -> SnapshotRequest:
+        return SnapshotRequest(slug=staged_slug, repository=self.facts)
 
+    def test_other_repository_cannot_snapshot_the_staged_ticket(
+        self, other_snapshot_read: SnapshotRead, request_for_staged_ticket: SnapshotRequest
+    ) -> None:
         with pytest.raises(NotStagedError), other_snapshot_read.read() as unit:
-            unit.snapshots.take(request)
+            unit.snapshots.take(request_for_staged_ticket)
