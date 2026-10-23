@@ -75,6 +75,12 @@ def ticket_syntax_refusal_cases() -> pytest.MarkDecorator:
             reason='unsupported YAML syntax',
         ),
         SyntaxRefusal(
+            name='multi-line-double-quoted-list-item',
+            source='task: t\nfiles:\n  - "a\n# x\n  b"\n',
+            line=3,
+            reason='unsupported YAML syntax',
+        ),
+        SyntaxRefusal(
             name='block-scalar', source='a: |\n  x\n', line=1, reason='unsupported YAML syntax'
         ),
         SyntaxRefusal(
