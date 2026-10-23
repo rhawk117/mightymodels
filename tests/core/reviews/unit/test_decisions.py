@@ -15,12 +15,19 @@ from mightymodels_core.reviews import (
     UnknownFindingError,
 )
 
-from .conftest import FIRST_RUN, OTHER_SLUG, SLUG, UNSTARTED_RUN, Case, create_decided
+from tests.core.reviews.conftest import (
+    FIRST_RUN,
+    OTHER_SLUG,
+    SLUG,
+    UNSTARTED_RUN,
+    Case,
+    create_decided,
+)
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
 
-    from .conftest import DecisionHarness
+    from tests.core.reviews.conftest import DecisionHarness
 
 type Refusal = type[Exception]
 FIX_MV_1 = IncomingDisposition(decision='fix')

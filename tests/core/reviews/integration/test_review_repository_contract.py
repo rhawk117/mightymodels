@@ -13,7 +13,7 @@ from mightymodels_core.reviews import (
 from mightymodels_core.reviews.records import FINDINGS, RUNS_LISTED
 from mightymodels_core.reviews.tests.fakes import FakeReviewRepository, ReviewLedger
 
-from .conftest import (
+from tests.core.reviews.conftest import (
     FIRST_RUN,
     OTHER_SLUG,
     SECOND_RUN,
@@ -26,7 +26,7 @@ from .conftest import (
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
 
-    from .conftest import ReviewHarness
+    from tests.core.reviews.conftest import ReviewHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

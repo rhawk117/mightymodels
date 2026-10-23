@@ -18,7 +18,7 @@ from mightymodels_core.reviews import (
     fold_findings,
 )
 
-from .finding_builders import fold_one, incoming_finding
+from tests.core.reviews.finding_builders import fold_one, incoming_finding
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

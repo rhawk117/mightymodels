@@ -11,7 +11,7 @@ from mightymodels_core.reviews import (
 )
 from mightymodels_core.reviews.tests.fakes import FakeReviewDecisionRepository, ReviewLedger
 
-from .conftest import (
+from tests.core.reviews.conftest import (
     FIRST_RUN,
     SECOND_RUN,
     UNSTARTED_RUN,
@@ -22,7 +22,7 @@ from .conftest import (
 )
 
 if TYPE_CHECKING:
-    from .conftest import ReviewHarness
+    from tests.core.reviews.conftest import ReviewHarness
 
 
 class TestImplementations:

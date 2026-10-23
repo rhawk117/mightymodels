@@ -16,7 +16,7 @@ from mightymodels_core.reviews.policy.review import (
     persona_of_source,
 )
 
-from .finding_builders import fold_one, held_finding, incoming_finding
+from tests.core.reviews.finding_builders import fold_one, held_finding, incoming_finding
 
 if TYPE_CHECKING:
     from mightymodels_core.reviews import (

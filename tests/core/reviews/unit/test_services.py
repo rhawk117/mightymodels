@@ -14,7 +14,7 @@ from mightymodels_core.reviews import (
 )
 from mightymodels_core.reviews.records import RUNS_LISTED
 
-from .conftest import (
+from tests.core.reviews.conftest import (
     HEAD,
     OTHER_SLUG,
     SERVICE_MOMENT,
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from mightymodels_core.reviews import FindingRecord, Verdict
     from mightymodels_core.schemas.reviews import Decision, FindingSeverity, Result
 
-    from .conftest import ServiceHarness
+    from tests.core.reviews.conftest import ServiceHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

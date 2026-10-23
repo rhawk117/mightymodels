@@ -22,7 +22,7 @@ from mightymodels_core.reviews import (
 )
 from mightymodels_core.reviews.reports import MergeVaderBasis, PersonaSpec, UncleBobBasis
 
-from .conftest import (
+from tests.core.reviews.conftest import (
     HEAD,
     SERVICE_MOMENT,
     SLUG,
