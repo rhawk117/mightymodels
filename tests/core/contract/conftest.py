@@ -13,7 +13,6 @@ from mightymodels_core.contract import (
     Receipt,
     SqliteContractRepository,
 )
-from mightymodels_core.contract.tests.fakes import ContractLedger, FakeContractRepository
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
@@ -22,6 +21,8 @@ from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, Repository
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
 from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
+
+from tests.core.contract.fakes import ContractLedger, FakeContractRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator

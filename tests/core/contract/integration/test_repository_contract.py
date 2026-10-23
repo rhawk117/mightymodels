@@ -11,10 +11,10 @@ from mightymodels_core.contract import (
     UnapprovedCommandError,
 )
 from mightymodels_core.contract.records import COMMANDS
-from mightymodels_core.contract.tests.fakes import ContractLedger, FakeContractRepository
 from mightymodels_core.primitives import TaskId, WriteLimitError
 
 from tests.core.contract.conftest import APPROVAL, create_command, create_receipt
+from tests.core.contract.fakes import ContractLedger, FakeContractRepository
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
