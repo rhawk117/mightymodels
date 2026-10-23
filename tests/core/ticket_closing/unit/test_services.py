@@ -8,11 +8,6 @@ from mightymodels_core.investigations import InvestigationRecord, LedgerRecord
 from mightymodels_core.primitives import RedactedTextTooLongError, Slug, redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.reviews.services import ReviewDecisionService
-from mightymodels_core.reviews.tests.fakes import (
-    FakeReviewDecisionRepository,
-    FakeReviewRepository,
-    ReviewLedger,
-)
 from mightymodels_core.tasks.tests.fakes import (
     FakeAttemptRepository,
     FakeTaskRepository,
@@ -33,6 +28,11 @@ from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 from tests.core.investigations.fakes import (
     FakeInvestigationRepository,
     InvestigationLedger,
+)
+from tests.core.reviews.fakes import (
+    FakeReviewDecisionRepository,
+    FakeReviewRepository,
+    ReviewLedger,
 )
 from tests.core.ticket_closing.conftest import (
     ARCHIVE_PATH,

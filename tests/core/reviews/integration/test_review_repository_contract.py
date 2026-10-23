@@ -11,7 +11,6 @@ from mightymodels_core.reviews import (
     RunNotFoundError,
 )
 from mightymodels_core.reviews.records import FINDINGS, RUNS_LISTED
-from mightymodels_core.reviews.tests.fakes import FakeReviewRepository, ReviewLedger
 
 from tests.core.reviews.conftest import (
     FIRST_RUN,
@@ -22,6 +21,7 @@ from tests.core.reviews.conftest import (
     create_finding,
     create_run,
 )
+from tests.core.reviews.fakes import FakeReviewRepository, ReviewLedger
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

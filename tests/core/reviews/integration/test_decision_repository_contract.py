@@ -9,7 +9,6 @@ from mightymodels_core.reviews import (
     UndecidedFindingError,
     UnknownFindingError,
 )
-from mightymodels_core.reviews.tests.fakes import FakeReviewDecisionRepository, ReviewLedger
 
 from tests.core.reviews.conftest import (
     FIRST_RUN,
@@ -20,6 +19,7 @@ from tests.core.reviews.conftest import (
     create_resolved,
     create_run,
 )
+from tests.core.reviews.fakes import FakeReviewDecisionRepository, ReviewLedger
 
 if TYPE_CHECKING:
     from tests.core.reviews.conftest import ReviewHarness
