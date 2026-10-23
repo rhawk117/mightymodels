@@ -6,16 +6,11 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.investigations import SqliteInvestigationRepository
-from mightymodels_core.reviews import (
-    ReviewDecisionService,
-    SqliteReviewDecisionRepository,
-    SqliteReviewRepository,
-)
 from mightymodels_core.snapshot import SnapshotService
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository
 from mightymodels_core.tickets import SqliteTicketRepository
 
-from .entry import read_entry
+from .entry import read_entry, review_decisions_of
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -45,18 +40,13 @@ class SnapshotRead:
     def create_unit(self, entry: Entry) -> SnapshotUnit:
         unit = entry.unit
         repository_id = entry.repository_id
-        reviews = ReviewDecisionService(
-            reviews=SqliteReviewRepository(unit=unit, repository_id=repository_id),
-            decisions=SqliteReviewDecisionRepository(unit=unit, repository_id=repository_id),
-            clock=self.clock,
-        )
         snapshots = SnapshotService(
             tickets=SqliteTicketRepository(unit=unit, repository_id=repository_id),
             tasks=SqliteTaskRepository(unit=unit),
             attempts=SqliteAttemptRepository(unit=unit),
             contracts=SqliteContractRepository(unit=unit),
             investigations=SqliteInvestigationRepository(unit=unit, repository_id=repository_id),
-            reviews=reviews,
+            reviews=review_decisions_of(entry, self.clock),
             clock=self.clock,
         )
         return SnapshotUnit(snapshots=snapshots)

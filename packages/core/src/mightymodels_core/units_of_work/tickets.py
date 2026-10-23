@@ -12,8 +12,6 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.investigations import SqliteInvestigationRepository
-from mightymodels_core.reviews import SqliteReviewDecisionRepository, SqliteReviewRepository
-from mightymodels_core.reviews.services import ReviewDecisionService
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository
 from mightymodels_core.ticket_closing import ClosingService, SqliteClosingRepository
 from mightymodels_core.tickets import (
@@ -23,7 +21,7 @@ from mightymodels_core.tickets import (
     TicketSource,
 )
 
-from .entry import read_entry, write_entry
+from .entry import read_entry, review_decisions_of, write_entry
 from .errors import MissingTicketError
 
 if TYPE_CHECKING:
@@ -72,16 +70,6 @@ class TicketWriteUnit:
         draft.parent.mkdir(parents=True, exist_ok=True)
         draft.write_text(text, encoding='utf-8')
         draft.replace(workspace.ticket_file(slug))
-
-
-def review_decisions_of(entry: Entry, clock: Clock) -> ReviewDecisionService:
-    return ReviewDecisionService(
-        reviews=SqliteReviewRepository(unit=entry.unit, repository_id=entry.repository_id),
-        decisions=SqliteReviewDecisionRepository(
-            unit=entry.unit, repository_id=entry.repository_id
-        ),
-        clock=clock,
-    )
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
