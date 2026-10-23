@@ -31,7 +31,6 @@ from mightymodels_core.ticket_closing import (
     TicketMovedError,
     TooManyGotchasError,
 )
-from mightymodels_core.ticket_closing.tests.fakes import FakeClosingRepository
 from mightymodels_core.tickets import ClosedTicketError, NotStagedError
 from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
@@ -52,6 +51,7 @@ from tests.core.ticket_closing.conftest import (
     create_task,
     create_ticket_section,
 )
+from tests.core.ticket_closing.fakes import FakeClosingRepository
 
 if TYPE_CHECKING:
     from mightymodels_core.ticket_closing import CloseFacts

@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.ticket_closing import ClosingRepository
-from mightymodels_core.ticket_closing.tests.fakes import FakeClosingRepository
 
 from tests.core.ticket_closing.conftest import create_closing
+from tests.core.ticket_closing.fakes import FakeClosingRepository
 
 if TYPE_CHECKING:
     from tests.core.ticket_closing.conftest import ClosingHarness

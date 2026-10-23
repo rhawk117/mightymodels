@@ -26,8 +26,9 @@ from mightymodels_core.ticket_closing import (
     ClosingRecord,
     SqliteClosingRepository,
 )
-from mightymodels_core.ticket_closing.tests.fakes import FakeClosingRepository
 from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
+
+from tests.core.ticket_closing.fakes import FakeClosingRepository
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Generator
