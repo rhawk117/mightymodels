@@ -375,4 +375,4 @@ SELECT
   ) AS projection
 FROM tickets AS t;
 
-PRAGMA user_version = 3;
+PRAGMA user_version = 2;
