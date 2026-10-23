@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.git import Checkout, Git, GitUnavailableError, ProcessGit, UntrackedFiles
-from mightymodels_core.git.tests.fakes import InMemoryGit
 from mightymodels_core.primitives import RepositoryKey
 
 from tests.core.git.conftest import (
@@ -14,6 +13,7 @@ from tests.core.git.conftest import (
     UNTRACKED,
     git_backend_cases,
 )
+from tests.core.git.fakes import InMemoryGit
 
 if TYPE_CHECKING:
     from tests.core.git.conftest import RepositoryHarness, ScriptedHarness

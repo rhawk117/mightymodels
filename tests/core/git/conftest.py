@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING
 import anyio
 import pytest
 from mightymodels_core.git import Checkout, GitCommand, ProcessGit
-from mightymodels_core.git.tests.fakes import (
+from mightymodels_core.process import CompletedRun, SubprocessRunner
+
+from tests.core.git.fakes import (
     ANSWERED,
     CommitHistory,
     InMemoryGit,
     ScriptedRunner,
 )
-from mightymodels_core.process import CompletedRun, SubprocessRunner
 
 if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
