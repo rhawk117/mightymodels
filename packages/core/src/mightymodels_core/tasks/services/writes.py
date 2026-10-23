@@ -78,6 +78,29 @@ def status_of(task: TaskRecord | None) -> TaskStatus:
     return 'pending' if task is None else task.status
 
 
+def verification_transition(gate: VerificationGate, at: datetime) -> Transition:
+    problems = gate.get_verification_problems()
+    return Transition(
+        task_key=gate.task.key,
+        before=gate.task.status,
+        after='blocked' if problems else 'verified',
+        reasons=tuple(map(redact, problems)),
+        head=gate.git.head,
+        at=at,
+    )
+
+
+def mark_transition(request: MarkRequest, before: TaskStatus, at: datetime) -> Transition:
+    return Transition(
+        task_key=request.task_key,
+        before=before,
+        after=request.to,
+        reasons=(redact(request.reason),),
+        head=None,
+        at=at,
+    )
+
+
 def get_moved_fields(seen: TaskRecord, current: TaskRecord) -> list[str]:
     moved = {
         'status': seen.status != current.status,
@@ -153,15 +176,7 @@ class TaskService:
         gate = VerificationGate(
             task=current, evidence=self.evidence_for(ticket_id, current, request), git=request.git
         )
-        problems = gate.get_verification_problems()
-        transition = Transition(
-            task_key=task_key,
-            before=current.status,
-            after='blocked' if problems else 'verified',
-            reasons=tuple(map(redact, problems)),
-            head=request.git.head,
-            at=self.clock.now(),
-        )
+        transition = verification_transition(gate, self.clock.now())
         self.tickets.mark_in_progress(ticket)
         self.tasks.record_verification(ticket_id, transition, request.commit)
         return self.task_held(ticket_id, task_key)
@@ -191,14 +206,7 @@ class TaskService:
         if problem := policy.get_transition_problem():
             raise problem
 
-        transition = Transition(
-            task_key=task_key,
-            before=before,
-            after=request.to,
-            reasons=(redact(request.reason),),
-            head=None,
-            at=self.clock.now(),
-        )
+        transition = mark_transition(request, before, self.clock.now())
         self.tickets.mark_in_progress(ticket)
         self.tasks.record_mark(ticket_id, transition)
         return self.task_held(ticket_id, task_key)

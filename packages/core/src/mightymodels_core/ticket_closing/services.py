@@ -90,14 +90,9 @@ class ClosingService:
         if isinstance(token, ClosedTicketError):
             raise token
 
-        if moved := get_moved_fields(request.seen, ticket):
-            raise TicketMovedError(slug=slug, changed=moved)
-
         review = self.review_decisions.latest_review(slug)
-        if blockers := self.live_work(ticket, request.facts, review):
-            raise LiveWorkRemainsError(
-                slug=slug, blockers=blockers, git_refusal=request.facts.git_refusal
-            )
+        if problem := self.closing_problem(ticket, request, review):
+            raise problem
 
         lines = create_one_lined_closing(request.lines, self.options)
         if problem := ClosingPolicy(closing=lines, options=self.options).get_closing_problem():
@@ -108,6 +103,19 @@ class ClosingService:
         self.tickets.mark_closed(token)
         self.closings.record_closing(ticket.id, closing)
         return ClosedTicket(closing=closing, archive=archive)
+
+    def closing_problem(
+        self, ticket: TicketRecord, request: CloseRequest, review: LatestReview | None
+    ) -> TicketMovedError | LiveWorkRemainsError | None:
+        if moved := get_moved_fields(request.seen, ticket):
+            return TicketMovedError(slug=ticket.slug, changed=moved)
+
+        if blockers := self.live_work(ticket, request.facts, review):
+            return LiveWorkRemainsError(
+                slug=ticket.slug, blockers=blockers, git_refusal=request.facts.git_refusal
+            )
+
+        return None
 
     def closing_record_of(self, request: CloseRequest, lines: OneLinedClosing) -> ClosingRecord:
         return ClosingRecord(

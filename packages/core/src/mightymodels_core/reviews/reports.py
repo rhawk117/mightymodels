@@ -235,6 +235,9 @@ class ReportReader:
             raise ForeignSourceError(index=index, sources=[named['id']], persona=self.persona)
 
         heading = Heading(index=index, source=named['id'], rest=named['rest'])
+        return self.finding_from(heading, block)
+
+    def finding_from(self, heading: Heading, block: Block) -> IncomingFinding:
         bullets = bullets_of(block.body)
         basis = self.spec.parser.basis(heading, bullets)
         return IncomingFinding(
