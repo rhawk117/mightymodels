@@ -15,11 +15,11 @@ from mightymodels_core.crashouts import (
 )
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.primitives import redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 
 from tests.core.crashouts.fakes import FakeCrashoutRepository
+from tests.core.primitives.clock import create_fake_clock
 from tests.core.similarity.fakes import FakeSimilarityRepository
 
 if TYPE_CHECKING:
@@ -32,7 +32,8 @@ if TYPE_CHECKING:
         CrashoutRepository,
     )
     from mightymodels_core.database import Database
-    from mightymodels_core.primitives.tests.clock import FakeClock
+
+    from tests.core.primitives.clock import FakeClock
 
 SQL = files('mightymodels_core.sql')
 FIRST_AT = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)

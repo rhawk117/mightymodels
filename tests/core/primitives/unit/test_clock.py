@@ -5,7 +5,8 @@ from mightymodels_core.database.codec import bind_value
 from mightymodels_core.primitives import Clock, from_unixepoch
 from mightymodels_core.primitives.clock import SystemClock
 from mightymodels_core.primitives.errors import NaiveClockTimeError
-from mightymodels_core.primitives.tests.clock import FakeClock, create_fake_clock
+
+from tests.core.primitives.clock import FakeClock, create_fake_clock
 
 
 def clock_protocol_cases() -> pytest.MarkDecorator:

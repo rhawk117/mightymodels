@@ -15,13 +15,13 @@ from mightymodels_core.contract import (
 )
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.primitives import Slug, redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
 from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
 
 from tests.core.contract.fakes import ContractLedger, FakeContractRepository
+from tests.core.primitives.clock import create_fake_clock
 from tests.core.tickets.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
