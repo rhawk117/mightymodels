@@ -14,9 +14,9 @@ from mightymodels_core.similarity import (
     overlap,
 )
 from mightymodels_core.similarity.matching import index_query
-from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
 
 from tests.core.similarity.conftest import STORED_REFERENCE, STORED_TEXT, create_written
+from tests.core.similarity.fakes import FakeSimilarityRepository
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

@@ -24,13 +24,13 @@ from mightymodels_core.reviews import (
 )
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
-from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
 
 from tests.core.reviews.fakes import (
     FakeReviewDecisionRepository,
     FakeReviewRepository,
     ReviewLedger,
 )
+from tests.core.similarity.fakes import FakeSimilarityRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping

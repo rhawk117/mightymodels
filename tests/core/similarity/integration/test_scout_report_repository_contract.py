@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.similarity import ScoutReportRepository
-from mightymodels_core.similarity.tests.fakes import FakeScoutReportRepository
 
 from tests.core.similarity.conftest import STORED_TARGET, create_scout_report
+from tests.core.similarity.fakes import FakeScoutReportRepository
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

@@ -11,7 +11,8 @@ from mightymodels_core.similarity import (
     SimilarityService,
     Written,
 )
-from mightymodels_core.similarity.tests.fakes import (
+
+from tests.core.similarity.fakes import (
     FakeScoutReportRepository,
     FakeSimilarityRepository,
 )

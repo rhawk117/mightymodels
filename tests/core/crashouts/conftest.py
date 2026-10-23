@@ -18,9 +18,9 @@ from mightymodels_core.primitives import redact
 from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
-from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
 
 from tests.core.crashouts.fakes import FakeCrashoutRepository
+from tests.core.similarity.fakes import FakeSimilarityRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator
