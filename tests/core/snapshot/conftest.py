@@ -9,7 +9,6 @@ from mightymodels_core.edge import create_database_spec
 from mightymodels_core.git import GitNoAnswerError
 from mightymodels_core.investigations import AddRequest, IncomingEntry, StartRequest
 from mightymodels_core.primitives import RepositoryKey, Slug, TaskId, redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.reviews import IncomingDisposition
 from mightymodels_core.reviews import StartRequest as ReviewStartRequest
 from mightymodels_core.snapshot import RepositoryFacts
@@ -17,6 +16,8 @@ from mightymodels_core.tasks import MarkRequest
 from mightymodels_core.tasks import StartRequest as TaskStartRequest
 from mightymodels_core.tickets import TicketSection, Tracker
 from mightymodels_core.units_of_work import InvestigationWork, ReviewWork, SnapshotRead, TaskWork
+
+from tests.core.primitives.clock import create_fake_clock
 
 from .snapshot_builders import HEAD, MOMENT, create_defect, create_receipt
 

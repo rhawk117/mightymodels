@@ -11,11 +11,11 @@ from mightymodels_core.tasks import Brief, GitFacts, StartRequest, VerifyRequest
 from tests.core.tasks.fakes import FakeAttemptRepository, FakeTaskRepository
 
 if TYPE_CHECKING:
-    from mightymodels_core.primitives.tests.clock import FakeClock
     from mightymodels_core.schemas.tasks import ArchitectMode, Worker
     from mightymodels_core.tasks import TaskReadService, TaskRecord, TaskService
 
     from tests.core.contract.fakes import FakeContractRepository
+    from tests.core.primitives.clock import FakeClock
     from tests.core.tasks.fakes import TaskLedger
     from tests.core.tickets.fakes import FakeTicketRepository
 

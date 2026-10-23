@@ -8,7 +8,6 @@ import pytest
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.investigations import InvestigationRecord
 from mightymodels_core.primitives import Slug, redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.investigations import ADD_INVESTIGATION, AddInvestigationParams
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
@@ -25,6 +24,7 @@ from tests.core.investigations.fakes import (
     FakeInvestigationRepository,
     InvestigationLedger,
 )
+from tests.core.primitives.clock import create_fake_clock
 from tests.core.tickets.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
@@ -34,8 +34,9 @@ if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
     from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
-    from mightymodels_core.primitives.tests.clock import FakeClock
     from mightymodels_core.tickets import TicketRepository
+
+    from tests.core.primitives.clock import FakeClock
 
 SQL = files('mightymodels_core.sql')
 RECORDED_INVESTIGATIONS = ('first-look', 'second-look')

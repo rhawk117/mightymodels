@@ -5,7 +5,6 @@ import pytest
 from mightymodels_core.contract.records import Approval, ApprovedCommand
 from mightymodels_core.investigations import InvestigationRecord, LedgerRecord
 from mightymodels_core.primitives import RedactedTextTooLongError, Slug, redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.reviews.services import ReviewDecisionService
 from mightymodels_core.ticket_closing import (
     LIVE_DEBUG,
@@ -23,6 +22,7 @@ from tests.core.investigations.fakes import (
     FakeInvestigationRepository,
     InvestigationLedger,
 )
+from tests.core.primitives.clock import create_fake_clock
 from tests.core.reviews.fakes import (
     FakeReviewDecisionRepository,
     FakeReviewRepository,

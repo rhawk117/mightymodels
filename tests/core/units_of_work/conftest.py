@@ -7,7 +7,6 @@ from mightymodels_core.database import ConnectionOptions, open_database
 from mightymodels_core.edge import create_database_spec
 from mightymodels_core.investigations import StartRequest as InvestigationStartRequest
 from mightymodels_core.primitives import RepositoryKey, Slug, redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.reviews import StartRequest as ReviewStartRequest
 from mightymodels_core.tickets import TicketAnswers, TicketSection, Tracker
 from mightymodels_core.units_of_work import (
@@ -19,6 +18,8 @@ from mightymodels_core.units_of_work import (
     TicketWork,
 )
 from mightymodels_core.workspace import workspace_at
+
+from tests.core.primitives.clock import create_fake_clock
 
 if TYPE_CHECKING:
     from collections.abc import Generator
