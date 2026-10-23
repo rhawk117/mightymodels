@@ -15,7 +15,7 @@ from mightymodels_core.git import (
 )
 from mightymodels_core.process import CompletedRun, FailedRun, SubprocessRunner
 
-from .conftest import SCRIPTED_ROOT, create_scripted_harness
+from tests.core.git.conftest import SCRIPTED_ROOT, create_scripted_harness
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.git import Git
 
-    from .conftest import ScriptedHarness
+    from tests.core.git.conftest import ScriptedHarness
 
 HOSTILE = {'option': '--output=/tmp/pwned', 'newline': 'main\n', 'dash': '-b'}
 NOT_A_REPOSITORY = CompletedRun(exit=128, stdout='', stderr='fatal: not a git repository\n')

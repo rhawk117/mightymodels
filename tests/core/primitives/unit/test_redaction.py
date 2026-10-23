@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 LONG_TEXT = 60_000
 SECONDS_FOR_LONG_TEXT = 5.0
-SOURCE = Path(__file__).parents[3] / 'packages' / 'core' / 'src'
+SOURCE = Path(__file__).parents[4] / 'packages' / 'core' / 'src'
 PATTERN_AT_THE_FIRST_RELEASE = re.compile(
     r'(?i)[A-Z0-9_]*(?:password|passwd|secret|token|api[_-]?key)[A-Z0-9_]*'
     r'["\']?\s*[:=]\s*["\']?[^\s,;"\']+'

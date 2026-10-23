@@ -5,7 +5,7 @@ from mightymodels_core.git import Checkout, Git, GitUnavailableError, ProcessGit
 from mightymodels_core.git.tests.fakes import InMemoryGit
 from mightymodels_core.primitives import RepositoryKey
 
-from .conftest import (
+from tests.core.git.conftest import (
     ADDED,
     BRANCH,
     COMMITS_ON_BRANCH,
@@ -16,7 +16,7 @@ from .conftest import (
 )
 
 if TYPE_CHECKING:
-    from .conftest import RepositoryHarness, ScriptedHarness
+    from tests.core.git.conftest import RepositoryHarness, ScriptedHarness
 
 
 class TestProtocol:
