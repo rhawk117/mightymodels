@@ -22,7 +22,7 @@ from mightymodels_core.database import (
     open_database,
 )
 
-from .conftest import (
+from tests.core.database.conftest import (
     NamePart,
     NoPart,
     PersonPart,
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from mightymodels_core.database.errors import SqliteFailure
     from msgspec import Struct
 
-    from .conftest import Statements
+    from tests.core.database.conftest import Statements
 
 pytestmark = pytest.mark.integration
 

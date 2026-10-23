@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.database import ConnectionOptions, SchemaVersionError, open_database
 
-from .conftest import SCHEMA
+from tests.core.sql.conftest import SCHEMA
 
 if TYPE_CHECKING:
     from pathlib import Path

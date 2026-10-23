@@ -21,7 +21,7 @@ from mightymodels_core.database.connection import (
     prepare_or_close,
 )
 
-from .conftest import (
+from tests.core.database.conftest import (
     FIXTURE_SCHEMA,
     FIXTURE_VERSION,
     CloseFailingConnection,
@@ -34,7 +34,7 @@ from .conftest import (
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
 
-    from .conftest import Statements
+    from tests.core.database.conftest import Statements
 
 pytestmark = pytest.mark.integration
 
