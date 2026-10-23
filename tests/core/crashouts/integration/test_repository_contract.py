@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 from mightymodels_core.crashouts import JOURNAL_WINDOW, CrashoutRepository
 from mightymodels_core.crashouts.tests.fakes import FakeCrashoutRepository
 
-from .conftest import create_crashout
+from tests.core.crashouts.conftest import create_crashout
 
 if TYPE_CHECKING:
-    from .conftest import CrashoutHarness
+    from tests.core.crashouts.conftest import CrashoutHarness
 
 
 class TestImplementations:

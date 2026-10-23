@@ -14,12 +14,12 @@ from mightymodels_core.contract.records import COMMANDS
 from mightymodels_core.contract.tests.fakes import ContractLedger, FakeContractRepository
 from mightymodels_core.primitives import TaskId, WriteLimitError
 
-from .conftest import APPROVAL, create_command, create_receipt
+from tests.core.contract.conftest import APPROVAL, create_command, create_receipt
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
 
-    from .conftest import ContractHarness
+    from tests.core.contract.conftest import ContractHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

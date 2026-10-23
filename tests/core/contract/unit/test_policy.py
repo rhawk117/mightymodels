@@ -22,7 +22,7 @@ from mightymodels_core.contract import (
 )
 from mightymodels_core.primitives import Slug, TaskId
 
-from .conftest import FIRST_KEY, HEAD, SECOND_KEY, create_command, create_receipt
+from tests.core.contract.conftest import FIRST_KEY, HEAD, SECOND_KEY, create_command, create_receipt
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

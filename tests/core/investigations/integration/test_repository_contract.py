@@ -17,12 +17,18 @@ from mightymodels_core.investigations.tests.fakes import (
 )
 from mightymodels_core.primitives import Slug, WriteLimitError
 
-from .conftest import FIRST, SECOND, UNADDED, create_entry, create_investigation
+from tests.core.investigations.conftest import (
+    FIRST,
+    SECOND,
+    UNADDED,
+    create_entry,
+    create_investigation,
+)
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
 
-    from .conftest import InvestigationHarness
+    from tests.core.investigations.conftest import InvestigationHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

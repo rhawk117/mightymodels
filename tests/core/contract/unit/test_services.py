@@ -17,7 +17,7 @@ from mightymodels_core.contract import (
 from mightymodels_core.primitives import Slug
 from mightymodels_core.tickets import NotStagedError
 
-from .conftest import (
+from tests.core.contract.conftest import (
     FIRST_KEY,
     HEAD,
     SECOND_KEY,
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.contract import ApprovedCommand
 
-    from .conftest import ServiceHarness
+    from tests.core.contract.conftest import ServiceHarness
 
 UNSTAGED_SLUG = Slug('unstaged-subject')
 OLD_HEAD = 'old0001'

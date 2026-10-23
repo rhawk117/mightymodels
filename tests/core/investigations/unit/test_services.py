@@ -13,12 +13,19 @@ from mightymodels_core.investigations import (
 )
 from mightymodels_core.primitives import RedactedTextTooLongError
 
-from .conftest import HEAD, MOMENT, STARTED, UNADDED, create_entry, create_incoming
+from tests.core.investigations.conftest import (
+    HEAD,
+    MOMENT,
+    STARTED,
+    UNADDED,
+    create_entry,
+    create_incoming,
+)
 
 if TYPE_CHECKING:
     from mightymodels_core.investigations import IncomingEntry
 
-    from .conftest import ServiceHarness
+    from tests.core.investigations.conftest import ServiceHarness
 
 
 def create_start(target: str = 'Retry policy') -> StartRequest:

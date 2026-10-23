@@ -11,12 +11,12 @@ from mightymodels_core.crashouts import (
 )
 from mightymodels_core.primitives import RedactedTextTooLongError
 
-from .conftest import MOMENT, create_entry
+from tests.core.crashouts.conftest import MOMENT, create_entry
 
 if TYPE_CHECKING:
     from mightymodels_core.crashouts import CrashoutEntry
 
-    from .conftest import ServiceHarness
+    from tests.core.crashouts.conftest import ServiceHarness
 
 DAY = timedelta(days=1)
 ROOT_CAUSE = 'the retry loop drops the connection pool after a timeout'

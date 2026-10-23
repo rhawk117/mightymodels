@@ -13,7 +13,7 @@ from mightymodels_core.investigations import (
     recorded_ledger,
 )
 
-from .conftest import (
+from tests.core.investigations.conftest import (
     FIRST,
     HEAD,
     SECOND,
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from mightymodels_core.investigations import EntryStatus, LedgerRecord
     from mightymodels_core.schemas.investigations import EntryKind
 
-    from .conftest import InvestigationHarness
+    from tests.core.investigations.conftest import InvestigationHarness
 
 
 def create_record(

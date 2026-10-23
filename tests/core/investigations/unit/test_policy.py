@@ -18,7 +18,7 @@ from mightymodels_core.investigations import (
 )
 from mightymodels_core.primitives import RedactedTextTooLongError
 
-from .conftest import HEAD, MOMENT, Case, create_incoming
+from tests.core.investigations.conftest import HEAD, MOMENT, Case, create_incoming
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

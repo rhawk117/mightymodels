@@ -13,7 +13,7 @@ from mightymodels_core.crashouts import (
 )
 from mightymodels_core.primitives import RedactedTextTooLongError
 
-from .conftest import MOMENT, create_entry
+from tests.core.crashouts.conftest import MOMENT, create_entry
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
