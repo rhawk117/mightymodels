@@ -14,10 +14,10 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives.tests.clock import FakeClock
     from mightymodels_core.schemas.tasks import ArchitectMode, Worker
     from mightymodels_core.tasks import TaskReadService, TaskRecord, TaskService
-    from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
     from tests.core.contract.fakes import FakeContractRepository
     from tests.core.tasks.fakes import TaskLedger
+    from tests.core.tickets.fakes import FakeTicketRepository
 
 FIRST_TASK = TaskId('T1')
 SERVICE_SLUG = Slug('service-subject')

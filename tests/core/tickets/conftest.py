@@ -20,12 +20,12 @@ from mightymodels_core.tickets import (
     TicketSlot,
     Tracker,
 )
-from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 from tests.core.investigations.fakes import (
     FakeInvestigationRepository,
     InvestigationLedger,
 )
+from tests.core.tickets.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator

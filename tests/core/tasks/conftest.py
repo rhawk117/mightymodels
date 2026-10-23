@@ -19,7 +19,6 @@ from mightymodels_core.tasks import (
     TaskService,
 )
 from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
-from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 from tests.core.contract.fakes import ContractLedger, FakeContractRepository
 from tests.core.tasks.fakes import (
@@ -27,6 +26,7 @@ from tests.core.tasks.fakes import (
     FakeTaskRepository,
     TaskLedger,
 )
+from tests.core.tickets.fakes import FakeTicketRepository
 
 from .repository_builders import TaskHarness
 from .service_builders import (

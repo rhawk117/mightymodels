@@ -17,7 +17,6 @@ from mightymodels_core.ticket_closing import (
     TooManyGotchasError,
 )
 from mightymodels_core.tickets import ClosedTicketError, NotStagedError
-from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 from tests.core.contract.fakes import ContractLedger, FakeContractRepository
 from tests.core.investigations.fakes import (
@@ -52,6 +51,7 @@ from tests.core.ticket_closing.conftest import (
     create_ticket_section,
 )
 from tests.core.ticket_closing.fakes import FakeClosingRepository
+from tests.core.tickets.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
     from mightymodels_core.ticket_closing import CloseFacts

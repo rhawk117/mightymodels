@@ -20,9 +20,9 @@ from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
 from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
-from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 from tests.core.contract.fakes import ContractLedger, FakeContractRepository
+from tests.core.tickets.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator

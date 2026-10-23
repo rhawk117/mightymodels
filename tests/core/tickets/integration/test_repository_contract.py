@@ -11,9 +11,9 @@ from mightymodels_core.tickets import (
     UnknownInvestigationError,
 )
 from mightymodels_core.tickets.policy import OpenTicket, open_ticket
-from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
 
 from tests.core.tickets.conftest import RECORDED_INVESTIGATIONS, create_section
+from tests.core.tickets.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
     from collections.abc import Callable
