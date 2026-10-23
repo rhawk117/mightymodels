@@ -10,7 +10,6 @@ from mightymodels_core.tickets import (
     TicketExistsError,
     TicketSource,
     branch_of,
-    get_branch_problem,
 )
 from mightymodels_core.workspace import LoneSurrogateError, TicketFile, parse_ticket_file
 
@@ -229,16 +228,13 @@ class TestWrite:
             service.write(SLUG, unrecorded_answers, free_slot)
 
 
-class TestBranchNamed:
+class TestBranchOf:
     @branch_named_cases()
     def test_the_branch_is_named(self, named: BranchRequest) -> None:
-        problem = get_branch_problem(named.choice, named.typed, named.current)
-
-        assert problem is None
         assert branch_of(named.choice, named.typed, named.current) == named.expected
 
     @branch_refusal_cases()
     def test_an_unnameable_branch_is_refused(self, refused: BranchRefusal) -> None:
-        problem = get_branch_problem(refused.choice, refused.typed, refused.current)
+        problem = branch_of(refused.choice, refused.typed, refused.current)
 
         assert type(problem) is refused.error_type

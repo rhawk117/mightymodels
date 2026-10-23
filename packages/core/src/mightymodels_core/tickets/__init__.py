@@ -14,7 +14,6 @@ from .policy import (
     TicketPolicy,
     branch_of,
     declared_slugs,
-    get_branch_problem,
 )
 from .records import (
     BranchChoice,
@@ -51,6 +50,5 @@ __all__ = [
     'UnknownInvestigationError',
     'branch_of',
     'declared_slugs',
-    'get_branch_problem',
     'open_ticket_of',
 ]

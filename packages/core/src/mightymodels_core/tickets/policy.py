@@ -63,15 +63,6 @@ def get_investigation_problem(key: str, unrecorded: Collection[Slug]) -> str | N
     return None
 
 
-def get_branch_problem(
-    choice: BranchChoice, name: str, current: str | None
-) -> BranchNameRequiredError | DetachedHeadError | None:
-    if choice == 'new':
-        return None if name.strip() else BranchNameRequiredError()
-
-    return None if current is not None else DetachedHeadError()
-
-
 def get_closed_problem(record: TicketRecord) -> ClosedTicketError | None:
     return ClosedTicketError(slug=record.slug) if record.status == 'closed' else None
 
@@ -90,11 +81,13 @@ def open_ticket(record: TicketRecord) -> OpenTicket | ClosedTicketError:
     return OpenTicket(id=record.id, slug=record.slug)
 
 
-def branch_of(choice: BranchChoice, name: str, current: str | None) -> str:
+def branch_of(
+    choice: BranchChoice, name: str, current: str | None
+) -> str | BranchNameRequiredError | DetachedHeadError:
     if choice == 'new':
-        return name.strip()
+        return name.strip() or BranchNameRequiredError()
 
-    return current or ''
+    return current if current is not None else DetachedHeadError()
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
