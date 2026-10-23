@@ -42,7 +42,7 @@ type FindingProblem = (
 )
 
 LOCATION = re.compile(r'^(?P<path>[^\s:]+):(?P<start>\d+)(?:-(?P<end>\d+))?$')
-UNNUMBERED = 'F0'
+FINDING_PREFIX = 'F'
 
 
 def stored_severity(severity: FindingSeverity) -> StoredSeverity:
@@ -98,8 +98,15 @@ def overlaps(left: FindingRecord, right: FindingRecord) -> bool:
     )
 
 
+def finding_key(number: int) -> str:
+    return f'{FINDING_PREFIX}{number}'
+
+
 def finding_number(key: str) -> int:
-    return int(key.removeprefix('F'))
+    return int(key.removeprefix(FINDING_PREFIX))
+
+
+UNNUMBERED = finding_key(0)
 
 
 def number_of(finding: FindingRecord) -> int:
@@ -238,7 +245,7 @@ class FindingMerge:
             return self.merged(overlapped, incoming)
 
         number = max(map(number_of, held.values()), default=0) + 1
-        return replace(incoming, key=f'F{number}')
+        return replace(incoming, key=finding_key(number))
 
     def fold(
         self, held: Sequence[FindingRecord], incoming: Sequence[FindingRecord]
