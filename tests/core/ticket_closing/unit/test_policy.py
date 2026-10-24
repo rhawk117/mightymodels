@@ -1,7 +1,9 @@
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_args
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.git.revisions import revision_error
 from mightymodels_core.primitives import RedactedTextTooLongError
 from mightymodels_core.ticket_closing import (
@@ -16,8 +18,9 @@ from mightymodels_core.ticket_closing import (
     get_moved_fields,
 )
 from mightymodels_core.tickets import TicketRecord
+from mightymodels_core.vocabulary.tasks import TaskStatus
 
-from tests.core.ticket_closing.conftest import (
+from tests.core.ticket_closing.closing_builders import (
     SERVICE_BRANCH,
     SERVICE_SLUG,
     create_branch_facts,
@@ -32,7 +35,6 @@ if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.reviews import LatestReview
     from mightymodels_core.schemas.reviews import Decision
-    from mightymodels_core.schemas.tasks import TaskStatus
     from mightymodels_core.tasks import TaskRecord
     from mightymodels_core.ticket_closing import BranchFacts, CloseFacts
 
@@ -116,13 +118,6 @@ def live_work_branch_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('case', [case.param for case in cases])
 
 
-def unverified_status_cases() -> pytest.MarkDecorator:
-    statuses: list[TaskStatus] = ['in-progress', 'failed', 'blocked']
-    return pytest.mark.parametrize(
-        'status', [pytest.param(status, id=status) for status in statuses]
-    )
-
-
 VERIFIED = create_task('T1', 'verified')
 
 
@@ -140,6 +135,12 @@ def find_live_work(
 
 
 class TestTaskBlockers:
+    unverified_statuses = st.sampled_from([
+        status
+        for status in get_args(TaskStatus.__value__)
+        if status not in {'pending', 'verified', 'superseded'}
+    ])
+
     def test_a_verified_ticket_with_nothing_else_has_no_live_work(self) -> None:
         assert find_live_work() == []
 
@@ -151,7 +152,10 @@ class TestTaskBlockers:
 
         assert blockers == ['T1 has contract commands but was never started', NO_VERIFIED_WORK]
 
-    @unverified_status_cases()
+    @given(status=unverified_statuses)
+    @example(status='in-progress')
+    @example(status='failed')
+    @example(status='blocked')
     def test_an_unverified_plan_task_blocks_closing(self, status: TaskStatus) -> None:
         started = create_task('T2', status)
         blockers = find_live_work(tasks=(VERIFIED, started))

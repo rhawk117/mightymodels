@@ -12,7 +12,11 @@ from mightymodels_core.ticket_closing import (
     archived_review,
 )
 
-from tests.core.ticket_closing.conftest import REVIEW_RUN, SERVICE_MOMENT, create_latest_review
+from tests.core.ticket_closing.closing_builders import (
+    REVIEW_RUN,
+    SERVICE_MOMENT,
+    create_latest_review,
+)
 
 if TYPE_CHECKING:
     from mightymodels_core.schemas.investigations import EntryKind

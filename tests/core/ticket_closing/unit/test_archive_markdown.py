@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import Slug, TaskId, redact
 from mightymodels_core.ticket_closing import (
     ArchivedCommand,
@@ -13,7 +15,7 @@ from mightymodels_core.ticket_closing import (
 )
 from mightymodels_core.tickets import Tracker
 
-from tests.core.ticket_closing.conftest import REVIEW_RUN, create_closing
+from tests.core.ticket_closing.closing_builders import REVIEW_RUN, create_closing
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -88,17 +90,8 @@ def create_parts(
     )
 
 
-def decision_limit_cases() -> pytest.MarkDecorator:
-    cases = [
-        pytest.param(0, 4, id='no-ledger'),
-        pytest.param(2, 2, id='ledger-below-limit'),
-        pytest.param(4, 0, id='ledger-at-limit'),
-        pytest.param(5, 0, id='ledger-over-limit'),
-    ]
-    return pytest.mark.parametrize(('ledger_count', 'reason_count'), cases)
-
-
 class TestArchiveMarkdown:
+    ledger_counts = st.integers(min_value=0, max_value=DECISION_LIMIT + 2)
     shipped_parts = (
         'shipped: Retry queue drains',
         'PR: https://example.test/pull/7',
@@ -174,13 +167,17 @@ class TestArchiveMarkdown:
             '0 passing at last run; not passing: T1.AC-1'
         )
 
-    @decision_limit_cases()
-    def test_decisions_stay_within_the_limit(self, ledger_count: int, reason_count: int) -> None:
+    @given(ledger_count=ledger_counts)
+    @example(ledger_count=DECISION_LIMIT)
+    @example(ledger_count=DECISION_LIMIT + 1)
+    def test_decisions_stay_within_the_limit(self, ledger_count: int) -> None:
         parts = create_parts(
             decisions=create_decisions(ledger_count),
             review=create_review(['reason'] * 6),
         )
         lines = self.render(parts)
         shown = lines[lines.index('decisions:') + 1 : lines.index('gotchas:')]
-        assert len([line for line in shown if line.startswith('- review ')]) == reason_count
+        assert len([line for line in shown if line.startswith('- review ')]) == max(
+            DECISION_LIMIT - ledger_count, 0
+        )
         assert len(shown) == max(ledger_count, DECISION_LIMIT)

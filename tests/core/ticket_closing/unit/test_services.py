@@ -33,7 +33,7 @@ from tests.core.tasks.fakes import (
     FakeTaskRepository,
     TaskLedger,
 )
-from tests.core.ticket_closing.conftest import (
+from tests.core.ticket_closing.closing_builders import (
     ARCHIVE_PATH,
     PLAN_TASK,
     REVIEW_RUN,

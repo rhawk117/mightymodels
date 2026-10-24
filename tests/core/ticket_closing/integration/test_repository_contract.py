@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.ticket_closing import ClosingRepository
 
-from tests.core.ticket_closing.conftest import create_closing
+from tests.core.ticket_closing.closing_builders import create_closing
 from tests.core.ticket_closing.fakes import FakeClosingRepository
 
 if TYPE_CHECKING:
-    from tests.core.ticket_closing.conftest import ClosingHarness
+    from tests.core.ticket_closing.closing_builders import ClosingHarness
 
 
 class TestImplementations:
