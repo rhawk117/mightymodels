@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.contract.records import Receipt, RecordedCommand
 from mightymodels_core.primitives import TaskId, redact
 from mightymodels_core.tasks import (
@@ -206,28 +208,18 @@ def readiness_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('records', 'problems'), cases)
 
 
-def proven_criteria_cases() -> pytest.MarkDecorator:
-    dotless = replace(
-        proven().evidence, commands=[create_command('T7.AC-1'), create_command('nodot')]
-    )
-    cases = [
-        pytest.param(
-            GateScenario(name='dotless-command-key', evidence=dotless),
-            {'AC-1', 'AC-2'},
-            id='dotless-command-key',
-        )
-    ]
-    return pytest.mark.parametrize(('scenario', 'criteria'), cases)
-
-
 class TestVerificationGate:
     @verification_cases()
     def test_verification_problems(self, scenario: GateScenario) -> None:
         assert scenario.gate.get_verification_problems() == list(scenario.problems)
 
-    @proven_criteria_cases()
-    def test_proven_criteria(self, scenario: GateScenario, criteria: set[str]) -> None:
-        assert scenario.gate.proven_criteria == criteria
+    def test_proven_criteria_ignore_a_dotless_command_key(self) -> None:
+        dotless = replace(
+            proven().evidence, commands=[create_command('T7.AC-1'), create_command('nodot')]
+        )
+        scenario = GateScenario(name='dotless-command-key', evidence=dotless)
+
+        assert scenario.gate.proven_criteria == {'AC-1', 'AC-2'}
 
 
 def done_commit_cases() -> pytest.MarkDecorator:
@@ -240,16 +232,6 @@ def done_commit_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('brief_text', 'named'), cases)
 
 
-def criterion_of_command_cases() -> pytest.MarkDecorator:
-    cases = [('T7.AC-1', 'AC-1'), ('R17.AC-2', 'AC-2'), ('nodot', None)]
-    return pytest.mark.parametrize(('key', 'criterion'), cases)
-
-
-def plan_task_cases() -> pytest.MarkDecorator:
-    cases = [('T1', True), ('R1', False), ('C1', False)]
-    return pytest.mark.parametrize(('key', 'expected'), cases)
-
-
 class TestDoneCommit:
     @done_commit_cases()
     def test_done_commit(self, brief_text: str, named: str | None) -> None:
@@ -257,15 +239,27 @@ class TestDoneCommit:
 
 
 class TestCriterionOfCommand:
-    @criterion_of_command_cases()
-    def test_criterion_of_command(self, key: str, criterion: str | None) -> None:
-        assert criterion_of_command(key) == criterion
+    keys = st.text()
+
+    @given(key=keys)
+    @example(key='T7.AC-1')
+    @example(key='R17.AC-2')
+    @example(key='nodot')
+    def test_criterion_is_the_text_after_the_first_dot(self, key: str) -> None:
+        expected = key.partition('.')[2] if '.' in key else None
+
+        assert criterion_of_command(key) == expected
 
 
 class TestPlanTask:
-    @plan_task_cases()
-    def test_only_the_t_prefix_is_a_plan_task(self, key: str, expected: bool) -> None:
-        assert is_plan_task(TaskId(key)) is expected
+    keys = st.text()
+
+    @given(key=keys)
+    @example(key='T1')
+    @example(key='R1')
+    @example(key='C1')
+    def test_only_the_t_prefix_is_a_plan_task(self, key: str) -> None:
+        assert is_plan_task(TaskId(key)) is key.startswith('T')
 
     def test_closed_plan_task_has_no_problem(self) -> None:
         assert get_plan_task_problem(create_record('T1', 'verified')) is None

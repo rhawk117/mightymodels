@@ -1,10 +1,11 @@
 """The task policy: transitions, start limits, architect-only modes, size bound and fix limit."""
 
 from dataclasses import dataclass
-from itertools import product
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_args
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import TaskId
 from mightymodels_core.tasks import (
     ArchitectSpentError,
@@ -18,20 +19,13 @@ from mightymodels_core.tasks import (
     TransitionError,
     TransitionPolicy,
 )
+from mightymodels_core.vocabulary.tasks import TaskStatus
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
-    from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
+    from mightymodels_core.schemas.tasks import ArchitectMode, Worker
 
 TASK = TaskId('T7')
-STATUSES: tuple[TaskStatus, ...] = (
-    'pending',
-    'in-progress',
-    'verified',
-    'failed',
-    'blocked',
-    'superseded',
-)
 ALLOWED_MOVES: frozenset[tuple[TaskStatus, TaskStatus]] = frozenset({
     ('pending', 'in-progress'),
     ('pending', 'superseded'),
@@ -44,17 +38,6 @@ ALLOWED_MOVES: frozenset[tuple[TaskStatus, TaskStatus]] = frozenset({
     ('blocked', 'in-progress'),
     ('blocked', 'superseded'),
 })
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Move:
-    before: TaskStatus
-    after: TaskStatus
-    marks: tuple[pytest.MarkDecorator, ...] = ()
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=f'{self.before}-to-{self.after}', marks=self.marks)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -88,17 +71,6 @@ class StartScenario:
             owned_count=self.owned_count,
             too_large_approved=self.too_large_approved,
         )
-
-
-def allowed_move_cases() -> pytest.MarkDecorator:
-    moves = [Move(before=before, after=after).param for before, after in sorted(ALLOWED_MOVES)]
-    return pytest.mark.parametrize('move', moves)
-
-
-def refused_move_cases() -> pytest.MarkDecorator:
-    refused = [pair for pair in product(STATUSES, STATUSES) if pair not in ALLOWED_MOVES]
-    moves = [Move(before=before, after=after).param for before, after in refused]
-    return pytest.mark.parametrize('move', moves)
 
 
 def start_accepted_cases() -> pytest.MarkDecorator:
@@ -212,32 +184,36 @@ def start_reasons_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('scenario', 'reasons'), cases)
 
 
-def fix_outside_in_progress_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(
-        'before', [status for status in STATUSES if status != 'in-progress']
-    )
-
-
-def fix_under_the_limit_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize('tried', [(), ('one',), ('one', 'two')])
-
-
 class TestTransitionPolicy:
-    def find_problem(self, move: Move) -> TransitionError | None:
-        policy = TransitionPolicy(task_key=TASK, before=move.before, after=move.after)
+    statuses = st.sampled_from(get_args(TaskStatus.__value__))
+
+    def find_problem(self, before: TaskStatus, after: TaskStatus) -> TransitionError | None:
+        policy = TransitionPolicy(task_key=TASK, before=before, after=after)
         return policy.get_transition_problem()
 
-    @allowed_move_cases()
-    def test_allowed_transition_has_no_problem(self, move: Move) -> None:
-        assert self.find_problem(move) is None
+    @given(before=statuses, after=statuses)
+    @example(before='pending', after='in-progress')
+    @example(before='pending', after='superseded')
+    @example(before='in-progress', after='verified')
+    @example(before='in-progress', after='failed')
+    @example(before='in-progress', after='blocked')
+    @example(before='in-progress', after='superseded')
+    @example(before='failed', after='in-progress')
+    @example(before='failed', after='superseded')
+    @example(before='blocked', after='in-progress')
+    @example(before='blocked', after='superseded')
+    def test_transition_is_allowed_exactly_when_listed(
+        self, before: TaskStatus, after: TaskStatus
+    ) -> None:
+        problem = self.find_problem(before, after)
 
-    @refused_move_cases()
-    def test_refused_transition_is_a_transition_error(self, move: Move) -> None:
-        problem = self.find_problem(move)
+        if (before, after) in ALLOWED_MOVES:
+            assert problem is None
+            return
 
         assert isinstance(problem, TransitionError)
-        assert (problem.current, problem.target) == (move.before, move.after)
-        assert str(problem) == f'{TASK} cannot move from {move.before} to {move.after}'
+        assert (problem.current, problem.target) == (before, after)
+        assert str(problem) == f'{TASK} cannot move from {before} to {after}'
 
 
 class TestStartPolicy:
@@ -269,6 +245,11 @@ class TestStartPolicy:
 
 
 class TestFixPolicy:
+    statuses_outside_in_progress = st.sampled_from([
+        status for status in get_args(TaskStatus.__value__) if status != 'in-progress'
+    ])
+    tries_under_the_limit = st.lists(st.text(), max_size=2).map(tuple)
+
     @pytest.fixture
     def spent_tries(self) -> tuple[str, ...]:
         return ('one', 'two', 'three')
@@ -278,11 +259,18 @@ class TestFixPolicy:
     ) -> FixNotUnderwayError | FixesSpentError | None:
         return FixPolicy(task_key=TASK, before=before, tried=tried).get_fix_problem()
 
-    @fix_outside_in_progress_cases()
+    @given(before=statuses_outside_in_progress)
+    @example(before='pending')
+    @example(before='verified')
+    @example(before='failed')
+    @example(before='blocked')
+    @example(before='superseded')
     def test_fix_outside_in_progress_is_refused(self, before: TaskStatus) -> None:
         assert isinstance(self.find_problem(before, ()), FixNotUnderwayError)
 
-    @fix_under_the_limit_cases()
+    @given(tried=tries_under_the_limit)
+    @example(tried=())
+    @example(tried=('one', 'two'))
     def test_fix_under_the_limit_is_accepted(self, tried: tuple[str, ...]) -> None:
         assert self.find_problem('in-progress', tried) is None
 
