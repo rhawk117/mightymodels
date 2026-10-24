@@ -202,6 +202,8 @@ def target_name_cases() -> pytest.MarkDecorator:
 
 
 class TestNamePolicy:
+    target_names = st.text()
+
     def create_policy(self, target: str) -> NamePolicy:
         return NamePolicy(target=target, day=MOMENT)
 
@@ -209,7 +211,7 @@ class TestNamePolicy:
     def test_target_name(self, case: Case[str, str]) -> None:
         assert self.create_policy(case.given).target_name == case.expected
 
-    @given(target=st.text())
+    @given(target=target_names)
     def test_target_name_is_a_slug_within_the_limit(self, target: str) -> None:
         name = self.create_policy(target).target_name
         assert re.fullmatch(r'[a-z0-9]+(-[a-z0-9]+)*', name)
