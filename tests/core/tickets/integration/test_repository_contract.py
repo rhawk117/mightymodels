@@ -12,8 +12,8 @@ from mightymodels_core.tickets import (
 )
 from mightymodels_core.tickets.policy import OpenTicket, open_ticket
 
-from tests.core.tickets.conftest import RECORDED_INVESTIGATIONS, create_section
 from tests.core.tickets.fakes import FakeTicketRepository
+from tests.core.tickets.ticket_builders import RECORDED_INVESTIGATIONS, create_section
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -2,18 +2,26 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import Slug
 from mightymodels_core.tickets import (
     BranchNameRequiredError,
     DetachedHeadError,
     InvalidTicketError,
     TicketExistsError,
+    TicketOptions,
     TicketSource,
     branch_of,
 )
 from mightymodels_core.workspace import LoneSurrogateError, TicketFile, parse_ticket_file
 
-from tests.core.tickets.conftest import SERVICE_MOMENT, create_answers
+from tests.core.tickets.ticket_builders import (
+    SERVICE_MOMENT,
+    create_answers,
+    create_free_slot,
+    create_service,
+)
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -22,16 +30,6 @@ if TYPE_CHECKING:
 
 SLUG = Slug('add-widget')
 SOURCE_PATH = '.mightymodels/add-widget/ticket.yml'
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class RoundTrip:
-    name: str
-    answers: TicketAnswers
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -58,28 +56,6 @@ class BranchRefusal:
     @property
     def param(self) -> ParameterSet:
         return pytest.param(self, id=self.name)
-
-
-def ticket_answers_round_trip_cases() -> pytest.MarkDecorator:
-    scenarios = [
-        RoundTrip(name='plain', answers=create_answers()),
-        RoundTrip(
-            name='quotes-and-backslashes',
-            answers=create_answers(summary='say "hi" to C:\\temp', context=('a \\ "b"',)),
-        ),
-        RoundTrip(
-            name='unicode-and-escaped-controls',
-            answers=create_answers(summary='caf\u00e9 \u2603 tab\there', context=('line\nbreak',)),
-        ),
-        RoundTrip(
-            name='raw-line-breaks-and-controls',
-            answers=create_answers(
-                summary='next\u0085 sep\u2028 para\u2029 del\x7f c1\x9f',
-                context=('\u2028', '\x80'),
-            ),
-        ),
-    ]
-    return pytest.mark.parametrize('trip', [scenario.param for scenario in scenarios])
 
 
 def branch_named_cases() -> pytest.MarkDecorator:
@@ -137,15 +113,25 @@ def branch_refusal_cases() -> pytest.MarkDecorator:
 
 
 class TestWrite:
-    @ticket_answers_round_trip_cases()
+    context_lines = st.text(alphabet=st.characters(exclude_categories=['Cs']))
+    summaries = st.text(alphabet=st.characters(exclude_categories=['Cs']), min_size=1)
+    contexts = st.lists(context_lines, min_size=1, max_size=TicketOptions().context_limit).map(
+        tuple
+    )
+
+    @given(summary=summaries, context=contexts)
+    @example(summary='add the widget', context=('one line', 'two lines'))
+    @example(summary='say "hi" to C:\\temp', context=('a \\ "b"',))
+    @example(summary='caf\u00e9 \u2603 tab\there', context=('line\nbreak',))
+    @example(summary='next\u0085 sep\u2028 para\u2029 del\x7f c1\x9f', context=('\u2028', '\x80'))
     def test_a_written_ticket_parses_back_to_the_same_answers(
-        self, service: TicketService, free_slot: TicketSlot, trip: RoundTrip
+        self, summary: str, context: tuple[str, ...]
     ) -> None:
-        text = service.write(SLUG, trip.answers, free_slot)
+        answers = create_answers(summary=summary, context=context)
+        text = create_service().write(SLUG, answers, create_free_slot())
 
         parsed = parse_ticket_file(text)
         assert isinstance(parsed, TicketFile)
-        answers = trip.answers
         assert (parsed.task, parsed.summary, parsed.context) == (
             SLUG,
             answers.summary,

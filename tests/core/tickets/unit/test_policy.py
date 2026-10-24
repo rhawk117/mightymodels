@@ -14,7 +14,7 @@ from mightymodels_core.tickets.policy import OpenTicket, get_closed_problem, ope
 from mightymodels_core.workspace import CompanionDocsFile, HandoffContextFile, TicketFile
 from msgspec.structs import replace
 
-from tests.core.tickets.conftest import create_section
+from tests.core.tickets.ticket_builders import create_section
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

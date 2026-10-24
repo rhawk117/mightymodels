@@ -11,7 +11,7 @@ from mightymodels_core.workspace import (
     TicketFileTypeError,
 )
 
-from tests.core.tickets.conftest import RECORDED_INVESTIGATIONS, SERVICE_MOMENT
+from tests.core.tickets.ticket_builders import RECORDED_INVESTIGATIONS, SERVICE_MOMENT
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -1,31 +1,28 @@
 """The ticket repository over a real sqlite unit and over the fake, one fixture for both."""
 
-from datetime import UTC, datetime
-from importlib.resources import files
 from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
-from mightymodels_core.investigations import InvestigationRecord
-from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.investigations import ADD_INVESTIGATION, AddInvestigationParams
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.tickets import (
     SqliteTicketRepository,
-    TicketAnswers,
-    TicketSection,
     TicketService,
     TicketSlot,
-    Tracker,
 )
 
-from tests.core.investigations.fakes import (
-    FakeInvestigationRepository,
-    InvestigationLedger,
-)
 from tests.core.primitives.clock import create_fake_clock
 from tests.core.tickets.fakes import FakeTicketRepository
+from tests.core.tickets.ticket_builders import (
+    RECORDED_INVESTIGATIONS,
+    SERVICE_MOMENT,
+    SQL,
+    create_answers,
+    create_fake_investigations,
+    create_free_slot,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -34,28 +31,10 @@ if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
     from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
-    from mightymodels_core.tickets import TicketRepository
+    from mightymodels_core.tickets import TicketAnswers, TicketRepository
 
+    from tests.core.investigations.fakes import FakeInvestigationRepository
     from tests.core.primitives.clock import FakeClock
-
-SQL = files('mightymodels_core.sql')
-RECORDED_INVESTIGATIONS = ('first-look', 'second-look')
-SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
-
-
-def create_section(slug: Slug, branch: str) -> TicketSection:
-    return TicketSection(
-        ticket=f'.mightymodels/{slug}/ticket.yml',
-        summary=redact(f'summary of {slug}'),
-        branch=branch,
-        scope='med',
-        plan_first=False,
-        auto_escalate=False,
-        models={'engineer': 'sonnet'},
-        tracker=Tracker(issue=None, jira=None),
-        context=('one', 'two'),
-        validated_at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
-    )
 
 
 def repository_implementation_params() -> list[ParameterSet]:
@@ -117,12 +96,7 @@ def repository(request: SubRequest) -> TicketRepository:
 
 @pytest.fixture
 def fake_investigations() -> FakeInvestigationRepository:
-    ledger = InvestigationLedger()
-    investigations = FakeInvestigationRepository(ledger=ledger)
-    for key in RECORDED_INVESTIGATIONS:
-        record = InvestigationRecord(key=Slug(key), target=redact(key), kind='behavior')
-        investigations.add_investigation(record)
-    return investigations
+    return create_fake_investigations()
 
 
 @pytest.fixture
@@ -137,25 +111,6 @@ def service(
     clock: FakeClock,
 ) -> TicketService:
     return TicketService(tickets=fake_repository, investigations=fake_investigations, clock=clock)
-
-
-def create_answers(
-    *,
-    summary: str = 'add the widget',
-    context: tuple[str, ...] = ('one line', 'two lines'),
-    investigations: tuple[str, ...] = ('first-look',),
-) -> TicketAnswers:
-    return TicketAnswers(
-        summary=summary,
-        context=context,
-        scope='large',
-        plan_first=True,
-        branch='feat/widget',
-        issue=7,
-        jira='WID-1',
-        reference_urls=('https://example.com/a', 'https://example.com/b'),
-        investigations=investigations,
-    )
 
 
 @pytest.fixture
@@ -175,7 +130,7 @@ def unrecorded_answers() -> TicketAnswers:
 
 @pytest.fixture
 def free_slot() -> TicketSlot:
-    return TicketSlot(path='.mightymodels/add-widget/ticket.yml', exists=False)
+    return create_free_slot()
 
 
 @pytest.fixture
