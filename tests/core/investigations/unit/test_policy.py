@@ -1,9 +1,12 @@
 """The entry rules, the batch rules, the redacted records and the investigation names."""
 
+import re
 from types import NoneType
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.investigations import (
     BatchPolicy,
     CiteRequiredError,
@@ -18,7 +21,7 @@ from mightymodels_core.investigations import (
 )
 from mightymodels_core.primitives import RedactedTextTooLongError
 
-from tests.core.investigations.conftest import HEAD, MOMENT, Case, create_incoming
+from tests.core.investigations.investigation_builders import HEAD, MOMENT, Case, create_incoming
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -79,27 +82,27 @@ def entry_rule_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('case', [case.param for case in cases])
 
 
-def unknown_superseded_cases() -> pytest.MarkDecorator:
-    cases = [
-        Case(name='held-seq', given=(2,), expected=NoneType),
-        Case(name='unheld-seq', given=(3,), expected=UnknownSupersededError),
-        Case(name='one-unheld-among-held', given=(1, 7), expected=UnknownSupersededError),
-    ]
-    return pytest.mark.parametrize('case', [case.param for case in cases])
-
-
 class TestEntryPolicy:
-    def find_problem(self, entry: IncomingEntry, supersedable: Sequence[int] = (1, 2)) -> object:
-        return EntryPolicy(index=0, entry=entry, supersedable=supersedable).get_entry_problem()
+    supersedable = (1, 2)
+    supersedes_seqs = st.lists(st.integers(min_value=1, max_value=9)).map(tuple)
+
+    def find_problem(self, entry: IncomingEntry) -> object:
+        return EntryPolicy(index=0, entry=entry, supersedable=self.supersedable).get_entry_problem()
 
     @entry_rule_cases()
     def test_entry_rule(self, case: EntryCase) -> None:
         assert type(self.find_problem(case.given)) is case.expected
 
-    @unknown_superseded_cases()
-    def test_unknown_superseded_entries(self, case: Case[tuple[int, ...], type[object]]) -> None:
-        entry = create_incoming(supersedes=case.given)
-        assert type(self.find_problem(entry)) is case.expected
+    @given(supersedes=supersedes_seqs)
+    @example(supersedes=(2,))
+    @example(supersedes=(3,))
+    @example(supersedes=(1, 7))
+    def test_unknown_superseded_entries(self, supersedes: tuple[int, ...]) -> None:
+        problem = self.find_problem(create_incoming(supersedes=supersedes))
+        if all(seq in self.supersedable for seq in supersedes):
+            assert problem is None
+        else:
+            assert isinstance(problem, UnknownSupersededError)
 
     def test_unknown_superseded_names_the_unheld_entries_in_order(self) -> None:
         problem = self.find_problem(create_incoming(supersedes=(9, 1, 7)))
@@ -205,6 +208,12 @@ class TestNamePolicy:
     @target_name_cases()
     def test_target_name(self, case: Case[str, str]) -> None:
         assert self.create_policy(case.given).target_name == case.expected
+
+    @given(target=st.text())
+    def test_target_name_is_a_slug_within_the_limit(self, target: str) -> None:
+        name = self.create_policy(target).target_name
+        assert re.fullmatch(r'[a-z0-9]+(-[a-z0-9]+)*', name)
+        assert 1 <= len(name) <= InvestigationOptions().name_limit
 
     def test_the_stem_is_the_day_and_the_target(self) -> None:
         assert self.create_policy('Retry policy').stem == '20260506-retry-policy'

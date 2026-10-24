@@ -4,6 +4,8 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.investigations import (
     KnownsSelection,
     UnknownInvestigationError,
@@ -13,7 +15,7 @@ from mightymodels_core.investigations import (
     recorded_ledger,
 )
 
-from tests.core.investigations.conftest import (
+from tests.core.investigations.investigation_builders import (
     FIRST,
     HEAD,
     SECOND,
@@ -28,7 +30,7 @@ if TYPE_CHECKING:
     from mightymodels_core.investigations import EntryStatus, LedgerRecord
     from mightymodels_core.schemas.investigations import EntryKind
 
-    from tests.core.investigations.conftest import InvestigationHarness
+    from tests.core.investigations.investigation_builders import InvestigationHarness
 
 
 def create_record(
@@ -41,17 +43,6 @@ def create_record(
 ) -> LedgerRecord:
     entry = create_entry(seq, round_number=round_number)
     return replace(entry, kind=kind, supersedes=supersedes, head=head)
-
-
-def entry_status_cases() -> pytest.MarkDecorator:
-    cases = [
-        Case(name='stored-at-head', given=(HEAD, HEAD), expected='current'),
-        Case(name='stored-at-another-head', given=('def5678', HEAD), expected='lead'),
-        Case(name='no-head-asked', given=(HEAD, None), expected='lead'),
-        Case(name='stored-with-no-head', given=(None, HEAD), expected='lead'),
-        Case(name='no-head-at-all', given=(None, None), expected='lead'),
-    ]
-    return pytest.mark.parametrize('case', [case.param for case in cases])
 
 
 def knowns_selection_cases() -> pytest.MarkDecorator:
@@ -123,12 +114,17 @@ class TestLedger:
 
 
 class TestKnowns:
-    @entry_status_cases()
-    def test_entry_status_at_head(
-        self, case: Case[tuple[str | None, str | None], EntryStatus]
-    ) -> None:
-        stored, asked = case.given
-        assert entry_status(create_record(1, head=stored), asked) == case.expected
+    heads = st.sampled_from((HEAD, 'def5678', None))
+
+    @given(stored=heads, asked=heads)
+    @example(stored=HEAD, asked=HEAD)
+    @example(stored='def5678', asked=HEAD)
+    @example(stored=HEAD, asked=None)
+    @example(stored=None, asked=HEAD)
+    @example(stored=None, asked=None)
+    def test_entry_status_at_head(self, stored: str | None, asked: str | None) -> None:
+        expected: EntryStatus = 'current' if asked is not None and asked == stored else 'lead'
+        assert entry_status(create_record(1, head=stored), asked) == expected
 
     @knowns_selection_cases()
     def test_knowns_selection(self, case: Case[KnownsSelection, list[int]]) -> None:
