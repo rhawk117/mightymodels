@@ -1,47 +1,36 @@
-import pytest
+from hypothesis import example, given
 from mightymodels_core.git import SAFE_REVISION, UnsafeRevisionError, revision_error
 
-
-def hostile_revision_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(
-        'revision',
-        [
-            pytest.param('main\n', id='trailing-newline'),
-            pytest.param('\nmain', id='leading-newline'),
-            pytest.param('--output=/tmp/pwned', id='option'),
-            pytest.param('-b', id='leading-dash'),
-            pytest.param('.hidden', id='leading-dot'),
-            pytest.param('/absolute', id='leading-slash'),
-            pytest.param('main branch', id='space'),
-            pytest.param('main;id', id='shell-separator'),
-            pytest.param('main^{commit}', id='revision-syntax'),
-            pytest.param('', id='empty'),
-        ],
-    )
-
-
-def plain_revision_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(
-        'revision',
-        [
-            pytest.param('main', id='branch'),
-            pytest.param('HEAD', id='head'),
-            pytest.param('origin/fix/retry-queue', id='remote-branch'),
-            pytest.param('v1.0.0-rc_1', id='tag'),
-            pytest.param('a' * 40, id='sha'),
-        ],
-    )
+from tests.core.git.git_builders import PLAIN_NAMES, REFUSED_REVISIONS
 
 
 class TestRevisionError:
-    @hostile_revision_cases()
+    plain_names = PLAIN_NAMES
+    refused_revisions = REFUSED_REVISIONS
+
+    @given(revision=refused_revisions)
+    @example(revision='main\n')
+    @example(revision='\nmain')
+    @example(revision='--output=/tmp/pwned')
+    @example(revision='-b')
+    @example(revision='.hidden')
+    @example(revision='/absolute')
+    @example(revision='main branch')
+    @example(revision='main;id')
+    @example(revision='main^{commit}')
+    @example(revision='')
     def test_anything_but_a_whole_plain_name_is_refused(self, revision: str) -> None:
         refusal = revision_error(revision)
 
         assert isinstance(refusal, UnsafeRevisionError)
         assert refusal.revision == revision
 
-    @plain_revision_cases()
+    @given(revision=plain_names)
+    @example(revision='main')
+    @example(revision='HEAD')
+    @example(revision='origin/fix/retry-queue')
+    @example(revision='v1.0.0-rc_1')
+    @example(revision='a' * 40)
     def test_a_plain_name_is_accepted(self, revision: str) -> None:
         assert revision_error(revision) is None
 

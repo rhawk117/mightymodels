@@ -1,9 +1,12 @@
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from types import MappingProxyType
+from typing import TYPE_CHECKING, get_protocol_members
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.git import (
     GIT_TIMEOUT_SECONDS,
+    Git,
     GitCommand,
     GitMissingError,
     GitNoAnswerError,
@@ -15,85 +18,111 @@ from mightymodels_core.git import (
 )
 from mightymodels_core.process import CompletedRun, FailedRun, SubprocessRunner
 
-from tests.core.git.conftest import SCRIPTED_ROOT, create_scripted_harness
+from tests.core.git.git_builders import REFUSED_REVISIONS, SCRIPTED_ROOT, create_scripted_harness
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Mapping
     from pathlib import Path
 
-    from _pytest.mark import ParameterSet
-    from mightymodels_core.git import Git
-
-    from tests.core.git.conftest import ScriptedHarness
+    from tests.core.git.git_builders import ScriptedHarness
 
 HOSTILE = {'option': '--output=/tmp/pwned', 'newline': 'main\n', 'dash': '-b'}
 NOT_A_REPOSITORY = CompletedRun(exit=128, stdout='', stderr='fatal: not a git repository\n')
 FAILURE_DETAIL = 'git refused to start'
 
 
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Operation:
-    name: str
-    method: str
-    arguments: tuple[Any, ...] = ()
-    keywords: dict[str, Any] | None = None
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
-
-    async def ask(self, git: Git) -> object:
-        return await getattr(git, self.method)(*self.arguments, **(self.keywords or {}))
+type Revisions = tuple[str, ...]
+type Operation = Callable[[Git, Revisions], Awaitable[object]]
 
 
-def every_operation_cases() -> pytest.MarkDecorator:
-    operations = [
-        Operation(name='refusal', method='refusal'),
-        Operation(name='checkout', method='checkout'),
-        Operation(name='common-directory', method='common_directory'),
-        Operation(name='resolve-head', method='resolve_head'),
-        Operation(name='resolve-commit', method='resolve_commit', arguments=('main',)),
-        Operation(name='is-ancestor', method='is_ancestor', arguments=('main', 'HEAD')),
-        Operation(name='changed-files', method='changed_files', arguments=('main', 'HEAD')),
-        Operation(name='current-branch', method='current_branch'),
-        Operation(
-            name='dirty-paths',
-            method='dirty_paths',
-            keywords={'untracked': UntrackedFiles.NORMAL},
-        ),
-        Operation(name='commits-on-no-remote', method='commits_on_no_remote', arguments=('main',)),
-    ]
-    return pytest.mark.parametrize('operation', [operation.param for operation in operations])
+async def ask_refusal(git: Git, _revisions: Revisions) -> object:
+    return await git.refusal()
 
 
-def hostile_operation_cases() -> pytest.MarkDecorator:
-    operations = [
-        Operation(
-            name=f'{method}-{index}-{name}',
-            method=method,
-            arguments=tuple(hostile if position == index else 'main' for position in range(count)),
-        )
-        for method, count in (('resolve_commit', 1), ('is_ancestor', 2), ('changed_files', 2))
-        for index in range(count)
-        for name, hostile in HOSTILE.items()
-    ]
-    operations.extend(
-        Operation(
-            name=f'commits_on_no_remote-{name}',
-            method='commits_on_no_remote',
-            arguments=(hostile,),
-        )
-        for name, hostile in HOSTILE.items()
-    )
-    return pytest.mark.parametrize('operation', [operation.param for operation in operations])
+async def ask_checkout(git: Git, _revisions: Revisions) -> object:
+    return await git.checkout()
+
+
+async def ask_common_directory(git: Git, _revisions: Revisions) -> object:
+    return await git.common_directory()
+
+
+async def ask_resolve_head(git: Git, _revisions: Revisions) -> object:
+    return await git.resolve_head()
+
+
+async def ask_resolve_commit(git: Git, revisions: Revisions) -> object:
+    return await git.resolve_commit(revisions[0])
+
+
+async def ask_is_ancestor(git: Git, revisions: Revisions) -> object:
+    return await git.is_ancestor(revisions[0], revisions[1])
+
+
+async def ask_changed_files(git: Git, revisions: Revisions) -> object:
+    return await git.changed_files(revisions[0], revisions[1])
+
+
+async def ask_current_branch(git: Git, _revisions: Revisions) -> object:
+    return await git.current_branch()
+
+
+async def ask_dirty_paths(git: Git, _revisions: Revisions) -> object:
+    return await git.dirty_paths(untracked=UntrackedFiles.NORMAL)
+
+
+async def ask_commits_on_no_remote(git: Git, revisions: Revisions) -> object:
+    return await git.commits_on_no_remote(revisions[0])
+
+
+OPERATIONS: Mapping[str, Operation] = MappingProxyType({
+    'refusal': ask_refusal,
+    'checkout': ask_checkout,
+    'common_directory': ask_common_directory,
+    'resolve_head': ask_resolve_head,
+    'resolve_commit': ask_resolve_commit,
+    'is_ancestor': ask_is_ancestor,
+    'changed_files': ask_changed_files,
+    'current_branch': ask_current_branch,
+    'dirty_paths': ask_dirty_paths,
+    'commits_on_no_remote': ask_commits_on_no_remote,
+})
+REVISION_POSITIONS = (
+    ('resolve_commit', 0),
+    ('is_ancestor', 0),
+    ('is_ancestor', 1),
+    ('changed_files', 0),
+    ('changed_files', 1),
+    ('commits_on_no_remote', 0),
+)
+PLAIN_REVISIONS = ('main', 'HEAD')
+
+
+class TestOperations:
+    def test_the_operations_are_the_git_protocol_members(self) -> None:
+        assert set(OPERATIONS) == set(get_protocol_members(Git))
 
 
 class TestRefusedBeforeAnyProcessStarts:
-    @hostile_operation_cases()
+    revision_positions = st.sampled_from(REVISION_POSITIONS)
+    refused_revisions = REFUSED_REVISIONS
+
+    @given(placement=revision_positions, revision=refused_revisions)
+    @example(placement=('resolve_commit', 0), revision=HOSTILE['option'])
+    @example(placement=('is_ancestor', 0), revision=HOSTILE['newline'])
+    @example(placement=('is_ancestor', 1), revision=HOSTILE['dash'])
+    @example(placement=('changed_files', 0), revision=HOSTILE['dash'])
+    @example(placement=('changed_files', 1), revision=HOSTILE['option'])
+    @example(placement=('commits_on_no_remote', 0), revision=HOSTILE['newline'])
     async def test_a_hostile_revision_is_refused_and_no_process_starts(
-        self, scripted: ScriptedHarness, operation: Operation
+        self, placement: tuple[str, int], revision: str
     ) -> None:
+        name, position = placement
+        revisions = tuple(revision if index == position else 'main' for index in range(2))
+        scripted = create_scripted_harness()
+
         with pytest.raises(UnsafeRevisionError):
-            await operation.ask(scripted.git)
+            await OPERATIONS[name](scripted.git, revisions)
 
         assert scripted.runner.runs == []
 
@@ -110,11 +139,23 @@ class TestRefusedBeforeAnyProcessStarts:
 
 
 class TestTimeout:
-    @every_operation_cases()
-    async def test_every_operation_runs_under_thirty_seconds(
-        self, scripted: ScriptedHarness, operation: Operation
-    ) -> None:
-        await operation.ask(scripted.git)
+    operation_names = st.sampled_from(sorted(OPERATIONS))
+
+    @given(name=operation_names)
+    @example(name='refusal')
+    @example(name='checkout')
+    @example(name='common_directory')
+    @example(name='resolve_head')
+    @example(name='resolve_commit')
+    @example(name='is_ancestor')
+    @example(name='changed_files')
+    @example(name='current_branch')
+    @example(name='dirty_paths')
+    @example(name='commits_on_no_remote')
+    async def test_every_operation_runs_under_thirty_seconds(self, name: str) -> None:
+        scripted = create_scripted_harness()
+
+        await OPERATIONS[name](scripted.git, PLAIN_REVISIONS)
 
         timeouts = {run.timeout for run in scripted.runner.runs}
         assert scripted.runner.runs

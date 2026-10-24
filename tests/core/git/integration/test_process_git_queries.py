@@ -4,7 +4,8 @@ import pytest
 from mightymodels_core.git import Checkout, Git, GitUnavailableError, ProcessGit, UntrackedFiles
 from mightymodels_core.primitives import RepositoryKey
 
-from tests.core.git.conftest import (
+from tests.core.git.fakes import InMemoryGit
+from tests.core.git.git_builders import (
     ADDED,
     BRANCH,
     COMMITS_ON_BRANCH,
@@ -13,10 +14,9 @@ from tests.core.git.conftest import (
     UNTRACKED,
     git_backend_cases,
 )
-from tests.core.git.fakes import InMemoryGit
 
 if TYPE_CHECKING:
-    from tests.core.git.conftest import RepositoryHarness, ScriptedHarness
+    from tests.core.git.git_builders import RepositoryHarness, ScriptedHarness
 
 
 class TestProtocol:
