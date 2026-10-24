@@ -1,9 +1,12 @@
 """The contract policy: command shape, approval, run pick and the receipt assessment."""
 
+import string
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.contract import (
     ApprovalPolicy,
     ChangedCommandError,
@@ -22,7 +25,13 @@ from mightymodels_core.contract import (
 )
 from mightymodels_core.primitives import Slug, TaskId
 
-from tests.core.contract.conftest import FIRST_KEY, HEAD, SECOND_KEY, create_command, create_receipt
+from tests.core.contract.contract_builders import (
+    FIRST_KEY,
+    HEAD,
+    SECOND_KEY,
+    create_command,
+    create_receipt,
+)
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -31,6 +40,7 @@ if TYPE_CHECKING:
 
 SLUG = Slug('policy-subject')
 OPTIONS = ContractOptions()
+KEY_CHARACTERS = frozenset(string.ascii_letters + string.digits + '._-')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -75,9 +85,6 @@ def command_shape_cases() -> pytest.MarkDecorator:
             error_type=InvalidCommandKeyError,
         ),
         ShapeScenario(name='key-empty', key='', error_type=InvalidCommandKeyError),
-        ShapeScenario(name='key-with-space', key='T1 AC-1', error_type=InvalidCommandKeyError),
-        ShapeScenario(name='key-with-slash', key='T1/AC-1', error_type=InvalidCommandKeyError),
-        ShapeScenario(name='key-with-newline', key='T1.AC-1\n', error_type=InvalidCommandKeyError),
         ShapeScenario(name='argv-empty', argv=(), error_type=InvalidArgvError),
         ShapeScenario(name='timeout-at-floor', timeout=OPTIONS.timeout_floor),
         ShapeScenario(
@@ -94,20 +101,6 @@ def command_shape_cases() -> pytest.MarkDecorator:
         ShapeScenario(name='approver-blank', approved_by='  ', error_type=MissingApprovalError),
     ]
     return pytest.mark.parametrize('scenario', [scenario.param for scenario in scenarios])
-
-
-def argv_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(
-        ('value', 'expected'),
-        [
-            pytest.param(('make', 'test'), True, id='tuple'),
-            pytest.param(['make', 'test'], True, id='list'),
-            pytest.param('make test', False, id='shell-string'),
-            pytest.param((), False, id='empty'),
-            pytest.param(['make', 1], False, id='non-string-argument'),
-            pytest.param(None, False, id='none'),
-        ],
-    )
 
 
 def assessment_cases() -> pytest.MarkDecorator:
@@ -157,6 +150,10 @@ def assessment_cases() -> pytest.MarkDecorator:
 
 
 class TestCommandPolicy:
+    forbidden_character_keys = st.text(max_size=OPTIONS.key_limit).filter(
+        lambda key: any(character not in KEY_CHARACTERS for character in key)
+    )
+
     def find_problem(self, scenario: ShapeScenario) -> Exception | None:
         command = replace(
             create_command(scenario.key, argv=scenario.argv),
@@ -171,9 +168,44 @@ class TestCommandPolicy:
 
         assert type(problem) is (scenario.error_type or type(None))
 
-    @argv_cases()
-    def test_argv_is_a_non_empty_list_of_strings(self, value: object, expected: bool) -> None:
-        assert is_argv(value) is expected
+    @given(key=forbidden_character_keys)
+    @example(key='T1 AC-1')
+    @example(key='T1/AC-1')
+    @example(key='T1.AC-1\n')
+    def test_key_with_a_forbidden_character_is_refused(self, key: str) -> None:
+        problem = self.find_problem(ShapeScenario(name='forbidden', key=key))
+
+        assert type(problem) is InvalidCommandKeyError
+
+
+class TestIsArgv:
+    argument_lists = st.lists(st.text(), min_size=1)
+    argv_values = st.one_of(argument_lists, argument_lists.map(tuple))
+    mixed_lists = st.lists(st.one_of(st.text(), st.none(), st.integers()), min_size=1).filter(
+        lambda items: any(not isinstance(item, str) for item in items)
+    )
+    non_argv_values = st.one_of(
+        st.text(),
+        st.none(),
+        st.just(()),
+        st.just([]),
+        mixed_lists,
+        mixed_lists.map(tuple),
+    )
+
+    @given(value=argv_values)
+    @example(value=('make', 'test'))
+    @example(value=['make', 'test'])
+    def test_a_non_empty_list_or_tuple_of_strings_is_argv(self, value: list[str]) -> None:
+        assert is_argv(value) is True
+
+    @given(value=non_argv_values)
+    @example(value='make test')
+    @example(value=())
+    @example(value=['make', 1])
+    @example(value=None)
+    def test_anything_else_is_not_argv(self, value: object) -> None:
+        assert is_argv(value) is False
 
 
 class TestApprovalPolicy:
