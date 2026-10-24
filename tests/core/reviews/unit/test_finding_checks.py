@@ -1,9 +1,11 @@
 """The checks every incoming review finding passes."""
 
-from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from dataclasses import replace
+from typing import TYPE_CHECKING, get_args
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import RedactedTextTooLongError, redact
 from mightymodels_core.reviews import (
     FieldRequiredError,
@@ -17,45 +19,13 @@ from mightymodels_core.reviews import (
     UnsupportedQualityError,
     fold_findings,
 )
+from mightymodels_core.vocabulary.reviews import FindingSeverity
 
 from tests.core.reviews.finding_builders import fold_one, incoming_finding
 
 if TYPE_CHECKING:
-    from _pytest.mark import ParameterSet
     from mightymodels_core.reviews import IncomingFinding
     from mightymodels_core.reviews.findings import FindingOptions
-    from mightymodels_core.schemas.reviews import FindingSeverity
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class LocationCase:
-    name: str
-    location: str
-    error_type: type[Exception]
-    marks: tuple[pytest.MarkDecorator, ...] = ()
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name, marks=self.marks)
-
-
-def bad_location_cases() -> pytest.MarkDecorator:
-    cases = [
-        LocationCase(name='line-zero', location='src/q.py:0', error_type=LineBelowOneError),
-        LocationCase(name='range-from-zero', location='src/q.py:0-3', error_type=LineBelowOneError),
-        LocationCase(name='range-to-zero', location='src/q.py:3-0', error_type=LineBelowOneError),
-        LocationCase(name='reversed', location='src/q.py:9-3', error_type=ReversedRangeError),
-        LocationCase(name='no-line', location='nowhere', error_type=LocationShapeError),
-    ]
-    return pytest.mark.parametrize('case', [case.param for case in cases])
-
-
-def good_location_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize('location', ['src/q.py:1', 'src/q.py:3-9', 'src/q.py:4-4'])
-
-
-def blank_text_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize('field', ['title', 'fix', 'verify', 'location'])
 
 
 def sources_cases() -> pytest.MarkDecorator:
@@ -70,22 +40,68 @@ def sources_cases() -> pytest.MarkDecorator:
     )
 
 
-def quality_severity_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize('severity', ['Blocker', 'Critical', 'High', 'Medium'])
-
-
 class TestFindingChecks:
+    starts = st.integers(min_value=1, max_value=10_000)
+    spans = starts.flatmap(
+        lambda start: st.tuples(st.just(start), st.integers(min_value=start, max_value=10_000))
+    )
+    zero_start_spans = st.tuples(st.just(0), st.integers(min_value=0, max_value=10_000))
+    zero_end_spans = st.tuples(starts, st.just(0))
+    reversed_spans = starts.flatmap(
+        lambda end: st.tuples(st.integers(min_value=end + 1, max_value=10_001), st.just(end))
+    )
+
+    def fold_location(self, location: str) -> None:
+        fold_one([], incoming_finding(location=location))
+
     @pytest.fixture
     def refused_batch(self) -> list[IncomingFinding]:
         return [incoming_finding(), incoming_finding(location='src/q.py:0')]
 
-    @bad_location_cases()
-    def test_a_location_that_is_not_a_span_is_refused(self, case: LocationCase) -> None:
-        with pytest.raises(case.error_type):
-            fold_one([], incoming_finding(location=case.location))
+    @given(span=zero_start_spans)
+    @example(span=(0, 0))
+    @example(span=(0, 3))
+    def test_a_span_starting_at_zero_is_refused(self, span: tuple[int, int]) -> None:
+        start, end = span
+        with pytest.raises(LineBelowOneError):
+            self.fold_location(f'src/q.py:{start}-{end}')
 
-    @good_location_cases()
-    def test_a_span_is_accepted_as_written(self, location: str) -> None:
+    @given(span=zero_end_spans)
+    @example(span=(3, 0))
+    def test_a_span_ending_at_zero_is_refused(self, span: tuple[int, int]) -> None:
+        start, end = span
+        with pytest.raises(LineBelowOneError):
+            self.fold_location(f'src/q.py:{start}-{end}')
+
+    @given(span=reversed_spans)
+    @example(span=(9, 3))
+    def test_a_reversed_span_is_refused(self, span: tuple[int, int]) -> None:
+        start, end = span
+        with pytest.raises(ReversedRangeError):
+            self.fold_location(f'src/q.py:{start}-{end}')
+
+    def test_a_single_line_below_one_is_refused(self) -> None:
+        with pytest.raises(LineBelowOneError):
+            self.fold_location('src/q.py:0')
+
+    def test_a_location_without_a_line_is_refused(self) -> None:
+        with pytest.raises(LocationShapeError):
+            self.fold_location('nowhere')
+
+    @given(line=starts)
+    @example(line=1)
+    def test_a_single_line_is_accepted_as_written(self, line: int) -> None:
+        location = f'src/q.py:{line}'
+        (stored,) = fold_one([], incoming_finding(location=location))
+
+        assert stored.location == location
+
+    @given(span=spans)
+    @example(span=(3, 9))
+    @example(span=(4, 4))
+    def test_a_span_is_accepted_as_written(self, span: tuple[int, int]) -> None:
+        start, end = span
+        location = f'src/q.py:{start}-{end}'
         (stored,) = fold_one([], incoming_finding(location=location))
 
         assert stored.location == location
@@ -102,6 +118,8 @@ class TestFindingChecks:
 
 
 class TestTextChecks:
+    required_text_fields = st.sampled_from(['title', 'fix', 'verify', 'location'])
+
     @pytest.fixture
     def blank_evidence(self) -> IncomingEvidence:
         return IncomingEvidence(kind='metric', cite=' ')
@@ -114,7 +132,11 @@ class TestTextChecks:
     def short_secret(self) -> IncomingFinding:
         return incoming_finding(title='password=abcd')
 
-    @blank_text_cases()
+    @given(field=required_text_fields)
+    @example(field='title')
+    @example(field='fix')
+    @example(field='verify')
+    @example(field='location')
     def test_blank_required_text_is_refused(self, field: str) -> None:
         with pytest.raises(FieldRequiredError) as raised:
             fold_one([], incoming_finding(**{field: '   '}))
@@ -141,6 +163,10 @@ class TestTextChecks:
 
 
 class TestSourceAndQualityChecks:
+    evidence_required_severities = st.sampled_from([
+        severity for severity in get_args(FindingSeverity.__value__) if severity != 'Low'
+    ])
+
     @pytest.fixture
     def cited(self) -> IncomingEvidence:
         return IncomingEvidence(kind='idiom', cite='  python.md rule  ')
@@ -161,7 +187,11 @@ class TestSourceAndQualityChecks:
 
         assert stored.sources == ('MV-1', 'UB-2')
 
-    @quality_severity_cases()
+    @given(severity=evidence_required_severities)
+    @example(severity='Blocker')
+    @example(severity='Critical')
+    @example(severity='High')
+    @example(severity='Medium')
     def test_quality_without_evidence_above_low_is_refused(self, severity: FindingSeverity) -> None:
         with pytest.raises(UnsupportedQualityError):
             fold_one([], incoming_finding(kind='quality', severity=severity))

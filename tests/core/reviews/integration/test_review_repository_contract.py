@@ -12,7 +12,8 @@ from mightymodels_core.reviews import (
 )
 from mightymodels_core.reviews.records import FINDINGS, RUNS_LISTED
 
-from tests.core.reviews.conftest import (
+from tests.core.reviews.fakes import FakeReviewRepository, ReviewLedger
+from tests.core.reviews.review_builders import (
     FIRST_RUN,
     OTHER_SLUG,
     SECOND_RUN,
@@ -21,12 +22,11 @@ from tests.core.reviews.conftest import (
     create_finding,
     create_run,
 )
-from tests.core.reviews.fakes import FakeReviewRepository, ReviewLedger
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
 
-    from tests.core.reviews.conftest import ReviewHarness
+    from tests.core.reviews.review_builders import ReviewHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

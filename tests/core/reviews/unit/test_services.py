@@ -14,26 +14,28 @@ from mightymodels_core.reviews import (
 )
 from mightymodels_core.reviews.records import RUNS_LISTED
 
-from tests.core.reviews.conftest import (
+from tests.core.reviews.review_builders import (
     HEAD,
     OTHER_SLUG,
     SERVICE_MOMENT,
     SERVICE_RUN,
     UNSTARTED_RUN,
-    Case,
     create_decided,
+    create_resolved,
+    create_run,
+)
+from tests.core.reviews.service_builders import (
+    Case,
     create_gate_finding,
     create_incoming,
     create_request,
-    create_resolved,
-    create_run,
 )
 
 if TYPE_CHECKING:
     from mightymodels_core.reviews import FindingRecord, Verdict
     from mightymodels_core.schemas.reviews import Decision, FindingSeverity, Result
 
-    from tests.core.reviews.conftest import ServiceHarness
+    from tests.core.reviews.service_builders import ServiceHarness
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -54,10 +56,6 @@ def arrange_state(harness: ServiceHarness, state: GateState) -> None:
 
 def one(severity: FindingSeverity) -> list[FindingRecord]:
     return [create_gate_finding('F1', 'MV-1', severity)]
-
-
-def unknown_run_read_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize('read', ['gate', 'report'])
 
 
 def gate_order_cases() -> pytest.MarkDecorator:
@@ -208,10 +206,13 @@ class TestAddFindings:
 
 
 class TestGateAndReport:
-    @unknown_run_read_cases()
-    def test_unknown_run_is_refused(self, service_harness: ServiceHarness, read: str) -> None:
+    def test_gate_of_an_unknown_run_is_refused(self, service_harness: ServiceHarness) -> None:
         with pytest.raises(RunNotFoundError):
-            getattr(service_harness.service, read)(UNSTARTED_RUN)
+            service_harness.service.gate(UNSTARTED_RUN)
+
+    def test_report_of_an_unknown_run_is_refused(self, service_harness: ServiceHarness) -> None:
+        with pytest.raises(RunNotFoundError):
+            service_harness.service.report(UNSTARTED_RUN)
 
     @gate_order_cases()
     def test_gate_order(

@@ -10,7 +10,8 @@ from mightymodels_core.reviews import (
     UnknownFindingError,
 )
 
-from tests.core.reviews.conftest import (
+from tests.core.reviews.fakes import FakeReviewDecisionRepository, ReviewLedger
+from tests.core.reviews.review_builders import (
     FIRST_RUN,
     SECOND_RUN,
     UNSTARTED_RUN,
@@ -19,10 +20,9 @@ from tests.core.reviews.conftest import (
     create_resolved,
     create_run,
 )
-from tests.core.reviews.fakes import FakeReviewDecisionRepository, ReviewLedger
 
 if TYPE_CHECKING:
-    from tests.core.reviews.conftest import ReviewHarness
+    from tests.core.reviews.review_builders import ReviewHarness
 
 
 class TestImplementations:

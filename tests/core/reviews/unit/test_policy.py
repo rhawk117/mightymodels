@@ -2,9 +2,11 @@
 
 from dataclasses import replace
 from types import NoneType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_args
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.git import UnsafeRevisionError
 from mightymodels_core.primitives import RunId, create_routing_table
 from mightymodels_core.reviews import (
@@ -21,22 +23,21 @@ from mightymodels_core.reviews import (
     reopened_keys,
 )
 from mightymodels_core.reviews.reports import MergeVaderBasis, PersonaSpec, UncleBobBasis
+from mightymodels_core.vocabulary.reviews import Depth, Emphasis
 
-from tests.core.reviews.conftest import (
+from tests.core.reviews.review_builders import (
     HEAD,
     SERVICE_MOMENT,
     SLUG,
-    Case,
     create_finding,
-    create_request,
     create_run,
 )
+from tests.core.reviews.service_builders import Case, create_request
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.reviews import StartRequest
-    from mightymodels_core.schemas.reviews import Depth, Emphasis
 
 BOTH = ['merge-vader', 'uncle-bob']
 MV_HEAVY = {'merge-vader': 0.7, 'uncle-bob': 0.3}
@@ -161,6 +162,10 @@ def persona_cases() -> pytest.MarkDecorator:
 
 class TestStartPolicy:
     routing = create_routing_table()
+    depths = st.sampled_from(get_args(Depth.__value__))
+    preset_emphases = st.sampled_from([
+        emphasis for emphasis in get_args(Emphasis.__value__) if emphasis != 'custom'
+    ])
 
     def policy_of(self, request: StartRequest) -> StartPolicy:
         return StartPolicy(request=request, routing=self.routing)
@@ -181,26 +186,30 @@ class TestStartPolicy:
     def test_personas_run_at_each_depth(self, case: Case[StartRequest, Sequence[str]]) -> None:
         assert self.policy_of(case.given).personas == case.expected
 
-    @pytest.mark.parametrize(
-        ('depth', 'personas', 'model'),
-        [('quick', ['uncle-bob'], 'sonnet'), ('standard', BOTH, 'opus'), ('deep', BOTH, 'opus')],
-    )
-    def test_each_persona_reviews_on_the_depth_model(
-        self, depth: Depth, personas: list[str], model: str
-    ) -> None:
+    @given(depth=depths)
+    @example(depth='quick')
+    @example(depth='standard')
+    @example(depth='deep')
+    def test_each_persona_reviews_on_the_depth_model(self, depth: Depth) -> None:
+        expected = {
+            'quick': dict.fromkeys(['uncle-bob'], 'sonnet'),
+            'standard': dict.fromkeys(BOTH, 'opus'),
+            'deep': dict.fromkeys(BOTH, 'opus'),
+        }
         policy = self.policy_of(create_request(depth=depth, persona='uncle-bob'))
-        assert policy.reviewer_models == dict.fromkeys(personas, model)
+        assert policy.reviewer_models == expected[depth]
 
-    @pytest.mark.parametrize(
-        ('emphasis', 'expected'),
-        [
-            ('release-readiness', MV_HEAVY),
-            ('maintainability', {'merge-vader': 0.3, 'uncle-bob': 0.7}),
-            ('balanced', {'merge-vader': 0.5, 'uncle-bob': 0.5}),
-        ],
-    )
-    def test_preset_weights(self, emphasis: Emphasis, expected: dict[str, float]) -> None:
-        assert self.policy_of(create_request(emphasis=emphasis)).weights == expected
+    @given(emphasis=preset_emphases)
+    @example(emphasis='release-readiness')
+    @example(emphasis='maintainability')
+    @example(emphasis='balanced')
+    def test_preset_weights(self, emphasis: Emphasis) -> None:
+        expected = {
+            'release-readiness': MV_HEAVY,
+            'maintainability': {'merge-vader': 0.3, 'uncle-bob': 0.7},
+            'balanced': {'merge-vader': 0.5, 'uncle-bob': 0.5},
+        }
+        assert self.policy_of(create_request(emphasis=emphasis)).weights == expected[emphasis]
 
     def test_target_is_refused_before_weights(self) -> None:
         request = create_request(scope='branch', emphasis='custom')

@@ -4,6 +4,8 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import redact
 from mightymodels_core.reviews import (
     IncomingEvidence,
@@ -24,16 +26,6 @@ if TYPE_CHECKING:
         IncomingFinding,
     )
     from mightymodels_core.reviews.findings import FindingOptions
-
-
-def finding_key_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(('key', 'number'), [('F1', 1), ('F12', 12)])
-
-
-def source_persona_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(
-        ('source', 'persona'), [('MV-3', 'merge-vader'), ('UB-16', 'uncle-bob')]
-    )
 
 
 class TestStoredSeverity:
@@ -58,13 +50,23 @@ class TestFindingNumbering:
 
 
 class TestKeyParsing:
-    @finding_key_cases()
-    def test_finding_number_reads_the_digits(self, key: str, number: int) -> None:
-        assert finding_number(key) == number
+    source_personas = ReviewOptions().source_personas
+    numbers = st.integers(min_value=1)
+    prefixed_numbers = st.tuples(st.sampled_from(sorted(source_personas)), numbers)
 
-    @source_persona_cases()
-    def test_persona_of_source_reads_the_prefix(self, source: str, persona: str) -> None:
-        assert persona_of_source(source, ReviewOptions().source_personas) == persona
+    @given(number=numbers)
+    @example(number=1)
+    @example(number=12)
+    def test_finding_number_reads_the_digits(self, number: int) -> None:
+        assert finding_number(f'F{number}') == number
+
+    @given(prefixed=prefixed_numbers)
+    @example(prefixed=('MV', 3))
+    @example(prefixed=('UB', 16))
+    def test_persona_of_source_reads_the_prefix(self, prefixed: tuple[str, int]) -> None:
+        prefix, number = prefixed
+        expected = {'MV': 'merge-vader', 'UB': 'uncle-bob'}
+        assert persona_of_source(f'{prefix}-{number}', self.source_personas) == expected[prefix]
 
 
 class TestFindingOverlap:
