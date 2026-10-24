@@ -1,10 +1,12 @@
 """The run, finding, decision and outcome builders and the shared ids of the review tests."""
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING
 
+from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.primitives import RunId, Slug, redact
 from mightymodels_core.reviews import (
     DecidedFinding,
@@ -12,9 +14,23 @@ from mightymodels_core.reviews import (
     FindingRecord,
     ResolvedFinding,
     ReviewRunRecord,
+    SqliteReviewDecisionRepository,
+    SqliteReviewRepository,
+)
+from mightymodels_core.schemas import DECLARATIONS
+from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
+
+from tests.core.reviews.fakes import (
+    FakeReviewDecisionRepository,
+    FakeReviewRepository,
+    ReviewLedger,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+    from contextlib import AbstractContextManager
+    from pathlib import Path
+
     from mightymodels_core.reviews import ReviewDecisionRepository, ReviewRepository
     from mightymodels_core.schemas.reviews import Decision, Result
 
@@ -33,6 +49,41 @@ HEAD = 'abc1234'
 class ReviewHarness:
     reviews: ReviewRepository
     decisions: ReviewDecisionRepository
+
+
+type HarnessOpener = Callable[[Path], AbstractContextManager[ReviewHarness]]
+
+
+@contextmanager
+def open_fake_harness(directory: Path) -> Generator[ReviewHarness]:
+    del directory
+    ledger = ReviewLedger()
+    yield ReviewHarness(
+        reviews=FakeReviewRepository(ledger=ledger),
+        decisions=FakeReviewDecisionRepository(ledger=ledger),
+    )
+
+
+@contextmanager
+def open_sqlite_harness(directory: Path) -> Generator[ReviewHarness]:
+    spec = DatabaseSpec(
+        schema=SQL.joinpath('schema.sql'),
+        statements=SQL.joinpath('statements.sql'),
+        declarations=DECLARATIONS,
+    )
+    database = open_database(directory.joinpath('mightymodels.db'), spec, ConnectionOptions())
+    try:
+        with database.write() as unit:
+            repository = unit.one(
+                ENSURE_REPOSITORY, RepositoryKeyParams(repository_key='owner/repo')
+            )
+            assert repository is not None
+            yield ReviewHarness(
+                reviews=SqliteReviewRepository(unit=unit, repository_id=repository.id),
+                decisions=SqliteReviewDecisionRepository(unit=unit, repository_id=repository.id),
+            )
+    finally:
+        database.close()
 
 
 def create_run(run_id: RunId = FIRST_RUN, *, slug: Slug | None = SLUG) -> ReviewRunRecord:
