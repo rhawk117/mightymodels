@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import anyio
-import pytest
 from hypothesis import strategies as st
 from mightymodels_core.git import Checkout, GitCommand, ProcessGit
 from mightymodels_core.process import CompletedRun, SubprocessRunner
@@ -89,12 +88,6 @@ def create_memory_harness(root: Path) -> RepositoryHarness:
     first = history.commit(TRACKED)
     second = history.commit(ADDED)
     return RepositoryHarness(git=memory, root=root, first=first, second=second)
-
-
-def git_backend_cases() -> pytest.MarkDecorator:
-    process = pytest.param('process', id='process', marks=pytest.mark.integration)
-    memory = pytest.param('memory', id='memory')
-    return pytest.mark.parametrize('harness', [process, memory], indirect=True)
 
 
 def create_scripted_harness(
