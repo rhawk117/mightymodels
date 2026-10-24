@@ -1,4 +1,4 @@
-"""The ticket repository over a real sqlite unit and over the fake, one fixture for both."""
+"""Fixtures the ticket repository tiers and service tests share."""
 
 from typing import TYPE_CHECKING
 
@@ -8,7 +8,6 @@ from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.investigations import ADD_INVESTIGATION, AddInvestigationParams
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.tickets import (
-    SqliteTicketRepository,
     TicketService,
     TicketSlot,
 )
@@ -28,20 +27,11 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from _pytest.fixtures import SubRequest
-    from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
     from mightymodels_core.tickets import TicketAnswers, TicketRepository
 
     from tests.core.investigations.fakes import FakeInvestigationRepository
     from tests.core.primitives.clock import FakeClock
-
-
-def repository_implementation_params() -> list[ParameterSet]:
-    return [
-        pytest.param('sqlite_repository', id='sqlite', marks=pytest.mark.integration),
-        pytest.param('fake_repository', id='fake'),
-    ]
 
 
 @pytest.fixture
@@ -79,19 +69,8 @@ def repository_id(database: Database) -> int:
 
 
 @pytest.fixture
-def sqlite_repository(database: Database, repository_id: int) -> Generator[TicketRepository]:
-    with database.write() as unit:
-        yield SqliteTicketRepository(unit=unit, repository_id=repository_id)
-
-
-@pytest.fixture
 def fake_repository() -> TicketRepository:
     return FakeTicketRepository(recorded_investigations=RECORDED_INVESTIGATIONS)
-
-
-@pytest.fixture(params=repository_implementation_params())
-def repository(request: SubRequest) -> TicketRepository:
-    return request.getfixturevalue(request.param)
 
 
 @pytest.fixture
