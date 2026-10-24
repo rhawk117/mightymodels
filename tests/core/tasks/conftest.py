@@ -1,23 +1,15 @@
-"""The task and attempt repositories over a real sqlite unit and over the fakes."""
+"""The database and service fixtures the task and attempt tests share."""
 
-from datetime import UTC, datetime
-from importlib.resources import files
 from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.contract.records import Approval
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
-from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
-from mightymodels_core.tasks import (
-    SqliteAttemptRepository,
-    SqliteTaskRepository,
-    TaskReadService,
-    TaskService,
-)
-from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
+from mightymodels_core.tasks import TaskReadService, TaskService
+from mightymodels_core.tickets import SqliteTicketRepository
 
 from tests.core.contract.fakes import ContractLedger, FakeContractRepository
 from tests.core.primitives.clock import create_fake_clock
@@ -28,7 +20,7 @@ from tests.core.tasks.fakes import (
 )
 from tests.core.tickets.fakes import FakeTicketRepository
 
-from .repository_builders import TaskHarness
+from .repository_builders import SQL, TICKET_SLUGS, create_ticket_section
 from .service_builders import (
     BASE_COMMIT,
     COMMAND_KEY,
@@ -46,35 +38,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from _pytest.fixtures import SubRequest
-    from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
-
-SQL = files('mightymodels_core.sql')
-TICKET_SLUGS = (Slug('tasks-subject'), Slug('other-subject'))
-FAKE_TICKET_IDS = (1, 2)
-
-
-def create_ticket_section(slug: Slug) -> TicketSection:
-    return TicketSection(
-        ticket=f'.mightymodels/{slug}/ticket.yml',
-        summary=redact('a summary'),
-        branch='main',
-        scope='med',
-        plan_first=False,
-        auto_escalate=False,
-        models={'engineer': 'sonnet'},
-        tracker=Tracker(issue=None, jira=None),
-        context=(),
-        validated_at=datetime(2026, 1, 1, tzinfo=UTC),
-    )
-
-
-def task_implementation_cases() -> list[ParameterSet]:
-    return [
-        pytest.param('sqlite_harness', id='sqlite', marks=pytest.mark.integration),
-        pytest.param('fake_harness', id='fake'),
-    ]
 
 
 @pytest.fixture
@@ -112,37 +76,6 @@ def staged_ticket_ids(database: Database) -> tuple[int, int]:
             ids.append(row.id)
     first, second = ids
     return first, second
-
-
-@pytest.fixture
-def sqlite_harness(
-    database: Database, staged_ticket_ids: tuple[int, int]
-) -> Generator[TaskHarness]:
-    ticket_id, other_ticket_id = staged_ticket_ids
-    with database.write() as unit:
-        yield TaskHarness(
-            tasks=SqliteTaskRepository(unit=unit),
-            attempts=SqliteAttemptRepository(unit=unit),
-            ticket_id=ticket_id,
-            other_ticket_id=other_ticket_id,
-        )
-
-
-@pytest.fixture
-def fake_harness() -> TaskHarness:
-    ledger = TaskLedger()
-    ticket_id, other_ticket_id = FAKE_TICKET_IDS
-    return TaskHarness(
-        tasks=FakeTaskRepository(ledger=ledger),
-        attempts=FakeAttemptRepository(ledger=ledger),
-        ticket_id=ticket_id,
-        other_ticket_id=other_ticket_id,
-    )
-
-
-@pytest.fixture(params=task_implementation_cases())
-def harness(request: SubRequest) -> TaskHarness:
-    return request.getfixturevalue(request.param)
 
 
 @pytest.fixture
