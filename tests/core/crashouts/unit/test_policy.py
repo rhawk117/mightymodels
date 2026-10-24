@@ -1,9 +1,12 @@
 """The crashout rules: what refuses an entry, and the record built from one that passes."""
 
+import string
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.crashouts import (
     BlankCrashoutFieldError,
     CrashoutOptions,
@@ -13,10 +16,9 @@ from mightymodels_core.crashouts import (
 )
 from mightymodels_core.primitives import RedactedTextTooLongError
 
-from tests.core.crashouts.conftest import MOMENT, create_entry
+from tests.core.crashouts.crashout_builders import MOMENT, create_entry
 
 if TYPE_CHECKING:
-    from _pytest.mark import ParameterSet
     from mightymodels_core.crashouts import CrashoutEntry, CrashoutRecord
 
 
@@ -25,48 +27,43 @@ SHORT_ENTRY = create_entry(
 )
 
 
-def blank_field_cases() -> pytest.MarkDecorator:
-    cases: list[ParameterSet] = [
-        pytest.param(create_entry(rant='  \n '), 'rant', id='rant'),
-        pytest.param(create_entry(failures=('ok', ' \t')), 'failures', id='failure'),
-        pytest.param(create_entry(root_cause='  '), 'root_cause', id='root-cause'),
-        pytest.param(create_entry(corrective_action=''), 'corrective_action', id='action'),
-    ]
-    return pytest.mark.parametrize(('entry', 'field'), cases)
-
-
-def too_long_cases() -> pytest.MarkDecorator:
-    cases: list[ParameterSet] = [
-        pytest.param(replace(SHORT_ENTRY, branch='b' * 6), 'branch', id='branch'),
-        pytest.param(replace(SHORT_ENTRY, rant='r' * 6), 'rant', id='rant'),
-        pytest.param(replace(SHORT_ENTRY, failures=('f' * 6,)), 'failures', id='failure'),
-        pytest.param(replace(SHORT_ENTRY, root_cause='c' * 6), 'root_cause', id='root-cause'),
-        pytest.param(
-            replace(SHORT_ENTRY, corrective_action='a' * 6), 'corrective_action', id='action'
-        ),
-    ]
-    return pytest.mark.parametrize(('entry', 'field'), cases)
-
-
-def rant_line_ending_cases() -> pytest.MarkDecorator:
-    cases: list[ParameterSet] = [
-        pytest.param('a  \r\nb\r\n', 'a\nb', id='crlf'),
-        pytest.param('a\rb', 'a\nb', id='cr'),
-        pytest.param('\n\n  a\n   b  \n\n', '  a\n   b', id='indent-kept'),
-    ]
-    return pytest.mark.parametrize(('rant', 'expected'), cases)
-
-
 class TestNormalizedRant:
-    @rant_line_ending_cases()
+    rant_lines = st.lists(
+        st.tuples(
+            st.text(alphabet=string.ascii_lowercase + ' ').map(str.rstrip),
+            st.text(alphabet=' \t'),
+        )
+    )
+    line_endings = st.sampled_from(['\r\n', '\r', '\n'])
+
+    @given(rant_lines=rant_lines, line_ending=line_endings)
+    @example(rant_lines=[('a', '  '), ('b', ''), ('', '')], line_ending='\r\n')
+    @example(rant_lines=[('a', ''), ('b', '')], line_ending='\r')
+    @example(
+        rant_lines=[('', ''), ('', ''), ('  a', ''), ('   b', '  '), ('', ''), ('', '')],
+        line_ending='\n',
+    )
     def test_the_rant_loses_its_line_endings_and_keeps_its_words(
-        self, rant: str, expected: str
+        self, rant_lines: list[tuple[str, str]], line_ending: str
     ) -> None:
-        assert normalized_rant(rant) == expected
+        rant = line_ending.join(line + trailing for line, trailing in rant_lines)
+        words = '\n'.join(line for line, _ in rant_lines).strip('\n')
+        assert normalized_rant(rant) == words
 
 
 class TestEntryProblem:
     options = CrashoutOptions(name_limit=5, prose_limit=5)
+    blank_fields = st.sampled_from(['rant', 'failures', 'root_cause', 'corrective_action'])
+    blank_texts = st.text(alphabet=' \t\r\n\x0b\x0c\u00a0\u2003')
+    too_long_fields = st.sampled_from([
+        'branch',
+        'rant',
+        'failures',
+        'root_cause',
+        'corrective_action',
+    ])
+    # Over both limits, and with nothing for redaction or whitespace trimming to change.
+    too_long_texts = st.text(alphabet=string.ascii_lowercase + string.digits, min_size=6)
 
     def find_problem(self, entry: CrashoutEntry) -> object:
         return CrashoutPolicy(entry=entry, options=self.options).get_entry_problem()
@@ -77,16 +74,32 @@ class TestEntryProblem:
     def test_an_entry_without_failures_is_refused(self) -> None:
         assert isinstance(self.find_problem(create_entry(failures=())), NoFailuresError)
 
-    @blank_field_cases()
-    def test_a_blank_text_is_refused_by_its_field(self, entry: CrashoutEntry, field: str) -> None:
+    def create_entry_with(
+        self, field: str, text: str, *, earlier_failures: tuple[str, ...] = ()
+    ) -> CrashoutEntry:
+        if field == 'failures':
+            return replace(SHORT_ENTRY, failures=(*earlier_failures, text))
+        return replace(SHORT_ENTRY, **{field: text})
+
+    @given(field=blank_fields, text=blank_texts)
+    @example(field='rant', text='  \n ')
+    @example(field='failures', text=' \t')
+    @example(field='root_cause', text='  ')
+    @example(field='corrective_action', text='')
+    def test_a_blank_text_is_refused_by_its_field(self, field: str, text: str) -> None:
+        entry = self.create_entry_with(field, text, earlier_failures=('ok',))
         problem = self.find_problem(entry)
         assert isinstance(problem, BlankCrashoutFieldError)
         assert problem.field == field
 
-    @too_long_cases()
-    def test_text_redaction_leaves_too_long_is_refused(
-        self, entry: CrashoutEntry, field: str
-    ) -> None:
+    @given(field=too_long_fields, text=too_long_texts)
+    @example(field='branch', text='b' * 6)
+    @example(field='rant', text='r' * 6)
+    @example(field='failures', text='f' * 6)
+    @example(field='root_cause', text='c' * 6)
+    @example(field='corrective_action', text='a' * 6)
+    def test_text_redaction_leaves_too_long_is_refused(self, field: str, text: str) -> None:
+        entry = self.create_entry_with(field, text)
         policy = CrashoutPolicy(entry=entry, options=self.options)
         with pytest.raises(RedactedTextTooLongError) as raised:
             policy.crashout_record(MOMENT)
