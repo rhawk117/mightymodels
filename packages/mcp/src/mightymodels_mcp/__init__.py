@@ -1,2 +1,3 @@
-def main() -> None:
-    print('Hello from mightymodels-mcp!')
+from .server.entrypoint import main
+
+__all__ = ['main']

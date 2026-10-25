@@ -8,6 +8,7 @@ reports without its text.
 
 import inspect
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import TYPE_CHECKING, Any, Self
 
 from mcp.server.mcpserver import Context
@@ -17,6 +18,7 @@ from mcp.server.mcpserver.utilities.func_metadata import FuncMetadata
 from mightymodels_core.primitives import StateError
 from pydantic import BaseModel
 
+from .call_log import CallRecord
 from .dependencies import ServerDependencies
 from .requests import RequestModel
 
@@ -25,10 +27,13 @@ if TYPE_CHECKING:
 
     from mcp.types import Icon, ToolAnnotations
 
+    from .call_log import CallOutcome
+
 type ToolContext = Context[ServerDependencies, Any]
 type ToolHandler[R: RequestModel, V: BaseModel] = Callable[[R, ToolContext], Awaitable[V]]
 
 CONTEXT_ARGUMENT = 'ctx'
+SLUG_ARGUMENT = 'slug'
 ANNOTATION_HINTS = ('read_only_hint', 'destructive_hint', 'idempotent_hint', 'open_world_hint')
 
 
@@ -117,18 +122,35 @@ class ToolDefinitionPolicy[R: RequestModel, V: BaseModel]:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RefusalTranslatingHandler[R: RequestModel, V: BaseModel]:
+    name: str
     handler: ToolHandler[R, V]
 
+    def record_call(self, request: R, outcome: CallOutcome, started: float) -> None:
+        CallRecord(
+            tool_name=self.name,
+            slug=getattr(request, SLUG_ARGUMENT, None),
+            outcome=outcome,
+            duration_ms=(perf_counter() - started) * 1000,
+        ).emit()
+
     async def run(self, request: R, ctx: ToolContext) -> V:
+        started = perf_counter()
         try:
-            return await self.handler(request, ctx)
+            result = await self.handler(request, ctx)
         except StateError as refusal:
+            self.record_call(request, 'refused', started)
             raise ToolError(str(refusal)) from refusal
+        except Exception:
+            self.record_call(request, 'error', started)
+            raise
+
+        self.record_call(request, 'ok', started)
+        return result
 
 
 def create_tool[R: RequestModel, V: BaseModel](definition: ToolDefinition[R, V]) -> Tool:
     request_model = definition.request_model
-    translator = RefusalTranslatingHandler(handler=definition.handler)
+    translator = RefusalTranslatingHandler(name=definition.name, handler=definition.handler)
     return Tool(
         fn=translator.run,
         name=definition.name,
