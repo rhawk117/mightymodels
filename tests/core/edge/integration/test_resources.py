@@ -8,6 +8,7 @@ from mightymodels_core.edge import (
     DataDirectoryMissingError,
     open_state,
 )
+from mightymodels_core.edge.resources import StateBackends
 from mightymodels_core.git import GitMissingError, NotARepositoryError
 from mightymodels_core.workspace import EXCLUDE_LINE
 
@@ -118,15 +119,16 @@ class TestOpenState:
 class TestOpenStateCloses:
     refusal = PermissionError('exclude refused')
 
-    @pytest.fixture
-    def opened_databases(self) -> list[Database]:
-        return []
+    opened_databases: list[Database]
 
-    def record_open(
-        self, opened_databases: list[Database], path: Path, spec: DatabaseSpec
-    ) -> Database:
+    @pytest.fixture
+    def refusing_backends(self) -> StateBackends:
+        self.opened_databases = []
+        return StateBackends(connect=self.record_open, exclude=self.refuse)
+
+    def record_open(self, path: Path, spec: DatabaseSpec) -> Database:
         database = open_database(path, spec)
-        opened_databases.append(database)
+        self.opened_databases.append(database)
         return database
 
     async def refuse(self, _git: Git) -> None:
@@ -144,17 +146,12 @@ class TestOpenStateCloses:
         self.assert_closed(state.database)
 
     async def test_the_database_is_closed_when_excluding_the_state_raises(
-        self, start: StartHarness, opened_databases: list[Database]
+        self, start: StartHarness, refusing_backends: StateBackends
     ) -> None:
-        def connect(path: Path, spec: DatabaseSpec) -> Database:
-            return self.record_open(opened_databases, path, spec)
-
         with pytest.raises(PermissionError) as raised:
-            async with open_state(
-                start.data_directory, start.toplevel, connect=connect, exclude=self.refuse
-            ):
+            async with open_state(start.data_directory, start.toplevel, backends=refusing_backends):
                 pass
 
         assert raised.value is self.refusal
-        (database,) = opened_databases
+        (database,) = self.opened_databases
         self.assert_closed(database)
