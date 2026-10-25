@@ -7,9 +7,10 @@ Every command goes through `make`. Each target delegates to uv or to `scripts/qu
 - `make setup` installs the pre-commit git hook and syncs every workspace package and dependency group. A fresh clone has no git hook, so run it before the first commit.
 - `make sync` syncs the workspace packages and dependency groups.
 - `make format` runs the formatters.
-- `make lint` runs ruff format and ruff check without fixing, mdformat, ty, and then the Claude CLI's strict plugin validation. It fails when `claude` is not on `PATH`.
+- `make lint` runs ruff format and ruff check without fixing, mdformat and ty.
 - `make typecheck` runs ty alone.
-- `make test` runs pytest with coverage.
+- `make test` runs `pytest -q -m "unit or agents or smoke"`, with coverage.
+- `make test.end-to-end` runs `pytest -q -m e2e`.
 - `make pre-commit` runs every pre-commit hook on all files, including the hygiene fixers and uv-lock.
 - `make check` runs lint, then test.
 
