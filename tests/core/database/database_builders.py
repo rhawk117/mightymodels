@@ -27,6 +27,17 @@ CREATE TABLE people (
 PRAGMA user_version = {FIXTURE_VERSION};
 """
 
+ECHO_STATEMENTS = """
+-- name: echo
+SELECT json_object(
+    'items', json(:items),
+    'mapping', json(:mapping),
+    'at', strftime('%Y-%m-%dT%H:%M:%SZ', :at, 'unixepoch'),
+    'color', :color,
+    'flag', :flag
+) AS row;
+"""
+
 FIXTURE_STATEMENTS = """
 -- name: add_team
 INSERT INTO teams (name) VALUES (:name);

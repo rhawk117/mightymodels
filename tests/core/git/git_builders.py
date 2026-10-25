@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from mightymodels_core.process import RunOutcome
 
 SCRIPTED_ROOT = Path('/repository')
+MEMORY_ROOT = Path('/repository')
 GIT_ROOT_NAME = 'repository'
 ORIGIN_URL = 'https://github.com/Owner/Repo.git'
 TRACKED = 'a.txt'
