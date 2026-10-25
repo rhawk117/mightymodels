@@ -9,15 +9,21 @@ from mcp.server.elicitation import (
 )
 from mcp.server.mcpserver.resolve import Elicit
 from mcp_types._v2025_11_25 import TitledSingleSelectEnumSchema
-from mightymodels_mcp.forms.choices import answers_of, complete_request
+from mightymodels_mcp.forms.choices import (
+    ChoiceRound,
+    TextQuestion,
+    answers_of,
+    complete_request,
+)
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT, needs_input_text
+from mightymodels_mcp.server.requests import RequestModel
 from pydantic import BaseModel, ValidationError
 
 from tests.mcp.forms.form_probes import DEPTH, MODE, REVIEW_ROUND, ChainRequest
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
-    from mightymodels_mcp.forms.choices import ChoiceOutcome, ChoiceRound
+    from mightymodels_mcp.forms.choices import ChoiceOutcome
 
 
 def unanswered_outcome_cases() -> pytest.MarkDecorator:
@@ -77,6 +83,54 @@ class TestChoiceRound:
     def test_unanswered_round_has_no_answers(self, outcome: ChoiceOutcome) -> None:
         assert answers_of(outcome) is None
         assert complete_request(self.bare_request, outcome) is None
+
+
+class NamedRequest(RequestModel):
+    mode: str | None = None
+    label: str | None = None
+
+
+NAME = TextQuestion(
+    argument='label_text', answers='label', title='Label', description='Name the label.'
+)
+NAMED_ROUND = ChoiceRound(message='Name it', questions=(MODE,), texts=(NAME,))
+
+
+class TestTextQuestion:
+    def render_properties(self, round_: ChoiceRound) -> dict[str, dict[str, object]]:
+        return render_elicitation_schema(round_.create_schema())['properties']
+
+    def test_text_renders_as_an_optional_string(self) -> None:
+        rendered = render_elicitation_schema(NAMED_ROUND.create_schema())
+
+        assert rendered['properties']['label_text']['type'] == 'string'
+        assert rendered['required'] == ['mode']
+
+    def test_text_is_asked_only_when_its_field_is_omitted(self) -> None:
+        omitted = NAMED_ROUND.omitted_by(NamedRequest(mode='quick'))
+        answered = NAMED_ROUND.omitted_by(NamedRequest(mode='quick', label='x'))
+
+        assert list(self.render_properties(omitted)) == ['label_text']
+        asked = answered.ask()
+
+        assert isinstance(asked, BaseModel)
+        assert asked.model_dump() == {}
+
+    def test_text_round_asks_when_only_text_is_omitted(self) -> None:
+        asked = NAMED_ROUND.omitted_by(NamedRequest(mode='quick')).ask()
+
+        assert isinstance(asked, Elicit)
+
+    def test_unanswered_text_is_none(self) -> None:
+        schema = NAMED_ROUND.create_schema()
+
+        assert schema.model_validate({'mode': 'quick'}).model_dump() == {
+            'mode': 'quick',
+            'label_text': None,
+        }
+
+    def test_choice_questions_stay_choice_only(self) -> None:
+        assert NAMED_ROUND.questions == (MODE,)
 
 
 class TestNeedsInputText:

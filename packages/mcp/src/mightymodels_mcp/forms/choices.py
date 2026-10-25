@@ -56,25 +56,40 @@ class ChoiceQuestion:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class TextQuestion:
+    argument: str
+    answers: str
+    title: str
+    description: str
+
+    def create_field(self) -> tuple[Any, Any]:
+        return str | None, Field(default=None, title=self.title, description=self.description)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ChoiceRound:
     message: str
     questions: tuple[ChoiceQuestion, ...]
+    texts: tuple[TextQuestion, ...] = ()
 
     def omitted_by(self, request: BaseModel) -> ChoiceRound:
         omitted = tuple(
             question for question in self.questions if getattr(request, question.argument) is None
         )
-        return ChoiceRound(message=self.message, questions=omitted)
+        omitted_texts = tuple(text for text in self.texts if getattr(request, text.answers) is None)
+        return ChoiceRound(message=self.message, questions=omitted, texts=omitted_texts)
 
     def create_schema(self) -> type[BaseModel]:
         fields: dict[str, Any] = {
             question.argument: question.create_field() for question in self.questions
         }
+        fields |= {text.argument: text.create_field() for text in self.texts}
         return create_model(ROUND_MODEL_NAME, __base__=BaseModel, **fields)
 
     def ask(self) -> Elicit[BaseModel] | BaseModel:
         schema = self.create_schema()
-        return Elicit(self.message, schema) if self.questions else schema()
+        asks_something = bool(self.questions or self.texts)
+        return Elicit(self.message, schema) if asks_something else schema()
 
 
 ChoiceOutcome = ElicitationResult[BaseModel]
