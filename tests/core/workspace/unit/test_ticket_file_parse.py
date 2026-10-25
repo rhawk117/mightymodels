@@ -23,7 +23,7 @@ class TestParseTicketFile:
     blank_runs = st.text(
         alphabet=st.characters(categories=['Zs'], include_characters='\t'), min_size=1
     )
-    comment_tails = st.sampled_from(['', '# c'])
+    comment_tails = st.sampled_from(['', '# c', '\n# c'])
     full_source = (
         '# a ticket\n'
         'task: "retry-queue"   # the slug\n'
@@ -88,6 +88,8 @@ class TestParseTicketFile:
     @example(whitespace='\t', comment='# c')
     @example(whitespace='\xa0', comment='')
     @example(whitespace='\xa0', comment='# c')
+    @example(whitespace='\t', comment='\n# c')
+    @example(whitespace='\xa0', comment='\n# c')
     def test_a_blank_or_comment_line_holding_tabs_or_space_separators_is_skipped(
         self, whitespace: str, comment: str
     ) -> None:
