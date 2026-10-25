@@ -9,6 +9,7 @@ from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from
 from mightymodels_core.workspace import find_root
 
 from mightymodels_mcp.contract.tools import register_contract_tools
+from mightymodels_mcp.investigation.tools import register_investigation_tools
 from mightymodels_mcp.review.decision_tools import register_decision_tools
 from mightymodels_mcp.review.tools import register_review_tools
 from mightymodels_mcp.snapshot.tools import register_snapshot_tools
@@ -30,7 +31,8 @@ REFUSED_START = 2
 def create_catalog() -> ToolCatalog:
     tickets = register_ticket_tools(ToolCatalog())
     reviews = register_review_tools(register_contract_tools(register_task_tools(tickets)))
-    return register_snapshot_tools(register_decision_tools(reviews))
+    snapshots = register_snapshot_tools(register_decision_tools(reviews))
+    return register_investigation_tools(snapshots)
 
 
 def run(environ: Mapping[str, str], cwd: Path) -> int:
