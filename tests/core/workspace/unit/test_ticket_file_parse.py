@@ -1,22 +1,12 @@
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.workspace import (
     CompanionDocsFile,
     HandoffContextFile,
     TicketFile,
     parse_ticket_file,
 )
-
-
-def ticket_blank_line_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(
-        'source',
-        [
-            pytest.param('task: t\n\t\n# c\n', id='tab-in-a-blank-line'),
-            pytest.param('task: t\n\t# c\n', id='tab-in-a-comment-line'),
-            pytest.param('task: t\n\xa0\n# c\n', id='no-break-space-in-a-blank-line'),
-            pytest.param('task: t\n\xa0# c\n', id='no-break-space-in-a-comment-line'),
-        ],
-    )
 
 
 def ticket_line_end_cases() -> pytest.MarkDecorator:
@@ -30,6 +20,10 @@ def ticket_line_end_cases() -> pytest.MarkDecorator:
 
 
 class TestParseTicketFile:
+    blank_runs = st.text(
+        alphabet=st.characters(categories=['Zs'], include_characters='\t'), min_size=1
+    )
+    comment_tails = st.sampled_from(['', '# c'])
     full_source = (
         '# a ticket\n'
         'task: "retry-queue"   # the slug\n'
@@ -89,11 +83,15 @@ class TestParseTicketFile:
     ) -> None:
         assert parse_ticket_file(source) == TicketFile(task='a', summary='b')
 
-    @ticket_blank_line_cases()
-    def test_a_blank_or_comment_line_holding_a_tab_or_no_break_space_is_skipped(
-        self, source: str
+    @given(whitespace=blank_runs, comment=comment_tails)
+    @example(whitespace='\t', comment='')
+    @example(whitespace='\t', comment='# c')
+    @example(whitespace='\xa0', comment='')
+    @example(whitespace='\xa0', comment='# c')
+    def test_a_blank_or_comment_line_holding_tabs_or_space_separators_is_skipped(
+        self, whitespace: str, comment: str
     ) -> None:
-        assert parse_ticket_file(source) == TicketFile(task='t')
+        assert parse_ticket_file(f'task: t\n{whitespace}{comment}\n') == TicketFile(task='t')
 
     @pytest.mark.parametrize(
         ('source', 'task'),

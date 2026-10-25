@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.workspace import (
     CompanionDocsFile,
     HandoffContextFile,
@@ -10,6 +12,8 @@ from mightymodels_core.workspace import (
     parse_ticket_file,
 )
 from mightymodels_core.workspace.ticket_text import render_ticket, with_context
+
+from tests.core.workspace.workspace_builders import ESCAPED_CHARACTERS, LONE_SURROGATES
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
@@ -66,31 +70,21 @@ def context_rewrite_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('rewrite', [scenario.param for scenario in scenarios])
 
 
-def context_quoting_cases() -> pytest.MarkDecorator:
-    lines = ['a: b', 'c # d', 'say "x"', 'back\\slash', 'tab\there', 'ünï']
-    return pytest.mark.parametrize('line', [pytest.param(line, id=line[:6]) for line in lines])
-
-
-def lone_surrogate_cases() -> pytest.MarkDecorator:
-    surrogates = ['\ud800', '\udbff', '\udc00', '\udfff']
-    return pytest.mark.parametrize(
-        'surrogate', [pytest.param(char, id=ascii(char)) for char in surrogates]
-    )
-
-
-def noncharacter_cases() -> pytest.MarkDecorator:
-    noncharacters = {'u-fffe': '\ufffe', 'u-ffff': '\uffff'}
-    return pytest.mark.parametrize(
-        'noncharacter', [pytest.param(char, id=name) for name, char in noncharacters.items()]
-    )
-
-
 class TestWithContext:
+    lines = st.text()
+    surrogates = LONE_SURROGATES
+
     @context_rewrite_cases()
     def test_only_the_context_block_is_rewritten(self, rewrite: ContextRewrite) -> None:
         assert with_context(rewrite.source, rewrite.context) == rewrite.expected
 
-    @context_quoting_cases()
+    @given(line=lines)
+    @example(line='a: b')
+    @example(line='c # d')
+    @example(line='say "x"')
+    @example(line='back\\slash')
+    @example(line='tab\there')
+    @example(line='ünï')
     def test_a_line_reads_back_as_written(self, line: str) -> None:
         text = with_context(f'{HEAD}context:\n  - "old"\n', (line,))
 
@@ -100,7 +94,11 @@ class TestWithContext:
         assert isinstance(parsed, TicketFile)
         assert parsed.context == (line,)
 
-    @lone_surrogate_cases()
+    @given(surrogate=surrogates)
+    @example(surrogate='\ud800')
+    @example(surrogate='\udbff')
+    @example(surrogate='\udc00')
+    @example(surrogate='\udfff')
     def test_a_lone_surrogate_is_returned_as_the_refusal(self, surrogate: str) -> None:
         refusal = with_context(f'{HEAD}context:\n  - "old"\n', (f'a{surrogate}b',))
 
@@ -108,31 +106,26 @@ class TestWithContext:
         assert refusal.character == surrogate
 
 
-def ticket_escape_cases() -> pytest.MarkDecorator:
-    texts = ['next\u0085', 'sep\u2028', 'para\u2029', 'del\x7f', 'c1\x9f', 'nul\x00']
-    return pytest.mark.parametrize('text', [pytest.param(text, id=ascii(text)) for text in texts])
-
-
 class TestRenderTicket:
-    @pytest.fixture
-    def ticket(self) -> TicketFile:
-        return TicketFile(
-            task='alpha',
-            summary='s',
-            triaged_at='2026-01-02T03:04:05+00:00',
-            context=('a', 'b'),
-            companion_docs=CompanionDocsFile(
-                issue_number=7, jira_key=None, reference_urls=('https://example.com',)
-            ),
-            subagent_models={'primary-agent': None, 'engineer': 'sonnet'},
-            handoff_context=HandoffContextFile(
-                scope='med', plan_first=True, branch_name='feat/x', worktrees_okay=False
-            ),
-            investigations=('first-look',),
-        )
+    ticket = TicketFile(
+        task='alpha',
+        summary='s',
+        triaged_at='2026-01-02T03:04:05+00:00',
+        context=('a', 'b'),
+        companion_docs=CompanionDocsFile(
+            issue_number=7, jira_key=None, reference_urls=('https://example.com',)
+        ),
+        subagent_models={'primary-agent': None, 'engineer': 'sonnet'},
+        handoff_context=HandoffContextFile(
+            scope='med', plan_first=True, branch_name='feat/x', worktrees_okay=False
+        ),
+        investigations=('first-look',),
+    )
+    escaped_characters = ESCAPED_CHARACTERS
+    surrogates = LONE_SURROGATES
 
-    def test_keys_come_in_the_fixed_order(self, ticket: TicketFile) -> None:
-        assert render_ticket(ticket) == (
+    def test_keys_come_in_the_fixed_order(self) -> None:
+        assert render_ticket(self.ticket) == (
             'task: "alpha"\n'
             'summary: "s"\n'
             'triaged-at: "2026-01-02T03:04:05+00:00"\n'
@@ -145,51 +138,47 @@ class TestRenderTicket:
             'investigations:\n  - "first-look"\n'
         )
 
-    def test_the_rendered_text_reads_back(self, ticket: TicketFile) -> None:
-        rendered = render_ticket(ticket)
+    def test_the_rendered_text_reads_back(self) -> None:
+        rendered = render_ticket(self.ticket)
 
         assert isinstance(rendered, str)
-        assert parse_ticket_file(rendered) == ticket
+        assert parse_ticket_file(rendered) == self.ticket
 
-    @ticket_escape_cases()
-    def test_a_refused_character_is_escaped_and_reads_back(
-        self, ticket: TicketFile, text: str
-    ) -> None:
-        rendered = render_ticket(TicketFile(task=ticket.task, summary=text, context=ticket.context))
-
-        assert isinstance(rendered, str)
-        parsed = parse_ticket_file(rendered)
-
-        assert text not in rendered
-        assert isinstance(parsed, TicketFile)
-        assert parsed.summary == text
-
-    @noncharacter_cases()
-    def test_a_noncharacter_is_escaped_and_reads_back(
-        self, ticket: TicketFile, noncharacter: str
-    ) -> None:
-        text = f'a{noncharacter}b'
-        rendered = render_ticket(TicketFile(task=ticket.task, summary=text, context=ticket.context))
+    @given(character=escaped_characters)
+    @example(character='\x85')
+    @example(character='\u2028')
+    @example(character='\u2029')
+    @example(character='\x7f')
+    @example(character='\x9f')
+    @example(character='\x00')
+    @example(character='\ufffe')
+    @example(character='\uffff')
+    def test_a_refused_character_is_escaped_and_reads_back(self, character: str) -> None:
+        text = f'a{character}b'
+        rendered = render_ticket(
+            TicketFile(task=self.ticket.task, summary=text, context=self.ticket.context)
+        )
 
         assert isinstance(rendered, str)
         parsed = parse_ticket_file(rendered)
-        assert noncharacter not in rendered
+
+        assert character not in rendered
         assert isinstance(parsed, TicketFile)
         assert parsed.summary == text
 
-    @lone_surrogate_cases()
-    def test_a_lone_surrogate_is_returned_as_the_refusal(
-        self, ticket: TicketFile, surrogate: str
-    ) -> None:
-        refusal = render_ticket(TicketFile(task=ticket.task, summary=f'a{surrogate}b'))
+    @given(surrogate=surrogates)
+    @example(surrogate='\ud800')
+    @example(surrogate='\udbff')
+    @example(surrogate='\udc00')
+    @example(surrogate='\udfff')
+    def test_a_lone_surrogate_is_returned_as_the_refusal(self, surrogate: str) -> None:
+        refusal = render_ticket(TicketFile(task=self.ticket.task, summary=f'a{surrogate}b'))
 
         assert isinstance(refusal, LoneSurrogateError)
         assert refusal.character == surrogate
         assert f'U+{ord(surrogate):04X}' in str(refusal)
 
-    def test_a_lone_surrogate_in_a_list_value_is_returned_as_the_refusal(
-        self, ticket: TicketFile
-    ) -> None:
-        refusal = render_ticket(TicketFile(task=ticket.task, context=('ok', '\ud800')))
+    def test_a_lone_surrogate_in_a_list_value_is_returned_as_the_refusal(self) -> None:
+        refusal = render_ticket(TicketFile(task=self.ticket.task, context=('ok', '\ud800')))
 
         assert isinstance(refusal, LoneSurrogateError)
