@@ -1,10 +1,13 @@
 import os
 import tomllib
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
 import pytest
 from hypothesis import settings
+
+pytest_plugins = ['pytester']
 
 
 def resolve_hypothesis_profile() -> str:
@@ -33,8 +36,15 @@ def has_tier_directory(relative_parts: tuple[str, ...]) -> bool:
     return len(relative_parts) > TIER_DEPTH and relative_parts[1] in TIER_NAMES
 
 
+def is_test_module(config: pytest.Config, file_path: Path) -> bool:
+    patterns: list[str] = config.getini('python_files')
+    return file_path.suffix == '.py' and any(
+        fnmatch(file_path.name, pattern) for pattern in patterns
+    )
+
+
 def pytest_collect_file(file_path: Path, parent: pytest.Collector) -> None:
-    if not file_path.name.startswith('test_') or file_path.suffix != '.py':
+    if not is_test_module(parent.config, file_path):
         return
 
     relative_parts = get_core_relative_parts(parent.config.rootpath, file_path)
