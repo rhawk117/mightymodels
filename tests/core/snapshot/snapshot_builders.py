@@ -12,6 +12,7 @@ from mightymodels_core.investigations import AddRequest, IncomingEntry, StartReq
 from mightymodels_core.primitives import RepositoryKey, Slug, TaskId, redact
 from mightymodels_core.reviews import IncomingDisposition, IncomingFinding
 from mightymodels_core.reviews import StartRequest as ReviewStartRequest
+from mightymodels_core.snapshot import RepositoryFacts
 from mightymodels_core.tasks import MarkRequest
 from mightymodels_core.tasks import StartRequest as TaskStartRequest
 from mightymodels_core.tickets import TicketSection, Tracker
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
 HEAD = 'a' * 40
 MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 OLD_HEAD = 'b' * 40
+REPOSITORY_FACTS = RepositoryFacts(
+    branch='feat/widget', head=HEAD, dirty=('src/a.py', 'src/b.py', 'src/c.py'), refusal=None
+)
 FIRST_SUMMARY = 'add the widget'
 OTHER_SUMMARY = 'a ticket of the other repository'
 

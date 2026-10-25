@@ -21,7 +21,7 @@ These rules add to the Python rules, which still apply in full.
 
 ## Tiers
 
-- Tests live in `tests/<pkg>/<concept>/{unit,integration,smoke}/`, and the directory sets the tier. The root `conftest.py` marks each test from its directory, and a test module under `tests/core` outside a tier directory fails collection. Never write a tier mark by hand.
+- Under `tests/core`, tests live in `tests/core/<concept>/{unit,integration,smoke}/`, and the directory sets the tier. The root `conftest.py` marks each test from its directory, and a test module under `tests/core` outside a tier directory fails collection. Never write a tier mark by hand under `tests/core`. Other test trees keep explicit tier marks until they adopt this layout.
 - `unit` tests use fakes and memory. `integration` tests touch SQLite (file or in-memory), real git, a child process or the filesystem. `smoke` tests run an entry-point concept through real resources (`open_state`).
 
 ## Helpers
@@ -79,7 +79,7 @@ class TestStoreUpload:
 ## Scenarios
 
 - Test classes never inherit from each other, with one exception: a suite. To run the same tests over several inputs, parametrize over scenarios.
-- A contract that several tiers or implementations share is one suite class in a helper file. Its name does not start with `Test`, so pytest does not collect it, and it nests the `Test*` groups. Each tier module holds a bare subclass of the suite. Each tier `conftest.py` defines only the suite's fixture (usually `harness`), and every other fixture is defined once, in the concept `conftest.py`. Any other inheritance between test classes stays banned.
+- A contract that several tiers or implementations share is one suite class in a helper file. Its name does not start with `Test`, so pytest does not collect it, and it nests the `Test*` groups. Each tier module holds a bare subclass of the suite. Each tier `conftest.py` defines only the suite's fixtures (`harness`, plus `open_harness` when the suite holds a property, see "Hypothesis or pytest.param"), and every other fixture is defined once, in the concept `conftest.py`. Any other inheritance between test classes stays banned.
 - Every parametrize set lives in a module-level `<subject>_<kind>_cases()` function that builds its cases and returns the `pytest.mark.parametrize` decorator. When the cases derive from options the class holds, the function takes them as an argument (`@upload_policy_size_boundary_cases(options)`), so the coupling is visible.
 - A case with more than one value is a Scenario class: a frozen dataclass with a `name`, the case's inputs and expected outcome, a `marks` tuple, and a `param` property returning `pytest.param(self, id=self.name, marks=self.marks)`. A single-value case stays a plain `pytest.param`.
 - Annotate `param` as `ParameterSet`, imported from `_pytest.mark` under `TYPE_CHECKING`; pytest exposes no public name for it.
@@ -119,6 +119,7 @@ def upload_policy_size_boundary_cases(options: UploadOptions) -> pytest.MarkDeco
 ## Hypothesis or pytest.param
 
 - `@given` when the claim holds for every value of a kind: state it as a property over a strategy. Strategies sit as class attributes beside the test, built from the domain types with `st.builds`.
+- A claim about every member of a named finite set (a production collection such as `DECLARATIONS`) uses a cases function with one `pytest.param(member, id=member.name)` per member. `@given` stays for open input spaces.
 - Cases functions for named boundaries a reader should see by name (`empty`, `at-limit`, `one-over-limit`), never for sampling an input space by hand.
 - A regression is pinned with `@example(...)` on the property test that covers it, and that test is marked `@pytest.mark.regression`. When no property covers it yet, write the property first.
 - `@given` tests take no function-scoped fixtures: Hypothesis reuses them across examples and fails its `function_scoped_fixture` health check. Build per-example state in a helper method instead.

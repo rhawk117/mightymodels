@@ -5,21 +5,11 @@ from mightymodels_core.database import DatabaseSpec
 
 from tests.core.database.database_builders import (
     ECHO,
+    ECHO_STATEMENTS,
     FIXTURE_SCHEMA,
     FIXTURE_STATEMENTS,
     create_statements,
 )
-
-ECHO_STATEMENTS = """
--- name: echo
-SELECT json_object(
-    'items', json(:items),
-    'mapping', json(:mapping),
-    'at', strftime('%Y-%m-%dT%H:%M:%SZ', :at, 'unixepoch'),
-    'color', :color,
-    'flag', :flag
-) AS row;
-"""
 
 
 @pytest.fixture(scope='session')

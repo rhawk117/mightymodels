@@ -3,13 +3,13 @@ from contextlib import closing
 from typing import TYPE_CHECKING
 
 import msgspec
-from hypothesis import given
-from hypothesis import strategies as st
+import pytest
 from mightymodels_core.database import ConnectionOptions, open_database
 from mightymodels_core.schemas import DECLARATIONS
 
 if TYPE_CHECKING:
-    import pytest
+    from pathlib import Path
+
     from mightymodels_core.database import DatabaseSpec, Declaration
 
 EXEMPT_SCAN_TARGETS = ('json_each', 'json_tree', '(subquery', 'subquery')
@@ -27,32 +27,36 @@ def unbound_fields(declaration: Declaration) -> dict[str, None]:
     return dict.fromkeys(field.name for field in msgspec.structs.fields(declaration.params))
 
 
-class TestCataloguePlans:
-    declarations = st.sampled_from(DECLARATIONS)
+def catalogue_declaration_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'declaration',
+        [pytest.param(declaration, id=declaration.name) for declaration in DECLARATIONS],
+    )
 
-    def find_scans(
-        self,
-        tmp_path_factory: pytest.TempPathFactory,
-        database_spec: DatabaseSpec,
-        blocks: dict[str, str],
-        declaration: Declaration,
-    ) -> list[str]:
+
+class TestCataloguePlans:
+    @pytest.fixture(scope='class')
+    @classmethod
+    def plan_database_path(
+        cls, tmp_path_factory: pytest.TempPathFactory, database_spec: DatabaseSpec
+    ) -> Path:
         path = tmp_path_factory.mktemp('plan').joinpath('mightymodels.db')
         open_database(path, database_spec, ConnectionOptions()).close()
-        with closing(sqlite3.connect(path)) as connection:
+        return path
+
+    def find_scans(
+        self, plan_database_path: Path, blocks: dict[str, str], declaration: Declaration
+    ) -> list[str]:
+        with closing(sqlite3.connect(plan_database_path)) as connection:
             plan = connection.execute(
                 f'EXPLAIN QUERY PLAN {blocks[declaration.name]}', unbound_fields(declaration)
             ).fetchall()
         return [row[3] for row in plan if is_base_table_scan(row[3])]
 
-    @given(declaration=declarations)
+    @catalogue_declaration_cases()
     def test_declared_statement_is_served_by_an_index(
-        self,
-        tmp_path_factory: pytest.TempPathFactory,
-        database_spec: DatabaseSpec,
-        blocks: dict[str, str],
-        declaration: Declaration,
+        self, plan_database_path: Path, blocks: dict[str, str], declaration: Declaration
     ) -> None:
-        scans = self.find_scans(tmp_path_factory, database_spec, blocks, declaration)
+        scans = self.find_scans(plan_database_path, blocks, declaration)
 
         assert scans == []

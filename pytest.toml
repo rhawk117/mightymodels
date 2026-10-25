@@ -23,9 +23,9 @@ addopts = [
 filterwarnings = ["error"]
 
 markers = [
-    "smoke: a quick sanity check",
-    "unit: tests behavior without spinning up something heavy",
-    "integration: tests requiring external services or processes",
+    "smoke: runs an entry-point concept through real resources (open_state)",
+    "unit: uses fakes and memory only",
+    "integration: touches SQLite (file or in-memory), real git, a child process or the filesystem",
     "regression: tests something which previously failed before",
     "agents: test case markers focused on AI code generation quality",
 ]

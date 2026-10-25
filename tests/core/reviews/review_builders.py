@@ -55,8 +55,7 @@ type HarnessOpener = Callable[[Path], AbstractContextManager[ReviewHarness]]
 
 
 @contextmanager
-def open_fake_harness(directory: Path) -> Generator[ReviewHarness]:
-    del directory
+def open_fake_harness(_directory: Path) -> Generator[ReviewHarness]:
     ledger = ReviewLedger()
     yield ReviewHarness(
         reviews=FakeReviewRepository(ledger=ledger),

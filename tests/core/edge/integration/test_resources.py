@@ -1,4 +1,5 @@
 import sqlite3
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import pytest
@@ -8,7 +9,6 @@ from mightymodels_core.edge import (
     DataDirectoryMissingError,
     open_state,
 )
-from mightymodels_core.edge.resources import StateBackends
 from mightymodels_core.git import GitMissingError, NotARepositoryError
 from mightymodels_core.workspace import EXCLUDE_LINE
 
@@ -116,23 +116,26 @@ class TestOpenState:
         assert exclude_lines(start).count(EXCLUDE_LINE) == 1
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RefusingBackends:
+    refusal: PermissionError
+    opened: list[Database] = field(default_factory=list)
+
+    def connect(self, path: Path, spec: DatabaseSpec) -> Database:
+        database = open_database(path, spec)
+        self.opened.append(database)
+        return database
+
+    async def exclude(self, _git: Git, /) -> None:
+        raise self.refusal
+
+
 class TestOpenStateCloses:
     refusal = PermissionError('exclude refused')
 
-    opened_databases: list[Database]
-
     @pytest.fixture
-    def refusing_backends(self) -> StateBackends:
-        self.opened_databases = []
-        return StateBackends(connect=self.record_open, exclude=self.refuse)
-
-    def record_open(self, path: Path, spec: DatabaseSpec) -> Database:
-        database = open_database(path, spec)
-        self.opened_databases.append(database)
-        return database
-
-    async def refuse(self, _git: Git) -> None:
-        raise self.refusal
+    def refusing_backends(self) -> RefusingBackends:
+        return RefusingBackends(refusal=self.refusal)
 
     def assert_closed(self, database: Database) -> None:
         with pytest.raises(DatabaseClosedError), database.read():
@@ -146,12 +149,12 @@ class TestOpenStateCloses:
         self.assert_closed(state.database)
 
     async def test_the_database_is_closed_when_excluding_the_state_raises(
-        self, start: StartHarness, refusing_backends: StateBackends
+        self, start: StartHarness, refusing_backends: RefusingBackends
     ) -> None:
         with pytest.raises(PermissionError) as raised:
             async with open_state(start.data_directory, start.toplevel, backends=refusing_backends):
                 pass
 
         assert raised.value is self.refusal
-        (database,) = self.opened_databases
+        (database,) = refusing_backends.opened
         self.assert_closed(database)

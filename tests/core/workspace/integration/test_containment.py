@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from hypothesis import example, given
-from hypothesis import strategies as st
 from mightymodels_core.primitives import RunId
 from mightymodels_core.workspace import (
     OutsideStateDirectoryError,
@@ -89,6 +87,12 @@ ESCAPING_SYMLINKS = (
 )
 
 
+def escaping_symlink_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'escaping', [pytest.param(escaping, id=escaping.name) for escaping in ESCAPING_SYMLINKS]
+    )
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ClimbingParts:
     name: str
@@ -109,8 +113,6 @@ def workspace_climbing_parts_cases() -> pytest.MarkDecorator:
 
 
 class TestSymlinkBelowTheStateDirectory:
-    escaping_symlinks = st.sampled_from(ESCAPING_SYMLINKS)
-
     @pytest.fixture
     def workspace_with_a_dangling_symlink(self, state: Path, tmp_path: Path) -> Workspace:
         state.joinpath(TICKET).symlink_to(tmp_path.joinpath('never-created'))
@@ -122,12 +124,12 @@ class TestSymlinkBelowTheStateDirectory:
         state.joinpath(TICKET).symlink_to(state.joinpath('first-name'))
         return workspace_at(state.parent)
 
-    def build_workspace_with_a_symlink_to_outside(
-        self, tmp_path_factory: pytest.TempPathFactory, escaping: EscapingSymlink
+    @pytest.fixture
+    def workspace_with_a_symlink_to_outside(
+        self, tmp_path: Path, escaping: EscapingSymlink
     ) -> Workspace:
-        root = tmp_path_factory.mktemp('escaping')
-        state = root.joinpath('checkout', '.mightymodels')
-        outside = root.joinpath('outside')
+        state = tmp_path.joinpath('checkout', '.mightymodels')
+        outside = tmp_path.joinpath('outside')
         state.mkdir(parents=True)
         outside.mkdir()
         planted = state.joinpath(*escaping.planted)
@@ -135,24 +137,12 @@ class TestSymlinkBelowTheStateDirectory:
         planted.symlink_to(outside)
         return workspace_at(state.parent)
 
-    @given(escaping=escaping_symlinks)
-    @example(escaping=ESCAPING_SYMLINKS[0])
-    @example(escaping=ESCAPING_SYMLINKS[1])
-    @example(escaping=ESCAPING_SYMLINKS[2])
-    @example(escaping=ESCAPING_SYMLINKS[3])
-    @example(escaping=ESCAPING_SYMLINKS[4])
-    @example(escaping=ESCAPING_SYMLINKS[5])
-    @example(escaping=ESCAPING_SYMLINKS[6])
-    @example(escaping=ESCAPING_SYMLINKS[7])
-    @example(escaping=ESCAPING_SYMLINKS[8])
-    @example(escaping=ESCAPING_SYMLINKS[9])
+    @escaping_symlink_cases()
     def test_a_symlink_that_leads_outside_is_refused_wherever_it_sits(
-        self, tmp_path_factory: pytest.TempPathFactory, escaping: EscapingSymlink
+        self, workspace_with_a_symlink_to_outside: Workspace, escaping: EscapingSymlink
     ) -> None:
-        workspace = self.build_workspace_with_a_symlink_to_outside(tmp_path_factory, escaping)
-
         with pytest.raises(OutsideStateDirectoryError) as refusal:
-            escaping.ask(workspace)
+            escaping.ask(workspace_with_a_symlink_to_outside)
 
         assert refusal.value.shown.startswith('.mightymodels/')
         assert ESCAPES in str(refusal.value)

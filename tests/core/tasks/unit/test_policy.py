@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, get_args
 
 import pytest
-from hypothesis import example, given
+from hypothesis import assume, example, given
 from hypothesis import strategies as st
 from mightymodels_core.primitives import TaskId
 from mightymodels_core.tasks import (
@@ -184,6 +184,14 @@ def start_reasons_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('scenario', 'reasons'), cases)
 
 
+def allowed_move_cases() -> pytest.MarkDecorator:
+    cases = [
+        pytest.param(before, after, id=f'{before}->{after}')
+        for before, after in sorted(ALLOWED_MOVES)
+    ]
+    return pytest.mark.parametrize(('before', 'after'), cases)
+
+
 class TestTransitionPolicy:
     statuses = st.sampled_from(get_args(TaskStatus.__value__))
 
@@ -191,25 +199,15 @@ class TestTransitionPolicy:
         policy = TransitionPolicy(task_key=TASK, before=before, after=after)
         return policy.get_transition_problem()
 
-    @given(before=statuses, after=statuses)
-    @example(before='pending', after='in-progress')
-    @example(before='pending', after='superseded')
-    @example(before='in-progress', after='verified')
-    @example(before='in-progress', after='failed')
-    @example(before='in-progress', after='blocked')
-    @example(before='in-progress', after='superseded')
-    @example(before='failed', after='in-progress')
-    @example(before='failed', after='superseded')
-    @example(before='blocked', after='in-progress')
-    @example(before='blocked', after='superseded')
-    def test_transition_is_allowed_exactly_when_listed(
-        self, before: TaskStatus, after: TaskStatus
-    ) -> None:
-        problem = self.find_problem(before, after)
+    @allowed_move_cases()
+    def test_listed_transition_is_allowed(self, before: TaskStatus, after: TaskStatus) -> None:
+        assert self.find_problem(before, after) is None
 
-        if (before, after) in ALLOWED_MOVES:
-            assert problem is None
-            return
+    @given(before=statuses, after=statuses)
+    def test_unlisted_transition_is_refused(self, before: TaskStatus, after: TaskStatus) -> None:
+        assume((before, after) not in ALLOWED_MOVES)
+
+        problem = self.find_problem(before, after)
 
         assert isinstance(problem, TransitionError)
         assert (problem.current, problem.target) == (before, after)

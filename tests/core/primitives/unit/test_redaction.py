@@ -228,7 +228,7 @@ def python_sources(package: Traversable) -> list[Traversable]:
         if entry.is_dir():
             sources.extend(python_sources(entry))
 
-        if entry.name.endswith('.py'):
+        if entry.is_file() and entry.name.endswith('.py'):
             sources.append(entry)
     return sources
 

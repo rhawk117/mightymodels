@@ -239,16 +239,16 @@ class TestDoneCommit:
 
 
 class TestCriterionOfCommand:
-    keys = st.text()
+    heads = st.text(alphabet=st.characters(exclude_characters='.'))
+    tails = st.text()
 
-    @given(key=keys)
-    @example(key='T7.AC-1')
-    @example(key='R17.AC-2')
-    @example(key='nodot')
-    def test_criterion_is_the_text_after_the_first_dot(self, key: str) -> None:
-        expected = key.partition('.')[2] if '.' in key else None
+    @given(head=heads, tail=tails)
+    def test_criterion_is_the_text_after_the_first_dot(self, head: str, tail: str) -> None:
+        assert criterion_of_command(f'{head}.{tail}') == tail
 
-        assert criterion_of_command(key) == expected
+    @given(key=heads)
+    def test_dotless_key_has_no_criterion(self, key: str) -> None:
+        assert criterion_of_command(key) is None
 
 
 class TestPlanTask:
