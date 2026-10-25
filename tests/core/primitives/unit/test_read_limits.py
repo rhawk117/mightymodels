@@ -1,60 +1,13 @@
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import ReadLimit, ReadLimitError, WriteLimitError
-
-if TYPE_CHECKING:
-    from _pytest.mark import ParameterSet
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class LatestScenario:
-    name: str
-    newest_first: tuple[int, ...]
-    expected_rows: tuple[int, ...]
-    expected_left_out: bool
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
-
-
-def read_limit_latest_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize(
-        'scenario',
-        [
-            LatestScenario(
-                name='under the limit',
-                newest_first=(2, 1),
-                expected_rows=(1, 2),
-                expected_left_out=False,
-            ).param,
-            LatestScenario(
-                name='at the limit',
-                newest_first=(3, 2, 1),
-                expected_rows=(1, 2, 3),
-                expected_left_out=False,
-            ).param,
-            LatestScenario(
-                name='past the limit',
-                newest_first=(5, 4, 3, 2, 1),
-                expected_rows=(3, 4, 5),
-                expected_left_out=True,
-            ).param,
-            LatestScenario(
-                name='empty',
-                newest_first=(),
-                expected_rows=(),
-                expected_left_out=False,
-            ).param,
-        ],
-    )
 
 
 class TestReadLimit:
     owner = 'the task table'
     limit = ReadLimit(rows=3, kept='tasks')
+    newest_first_rows = st.lists(st.integers())
 
     @pytest.fixture
     def refusal(self) -> ReadLimitError | None:
@@ -83,8 +36,13 @@ class TestReadLimit:
         assert (refusal.owner, refusal.rows, refusal.kept) == (self.owner, 3, 'tasks')
         assert 'the task table would hold more than 3 tasks' in str(refusal)
 
-    @read_limit_latest_cases()
-    def test_latest_keeps_the_newest_rows_oldest_first(self, scenario: LatestScenario) -> None:
-        latest = self.limit.latest(scenario.newest_first)
-        assert latest.rows == scenario.expected_rows
-        assert latest.older_left_out is scenario.expected_left_out
+    @given(newest_first=newest_first_rows)
+    @example(newest_first=[2, 1])
+    @example(newest_first=[3, 2, 1])
+    @example(newest_first=[5, 4, 3, 2, 1])
+    @example(newest_first=[])
+    def test_latest_keeps_the_newest_rows_oldest_first(self, newest_first: list[int]) -> None:
+        latest = self.limit.latest(newest_first)
+
+        assert list(reversed(latest.rows)) == newest_first[: self.limit.rows]
+        assert latest.older_left_out is (len(newest_first) > self.limit.rows)

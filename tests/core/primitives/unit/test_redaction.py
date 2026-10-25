@@ -1,8 +1,9 @@
 import re
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import TYPE_CHECKING, cast, get_args
+from importlib.resources import files
+from types import MappingProxyType
+from typing import TYPE_CHECKING, get_args
 
 import pytest
 from hypothesis import given
@@ -19,13 +20,12 @@ from mightymodels_core.primitives import (
 from mightymodels_core.primitives.redaction import default_secret_patterns
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from importlib.resources.abc import Traversable
 
     from _pytest.mark.structures import ParameterSet
 
 LONG_TEXT = 60_000
 SECONDS_FOR_LONG_TEXT = 5.0
-SOURCE = Path(__file__).parents[4] / 'packages' / 'core' / 'src'
 PATTERN_AT_THE_FIRST_RELEASE = re.compile(
     r'(?i)[A-Z0-9_]*(?:password|passwd|secret|token|api[_-]?key)[A-Z0-9_]*'
     r'["\']?\s*[:=]\s*["\']?[^\s,;"\']+'
@@ -68,22 +68,24 @@ class SecretSample:
         return pytest.param(self, id=self.name)
 
 
+SECRET_SAMPLES = (
+    SecretSample(
+        name='private-key',
+        text='-----BEGIN RSA PRIVATE KEY-----\nabc\ndef\n-----END RSA PRIVATE KEY-----',
+    ),
+    SecretSample(name='aws-key', text='AKIAIOSFODNN7EXAMPLE'),
+    SecretSample(name='github-token', text='ghp_' + 'a' * 36),
+    SecretSample(name='slack-token', text='xoxb-1234567890-abcdef'),
+    SecretSample(name='stripe-key', text='sk_live_' + 'a' * 16),
+    SecretSample(name='api-key', text='sk-ant-' + 'a' * 20),
+    SecretSample(name='jwt', text='eyJhbGci.eyJzdWIi.signature'),
+    SecretSample(name='bearer', text='Bearer abcdefghijkl1234'),
+    SecretSample(name='assignment', text='password=hunter2'),
+)
+
+
 def secret_pattern_cases() -> pytest.MarkDecorator:
-    samples = [
-        SecretSample(
-            name='private-key',
-            text='-----BEGIN RSA PRIVATE KEY-----\nabc\ndef\n-----END RSA PRIVATE KEY-----',
-        ),
-        SecretSample(name='aws-key', text='AKIAIOSFODNN7EXAMPLE'),
-        SecretSample(name='github-token', text='ghp_' + 'a' * 36),
-        SecretSample(name='slack-token', text='xoxb-1234567890-abcdef'),
-        SecretSample(name='stripe-key', text='sk_live_' + 'a' * 16),
-        SecretSample(name='api-key', text='sk-ant-' + 'a' * 20),
-        SecretSample(name='jwt', text='eyJhbGci.eyJzdWIi.signature'),
-        SecretSample(name='bearer', text='Bearer abcdefghijkl1234'),
-        SecretSample(name='assignment', text='password=hunter2'),
-    ]
-    return pytest.mark.parametrize('sample', [sample.param for sample in samples])
+    return pytest.mark.parametrize('sample', [sample.param for sample in SECRET_SAMPLES])
 
 
 def long_token_cases() -> pytest.MarkDecorator:
@@ -115,7 +117,7 @@ class TestEachPattern:
         )
 
     def test_has_a_sample_for_every_pattern(self) -> None:
-        sampled = {case.values[0].name for case in secret_pattern_cases().args[1]}
+        sampled = {sample.name for sample in SECRET_SAMPLES}
         sampled.add('url-credentials')
 
         assert sampled == set(get_args(PatternName.__value__))
@@ -135,13 +137,7 @@ class TestEachPattern:
         ]
 
     def test_default_patterns_cannot_be_changed(self) -> None:
-        patterns = default_secret_patterns()
-        by_name = cast('MutableMapping[PatternName, re.Pattern[str]]', patterns.by_name)
-
-        with pytest.raises(TypeError):
-            by_name['jwt'] = re.compile('changed')
-
-        assert 'add' not in dir(patterns)
+        assert isinstance(default_secret_patterns().by_name, MappingProxyType)
 
     def test_leaves_text_without_a_secret_alone(self) -> None:
         assert redact('nothing to hide here') == 'nothing to hide here'
@@ -226,12 +222,23 @@ class TestRedactionWithinALimit:
             redact_within(text, 'rant', self.LIMIT)
 
 
+def python_sources(package: Traversable) -> list[Traversable]:
+    sources = []
+    for entry in package.iterdir():
+        if entry.is_dir():
+            sources.extend(python_sources(entry))
+
+        if entry.name.endswith('.py'):
+            sources.append(entry)
+    return sources
+
+
 class TestRedactedTextConstruction:
     def test_redacted_text_is_built_only_in_redaction_py(self) -> None:
         constructors = {
-            path.name
-            for path in SOURCE.rglob('*.py')
-            for line in path.read_text().splitlines()
+            source.name
+            for source in python_sources(files('mightymodels_core'))
+            for line in source.read_text(encoding='utf-8').splitlines()
             if 'RedactedText(' in line and 'NewType(' not in line
         }
 

@@ -1,6 +1,8 @@
+from types import MappingProxyType
 from typing import get_args
 
-import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import (
     AgentFolder,
     AgentName,
@@ -34,33 +36,53 @@ class TestCoverage:
 
 
 class TestValues:
-    @pytest.mark.parametrize(
-        ('model', 'agents'),
-        [
-            (
-                'haiku',
-                ['code-scout', 'web-scout', 'qualitylens', 'fact-checker', 'intern', 'gitty-up'],
-            ),
-            ('sonnet', ['engineer', 'terry-toolchain']),
-            ('opus', ['architect', 'merge-vader', 'uncle-bob']),
-            ('fable', ['wingman']),
-        ],
-    )
-    def test_each_agent_has_its_fixed_model(self, model: Model, agents: list[AgentName]) -> None:
-        assert [table.fixed_model(agent) for agent in agents] == [model] * len(agents)
+    fixed_models = MappingProxyType({
+        'code-scout': 'haiku',
+        'web-scout': 'haiku',
+        'qualitylens': 'haiku',
+        'fact-checker': 'haiku',
+        'intern': 'haiku',
+        'gitty-up': 'haiku',
+        'engineer': 'sonnet',
+        'terry-toolchain': 'sonnet',
+        'architect': 'opus',
+        'merge-vader': 'opus',
+        'uncle-bob': 'opus',
+        'wingman': 'fable',
+    })
+    efforts = MappingProxyType({
+        'haiku': 'high',
+        'sonnet': 'medium',
+        'opus': 'medium',
+        'fable': 'high',
+    })
+    reviewer_models = MappingProxyType({'quick': 'sonnet', 'standard': 'opus', 'deep': 'opus'})
+    agents = st.sampled_from(AGENTS)
+    models = st.sampled_from(MODELS)
+    depths = st.sampled_from(DEPTHS)
 
-    @pytest.mark.parametrize(
-        ('model', 'effort'),
-        [('haiku', 'high'), ('sonnet', 'medium'), ('opus', 'medium'), ('fable', 'high')],
-    )
-    def test_effort_per_model(self, model: Model, effort: Effort) -> None:
-        assert table.effort_of(model) == effort
+    @given(agent=agents)
+    @example(agent='code-scout')
+    @example(agent='engineer')
+    @example(agent='architect')
+    @example(agent='wingman')
+    def test_each_agent_has_its_fixed_model(self, agent: AgentName) -> None:
+        assert table.fixed_model(agent) == self.fixed_models[agent]
 
-    @pytest.mark.parametrize(
-        ('depth', 'model'), [('quick', 'sonnet'), ('standard', 'opus'), ('deep', 'opus')]
-    )
-    def test_reviewer_model_per_depth(self, depth: Depth, model: Model) -> None:
-        assert table.reviewer_model(depth) == model
+    @given(model=models)
+    @example(model='haiku')
+    @example(model='sonnet')
+    @example(model='opus')
+    @example(model='fable')
+    def test_effort_per_model(self, model: Model) -> None:
+        assert table.effort_of(model) == self.efforts[model]
+
+    @given(depth=depths)
+    @example(depth='quick')
+    @example(depth='standard')
+    @example(depth='deep')
+    def test_reviewer_model_per_depth(self, depth: Depth) -> None:
+        assert table.reviewer_model(depth) == self.reviewer_models[depth]
 
     def test_folders_match_the_agents_directories(self) -> None:
         assert table.folders['engineer'] == 'workers'
