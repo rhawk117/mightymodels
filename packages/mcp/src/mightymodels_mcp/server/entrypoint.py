@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from
 from mightymodels_core.workspace import find_root
 
+from mightymodels_mcp.ticket.tools import register_ticket_tools
+
 from .app import create_server
 from .call_log import InvalidLogLevelError, LogSettings, installed_logging, parse_log_level
 from .dependencies import ServerDependencies
@@ -21,7 +23,7 @@ REFUSED_START = 2
 
 
 def create_catalog() -> ToolCatalog:
-    return ToolCatalog()
+    return register_ticket_tools(ToolCatalog())
 
 
 def run(environ: Mapping[str, str], cwd: Path) -> int:

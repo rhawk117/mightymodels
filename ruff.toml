@@ -109,7 +109,7 @@ parametrize-values-row-type = "tuple"
 
 [lint.flake8-type-checking]
 strict = true
-runtime-evaluated-base-classes = ["pydantic.BaseModel", "msgspec.Struct"]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "msgspec.Struct", "mightymodels_mcp.server.requests.RequestModel"]
 
 # pro tip
 [lint.flake8-tidy-imports.banned-api]
