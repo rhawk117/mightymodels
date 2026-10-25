@@ -12,11 +12,11 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-async def start(tmp_path: Path) -> StartHarness:
+def start(tmp_path: Path) -> StartHarness:
     toplevel = tmp_path.joinpath('repository').resolve()
     subdirectory = toplevel.joinpath('src', 'deep')
     subdirectory.mkdir(parents=True)
-    await anyio.run_process(['git', 'init', '--quiet', str(toplevel)])
+    anyio.run(anyio.run_process, ['git', 'init', '--quiet', str(toplevel)])
     outside = tmp_path.joinpath('outside')
     outside.mkdir()
     return StartHarness(
