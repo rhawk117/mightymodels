@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from mightymodels_core.units_of_work import TicketWork
     from mightymodels_core.units_of_work.tickets import TicketWriteUnit
 
+pytestmark = [pytest.mark.integration]
+
+
 MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 TASK = TaskId('T1')
 REVIEW_RUN = RunId('20260506-070809')
@@ -107,10 +110,10 @@ def failed_ticket_id(request: FixtureRequest, ticket_work: TicketWork, slug: Slu
     request.getfixturevalue('written_text')
     with pytest.raises(UnitFailedError) as failure:
         fail_after_writes(ticket_work, slug)
+
     return failure.value.ticket_id
 
 
-@pytest.mark.integration
 class TestWriteUnitRollback:
     def test_error_in_a_write_unit_rolls_back_every_repositorys_writes(
         self, ticket_work: TicketWork, slug: Slug, failed_ticket_id: int

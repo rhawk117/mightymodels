@@ -10,6 +10,18 @@ from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepositor
 from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError
 
+if TYPE_CHECKING:
+    from mightymodels_core.database import Unit
+    from mightymodels_core.units_of_work import (
+        InvestigationWork,
+        JournalWork,
+        ReviewWork,
+        TaskWork,
+    )
+
+
+pytestmark = [pytest.mark.integration]
+
 SQLITE_STORES = (
     SqliteAttemptRepository,
     SqliteContractRepository,
@@ -29,17 +41,6 @@ def unit_of(store: object) -> Unit:
     return store.unit
 
 
-if TYPE_CHECKING:
-    from mightymodels_core.database import Unit
-    from mightymodels_core.units_of_work import (
-        InvestigationWork,
-        JournalWork,
-        ReviewWork,
-        TaskWork,
-    )
-
-
-@pytest.mark.integration
 class TestInvestigationWork:
     def test_write_unit_holds_the_service_with_the_injected_clock(
         self, investigation_work: InvestigationWork
@@ -54,7 +55,6 @@ class TestInvestigationWork:
             assert unit_of(service.investigations) is unit_of(service.similarity)
 
 
-@pytest.mark.integration
 class TestTaskWork:
     def test_write_unit_holds_both_services_with_the_injected_clock(
         self, task_work: TaskWork
@@ -74,7 +74,6 @@ class TestTaskWork:
             assert unit_of(tasks.tickets) is unit_of(tasks.tasks)
 
 
-@pytest.mark.integration
 class TestReviewWork:
     def test_write_unit_holds_both_services_with_the_injected_clock(
         self, review_work: ReviewWork
@@ -93,7 +92,6 @@ class TestReviewWork:
             assert unit_of(reviews.reviews) is unit_of(reviews.similarity)
 
 
-@pytest.mark.integration
 class TestJournalWork:
     def test_write_unit_holds_the_crashout_service_with_the_injected_clock(
         self, journal_work: JournalWork
@@ -112,7 +110,6 @@ class TestJournalWork:
             assert unit_of(unit.similarity.scouts) is unit_of(crashouts.similarity)
 
 
-@pytest.mark.integration
 class TestUnknownRepository:
     def test_read_unit_refuses_a_repository_the_database_lacks(self, task_work: TaskWork) -> None:
         with pytest.raises(UnknownRepositoryError), task_work.read():
