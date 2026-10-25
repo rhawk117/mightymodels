@@ -1,18 +1,25 @@
-"""The review run tools' requests.
+"""The review tools' requests: the run tools', and the decision tools' dispose and resolve.
 
 A run id is held to core's pattern by its parser and publishes no `pattern` of its own, because
 core's patterns end in an end-of-string anchor that pydantic's Rust regex and JS clients read
 differently. Whether a start names what its scope needs, and whether the weights and persona fit,
-stay core's rules.
+stay core's rules, as do whether a decision has the reason it needs and whether a commit is a
+plain revision.
 """
 
 from typing import Annotated, Literal
 
 from mightymodels_core.primitives import RunId, parse_run_id
-from mightymodels_core.vocabulary.reviews import Depth, Emphasis, Persona, Scope
+from mightymodels_core.vocabulary.reviews import Decision, Depth, Emphasis, Persona, Result, Scope
 from pydantic import AfterValidator
 
-from mightymodels_mcp.server.requests import RequestModel, RevisionField, SlugField
+from mightymodels_mcp.server.requests import (
+    NameText,
+    ProseText,
+    RequestModel,
+    RevisionField,
+    SlugField,
+)
 
 type ReportShape = Literal['full', 'comment']
 
@@ -59,3 +66,22 @@ class ReviewReportRequest(RequestModel):
 
 class ReviewListRequest(RequestModel):
     pass
+
+
+class Disposition(RequestModel):
+    decision: Decision
+    reason: ProseText = ''
+
+
+class ReviewDisposeRequest(RequestModel):
+    run_id: RunIdField
+    decisions: dict[NameText, Disposition] | None = None
+    by: NameText = ''
+
+
+class ReviewResolveRequest(RequestModel):
+    run_id: RunIdField
+    finding: NameText
+    result: Result
+    commit: NameText | None = None
+    reason: ProseText | None = None

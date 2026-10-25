@@ -1,6 +1,7 @@
 """The review use cases: sync functions, each opening one `ReviewWork` unit for one tool call.
 
-Core's review unit carries the review services, so the run tools open it. A unit holds the
+Core's review unit carries the review and decision services, so the run tools and the decision
+tools open it. A unit holds the
 database connection synchronously and must never be held across an `await`. A report is read from
 the path core builds for it, never from one assembled here.
 """
@@ -17,17 +18,26 @@ from mightymodels_core.units_of_work import ReviewWork
 
 from .views import (
     render_added,
+    render_disposed,
     render_gate,
     render_listing,
     render_overridden,
     render_report,
+    render_resolved,
     render_started,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from mightymodels_core.edge import OpenState
     from mightymodels_core.primitives import RunId
-    from mightymodels_core.reviews import StartRequest
+    from mightymodels_core.reviews import (
+        FindingRecord,
+        IncomingDisposition,
+        ResolveRequest,
+        StartRequest,
+    )
     from mightymodels_core.vocabulary.reviews import Persona
     from mightymodels_core.workspace import Workspace
 
@@ -118,3 +128,34 @@ def list_reviews(work: ReviewWork) -> ReviewView:
         listing = unit.reviews.listing()
 
     return render_listing(listing, RUNS_LISTED.rows)
+
+
+def list_undecided(work: ReviewWork, run_id: RunId) -> tuple[FindingRecord, ...]:
+    with work.read() as unit:
+        report = unit.reviews.report(run_id)
+
+    gate = report.gate
+    ordered = gate.ordered(report.findings)
+    return tuple(finding for finding in ordered if gate.decision_of(finding) is None)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class DispositionsToRecord:
+    run_id: RunId
+    decisions: Mapping[str, IncomingDisposition]
+    by: str
+
+
+def dispose_findings(work: ReviewWork, dispositions: DispositionsToRecord) -> ReviewView:
+    run_id = dispositions.run_id
+    with work.write() as unit:
+        disposed = unit.decisions.dispose(run_id, dispositions.decisions, dispositions.by)
+
+    return render_disposed(run_id, disposed)
+
+
+def resolve_finding(work: ReviewWork, run_id: RunId, request: ResolveRequest) -> ReviewView:
+    with work.write() as unit:
+        resolved = unit.decisions.resolve(run_id, request)
+
+    return render_resolved(run_id, resolved)

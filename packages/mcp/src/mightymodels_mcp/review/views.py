@@ -1,6 +1,7 @@
-"""What the review tools return, and the short texts: started, overridden, added and listed.
+"""What the review tools return, and the short texts.
 
-Each function takes core's results and returns text, so no git, file or unit of work is read here.
+The short texts are started, overridden, added, listed, disposed and resolved. Each function
+takes core's results and returns text, so no git, file or unit of work is read here.
 """
 
 from typing import TYPE_CHECKING
@@ -15,8 +16,10 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives import RoutingTable
     from mightymodels_core.reviews import (
         AddedFindings,
+        Disposed,
         FindingRecord,
         GatePolicy,
+        ResolvedFinding,
         ReviewReport,
         ReviewRunRecord,
         RunListing,
@@ -83,6 +86,15 @@ def render_added(run_id: str, added: AddedFindings) -> ReviewView:
         f'{duplicates_text(added.duplicates)}'
     )
     return ReviewView(text=text, run_id=run_id)
+
+
+def render_disposed(run_id: str, disposed: Disposed) -> ReviewView:
+    tail = f'; undecided: {", ".join(disposed.undecided)}' if disposed.undecided else ''
+    return ReviewView(text=f'{disposed.recorded} dispositions recorded{tail}\n', run_id=run_id)
+
+
+def render_resolved(run_id: str, resolved: ResolvedFinding) -> ReviewView:
+    return ReviewView(text=f'{resolved.finding_key} {resolved.result}\n', run_id=run_id)
 
 
 def render_listing(listing: RunListing, kept: int) -> ReviewView:

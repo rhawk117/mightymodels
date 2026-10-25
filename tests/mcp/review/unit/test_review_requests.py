@@ -3,11 +3,14 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from mightymodels_mcp.review.schemas import (
+    Disposition,
     ReviewAddRequest,
+    ReviewDisposeRequest,
     ReviewGateRequest,
     ReviewListRequest,
     ReviewOverrideRequest,
     ReviewReportRequest,
+    ReviewResolveRequest,
     ReviewStartRequest,
 )
 from pydantic import ValidationError
@@ -25,6 +28,8 @@ RUN_REQUESTS: dict[str, type[RequestModel]] = {
     'gate': ReviewGateRequest,
     'add': ReviewAddRequest,
     'report': ReviewReportRequest,
+    'dispose': ReviewDisposeRequest,
+    'resolve': ReviewResolveRequest,
 }
 INVALID_RUN_IDS: dict[str, str] = {
     'empty': '',
@@ -102,7 +107,12 @@ class TestRunRequests:
 
     @malformed_run_requests()
     def test_malformed_run_id_is_refused(self, request_type: type[RequestModel], raw: str) -> None:
-        given = MappingProxyType({'run_id': raw, 'persona': 'merge-vader'})
+        given = MappingProxyType({
+            'run_id': raw,
+            'persona': 'merge-vader',
+            'finding': 'F1',
+            'result': 'fixed',
+        })
         fields = {key: value for key, value in given.items() if key in request_type.model_fields}
 
         with pytest.raises(ValidationError):
@@ -155,3 +165,59 @@ class TestReviewListRequest:
     def test_any_argument_is_refused(self) -> None:
         with pytest.raises(ValidationError):
             ReviewListRequest.model_validate({'run_id': RUN_ID})
+
+
+def dispose_invalid_decision_cases() -> pytest.MarkDecorator:
+    decisions: list[ParameterSet] = [
+        pytest.param({'F1': {'decision': 'shrug'}}, id='unknown-decision'),
+        pytest.param({'F1': {'decision': 'fix', 'note': 'x'}}, id='unknown-key'),
+        pytest.param({'F1': {'reason': 'why'}}, id='missing-decision'),
+        pytest.param({'F1': {'decision': 'dismiss', 'reason': 'x' * 4001}}, id='long-reason'),
+    ]
+    return pytest.mark.parametrize('decisions', decisions)
+
+
+def resolve_invalid_field_cases() -> pytest.MarkDecorator:
+    fields: list[ParameterSet] = [
+        pytest.param({'result': 'fixed'}, id='missing-finding'),
+        pytest.param({'finding': 'F1'}, id='missing-result'),
+        pytest.param({'finding': 'F1', 'result': 'done'}, id='unknown-result'),
+    ]
+    return pytest.mark.parametrize('given', fields)
+
+
+class TestReviewDisposeRequest:
+    def test_decisions_and_by_default_to_none_and_blank(self) -> None:
+        request = ReviewDisposeRequest.model_validate({'run_id': RUN_ID})
+
+        assert (request.decisions, request.by) == (None, '')
+
+    def test_decisions_are_taken_with_a_blank_default_reason(self) -> None:
+        given = {'F1': {'decision': 'fix'}, 'F2': {'decision': 'dismiss', 'reason': 'noise'}}
+
+        request = ReviewDisposeRequest.model_validate({'run_id': RUN_ID, 'decisions': given})
+
+        assert request.decisions == {
+            'F1': Disposition(decision='fix'),
+            'F2': Disposition(decision='dismiss', reason='noise'),
+        }
+
+    @dispose_invalid_decision_cases()
+    def test_invalid_decision_is_refused(self, decisions: dict[str, Any]) -> None:
+        with pytest.raises(ValidationError):
+            ReviewDisposeRequest.model_validate({'run_id': RUN_ID, 'decisions': decisions})
+
+
+class TestReviewResolveRequest:
+    def test_commit_and_reason_default_to_none(self) -> None:
+        given = {'run_id': RUN_ID, 'finding': 'F1', 'result': 'fixed'}
+
+        request = ReviewResolveRequest.model_validate(given)
+
+        assert (request.finding, request.result) == ('F1', 'fixed')
+        assert (request.commit, request.reason) == (None, None)
+
+    @resolve_invalid_field_cases()
+    def test_invalid_field_is_refused(self, given: dict[str, str]) -> None:
+        with pytest.raises(ValidationError):
+            ReviewResolveRequest.model_validate({'run_id': RUN_ID, **given})
