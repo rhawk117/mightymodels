@@ -14,7 +14,7 @@ tree. A database file of another schema version is refused when it is opened, be
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from importlib.resources import files
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from mightymodels_core.database import DatabaseSpec, open_database
 from mightymodels_core.git import Checkout, create_git
@@ -25,7 +25,7 @@ from mightymodels_core.workspace import exclude_state
 from .errors import DataDirectoryMissingError
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Awaitable, Callable
+    from collections.abc import AsyncGenerator
     from pathlib import Path
 
     from mightymodels_core.database import Database
@@ -65,13 +65,20 @@ async def exclude_state_from_git(git: Git) -> None:
     exclude_state(common_directory)
 
 
+@runtime_checkable
+class StateBackends(Protocol):
+    def connect(self, path: Path, spec: DatabaseSpec) -> Database: ...
+
+    async def exclude(self, git: Git, /) -> None: ...
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
-class StateBackends:
-    connect: Callable[[Path, DatabaseSpec], Database] = open_database
-    exclude: Callable[[Git], Awaitable[None]] = exclude_state_from_git
+class SystemStateBackends:
+    def connect(self, path: Path, spec: DatabaseSpec) -> Database:
+        return open_database(path, spec)
 
-
-DEFAULT_BACKENDS = StateBackends()
+    async def exclude(self, git: Git) -> None:
+        await exclude_state_from_git(git)
 
 
 @asynccontextmanager
@@ -79,10 +86,12 @@ async def open_state(
     data_directory: DataDirectory,
     start: Path,
     *,
-    backends: StateBackends = DEFAULT_BACKENDS,
+    backends: StateBackends | None = None,
 ) -> AsyncGenerator[OpenState]:
     if isinstance(data_directory, DataDirectoryMissingError):
         raise data_directory
+
+    backends = backends or SystemStateBackends()
 
     checkout = await create_git(start).checkout()
     if not isinstance(checkout, Checkout):
