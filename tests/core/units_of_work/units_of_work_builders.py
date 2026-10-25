@@ -1,20 +1,70 @@
+"""Builders and constants the unit-of-work tests share, imported by the suite and the conftests."""
+
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-import pytest
+from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.contract.records import Approval, ApprovedCommand
-from mightymodels_core.investigations import InvestigationRecord
+from mightymodels_core.crashouts import SqliteCrashoutRepository
+from mightymodels_core.investigations import InvestigationRecord, SqliteInvestigationRepository
 from mightymodels_core.primitives import RunId, Slug, TaskId, redact
-from mightymodels_core.reviews import DecidedFinding, FindingRecord, ReviewRunRecord
-from mightymodels_core.tasks import Attempt, FailedFix, Transition
+from mightymodels_core.reviews import (
+    DecidedFinding,
+    FindingRecord,
+    ReviewRunRecord,
+    SqliteReviewDecisionRepository,
+    SqliteReviewRepository,
+)
+from mightymodels_core.schemas.repositories import REPOSITORY_BY_KEY, RepositoryKeyParams
+from mightymodels_core.similarity import SqliteScoutReportRepository, SqliteSimilarityRepository
+from mightymodels_core.tasks import (
+    Attempt,
+    FailedFix,
+    SqliteAttemptRepository,
+    SqliteTaskRepository,
+    Transition,
+)
 from mightymodels_core.ticket_closing import ClosingRecord
+from mightymodels_core.tickets import SqliteTicketRepository
 
 if TYPE_CHECKING:
-    from _pytest.fixtures import FixtureRequest
+    from mightymodels_core.database import Database, Unit
+    from mightymodels_core.primitives import RepositoryKey
     from mightymodels_core.units_of_work import TicketWork
     from mightymodels_core.units_of_work.tickets import TicketWriteUnit
+    from mightymodels_core.workspace import Workspace
 
-pytestmark = [pytest.mark.integration]
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class UnitsOfWorkHarness:
+    database: Database
+    workspace: Workspace
+
+
+def count_repositories(database: Database, repository_key: RepositoryKey) -> int:
+    with database.read() as unit:
+        row = unit.one(REPOSITORY_BY_KEY, RepositoryKeyParams(repository_key=repository_key))
+    return 0 if row is None else 1
+
+
+SQLITE_STORES = (
+    SqliteAttemptRepository,
+    SqliteContractRepository,
+    SqliteCrashoutRepository,
+    SqliteInvestigationRepository,
+    SqliteReviewDecisionRepository,
+    SqliteReviewRepository,
+    SqliteScoutReportRepository,
+    SqliteSimilarityRepository,
+    SqliteTaskRepository,
+    SqliteTicketRepository,
+)
+
+
+def unit_of(store: object) -> Unit:
+    assert isinstance(store, SQLITE_STORES)
+    return store.unit
 
 
 MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
@@ -103,34 +153,3 @@ def fail_after_writes(ticket_work: TicketWork, slug: Slug) -> None:
         write_review_stores(unit, slug)
         unit.closing.closings.record_closing(ticket.id, closing)
         raise UnitFailedError(ticket.id)
-
-
-@pytest.fixture
-def failed_ticket_id(request: FixtureRequest, ticket_work: TicketWork, slug: Slug) -> int:
-    request.getfixturevalue('written_text')
-    with pytest.raises(UnitFailedError) as failure:
-        fail_after_writes(ticket_work, slug)
-
-    return failure.value.ticket_id
-
-
-class TestWriteUnitRollback:
-    def test_error_in_a_write_unit_rolls_back_every_repositorys_writes(
-        self, ticket_work: TicketWork, slug: Slug, failed_ticket_id: int
-    ) -> None:
-        with ticket_work.write() as unit:
-            assert unit.tickets.tickets.ticket(slug) is None
-            assert unit.tickets.investigations.investigation(Slug('first-look')) is None
-            assert unit.closing.tasks.task(failed_ticket_id, TASK) is None
-            assert unit.closing.attempts.failed_fixes(failed_ticket_id, TASK) == []
-            assert unit.closing.contracts.commands(failed_ticket_id) == []
-            assert unit.closing.review_decisions.reviews.run(REVIEW_RUN) is None
-            assert unit.closing.review_decisions.decisions.dispositions(REVIEW_RUN) == []
-            assert unit.closing.closings.closing(failed_ticket_id) is None
-
-    @pytest.mark.usefixtures('failed_ticket_id')
-    def test_error_in_a_write_unit_leaves_the_stored_file_in_place(
-        self, ticket_work: TicketWork, slug: Slug, written_text: str
-    ) -> None:
-        with ticket_work.read() as unit:
-            assert unit.files.source(slug).text == written_text

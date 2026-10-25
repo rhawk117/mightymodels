@@ -3,8 +3,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.crashouts import CrashoutEntry
-from mightymodels_core.database import ConnectionOptions, open_database
-from mightymodels_core.edge import create_database_spec
 from mightymodels_core.investigations import StartRequest as InvestigationStartRequest
 from mightymodels_core.primitives import RepositoryKey, Slug, redact
 from mightymodels_core.reviews import StartRequest as ReviewStartRequest
@@ -17,17 +15,16 @@ from mightymodels_core.units_of_work import (
     TaskWork,
     TicketWork,
 )
-from mightymodels_core.workspace import workspace_at
 
 from tests.core.primitives.clock import create_fake_clock
+from tests.core.units_of_work.units_of_work_builders import UnitFailedError, fail_after_writes
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
-    from pathlib import Path
-
     from mightymodels_core.database import Database
     from mightymodels_core.primitives import Clock, RunId
     from mightymodels_core.workspace import Workspace
+
+    from tests.core.units_of_work.units_of_work_builders import UnitsOfWorkHarness
 
 
 @pytest.fixture
@@ -41,12 +38,8 @@ def other_repository_key() -> RepositoryKey:
 
 
 @pytest.fixture
-def database(tmp_path: Path) -> Generator[Database]:
-    opened = open_database(
-        tmp_path.joinpath('mightymodels.db'), create_database_spec(), ConnectionOptions()
-    )
-    yield opened
-    opened.close()
+def database(harness: UnitsOfWorkHarness) -> Database:
+    return harness.database
 
 
 @pytest.fixture
@@ -55,8 +48,8 @@ def slug() -> Slug:
 
 
 @pytest.fixture
-def workspace(tmp_path: Path) -> Workspace:
-    return workspace_at(tmp_path.joinpath('project'))
+def workspace(harness: UnitsOfWorkHarness) -> Workspace:
+    return harness.workspace
 
 
 @pytest.fixture
@@ -225,3 +218,12 @@ def staged_ticket(ticket_work: TicketWork, slug: Slug, written_text: str) -> Slu
     with ticket_work.write() as unit:
         unit.tickets.stage(slug, unit.files.source(slug))
     return slug
+
+
+@pytest.fixture
+def failed_ticket_id(ticket_work: TicketWork, slug: Slug, written_text: str) -> int:
+    assert written_text
+    with pytest.raises(UnitFailedError) as failure:
+        fail_after_writes(ticket_work, slug)
+
+    return failure.value.ticket_id
