@@ -1,11 +1,14 @@
 import ast
 import inspect
-from pathlib import Path
+from importlib.resources import files
+from typing import TYPE_CHECKING
 
-import mightymodels_core
 import pytest
 from mightymodels_core import schemas
 from mightymodels_core.database import Command, Query
+
+if TYPE_CHECKING:
+    from importlib.resources.abc import Traversable
 
 
 def declared_constants() -> dict[str, str]:
@@ -27,13 +30,24 @@ def names_loaded_by(source: str) -> set[str]:
     }
 
 
+def package_sources(package: Traversable) -> list[Traversable]:
+    sources = []
+    for entry in package.iterdir():
+        if entry.name == 'schemas':
+            continue
+
+        if entry.is_dir():
+            sources.extend(package_sources(entry))
+
+        if entry.name.endswith('.py'):
+            sources.append(entry)
+    return sources
+
+
 @pytest.fixture(scope='module')
 def production_names() -> set[str]:
-    package = Path(inspect.getfile(mightymodels_core)).parent
     sources = [
-        path.read_text(encoding='utf-8')
-        for path in package.rglob('*.py')
-        if 'schemas' not in path.relative_to(package).parts
+        source.read_text(encoding='utf-8') for source in package_sources(files('mightymodels_core'))
     ]
     return set().union(*map(names_loaded_by, sources))
 

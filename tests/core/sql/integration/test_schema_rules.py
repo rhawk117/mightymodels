@@ -8,7 +8,7 @@ from mightymodels_core.database import (
     StatementFailedError,
 )
 
-from tests.core.sql.conftest import (
+from tests.core.sql.sql_builders import (
     CommandIdPart,
     CustomTicketPart,
     IdPart,
@@ -28,9 +28,7 @@ from tests.core.sql.conftest import (
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
 
-    from tests.core.sql.conftest import Statements
-
-pytestmark = pytest.mark.integration
+    from tests.core.sql.sql_builders import Statements
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

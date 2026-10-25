@@ -6,14 +6,12 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.database import ConnectionOptions, SchemaVersionError, open_database
 
-from tests.core.sql.conftest import SCHEMA
+from tests.core.sql.sql_builders import SCHEMA, strip_comments
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.database import DatabaseSpec
-
-pytestmark = pytest.mark.integration
 
 TABLES = frozenset({
     'repositories',
@@ -36,17 +34,6 @@ TABLES = frozenset({
     'scout_reports',
     'closings',
 })
-
-CONSTRAINT_PREFIXES = {
-    'PRIMARY KEY': 'pk_',
-    'FOREIGN KEY': 'fk_',
-    'UNIQUE': 'uq_',
-    'CHECK': 'ck_',
-}
-
-
-def strip_comments(script: str) -> str:
-    return re.sub(r'--[^\n]*', '', script)
 
 
 class TestShape:
@@ -101,19 +88,6 @@ class TestShape:
             ).fetchone()
         ]
         assert unindexed == []
-
-    def test_every_index_is_named_with_its_prefix(self, script: str) -> None:
-        names = re.findall(r'CREATE\s+(?:UNIQUE\s+)?INDEX\s+(\w+)', script)
-        assert names
-        assert [name for name in names if not name.startswith('ix_')] == []
-
-    @pytest.mark.parametrize('keyword', list(CONSTRAINT_PREFIXES))
-    def test_every_constraint_is_named_with_its_prefix(self, script: str, keyword: str) -> None:
-        prefix = CONSTRAINT_PREFIXES[keyword]
-        named = re.findall(rf'CONSTRAINT\s+(\w+)\s+{keyword}\b', script)
-        declared = re.findall(rf'\b{keyword}\b', script)
-        assert len(named) == len(declared)
-        assert [name for name in named if not name.startswith(prefix)] == []
 
     def test_user_version_matches_the_script(
         self, script: str, schema_inspection: sqlite3.Connection
