@@ -1,8 +1,14 @@
+import logging
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import pytest
+from mcp.server.elicitation import AcceptedElicitation
+from mcp.server.mcpserver.exceptions import InvalidSignature, ToolError
+from mcp.server.mcpserver.resolve import Resolve
 from mcp.types import ToolAnnotations
+from mightymodels_core.edge import DataDirectoryMissingError
+from mightymodels_mcp.server.call_log import CALL_LOGGER_NAME
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.server.registration import (
     ANNOTATION_HINTS,
@@ -18,6 +24,7 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
+    from mcp.server.mcpserver.tools import Tool
     from mightymodels_mcp.server.registration import ToolContext, ToolRegistrationError
 
 
@@ -34,6 +41,38 @@ class EchoNote:
     async def run(self, request: NoteRequest, ctx: ToolContext) -> NoteView:
         """Echo the note back."""
         return NoteView(note=f'{request.note} {ctx.request_id}')
+
+
+class NoteAnswer(BaseModel):
+    answer: str
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class NoteAsker:
+    def ask(self, request: NoteRequest) -> NoteAnswer:
+        return NoteAnswer(answer=request.note.upper())
+
+    def ask_unknown(self, unknown: str) -> NoteAnswer:
+        return NoteAnswer(answer=unknown)
+
+
+NOTE_RESOLVER = Resolve(NoteAsker().ask)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class AnswerNote:
+    async def run(
+        self, request: NoteRequest, ctx: ToolContext, *, answer: AcceptedElicitation[NoteAnswer]
+    ) -> NoteView:
+        """Answer the note with the resolved value."""
+        return NoteView(note=f'{request.note} {answer.data.answer} {ctx}')
+
+    async def refuse(
+        self, request: NoteRequest, ctx: ToolContext, *, answer: AcceptedElicitation[NoteAnswer]
+    ) -> NoteView:
+        """Be refused by core after the resolvers ran."""
+        assert request, (ctx, answer)
+        raise DataDirectoryMissingError(variable='VARIABLE', session_variable='SESSION')
 
 
 COMPLETE_ANNOTATIONS = ToolAnnotations(
@@ -139,3 +178,79 @@ class TestToolCatalog:
         with pytest.raises(DuplicateToolNameError):
             catalog.register(create_note_definition())
         assert len(catalog.list_tools()) == 1
+
+
+class TestResolvingTool:
+    request = NoteRequest(note='hello')
+
+    @pytest.fixture
+    def catalog(self) -> ToolCatalog:
+        return ToolCatalog()
+
+    def register_answering(self, catalog: ToolCatalog, name: str, *, refuse: bool) -> Tool:
+        tool = AnswerNote()
+        definition = replace(
+            create_note_definition(),
+            name=name,
+            handler=tool.refuse if refuse else tool.run,
+            resolvers={'answer': NOTE_RESOLVER},
+        )
+        return catalog.register(definition).tools[name]
+
+    @pytest.fixture
+    def caplog(self, caplog: pytest.LogCaptureFixture) -> pytest.LogCaptureFixture:
+        caplog.set_level(logging.INFO, logger=CALL_LOGGER_NAME)
+        return caplog
+
+    def call_records(self, caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+        return [record for record in caplog.records if record.name == CALL_LOGGER_NAME]
+
+    def test_definition_without_resolvers_resolves_nothing(self, catalog: ToolCatalog) -> None:
+        tool = catalog.register(create_note_definition()).tools['echo_note']
+        assert tool.resolved_params == {}
+        assert tool.resolver_plans == {}
+
+    def test_resolvers_reach_the_tool_as_full_outcomes(self, catalog: ToolCatalog) -> None:
+        tool = self.register_answering(catalog, 'answer_note', refuse=False)
+        assert tool.resolved_params == {'answer': (NOTE_RESOLVER, True)}
+        assert len(tool.resolver_plans) == 1
+        assert tool.parameters == NoteRequest.model_json_schema(by_alias=True)
+
+    @incomplete_definition_cases()
+    def test_incomplete_resolving_definition_is_refused(
+        self, catalog: ToolCatalog, incomplete: IncompleteDefinition
+    ) -> None:
+        resolving = replace(incomplete.definition, resolvers={'answer': NOTE_RESOLVER})
+        with pytest.raises(incomplete.refusal):
+            catalog.register(resolving)
+        assert catalog.list_tools() == []
+
+    def test_resolver_taking_an_unknown_argument_is_refused(self, catalog: ToolCatalog) -> None:
+        unknown = Resolve(NoteAsker().ask_unknown)
+        definition = replace(create_note_definition(), resolvers={'answer': unknown})
+        with pytest.raises(InvalidSignature):
+            catalog.register(definition)
+
+    async def test_handler_receives_the_resolved_value_and_is_recorded(
+        self, catalog: ToolCatalog, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        tool = self.register_answering(catalog, 'answer_note', refuse=False)
+        answer = AcceptedElicitation(data=NoteAnswer(answer='HELLO'))
+
+        view = await tool.fn(request=self.request, ctx='ctx', answer=answer)
+
+        assert view == NoteView(note='hello HELLO ctx')
+        (record,) = self.call_records(caplog)
+        assert record.__dict__['outcome'] == 'ok'
+
+    async def test_refusal_after_resolving_is_a_tool_error(
+        self, catalog: ToolCatalog, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        tool = self.register_answering(catalog, 'refuse_note', refuse=True)
+        answer = AcceptedElicitation(data=NoteAnswer(answer='HELLO'))
+
+        with pytest.raises(ToolError):
+            await tool.fn(request=self.request, ctx='ctx', answer=answer)
+
+        (record,) = self.call_records(caplog)
+        assert record.__dict__['outcome'] == 'refused'
