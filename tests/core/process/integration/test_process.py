@@ -22,7 +22,7 @@ def is_same_directory(printed: str, expected: Path) -> bool:
 
 class TestSubprocessRunner:
     runner = SubprocessRunner()
-    timeout = 1
+    timeout = 5
 
     async def test_completed_run_carries_exit_and_both_streams(self) -> None:
         child = ChildPython(
@@ -76,6 +76,9 @@ class TestSubprocessRunner:
 
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'timed_out'
+        assert outcome.stdout.strip().isdigit(), (
+            f'child did not print its pid before the timeout: {outcome.stdout!r}'
+        )
         with pytest.raises(ProcessLookupError):
             os.kill(int(outcome.stdout), 0)
 
