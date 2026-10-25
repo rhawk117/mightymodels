@@ -6,9 +6,8 @@ import pytest
 from mcp.server.elicitation import render_elicitation_schema
 from mcp.server.mcpserver.resolve import Elicit
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT
+from mightymodels_mcp.server.requests import NAME_LIMIT, PROSE_LIMIT
 from mightymodels_mcp.ticket.schemas import (
-    NAME_LIMIT,
-    PROSE_LIMIT,
     TicketContextRequest,
     TicketWriteRequest,
     create_ticket_answers,

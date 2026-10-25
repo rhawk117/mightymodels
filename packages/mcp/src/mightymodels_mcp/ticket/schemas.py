@@ -16,13 +16,8 @@ from mightymodels_core.tickets import BranchChoice, TicketAnswers
 from mightymodels_core.vocabulary.tickets import TicketScope
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
-from mightymodels_mcp.server.requests import RequestModel, SlugField
+from mightymodels_mcp.server.requests import NameText, ProseText, RequestModel, SlugField
 
-NAME_LIMIT = 255
-PROSE_LIMIT = 4000
-
-type NameText = Annotated[str, StringConstraints(max_length=NAME_LIMIT)]
-type ProseText = Annotated[str, StringConstraints(max_length=PROSE_LIMIT)]
 type LinkedInvestigation = Annotated[str, StringConstraints(max_length=SLUG_LIMIT)]
 
 

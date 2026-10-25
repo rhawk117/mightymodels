@@ -8,10 +8,16 @@ whole as `request`, so the published input schema is the request model's own fie
 from typing import Annotated, Any, override
 
 from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase
+from mightymodels_core.git.revisions import revision_error
 from mightymodels_core.primitives import Slug, parse_slug
-from pydantic import AfterValidator, ConfigDict
+from pydantic import AfterValidator, ConfigDict, StringConstraints
 
 REQUEST_ARGUMENT = 'request'
+NAME_LIMIT = 255
+PROSE_LIMIT = 4000
+
+type NameText = Annotated[str, StringConstraints(max_length=NAME_LIMIT)]
+type ProseText = Annotated[str, StringConstraints(max_length=PROSE_LIMIT)]
 
 
 class RequestModel(ArgModelBase):
@@ -32,3 +38,17 @@ def validate_slug(raw: str) -> Slug:
 
 
 type SlugField = Annotated[Slug, AfterValidator(validate_slug)]
+
+
+def validate_revision(raw: str) -> str:
+    refused = revision_error(raw)
+    if refused is None:
+        return raw
+
+    message = str(refused)
+    raise ValueError(message) from refused
+
+
+type RevisionField = Annotated[
+    str, StringConstraints(max_length=NAME_LIMIT), AfterValidator(validate_revision)
+]
