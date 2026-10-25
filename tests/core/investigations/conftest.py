@@ -1,112 +1,31 @@
-"""The investigation repository over a real sqlite unit and over the fake, one fixture for both."""
+"""The fixtures the investigation tests share; each tier conftest supplies the `harness`."""
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
-from importlib.resources import files
 from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
-from mightymodels_core.investigations import (
-    IncomingEntry,
-    InvestigationRecord,
-    InvestigationService,
-    Ledger,
-    LedgerRecord,
-    SqliteInvestigationRepository,
-)
-from mightymodels_core.investigations.tests.fakes import (
+from mightymodels_core.investigations import InvestigationService
+from mightymodels_core.schemas import DECLARATIONS
+from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
+
+from tests.core.investigations.fakes import (
     FakeInvestigationRepository,
     InvestigationLedger,
 )
-from mightymodels_core.primitives import Slug, redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
-from mightymodels_core.schemas import DECLARATIONS
-from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
-from mightymodels_core.similarity.tests.fakes import FakeSimilarityRepository
+from tests.core.investigations.investigation_builders import (
+    MOMENT,
+    SQL,
+    InvestigationHarness,
+    ServiceHarness,
+)
+from tests.core.primitives.clock import create_fake_clock
+from tests.core.similarity.fakes import FakeSimilarityRepository
 
 if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from _pytest.fixtures import SubRequest
-    from _pytest.mark import ParameterSet
     from mightymodels_core.database import Database
-    from mightymodels_core.investigations import InvestigationRepository
-    from mightymodels_core.primitives.tests.clock import FakeClock
-    from mightymodels_core.schemas.investigations import EntryKind, EntrySource
-
-SQL = files('mightymodels_core.sql')
-FIRST = Slug('first-look')
-SECOND = Slug('second-look')
-UNADDED = Slug('never-added')
-STARTED = Slug('20260506-retry-policy')
-MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
-HEAD = 'abc1234'
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class InvestigationHarness:
-    investigations: InvestigationRepository
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ServiceHarness:
-    service: InvestigationService
-    investigations: FakeInvestigationRepository
-    similarity: FakeSimilarityRepository
-    clock: FakeClock
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Case[Given, Expected]:
-    name: str
-    given: Given
-    expected: Expected
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
-
-
-def create_investigation(key: Slug) -> InvestigationRecord:
-    return InvestigationRecord(key=key, target=redact(f'target of {key}'), kind='behavior')
-
-
-def create_entry(seq: int, *, round_number: int = 1, day: int = 2) -> LedgerRecord:
-    return LedgerRecord(
-        seq=seq,
-        round=round_number,
-        kind='known',
-        text=redact(f'entry {seq}'),
-        source='code-scout',
-        cite=redact(f'src/file.py:{seq}'),
-        supersedes=(seq - 1,) if seq > 1 else (),
-        at=datetime(2026, 1, day, 3, 4, 5, tzinfo=UTC),
-        head='abc1234',
-    )
-
-
-def create_incoming(
-    kind: EntryKind = 'known',
-    *,
-    text: str = 'a fact',
-    source: EntrySource = 'code-scout',
-    cite: str | None = 'src/a.py:1',
-    supersedes: tuple[int, ...] = (),
-) -> IncomingEntry:
-    return IncomingEntry(kind=kind, text=text, source=source, cite=cite, supersedes=supersedes)
-
-
-def create_ledger(*records: LedgerRecord) -> Ledger:
-    return Ledger(investigation=create_investigation(FIRST), records=records)
-
-
-def investigation_implementation_cases() -> list[ParameterSet]:
-    return [
-        pytest.param('sqlite_harness', id='sqlite', marks=pytest.mark.integration),
-        pytest.param('fake_harness', id='fake'),
-    ]
 
 
 @pytest.fixture
@@ -139,23 +58,10 @@ def repository_id(database: Database) -> int:
 
 
 @pytest.fixture
-def sqlite_harness(database: Database, repository_id: int) -> Generator[InvestigationHarness]:
-    with database.write() as unit:
-        yield InvestigationHarness(
-            investigations=SqliteInvestigationRepository(unit=unit, repository_id=repository_id)
-        )
-
-
-@pytest.fixture
 def fake_harness() -> InvestigationHarness:
     return InvestigationHarness(
         investigations=FakeInvestigationRepository(ledger=InvestigationLedger())
     )
-
-
-@pytest.fixture(params=investigation_implementation_cases())
-def harness(request: SubRequest) -> InvestigationHarness:
-    return request.getfixturevalue(request.param)
 
 
 @pytest.fixture

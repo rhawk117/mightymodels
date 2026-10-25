@@ -1,115 +1,32 @@
-"""The contract repository over a real sqlite unit and over the fake, one fixture for both."""
+"""The contract fixtures: a database over the schema, and the service harnesses."""
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
-from importlib.resources import files
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.contract import (
-    Approval,
-    ApprovedCommand,
-    ContractService,
-    Receipt,
-    SqliteContractRepository,
-)
-from mightymodels_core.contract.tests.fakes import ContractLedger, FakeContractRepository
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
-from mightymodels_core.primitives import Slug, redact
-from mightymodels_core.primitives.tests.clock import create_fake_clock
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
-from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
-from mightymodels_core.tickets.tests.fakes import FakeTicketRepository
+from mightymodels_core.tickets import SqliteTicketRepository
+
+from tests.core.contract.contract_builders import (
+    APPROVAL,
+    FIRST_KEY,
+    SECOND_KEY,
+    SQL,
+    TICKET_SLUGS,
+    create_command,
+    create_service_harness,
+    create_ticket_section,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from _pytest.fixtures import SubRequest
-    from _pytest.mark import ParameterSet
-    from mightymodels_core.contract import ContractRepository
     from mightymodels_core.database import Database
-    from mightymodels_core.schemas.contract import Outcome
 
-SQL = files('mightymodels_core.sql')
-TICKET_SLUGS = (Slug('contract-subject'), Slug('other-subject'))
-FAKE_TICKET_IDS = (1, 2)
-APPROVAL = Approval(at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC), head='abc1234')
-SERVICE_SLUG = Slug('service-subject')
-SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
-HEAD = 'abc1234'
-FIRST_KEY = 'T1.AC-1'
-SECOND_KEY = 'T1.AC-2'
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ContractHarness:
-    contract: ContractRepository
-    ticket_id: int
-    other_ticket_id: int
-
-
-def create_command(key: str, *, argv: tuple[str, ...] = ('make', 'test')) -> ApprovedCommand:
-    return ApprovedCommand(key=key, argv=argv, expect_exit=0, timeout=300, approved_by='planner')
-
-
-def create_receipt(key: str, outcome: Outcome = 'pass', *, day: int = 3) -> Receipt:
-    return Receipt(
-        key=key,
-        argv=('make', 'test'),
-        outcome=outcome,
-        exit=0 if outcome == 'pass' else 1,
-        duration_ms=120,
-        stdout_tail=redact('ok'),
-        stderr_tail=redact(''),
-        digest='d1',
-        head='abc1234',
-        phase='task',
-        at=datetime(2026, 1, day, 3, 4, 5, tzinfo=UTC),
-    )
-
-
-def create_ticket_section(slug: Slug) -> TicketSection:
-    return TicketSection(
-        ticket=f'.mightymodels/{slug}/ticket.yml',
-        summary=redact('a summary'),
-        branch='main',
-        scope='med',
-        plan_first=False,
-        auto_escalate=False,
-        models={'engineer': 'sonnet'},
-        tracker=Tracker(issue=None, jira=None),
-        context=(),
-        validated_at=datetime(2026, 1, 1, tzinfo=UTC),
-    )
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ServiceHarness:
-    service: ContractService
-    ledger: ContractLedger
-    contracts: FakeContractRepository
-    ticket_id: int
-
-
-def create_service_harness() -> ServiceHarness:
-    ledger = ContractLedger()
-    contracts = FakeContractRepository(ledger=ledger)
-    tickets = FakeTicketRepository()
-    ticket_id = tickets.stage(SERVICE_SLUG, create_ticket_section(SERVICE_SLUG), ()).id
-    service = ContractService(
-        tickets=tickets, contracts=contracts, clock=create_fake_clock(SERVICE_MOMENT)
-    )
-    return ServiceHarness(service=service, ledger=ledger, contracts=contracts, ticket_id=ticket_id)
-
-
-def contract_implementation_cases() -> list[ParameterSet]:
-    return [
-        pytest.param('sqlite_harness', id='sqlite', marks=pytest.mark.integration),
-        pytest.param('fake_harness', id='fake'),
-    ]
+    from tests.core.contract.contract_builders import ServiceHarness
 
 
 @pytest.fixture
@@ -147,34 +64,6 @@ def staged_ticket_ids(database: Database) -> tuple[int, int]:
             ids.append(row.id)
     first, second = ids
     return first, second
-
-
-@pytest.fixture
-def sqlite_harness(
-    database: Database, staged_ticket_ids: tuple[int, int]
-) -> Generator[ContractHarness]:
-    ticket_id, other_ticket_id = staged_ticket_ids
-    with database.write() as unit:
-        yield ContractHarness(
-            contract=SqliteContractRepository(unit=unit),
-            ticket_id=ticket_id,
-            other_ticket_id=other_ticket_id,
-        )
-
-
-@pytest.fixture
-def fake_harness() -> ContractHarness:
-    ticket_id, other_ticket_id = FAKE_TICKET_IDS
-    return ContractHarness(
-        contract=FakeContractRepository(ledger=ContractLedger()),
-        ticket_id=ticket_id,
-        other_ticket_id=other_ticket_id,
-    )
-
-
-@pytest.fixture(params=contract_implementation_cases())
-def harness(request: SubRequest) -> ContractHarness:
-    return request.getfixturevalue(request.param)
 
 
 @pytest.fixture

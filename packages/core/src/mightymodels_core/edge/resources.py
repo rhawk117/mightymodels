@@ -25,7 +25,7 @@ from mightymodels_core.workspace import exclude_state
 from .errors import DataDirectoryMissingError
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Awaitable, Callable
     from pathlib import Path
 
     from mightymodels_core.database import Database
@@ -65,8 +65,22 @@ async def exclude_state_from_git(git: Git) -> None:
     exclude_state(common_directory)
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class StateBackends:
+    connect: Callable[[Path, DatabaseSpec], Database] = open_database
+    exclude: Callable[[Git], Awaitable[None]] = exclude_state_from_git
+
+
+DEFAULT_BACKENDS = StateBackends()
+
+
 @asynccontextmanager
-async def open_state(data_directory: DataDirectory, start: Path) -> AsyncGenerator[OpenState]:
+async def open_state(
+    data_directory: DataDirectory,
+    start: Path,
+    *,
+    backends: StateBackends = DEFAULT_BACKENDS,
+) -> AsyncGenerator[OpenState]:
     if isinstance(data_directory, DataDirectoryMissingError):
         raise data_directory
 
@@ -76,9 +90,9 @@ async def open_state(data_directory: DataDirectory, start: Path) -> AsyncGenerat
 
     git = create_git(checkout.toplevel)
     data_directory.mkdir(parents=True, exist_ok=True)
-    database = open_database(data_directory.joinpath(DATABASE_NAME), create_database_spec())
+    database = backends.connect(data_directory.joinpath(DATABASE_NAME), create_database_spec())
     try:
-        await exclude_state_from_git(git)
+        await backends.exclude(git)
         yield OpenState(checkout=checkout, git=git, database=database)
     finally:
         database.close()
