@@ -15,8 +15,6 @@ from mightymodels_core.schemas.crashouts import (
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
 
-pytestmark = pytest.mark.integration
-
 JOURNALED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
 

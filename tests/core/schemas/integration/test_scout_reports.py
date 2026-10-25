@@ -13,8 +13,6 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Database
     from mightymodels_core.schemas.scout_reports import Scout
 
-pytestmark = pytest.mark.integration
-
 
 def report(repository_id: int, scout: Scout, target: str) -> AddScoutReportParams:
     return AddScoutReportParams(

@@ -29,8 +29,6 @@ from mightymodels_core.schemas.tickets import (
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
 
-pytestmark = pytest.mark.integration
-
 VALIDATED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
 

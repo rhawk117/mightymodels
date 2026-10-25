@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
     from mightymodels_core.database import Declaration
 
-pytestmark = pytest.mark.integration
-
 EXEMPT_SCAN_TARGETS = ('json_each', 'json_tree', '(subquery', 'subquery')
 
 

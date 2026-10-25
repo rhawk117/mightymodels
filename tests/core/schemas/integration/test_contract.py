@@ -17,8 +17,6 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Database
     from mightymodels_core.schemas.contract import Outcome
 
-pytestmark = pytest.mark.integration
-
 APPROVED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 RAN_AT = datetime(2026, 1, 2, 4, 0, 0, tzinfo=UTC)
 

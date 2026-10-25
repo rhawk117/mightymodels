@@ -36,8 +36,6 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Database
     from mightymodels_core.schemas.reviews import Decision, Result
 
-pytestmark = pytest.mark.integration
-
 RECORDED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 LIMIT = 100
 

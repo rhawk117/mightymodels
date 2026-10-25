@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Database
     from mightymodels_core.schemas.similarity import SimilarityKind
 
-pytestmark = pytest.mark.integration
-
 
 def similar(
     repository_id: int, kind: SimilarityKind, reference: str, text: str

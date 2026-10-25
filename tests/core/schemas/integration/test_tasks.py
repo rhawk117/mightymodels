@@ -36,8 +36,6 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Database
     from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
 
-pytestmark = pytest.mark.integration
-
 STARTED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 LATER = datetime(2026, 1, 2, 3, 5, 6, tzinfo=UTC)
 

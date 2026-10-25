@@ -42,8 +42,6 @@ from mightymodels_core.schemas.tickets import (
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
 
-pytestmark = pytest.mark.integration
-
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class MirroredPair:
