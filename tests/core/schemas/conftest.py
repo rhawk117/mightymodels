@@ -1,13 +1,11 @@
 """The real schema, statement catalogue and declarations opened through the adapter."""
 
-import sqlite3
-from contextlib import closing
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
+from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database, parse_blocks
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import (
     ENSURE_REPOSITORY,
@@ -21,19 +19,18 @@ if TYPE_CHECKING:
 
     from mightymodels_core.database import Database
 
-SQL = files('mightymodels_core.sql')
-
 
 @pytest.fixture
 def database_path(tmp_path: Path) -> Path:
     return tmp_path.joinpath('mightymodels.db')
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def database_spec() -> DatabaseSpec:
+    sql = files('mightymodels_core.sql')
     return DatabaseSpec(
-        schema=SQL.joinpath('schema.sql'),
-        statements=SQL.joinpath('statements.sql'),
+        schema=sql.joinpath('schema.sql'),
+        statements=sql.joinpath('statements.sql'),
         declarations=DECLARATIONS,
     )
 
@@ -45,13 +42,11 @@ def database(database_path: Path, database_spec: DatabaseSpec) -> Generator[Data
     opened.close()
 
 
-@pytest.fixture
-def plan_connection(
-    database_path: Path, database_spec: DatabaseSpec
-) -> Generator[sqlite3.Connection]:
-    open_database(database_path, database_spec, ConnectionOptions()).close()
-    with closing(sqlite3.connect(database_path)) as connection:
-        yield connection
+@pytest.fixture(scope='module')
+def blocks() -> dict[str, str]:
+    return parse_blocks(
+        files('mightymodels_core.sql').joinpath('statements.sql').read_text(encoding='utf-8')
+    )
 
 
 @pytest.fixture

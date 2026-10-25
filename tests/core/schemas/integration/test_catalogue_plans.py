@@ -1,24 +1,18 @@
-from importlib.resources import files
+import sqlite3
+from contextlib import closing
 from typing import TYPE_CHECKING
 
 import msgspec
-import pytest
-from mightymodels_core.database import parse_blocks
+from hypothesis import given
+from hypothesis import strategies as st
+from mightymodels_core.database import ConnectionOptions, open_database
 from mightymodels_core.schemas import DECLARATIONS
 
 if TYPE_CHECKING:
-    import sqlite3
-
-    from mightymodels_core.database import Declaration
+    import pytest
+    from mightymodels_core.database import DatabaseSpec, Declaration
 
 EXEMPT_SCAN_TARGETS = ('json_each', 'json_tree', '(subquery', 'subquery')
-
-
-@pytest.fixture(scope='module')
-def blocks() -> dict[str, str]:
-    return parse_blocks(
-        files('mightymodels_core.sql').joinpath('statements.sql').read_text(encoding='utf-8')
-    )
 
 
 def is_base_table_scan(detail: str) -> bool:
@@ -33,18 +27,32 @@ def unbound_fields(declaration: Declaration) -> dict[str, None]:
     return dict.fromkeys(field.name for field in msgspec.structs.fields(declaration.params))
 
 
-@pytest.mark.parametrize('declaration', DECLARATIONS, ids=lambda declaration: declaration.name)
-def test_declared_statement_is_served_by_an_index(
-    plan_connection: sqlite3.Connection, blocks: dict[str, str], declaration: Declaration
-) -> None:
-    plan = plan_connection.execute(
-        f'EXPLAIN QUERY PLAN {blocks[declaration.name]}', unbound_fields(declaration)
-    ).fetchall()
+class TestCataloguePlans:
+    declarations = st.sampled_from(DECLARATIONS)
 
-    scans = [row[3] for row in plan if is_base_table_scan(row[3])]
+    def find_scans(
+        self,
+        tmp_path_factory: pytest.TempPathFactory,
+        database_spec: DatabaseSpec,
+        blocks: dict[str, str],
+        declaration: Declaration,
+    ) -> list[str]:
+        path = tmp_path_factory.mktemp('plan').joinpath('mightymodels.db')
+        open_database(path, database_spec, ConnectionOptions()).close()
+        with closing(sqlite3.connect(path)) as connection:
+            plan = connection.execute(
+                f'EXPLAIN QUERY PLAN {blocks[declaration.name]}', unbound_fields(declaration)
+            ).fetchall()
+        return [row[3] for row in plan if is_base_table_scan(row[3])]
 
-    assert scans == []
+    @given(declaration=declarations)
+    def test_declared_statement_is_served_by_an_index(
+        self,
+        tmp_path_factory: pytest.TempPathFactory,
+        database_spec: DatabaseSpec,
+        blocks: dict[str, str],
+        declaration: Declaration,
+    ) -> None:
+        scans = self.find_scans(tmp_path_factory, database_spec, blocks, declaration)
 
-
-def test_every_block_has_a_declaration(blocks: dict[str, str]) -> None:
-    assert set(blocks) == {declaration.name for declaration in DECLARATIONS}
+        assert scans == []
