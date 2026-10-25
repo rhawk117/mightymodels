@@ -6,7 +6,9 @@ from typing import Literal
 
 from mcp.types import Icon
 
-type IconName = Literal['close', 'contract', 'failed_fix', 'review', 'server', 'task', 'ticket']
+type IconName = Literal[
+    'close', 'contract', 'failed_fix', 'review', 'server', 'snapshot', 'task', 'ticket'
+]
 
 SVG_MIME_TYPE = 'image/svg+xml'
 
