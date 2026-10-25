@@ -1,32 +1,31 @@
-from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING
 
-import anyio
 import pytest
 from mcp import Client
-from mcp.types import ElicitRequestFormParams, ElicitResult, ToolAnnotations
+from mcp.types import ToolAnnotations
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT
 from mightymodels_mcp.server.entrypoint import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 
+from tests.mcp.server.server_harness import view_of
+from tests.mcp.ticket.ticket_harness import (
+    ANSWERED,
+    INTERVIEW,
+    SLUG,
+    TICKET_PATH,
+    RecordingAnswerer,
+    TicketHarness,
+)
+
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
-    from mcp.client.session import ClientRequestContext
-    from mcp.types import CallToolResult, ElicitRequestParams
 
     from tests.mcp.server.server_harness import ServerHarness
+    from tests.mcp.ticket.ticket_harness import (
+        FormAction,
+    )
 
-type FormAction = Literal['accept', 'decline', 'cancel']
-
-SLUG = 'probe-ticket'
-TICKET_PATH = f'.mightymodels/{SLUG}/ticket.yml'
-INTERVIEW = MappingProxyType({
-    'slug': SLUG,
-    'summary': 'Add the ticket tools',
-    'context': ['the first concept package'],
-})
-ANSWERED = MappingProxyType({**INTERVIEW, 'scope': 'med', 'compaction': True, 'branch': 'main'})
 STAGED_TEXT = f'staged {SLUG} (status staged, 0 investigations)\n'
 WRITES = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
@@ -34,58 +33,6 @@ WRITES = ToolAnnotations(
 READS = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class RecordingAnswerer:
-    answers: dict[str, str]
-    action: FormAction = 'accept'
-    asked: list[frozenset[str]] = field(default_factory=list)
-
-    async def answer(
-        self, context: ClientRequestContext, params: ElicitRequestParams
-    ) -> ElicitResult:
-        assert context
-        assert isinstance(params, ElicitRequestFormParams)
-        properties = params.requested_schema['properties']
-        self.asked.append(frozenset(properties))
-        if self.action != 'accept':
-            return ElicitResult(action=self.action)
-
-        return ElicitResult(
-            action='accept', content={name: self.answers[name] for name in properties}
-        )
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class TicketHarness:
-    server: ServerHarness
-
-    @property
-    def ticket_file(self) -> anyio.Path:
-        return anyio.Path(self.server.repository.joinpath(TICKET_PATH))
-
-    async def call(
-        self,
-        name: str,
-        arguments: dict[str, Any],
-        answerer: RecordingAnswerer | None = None,
-    ) -> CallToolResult:
-        answerer = answerer or RecordingAnswerer(answers={})
-        server = self.server.create_server(create_catalog())
-        async with Client(server, elicitation_callback=answerer.answer) as client:
-            return await client.call_tool(name, arguments)
-
-    async def current_branch(self) -> str:
-        command = ['git', '-C', str(self.server.repository), 'symbolic-ref', '--short', 'HEAD']
-        finished = await anyio.run_process(command)
-        return finished.stdout.decode().strip()
-
-
-def view_of(result: CallToolResult) -> dict[str, Any]:
-    assert not result.is_error, result.content
-    assert result.structured_content
-    return result.structured_content
 
 
 def unanswered_action_cases() -> pytest.MarkDecorator:

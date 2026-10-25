@@ -12,12 +12,8 @@ from mightymodels_mcp.server.entrypoint import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.ticket.use_cases import create_ticket_work
 
-from tests.mcp.ticket.e2e.test_ticket_tools import (
-    ANSWERED,
-    SLUG,
-    TicketHarness,
-    view_of,
-)
+from tests.mcp.server.server_harness import view_of
+from tests.mcp.ticket.ticket_harness import ANSWERED, SLUG, TicketHarness
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet

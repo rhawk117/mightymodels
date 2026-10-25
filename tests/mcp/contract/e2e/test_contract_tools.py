@@ -11,8 +11,9 @@ from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.server.entrypoint import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 
-from tests.mcp.task.e2e.test_task_tools import RecordingOpener
-from tests.mcp.ticket.e2e.test_ticket_tools import ANSWERED, SLUG, TicketHarness, view_of
+from tests.mcp.server.server_harness import view_of
+from tests.mcp.task.task_harness import RecordingOpener
+from tests.mcp.ticket.ticket_harness import ANSWERED, SLUG, TicketHarness
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
