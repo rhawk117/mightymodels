@@ -106,16 +106,18 @@ def assert_decode_refuses(text_type: object, raw: str) -> None:
         msgspec.json.decode(msgspec.json.encode(raw), type=text_type)
 
 
+def value_type_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'value_type', [pytest.param(value_type, id=value_type.name) for value_type in VALUE_TYPES]
+    )
+
+
 class TestValueTypes:
     value_types = st.sampled_from(VALUE_TYPES)
     limited_value_types = st.sampled_from(LIMITED_VALUE_TYPES)
     excesses = st.integers(min_value=1, max_value=MAX_EXCESS)
 
-    @given(value_type=value_types)
-    @example(value_type=SLUG)
-    @example(value_type=RUN_ID)
-    @example(value_type=TASK_ID)
-    @example(value_type=REPOSITORY_KEY)
+    @value_type_cases()
     def test_longest_valid_value_is_accepted(self, value_type: ValueType) -> None:
         assert value_type.parse(value_type.longest) == value_type.longest
         assert_decode_round_trips(value_type.text_type, value_type.longest)
