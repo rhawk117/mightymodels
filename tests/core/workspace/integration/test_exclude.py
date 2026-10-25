@@ -20,7 +20,7 @@ class ExistingExclude:
 
     @property
     def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name, marks=(pytest.mark.integration,))
+        return pytest.param(self, id=self.name)
 
 
 def exclude_existing_content_cases() -> pytest.MarkDecorator:

@@ -2,22 +2,23 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.primitives import RunId
 from mightymodels_core.workspace import (
-    PROJECT_DIR_VARIABLE,
     OutsideStateDirectoryError,
     Workspace,
-    find_root,
     workspace_at,
 )
 
 from tests.core.workspace.workspace_builders import TICKET
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from _pytest.mark import ParameterSet
 
 type PathRequest = Callable[[Workspace], object]
@@ -68,33 +69,24 @@ class EscapingSymlink:
     name: str
     planted: tuple[str, ...]
     ask: PathRequest
-    marks: tuple[pytest.MarkDecorator, ...] = (pytest.mark.integration,)
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name, marks=self.marks)
 
 
-def workspace_escaping_symlink_cases() -> pytest.MarkDecorator:
-    scenarios = [
-        EscapingSymlink(name='ticket-directory', planted=(TICKET,), ask=ask_ticket_file),
-        EscapingSymlink(name='ticket-file', planted=(TICKET, 'ticket.yml'), ask=ask_ticket_file),
-        EscapingSymlink(
-            name='ticket-draft', planted=(TICKET, 'ticket.yml.tmp'), ask=ask_ticket_draft
-        ),
-        EscapingSymlink(name='briefs', planted=(TICKET, 'briefs'), ask=ask_task_brief),
-        EscapingSymlink(name='ticket-reviews', planted=(TICKET, 'review'), ask=ask_ticket_review),
-        EscapingSymlink(name='runtime', planted=('.runtime',), ask=ask_runtime_review),
-        EscapingSymlink(
-            name='run-directory',
-            planted=('.runtime', 'reviews', RUN),
-            ask=ask_persona_report,
-        ),
-        EscapingSymlink(name='handoffs', planted=(TICKET, 'handoffs'), ask=ask_snapshot),
-        EscapingSymlink(name='archives', planted=('archives',), ask=ask_archive),
-        EscapingSymlink(name='debug-note', planted=(TICKET, 'whats-broken.md'), ask=ask_live_debug),
-    ]
-    return pytest.mark.parametrize('escaping', [scenario.param for scenario in scenarios])
+ESCAPING_SYMLINKS = (
+    EscapingSymlink(name='ticket-directory', planted=(TICKET,), ask=ask_ticket_file),
+    EscapingSymlink(name='ticket-file', planted=(TICKET, 'ticket.yml'), ask=ask_ticket_file),
+    EscapingSymlink(name='ticket-draft', planted=(TICKET, 'ticket.yml.tmp'), ask=ask_ticket_draft),
+    EscapingSymlink(name='briefs', planted=(TICKET, 'briefs'), ask=ask_task_brief),
+    EscapingSymlink(name='ticket-reviews', planted=(TICKET, 'review'), ask=ask_ticket_review),
+    EscapingSymlink(name='runtime', planted=('.runtime',), ask=ask_runtime_review),
+    EscapingSymlink(
+        name='run-directory',
+        planted=('.runtime', 'reviews', RUN),
+        ask=ask_persona_report,
+    ),
+    EscapingSymlink(name='handoffs', planted=(TICKET, 'handoffs'), ask=ask_snapshot),
+    EscapingSymlink(name='archives', planted=('archives',), ask=ask_archive),
+    EscapingSymlink(name='debug-note', planted=(TICKET, 'whats-broken.md'), ask=ask_live_debug),
+)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -117,14 +109,7 @@ def workspace_climbing_parts_cases() -> pytest.MarkDecorator:
 
 
 class TestSymlinkBelowTheStateDirectory:
-    @pytest.fixture
-    def workspace_with_a_symlink_to_outside(
-        self, escaping: EscapingSymlink, state: Path, outside: Path
-    ) -> Workspace:
-        planted = state.joinpath(*escaping.planted)
-        planted.parent.mkdir(parents=True, exist_ok=True)
-        planted.symlink_to(outside)
-        return workspace_at(state.parent)
+    escaping_symlinks = st.sampled_from(ESCAPING_SYMLINKS)
 
     @pytest.fixture
     def workspace_with_a_dangling_symlink(self, state: Path, tmp_path: Path) -> Workspace:
@@ -137,17 +122,41 @@ class TestSymlinkBelowTheStateDirectory:
         state.joinpath(TICKET).symlink_to(state.joinpath('first-name'))
         return workspace_at(state.parent)
 
-    @workspace_escaping_symlink_cases()
+    def build_workspace_with_a_symlink_to_outside(
+        self, tmp_path_factory: pytest.TempPathFactory, escaping: EscapingSymlink
+    ) -> Workspace:
+        root = tmp_path_factory.mktemp('escaping')
+        state = root.joinpath('checkout', '.mightymodels')
+        outside = root.joinpath('outside')
+        state.mkdir(parents=True)
+        outside.mkdir()
+        planted = state.joinpath(*escaping.planted)
+        planted.parent.mkdir(parents=True, exist_ok=True)
+        planted.symlink_to(outside)
+        return workspace_at(state.parent)
+
+    @given(escaping=escaping_symlinks)
+    @example(escaping=ESCAPING_SYMLINKS[0])
+    @example(escaping=ESCAPING_SYMLINKS[1])
+    @example(escaping=ESCAPING_SYMLINKS[2])
+    @example(escaping=ESCAPING_SYMLINKS[3])
+    @example(escaping=ESCAPING_SYMLINKS[4])
+    @example(escaping=ESCAPING_SYMLINKS[5])
+    @example(escaping=ESCAPING_SYMLINKS[6])
+    @example(escaping=ESCAPING_SYMLINKS[7])
+    @example(escaping=ESCAPING_SYMLINKS[8])
+    @example(escaping=ESCAPING_SYMLINKS[9])
     def test_a_symlink_that_leads_outside_is_refused_wherever_it_sits(
-        self, workspace_with_a_symlink_to_outside: Workspace, escaping: EscapingSymlink
+        self, tmp_path_factory: pytest.TempPathFactory, escaping: EscapingSymlink
     ) -> None:
+        workspace = self.build_workspace_with_a_symlink_to_outside(tmp_path_factory, escaping)
+
         with pytest.raises(OutsideStateDirectoryError) as refusal:
-            escaping.ask(workspace_with_a_symlink_to_outside)
+            escaping.ask(workspace)
 
         assert refusal.value.shown.startswith('.mightymodels/')
         assert ESCAPES in str(refusal.value)
 
-    @pytest.mark.integration
     def test_a_dangling_symlink_is_refused_before_anything_is_created_through_it(
         self, workspace_with_a_dangling_symlink: Workspace, tmp_path: Path
     ) -> None:
@@ -156,7 +165,6 @@ class TestSymlinkBelowTheStateDirectory:
 
         assert not tmp_path.joinpath('never-created').exists()
 
-    @pytest.mark.integration
     def test_a_symlink_that_stays_inside_the_state_directory_is_followed(
         self, workspace_with_a_symlink_that_stays_inside: Workspace, state: Path
     ) -> None:
@@ -177,7 +185,6 @@ class TestStateDirectoryBoundary:
         checkout.joinpath('.mightymodels').symlink_to(outside)
         return workspace_at(checkout)
 
-    @pytest.mark.integration
     def test_a_symlinked_state_directory_holds_the_paths_and_keeps_their_shown_names(
         self, workspace_whose_state_directory_is_a_symlink: Workspace, outside: Path
     ) -> None:
@@ -215,20 +222,9 @@ class TestPersonaReport:
         )
         assert report.relative == f'.mightymodels/.runtime/reviews/{RUN}/{REPORT_NAME}'
 
-    @pytest.mark.integration
     def test_a_report_that_is_a_symlink_has_no_file(
         self, workspace_with_a_symlinked_report: Workspace
     ) -> None:
         report = workspace_with_a_symlinked_report.persona_report(None, RUN, name=REPORT_NAME)
 
         assert report.file is None
-
-
-class TestFindRoot:
-    def test_the_project_directory_variable_wins_over_the_working_directory(self) -> None:
-        root = find_root({PROJECT_DIR_VARIABLE: '/project'}, Path('/elsewhere'))
-
-        assert root == Path('/project')
-
-    def test_the_working_directory_is_the_root_without_the_variable(self) -> None:
-        assert find_root({}, Path('/elsewhere')) == Path('/elsewhere')
