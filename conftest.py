@@ -1,10 +1,13 @@
 import os
 import tomllib
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
 import pytest
 from hypothesis import settings
+
+pytest_plugins = ['pytester']
 
 
 def resolve_hypothesis_profile() -> str:
@@ -16,6 +19,53 @@ settings.register_profile('dev', max_examples=50, print_blob=True)
 settings.register_profile('ci', parent=settings.get_profile('ci'), max_examples=300)
 settings.register_profile('thorough', parent=settings.get_profile('ci'), max_examples=1000)
 settings.load_profile(resolve_hypothesis_profile())
+
+TIER_DEPTH = 2
+TIER_NAMES = frozenset({'unit', 'integration', 'smoke'})
+
+
+def get_core_relative_parts(root: Path, path: Path) -> tuple[str, ...] | None:
+    relative_parts = path.relative_to(root.joinpath('tests', 'core'), walk_up=True).parts
+    if relative_parts[0] == '..':
+        return None
+
+    return relative_parts
+
+
+def has_tier_directory(relative_parts: tuple[str, ...]) -> bool:
+    return len(relative_parts) > TIER_DEPTH and relative_parts[1] in TIER_NAMES
+
+
+def is_test_module(config: pytest.Config, file_path: Path) -> bool:
+    patterns: list[str] = config.getini('python_files')
+    return file_path.suffix == '.py' and any(
+        fnmatch(file_path.name, pattern) for pattern in patterns
+    )
+
+
+def pytest_collect_file(file_path: Path, parent: pytest.Collector) -> None:
+    if not is_test_module(parent.config, file_path):
+        return
+
+    relative_parts = get_core_relative_parts(parent.config.rootpath, file_path)
+    if relative_parts is None or has_tier_directory(relative_parts):
+        return
+
+    tiers = ', '.join(sorted(TIER_NAMES))
+    message = (
+        f'{file_path} is not under tests/core/<concept>/<tier>/, '
+        f'where the tier is one of the directories {tiers}'
+    )
+    raise pytest.UsageError(message)
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    for item in items:
+        relative_parts = get_core_relative_parts(config.rootpath, item.path)
+        if relative_parts is None or not has_tier_directory(relative_parts):
+            continue
+
+        item.add_marker(relative_parts[1])
 
 
 @pytest.fixture

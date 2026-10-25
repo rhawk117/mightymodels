@@ -1,24 +1,15 @@
 """The ticket rows, their investigation links and their closings."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.tickets import TicketScope, TicketStatus
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type TicketStatus = Literal['staged', 'in-progress', 'closed']
-
-
-type TicketScope = Literal['sm', 'med', 'large']
-
-
-class TicketIdParams(Struct, frozen=True, kw_only=True, gc=False):
-    id: int
 
 
 class TicketSlugParams(Struct, frozen=True, kw_only=True, gc=False):
@@ -108,7 +99,6 @@ class ClosingRow(Struct, frozen=True, kw_only=True):
     archive: str
 
 
-TICKET_BY_ID = Query(name='ticket_by_id', params=TicketIdParams, row=TicketRow)
 TICKET_BY_SLUG = Query(name='ticket_by_slug', params=TicketSlugParams, row=TicketRow)
 STAGE_TICKET = Query(name='stage_ticket', params=StageTicketParams, row=TicketIdRow)
 SET_TICKET_STATUS = Command(name='set_ticket_status', params=SetTicketStatusParams)
@@ -123,7 +113,6 @@ UPSERT_CLOSING = Command(name='upsert_closing', params=UpsertClosingParams)
 CLOSING_OF_TICKET = Query(name='closing_of_ticket', params=ClosingParams, row=ClosingRow)
 
 DECLARATIONS: tuple[Declaration, ...] = (
-    TICKET_BY_ID,
     TICKET_BY_SLUG,
     STAGE_TICKET,
     SET_TICKET_STATUS,

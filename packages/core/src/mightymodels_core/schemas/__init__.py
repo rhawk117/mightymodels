@@ -3,7 +3,7 @@
 Each aggregate's Params (write, keyed by the parent) and Row (read, keyed by id or a join key)
 Structs keep separate field lists on purpose. python.md allows no per-aggregate field base, and the
 codec binds and decodes flat Structs, so a nested Struct would bind as one JSON parameter.
-tests/core/schemas/test_mirrored_fields.py guards the duplication: it fails when the shared
+tests/core/schemas/unit/test_mirrored_fields.py guards the duplication: it fails when the shared
 fields of a mirrored pair differ in name or type.
 """
 

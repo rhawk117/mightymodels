@@ -1,20 +1,15 @@
 """The crashout journal of a repository."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Query
+from mightymodels_core.vocabulary.crashouts import CrashoutSeverity, Verdict
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-
-type CrashoutSeverity = Literal['mild-tilt', 'heated', 'crashout', 'full-meltdown']
-
-
-type Verdict = Literal['deserved', 'split', 'unreasonable']
 
 
 class JournalCrashoutParams(Struct, frozen=True, kw_only=True):

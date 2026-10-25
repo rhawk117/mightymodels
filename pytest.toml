@@ -2,7 +2,7 @@
 strict = true
 strict_markers = true
 anyio_mode = "auto"
-testpaths = ["packages/*/src/*", "tests"]
+testpaths = ["tests"]
 empty_parameter_set_mark = "fail_at_collect"
 faulthandler_timeout = "60"
 faulthandler_exit_on_timeout = true
@@ -23,9 +23,9 @@ addopts = [
 filterwarnings = ["error"]
 
 markers = [
-    "smoke: a quick sanity check",
-    "unit: tests behavior without spinning up something heavy",
-    "integration: tests requiring external services or processes",
+    "smoke: runs an entry-point concept through real resources (open_state)",
+    "unit: uses fakes and memory only",
+    "integration: touches SQLite (file or in-memory), real git, a child process or the filesystem",
     "regression: tests something which previously failed before",
     "agents: test case markers focused on AI code generation quality",
 ]
