@@ -8,13 +8,13 @@ from mightymodels_core.edge import create_database_spec
 from mightymodels_core.git import GitNoAnswerError
 from mightymodels_core.primitives import RepositoryKey, Slug
 from mightymodels_core.snapshot import RepositoryFacts
-from mightymodels_core.units_of_work import InvestigationWork, ReviewWork, SnapshotRead, TaskWork
+from mightymodels_core.units_of_work import SnapshotRead, TaskWork
 
 from tests.core.primitives.clock import create_fake_clock
 from tests.core.snapshot.snapshot_builders import (
-    HEAD,
     MOMENT,
     OTHER_SUMMARY,
+    REPOSITORY_FACTS,
     create_section,
     seed_investigation,
     seed_review,
@@ -59,27 +59,8 @@ def clock() -> Clock:
 
 
 @pytest.fixture
-def investigation_work(
-    database: Database, repository_key: RepositoryKey, clock: Clock
-) -> InvestigationWork:
-    return InvestigationWork(database=database, repository_key=repository_key, clock=clock)
-
-
-@pytest.fixture
-def task_work(database: Database, repository_key: RepositoryKey, clock: Clock) -> TaskWork:
-    return TaskWork(database=database, repository_key=repository_key, clock=clock)
-
-
-@pytest.fixture
-def review_work(database: Database, repository_key: RepositoryKey, clock: Clock) -> ReviewWork:
-    return ReviewWork(database=database, repository_key=repository_key, clock=clock)
-
-
-@pytest.fixture
 def repository_facts() -> RepositoryFacts:
-    return RepositoryFacts(
-        branch='feat/widget', head=HEAD, dirty=('src/a.py', 'src/b.py', 'src/c.py'), refusal=None
-    )
+    return REPOSITORY_FACTS
 
 
 @pytest.fixture

@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 import pytest
 from hypothesis import example, given
 from hypothesis import strategies as st
-from mightymodels_core.snapshot import RepositoryFacts, SnapshotRequest
+from mightymodels_core.snapshot import SnapshotRequest
 
 from tests.core.snapshot.snapshot_builders import (
-    HEAD,
+    REPOSITORY_FACTS,
     open_crowded_snapshot,
     seed_crowded_ledger,
     seed_crowded_review,
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.database import Database
     from mightymodels_core.primitives import Clock, RepositoryKey, RunId, Slug
-    from mightymodels_core.snapshot import SnapshotRecord
+    from mightymodels_core.snapshot import RepositoryFacts, SnapshotRecord
     from mightymodels_core.units_of_work import SnapshotRead
 
 CAPPED_SECTIONS = ('works', 'decisions', 'open_questions', 'review.decisions', 'do_not_retry')
@@ -110,9 +110,7 @@ class TestSnapshotCaps:
 
 class TestSnapshotLimitZero:
     sections = st.sampled_from(CAPPED_SECTIONS)
-    repository = RepositoryFacts(
-        branch='feat/widget', head=HEAD, dirty=('src/a.py', 'src/b.py', 'src/c.py'), refusal=None
-    )
+    repository = REPOSITORY_FACTS
 
     def take_limit_zero_snapshot(self, directory: Path) -> SnapshotRecord:
         with open_crowded_snapshot(directory) as crowded:
