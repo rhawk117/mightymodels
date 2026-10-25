@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -157,6 +158,28 @@ class TestCrashoutLast:
         assert view['entry']['severity'] == 'full-meltdown'
         assert view['entry']['failures'] == ['the column vanished']
         assert view['entry']['ticket'] is None
+
+
+@pytest.mark.usefixtures('recorded')
+class TestCrashoutLastTicketAndBranch:
+    ticket = 'mcp-per-action-tools'
+    branch = 'feat/journal-mapping'
+
+    @pytest.fixture
+    async def journaled(self, harness: JournalHarness) -> None:
+        await harness.add(
+            MappingProxyType({**FIRST_ENTRY, 'ticket': self.ticket, 'branch': self.branch})
+        )
+
+    @pytest.mark.usefixtures('journaled')
+    async def test_crashout_last_keeps_ticket_and_branch_apart(
+        self, harness: JournalHarness
+    ) -> None:
+        view = view_of(await harness.call('crashout_last', {}))
+
+        assert (view['entry']['ticket'], view['entry']['branch']) == (self.ticket, self.branch)
+        assert f'ticket: {self.ticket}' in view['text']
+        assert f'branch: {self.branch}' in view['text']
 
 
 class TestGit:
