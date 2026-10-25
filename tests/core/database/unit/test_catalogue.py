@@ -15,9 +15,7 @@ if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.database import Command, DatabaseError, Query
 
-    from tests.core.database.conftest import NamePart, NameRow
-
-pytestmark = pytest.mark.integration
+    from tests.core.database.database_builders import NamePart, NameRow
 
 BOTH_BLOCKS = """
 -- A preamble comment before any block is ignored.

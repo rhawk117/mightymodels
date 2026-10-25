@@ -2,10 +2,13 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from dataclasses import dataclass
 from operator import methodcaller
+from pathlib import Path
 from threading import Event
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from hypothesis import example, given
+from hypothesis import strategies as st
 from mightymodels_core.database import (
     BusyError,
     ConnectionOptions,
@@ -22,7 +25,7 @@ from mightymodels_core.database import (
     open_database,
 )
 
-from tests.core.database.conftest import (
+from tests.core.database.database_builders import (
     NamePart,
     NoPart,
     PersonPart,
@@ -35,16 +38,13 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator
     from concurrent.futures import Future
     from contextlib import AbstractContextManager
-    from pathlib import Path
 
     from _pytest.mark import ParameterSet
     from mightymodels_core.database import Command, Database, DatabaseSpec, Unit
     from mightymodels_core.database.errors import SqliteFailure
     from msgspec import Struct
 
-    from tests.core.database.conftest import Statements
-
-pytestmark = pytest.mark.integration
+    from tests.core.database.database_builders import Statements
 
 STATEMENTS = create_statements()
 ADA = PersonPart(name='ada', age=36)
@@ -107,28 +107,6 @@ def failing_statement_cases() -> pytest.MarkDecorator:
         ),
     ]
     return pytest.mark.parametrize('failing', [case.param for case in cases])
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Opener:
-    name: str
-    outer: Callable[[Database], AbstractContextManager[Unit]]
-    inner: Callable[[Database], AbstractContextManager[Unit]]
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
-
-
-def nested_unit_cases() -> pytest.MarkDecorator:
-    read, write = methodcaller('read'), methodcaller('write')
-    cases = [
-        Opener(name='read-in-read', outer=read, inner=read),
-        Opener(name='write-in-read', outer=read, inner=write),
-        Opener(name='read-in-write', outer=write, inner=read),
-        Opener(name='write-in-write', outer=write, inner=write),
-    ]
-    return pytest.mark.parametrize('opener', [case.param for case in cases])
 
 
 def write_then_fail(database: Database, statements: Statements) -> None:
@@ -267,13 +245,24 @@ class TestUnitLifecycle:
         with pytest.raises(UnitReusedError):
             scope.__enter__()
 
-    @nested_unit_cases()
+    openers = st.sampled_from([methodcaller('read'), methodcaller('write')])
+
+    @given(outer=openers, inner=openers)
+    @example(outer=methodcaller('read'), inner=methodcaller('read'))
+    @example(outer=methodcaller('read'), inner=methodcaller('write'))
+    @example(outer=methodcaller('write'), inner=methodcaller('read'))
+    @example(outer=methodcaller('write'), inner=methodcaller('write'))
     def test_nested_unit_raises(
-        self, database: Database, statements: Statements, opener: Opener
+        self,
+        shared_database_spec: DatabaseSpec,
+        outer: Callable[[Database], AbstractContextManager[Unit]],
+        inner: Callable[[Database], AbstractContextManager[Unit]],
     ) -> None:
-        with opener.outer(database), pytest.raises(NestedUnitError):
-            opener.inner(database).__enter__()
-        assert count_people(database, statements) == 0
+        options = ConnectionOptions(journal_mode='MEMORY')
+        with closing(open_database(Path(':memory:'), shared_database_spec, options)) as database:
+            with outer(database), pytest.raises(NestedUnitError):
+                inner(database).__enter__()
+            assert count_people(database, STATEMENTS) == 0
 
 
 class TestConcurrency:

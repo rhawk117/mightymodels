@@ -1,59 +1,27 @@
-import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime
-from typing import Any, Literal, get_args
+from pathlib import Path
+from typing import TYPE_CHECKING, get_args
 
 import pytest
 from hypothesis import example, given
 from hypothesis import strategies as st
-from mightymodels_core.database import (
-    NaiveTimestampError,
-    Query,
-    RowDecodeError,
-    bind_params,
-    decode_row,
-)
-from msgspec import Struct
+from mightymodels_core.database import ConnectionOptions, open_database
 
-pytestmark = pytest.mark.integration
+from tests.core.database.database_builders import ECHO, Color, EchoParams
+
+if TYPE_CHECKING:
+    from mightymodels_core.database import DatabaseSpec
+
+    from tests.core.database.database_builders import EchoRow
 
 
-type Color = Literal['red', 'green']
-
-
-class EchoParams(Struct, frozen=True, kw_only=True):
-    items: list[Any]
-    mapping: dict[str, Any]
-    at: datetime
-    color: Color
-    flag: bool
-
-
-class EchoRow(Struct, frozen=True, kw_only=True):
-    items: list[Any]
-    mapping: dict[str, Any]
-    at: datetime
-    color: Color
-    flag: bool
-
-
-ECHO = Query(name='echo', params=EchoParams, row=EchoRow)
-
-ECHO_SQL = """
-SELECT json_object(
-    'items', json(:items),
-    'mapping', json(:mapping),
-    'at', strftime('%Y-%m-%dT%H:%M:%SZ', :at, 'unixepoch'),
-    'color', :color,
-    'flag', :flag
-) AS row
-"""
-
-
-def echo(params: EchoParams) -> EchoRow:
-    with closing(sqlite3.connect(':memory:')) as connection:
-        (row,) = connection.execute(ECHO_SQL, bind_params(params)).fetchone()
-    return decode_row(ECHO, row)
+def echo(spec: DatabaseSpec, params: EchoParams) -> EchoRow:
+    options = ConnectionOptions(journal_mode='MEMORY')
+    with closing(open_database(Path(':memory:'), spec, options)) as opened, opened.read() as unit:
+        row = unit.one(ECHO, params)
+    assert row is not None
+    return row
 
 
 class TestRoundTrip:
@@ -84,37 +52,13 @@ class TestRoundTrip:
             flag=False,
         )
     )
-    def test_bound_params_read_back_equal(self, params: EchoParams) -> None:
-        row = echo(params)
+    def test_bound_params_read_back_equal(
+        self, echo_spec: DatabaseSpec, params: EchoParams
+    ) -> None:
+        row = echo(echo_spec, params)
 
         assert row.items == params.items
         assert row.mapping == params.mapping
         assert row.at == params.at.replace(microsecond=0)
         assert row.color == params.color
         assert row.flag == params.flag
-
-
-class TestBindParams:
-    @pytest.fixture
-    def naive_params(self) -> EchoParams:
-        return EchoParams(
-            items=[],
-            mapping={},
-            at=datetime.fromisoformat('2024-01-01T00:00:00'),
-            color='red',
-            flag=True,
-        )
-
-    def test_a_datetime_without_a_timezone_is_rejected(self, naive_params: EchoParams) -> None:
-        with pytest.raises(NaiveTimestampError) as raised:
-            bind_params(naive_params)
-
-        assert raised.value.field == 'at'
-
-
-class TestDecodeRow:
-    def test_a_row_that_does_not_fit_the_struct_is_rejected(self) -> None:
-        with pytest.raises(RowDecodeError) as raised:
-            decode_row(ECHO, '{"items": "nope"}')
-
-        assert raised.value.statement == 'echo'

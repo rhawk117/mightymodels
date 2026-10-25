@@ -1,4 +1,3 @@
-import sqlite3
 from contextlib import closing
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,14 +14,8 @@ from mightymodels_core.database import (
     UnversionedSchemaError,
     open_database,
 )
-from mightymodels_core.database.connection import (
-    install_schema,
-    parse_schema,
-    prepare_or_close,
-)
 
-from tests.core.database.conftest import (
-    FIXTURE_SCHEMA,
+from tests.core.database.database_builders import (
     FIXTURE_VERSION,
     CloseFailingConnection,
     NamePart,
@@ -34,9 +27,7 @@ from tests.core.database.conftest import (
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
 
-    from tests.core.database.conftest import Statements
-
-pytestmark = pytest.mark.integration
+    from tests.core.database.database_builders import Statements
 
 
 class TestOpen:
@@ -157,26 +148,34 @@ class TestPragmaReadBack:
 
 class TestFailureTranslation:
     def test_a_failing_rollback_during_schema_install_is_a_domain_error(
-        self, database_path: Path
+        self, database_path: Path, database_spec: DatabaseSpec, tmp_path: Path
     ) -> None:
-        connection = sqlite3.connect(
-            database_path, factory=RollbackFailingConnection, autocommit=True
+        broken = tmp_path.joinpath('broken.sql')
+        broken.write_text('CREATE TABLE broken (;\nPRAGMA user_version = 1;')
+        spec = DatabaseSpec(
+            schema=broken,
+            statements=database_spec.statements,
+            declarations=database_spec.declarations,
         )
-        with closing(connection), pytest.raises(StatementFailedError) as failed:
-            install_schema(connection, 'CREATE TABLE broken (')
+        options = ConnectionOptions(connection_class=RollbackFailingConnection)
+        with pytest.raises(StatementFailedError) as failed:
+            open_database(database_path, spec, options)
         assert failed.value.statement == 'ROLLBACK'
 
     def test_a_failing_close_on_the_open_error_path_is_a_domain_error(
-        self, database_path: Path
+        self, database_path: Path, database_spec: DatabaseSpec, tmp_path: Path
     ) -> None:
-        with closing(sqlite3.connect(database_path, autocommit=True)) as other:
-            other.execute('PRAGMA user_version = 3')
-        connection = sqlite3.connect(database_path, factory=CloseFailingConnection, autocommit=True)
-        try:
-            with pytest.raises(StatementFailedError) as failed:
-                prepare_or_close(connection, parse_schema(FIXTURE_SCHEMA), ConnectionOptions())
-        finally:
-            sqlite3.Connection.close(connection)
+        other = tmp_path.joinpath('other.sql')
+        other.write_text('CREATE TABLE extra (id INTEGER PRIMARY KEY);\nPRAGMA user_version = 3;')
+        other_spec = DatabaseSpec(
+            schema=other,
+            statements=database_spec.statements,
+            declarations=database_spec.declarations,
+        )
+        open_database(database_path, other_spec, ConnectionOptions()).close()
+        options = ConnectionOptions(connection_class=CloseFailingConnection)
+        with pytest.raises(StatementFailedError) as failed:
+            open_database(database_path, database_spec, options)
         assert failed.value.statement == 'close'
 
 
