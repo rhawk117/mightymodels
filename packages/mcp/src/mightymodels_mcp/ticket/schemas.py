@@ -11,6 +11,7 @@ branch of that name, so core's `branch_of` decides every branch the same way.
 from typing import Annotated, Any
 
 from mightymodels_core.primitives.value_types import SLUG_LIMIT
+from mightymodels_core.ticket_closing.records import ClosingLines
 from mightymodels_core.tickets import BranchChoice, TicketAnswers
 from mightymodels_core.vocabulary.tickets import TicketScope
 from pydantic import BaseModel, ConfigDict, StringConstraints
@@ -47,6 +48,13 @@ class TicketContextRequest(RequestModel):
     context: tuple[ProseText, ...]
 
 
+class CloseTicketRequest(RequestModel):
+    slug: SlugField
+    shipped: ProseText = ''
+    pr: ProseText | None = None
+    gotchas: tuple[ProseText, ...] = ()
+
+
 class WriteChoices(BaseModel):
     model_config = ConfigDict(extra='forbid', frozen=True)
 
@@ -76,3 +84,7 @@ def create_ticket_answers(
         reference_urls=request.reference_urls,
         investigations=request.investigations,
     )
+
+
+def create_closing_lines(request: CloseTicketRequest) -> ClosingLines:
+    return ClosingLines(shipped=request.shipped, pr=request.pr, gotchas=request.gotchas)

@@ -26,21 +26,27 @@ from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.server.registration import ToolDefinition
 
+from .close_facts import CloseAttempt, gather_close_facts
 from .schemas import (
+    CloseTicketRequest,
     TicketContextRequest,
     TicketRequest,
     TicketWriteRequest,
+    create_closing_lines,
     create_ticket_answers,
     create_write_choices,
 )
 from .use_cases import (
+    check_close,
+    close_ticket_work,
     create_ticket_work,
+    prepare_close,
     show_ticket,
     update_ticket_context,
     validate_ticket,
     write_ticket,
 )
-from .views import TicketView
+from .views import CloseView, TicketView
 
 if TYPE_CHECKING:
     from contextlib import AbstractAsyncContextManager
@@ -96,6 +102,9 @@ WRITES = ToolAnnotations(
 )
 READS = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
+)
+CLOSES = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=False
 )
 
 RoundAsk = Elicit[BaseModel] | BaseModel
@@ -160,6 +169,27 @@ async def ticket_update_context(request: TicketContextRequest, ctx: ToolContext)
         return update_ticket_context(create_ticket_work(state), request.slug, request.context)
 
 
+async def close_check(request: TicketRequest, ctx: ToolContext) -> CloseView:
+    """List what still blocks closing a ticket; changes nothing."""
+    async with open_state(ctx) as state:
+        work = create_ticket_work(state)
+        prepared = prepare_close(work, request.slug)
+        facts = await gather_close_facts(state.git, prepared)
+        return check_close(work, request.slug, facts)
+
+
+async def close_ticket(request: CloseTicketRequest, ctx: ToolContext) -> CloseView:
+    """Close a ticket with no live work left and write its archive."""
+    async with open_state(ctx) as state:
+        work = create_ticket_work(state)
+        prepared = prepare_close(work, request.slug)
+        facts = await gather_close_facts(state.git, prepared)
+        lines = create_closing_lines(request)
+        return close_ticket_work(
+            work, CloseAttempt(slug=request.slug, prepared=prepared, facts=facts, lines=lines)
+        )
+
+
 def register_ticket_tools(catalog: ToolCatalog) -> ToolCatalog:
     icon = load_icon('ticket')
     write = ToolDefinition(
@@ -199,4 +229,24 @@ def register_ticket_tools(catalog: ToolCatalog) -> ToolCatalog:
         result_model=TicketView,
         handler=ticket_update_context,
     )
-    return catalog.register(write).register(validate).register(show).register(update_context)
+    close_icon = load_icon('close')
+    check = ToolDefinition(
+        name='close_check',
+        title='Check a ticket for live work',
+        annotations=READS,
+        icon=close_icon,
+        request_model=TicketRequest,
+        result_model=CloseView,
+        handler=close_check,
+    )
+    close = ToolDefinition(
+        name='close_ticket',
+        title='Close a ticket',
+        annotations=CLOSES,
+        icon=close_icon,
+        request_model=CloseTicketRequest,
+        result_model=CloseView,
+        handler=close_ticket,
+    )
+    opened = catalog.register(write).register(validate).register(show).register(update_context)
+    return opened.register(check).register(close)
