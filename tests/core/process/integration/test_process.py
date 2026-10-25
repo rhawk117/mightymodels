@@ -1,13 +1,10 @@
-import contextlib
+import os
 import sys
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from mightymodels_core.process import CompletedRun, FailedRun, SubprocessRunner
-
-pytestmark = pytest.mark.integration
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -17,16 +14,6 @@ class ChildPython:
     @property
     def argv(self) -> list[str]:
         return [sys.executable, '-c', self.script]
-
-
-def process_with_argument_runs(argument: str) -> bool:
-    # The argv is fixed at exec, so this finds the child however late its own code starts.
-    needle = argument.encode()
-    for cmdline in Path('/proc').glob('[0-9]*/cmdline'):
-        with contextlib.suppress(OSError):
-            if needle in cmdline.read_bytes().split(b'\0'):
-                return True
-    return False
 
 
 def is_same_directory(printed: str, expected: Path) -> bool:
@@ -80,20 +67,17 @@ class TestSubprocessRunner:
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'refused'
 
-    @pytest.fixture
-    def child_marker(self) -> str:
-        return f'mightymodels-timed-out-child-{uuid.uuid4().hex}'
+    async def test_run_past_the_timeout_is_timed_out_and_the_child_is_gone(self) -> None:
+        child = ChildPython(
+            script='import os, signal; print(os.getpid(), flush=True); signal.pause()'
+        )
 
-    async def test_run_past_the_timeout_is_timed_out_and_the_child_is_gone(
-        self, child_marker: str
-    ) -> None:
-        child = ChildPython(script='import time; time.sleep(60)')
-
-        outcome = await self.runner.run([*child.argv, child_marker], timeout=self.timeout)
+        outcome = await self.runner.run(child.argv, timeout=self.timeout)
 
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'timed_out'
-        assert not process_with_argument_runs(child_marker)
+        with pytest.raises(ProcessLookupError):
+            os.kill(int(outcome.stdout), 0)
 
     async def test_output_that_is_not_text_is_undecodable(self) -> None:
         child = ChildPython(script='import sys; sys.stdout.buffer.write(b"\\xff\\xfe\\xfd")')
