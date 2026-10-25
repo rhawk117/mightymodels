@@ -1,21 +1,14 @@
 """One work tree to start in, one plugin data directory and one directory that is no work tree."""
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import anyio
 import pytest
 
+from tests.core.checkout_builders import StartHarness
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class StartHarness:
-    toplevel: Path
-    subdirectory: Path
-    data_directory: Path
-    outside: Path
 
 
 @pytest.fixture

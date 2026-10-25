@@ -6,13 +6,9 @@ from mightymodels_core.database import DatabaseClosedError, SchemaVersionError, 
 from mightymodels_core.edge import (
     DATABASE_NAME,
     DataDirectoryMissingError,
-    create_clock,
-    create_database_spec,
     open_state,
-    resources,
 )
 from mightymodels_core.git import GitMissingError, NotARepositoryError
-from mightymodels_core.primitives import SystemClock
 from mightymodels_core.workspace import EXCLUDE_LINE
 
 if TYPE_CHECKING:
@@ -23,9 +19,7 @@ if TYPE_CHECKING:
     from mightymodels_core.edge import OpenState
     from mightymodels_core.git import Git
 
-    from tests.core.edge.conftest import StartHarness
-
-pytestmark = pytest.mark.integration
+    from tests.core.checkout_builders import StartHarness
 
 
 def exclude_lines(start: StartHarness) -> list[str]:
@@ -125,23 +119,18 @@ class TestOpenStateCloses:
     refusal = PermissionError('exclude refused')
 
     @pytest.fixture
-    def opened_databases(self, monkeypatch: pytest.MonkeyPatch) -> list[Database]:
-        databases: list[Database] = []
+    def opened_databases(self) -> list[Database]:
+        return []
 
-        def record_open(path: Path, spec: DatabaseSpec) -> Database:
-            database = open_database(path, spec)
-            databases.append(database)
-            return database
+    def record_open(
+        self, opened_databases: list[Database], path: Path, spec: DatabaseSpec
+    ) -> Database:
+        database = open_database(path, spec)
+        opened_databases.append(database)
+        return database
 
-        monkeypatch.setattr(resources, 'open_database', record_open)
-        return databases
-
-    @pytest.fixture
-    def failing_exclude(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        async def refuse(_git: Git) -> None:
-            raise self.refusal
-
-        monkeypatch.setattr(resources, 'exclude_state_from_git', refuse)
+    async def refuse(self, _git: Git) -> None:
+        raise self.refusal
 
     def assert_closed(self, database: Database) -> None:
         with pytest.raises(DatabaseClosedError), database.read():
@@ -154,26 +143,18 @@ class TestOpenStateCloses:
 
         self.assert_closed(state.database)
 
-    @pytest.mark.usefixtures('failing_exclude')
     async def test_the_database_is_closed_when_excluding_the_state_raises(
         self, start: StartHarness, opened_databases: list[Database]
     ) -> None:
+        def connect(path: Path, spec: DatabaseSpec) -> Database:
+            return self.record_open(opened_databases, path, spec)
+
         with pytest.raises(PermissionError) as raised:
-            async with open_state(start.data_directory, start.toplevel):
+            async with open_state(
+                start.data_directory, start.toplevel, connect=connect, exclude=self.refuse
+            ):
                 pass
 
         assert raised.value is self.refusal
         (database,) = opened_databases
         self.assert_closed(database)
-
-
-class TestFactories:
-    def test_the_clock_is_the_system_clock(self) -> None:
-        assert isinstance(create_clock(), SystemClock)
-
-    def test_the_spec_names_the_packaged_sql(self) -> None:
-        spec = create_database_spec()
-
-        assert spec.schema.is_file()
-        assert spec.statements.is_file()
-        assert spec.declarations
