@@ -31,7 +31,6 @@ def headings_of(record: SnapshotRecord) -> list[str]:
     return [line for line in lines if line.startswith('## ')]
 
 
-@pytest.mark.integration
 class TestSnapshotRead:
     def test_record_holds_the_generated_time_of_the_injected_clock(
         self, snapshot_read: SnapshotRead, seeded: Slug, repository_facts: RepositoryFacts
@@ -99,7 +98,6 @@ class TestSnapshotRead:
         assert [line.text for line in record.open_questions] == ['which cache size']
 
 
-@pytest.mark.integration
 class TestSnapshotReadLimitsAndHeadings:
     def test_dirty_paths_are_cut_to_the_limit_and_the_count_stays_whole(
         self, snapshot_read: SnapshotRead, seeded: Slug, repository_facts: RepositoryFacts
