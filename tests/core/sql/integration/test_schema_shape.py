@@ -33,6 +33,7 @@ TABLES = frozenset({
     'similarity',
     'scout_reports',
     'session_pointers',
+    'ticket_decisions',
     'closings',
 })
 

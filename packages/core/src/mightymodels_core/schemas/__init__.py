@@ -19,6 +19,7 @@ from . import (
     session_pointers,
     similarity,
     tasks,
+    ticket_decisions,
     tickets,
 )
 
@@ -36,4 +37,5 @@ DECLARATIONS: tuple[Declaration, ...] = (
     *similarity.DECLARATIONS,
     *scout_reports.DECLARATIONS,
     *session_pointers.DECLARATIONS,
+    *ticket_decisions.DECLARATIONS,
 )

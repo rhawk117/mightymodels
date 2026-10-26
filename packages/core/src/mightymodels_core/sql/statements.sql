@@ -600,3 +600,19 @@ LIMIT 1;
 -- name: prune_session_pointers
 DELETE FROM session_pointers
 WHERE repository_id = :repository_id AND written_at < :cutoff;
+
+-- name: add_ticket_decision
+INSERT INTO ticket_decisions (ticket_id, question, answer, response, note, decided_at)
+VALUES (:ticket_id, :question, :answer, :response, :note, :decided_at);
+
+-- name: ticket_decisions
+SELECT json_object(
+  'question', question,
+  'answer', answer,
+  'response', response,
+  'note', note,
+  'decided_at', decided_at
+)
+FROM ticket_decisions
+WHERE ticket_id = :ticket_id
+ORDER BY id;
