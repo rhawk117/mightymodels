@@ -18,6 +18,7 @@ from mightymodels_hooks.scout_reports import (
     SubagentHandbackHandler,
     SubagentRecordHandler,
 )
+from mightymodels_hooks.session_pointer import SessionPointerHandler
 from mightymodels_hooks.session_start import SessionStartHandler
 
 if TYPE_CHECKING:
@@ -70,6 +71,9 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
         'pre-compact': PreCompactHandler(environ=environ, stderr=stderr),
         'subagent-record': SubagentRecordHandler(keeper=keeper),
         'subagent-handback': SubagentHandbackHandler(keeper=keeper),
+        'session-pointer': SessionPointerHandler(
+            environ=environ, stderr=stderr, clock=create_clock()
+        ),
     })
 
 
