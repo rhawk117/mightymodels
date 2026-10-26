@@ -82,12 +82,12 @@ BRANCH = ChoiceQuestion(
     ),
 )
 BRANCH_NAME = TextQuestion(
-    argument='branch_name',
+    field_name='branch_name',
     answers='branch',
     title='New branch name',
     description='The name of the new branch; leave it blank for the current branch.',
 )
-NAMED_BRANCH = replace(BRANCH, argument='branch (the current branch name, or the new branch name)')
+NAMED_BRANCH = replace(BRANCH, prompt='branch (the current branch name, or the new branch name)')
 WRITE_ROUND = ChoiceRound(
     message='Answer what the ticket still needs',
     questions=(SCOPE, COMPACTION, BRANCH),

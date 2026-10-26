@@ -55,7 +55,7 @@ DISPOSE_CHOICES = (
     Choice(value='accept-risk', title='Accept the risk'),
     Choice(value='dismiss', title='Dismiss'),
 )
-DISPOSE_ARGUMENT = 'decisions {"F…": {"decision": <choice>, "reason": "<why>"}}'
+DISPOSE_PROMPT = 'decisions {"F…": {"decision": <choice>, "reason": "<why>"}}'
 FIX = Disposition(decision='fix')
 
 ResolverContext = Context[ServerDependencies, Any]
@@ -101,7 +101,8 @@ def unanswered(page: DisposePage) -> DisposeChoice:
 
 def unanswered_question(keys: tuple[str, ...]) -> ChoiceQuestion:
     return ChoiceQuestion(
-        argument=DISPOSE_ARGUMENT,
+        argument='decisions',
+        prompt=DISPOSE_PROMPT,
         title=f'What should happen to {", ".join(keys)}? accept-risk and dismiss need a reason.',
         description='How each finding is decided, and why.',
         choices=DISPOSE_CHOICES,

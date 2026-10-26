@@ -16,7 +16,8 @@ NEEDS_INPUT = 'needs input: no one answered; ask the user, then call again with 
 
 
 def describe_question(question: ChoiceQuestion) -> str:
-    return f'{question.title}\nchoices: {", ".join(question.values)}\npass: {question.argument}\n'
+    choices = ', '.join(question.values)
+    return f'{question.title}\nchoices: {choices}\npass: {question.prompt or question.argument}\n'
 
 
 def needs_input_text(questions: Iterable[ChoiceQuestion]) -> str:

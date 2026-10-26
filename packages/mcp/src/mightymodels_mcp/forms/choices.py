@@ -33,6 +33,7 @@ class ChoiceQuestion:
     title: str
     description: str
     choices: tuple[Choice, ...]
+    prompt: str | None = None
 
     @property
     def values(self) -> tuple[str, ...]:
@@ -57,7 +58,7 @@ class ChoiceQuestion:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TextQuestion:
-    argument: str
+    field_name: str
     answers: str
     title: str
     description: str
@@ -83,7 +84,7 @@ class ChoiceRound:
         fields: dict[str, Any] = {
             question.argument: question.create_field() for question in self.questions
         }
-        fields |= {text.argument: text.create_field() for text in self.texts}
+        fields |= {text.field_name: text.create_field() for text in self.texts}
         return create_model(ROUND_MODEL_NAME, __base__=BaseModel, **fields)
 
     def ask(self) -> Elicit[BaseModel] | BaseModel:

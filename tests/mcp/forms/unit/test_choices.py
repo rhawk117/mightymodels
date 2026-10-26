@@ -91,7 +91,7 @@ class NamedRequest(RequestModel):
 
 
 NAME = TextQuestion(
-    argument='label_text', answers='label', title='Label', description='Name the label.'
+    field_name='label_text', answers='label', title='Label', description='Name the label.'
 )
 NAMED_ROUND = ChoiceRound(message='Name it', questions=(MODE,), texts=(NAME,))
 

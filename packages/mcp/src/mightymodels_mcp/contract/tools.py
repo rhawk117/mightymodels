@@ -75,7 +75,7 @@ APPROVAL_RESOLVER = Resolve(ask_approval)
 
 
 def describe_unanswered(request: ContractApproveRequest) -> str:
-    question = replace(create_approval_question(request), argument=PASS_APPROVER)
+    question = replace(create_approval_question(request), prompt=PASS_APPROVER)
     return needs_input_text([question])
 
 
