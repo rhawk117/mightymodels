@@ -8,8 +8,8 @@ needs-input text as a normal result. Neither tool asks git anything.
 
 The SDK reads a resolver's annotations at runtime and knows a context only as a `Context` class,
 never through a `type` alias, so the context, the outcomes and the asks are module-level plain
-assignments. A refusal from core inside a resolver becomes the tool error carrying core's message,
-as a handler's does.
+assignments. A refusal from core inside a resolver becomes the tool error carrying core's message
+through the same wrapper a handler gets when the tool is registered.
 """
 
 from dataclasses import dataclass
@@ -17,9 +17,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from mcp.server.elicitation import AcceptedElicitation
 from mcp.server.mcpserver import Context
-from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.mcpserver.resolve import Elicit, Resolve
-from mightymodels_core.primitives import StateError
 from mightymodels_core.reviews import IncomingDisposition, ResolveRequest
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -114,11 +112,8 @@ async def find_undecided(request: ReviewDisposeRequest, ctx: ResolverContext) ->
     if request.decisions is not None:
         return UndecidedFindings(run_id=request.run_id, findings=())
 
-    try:
-        async with open_state(ctx) as state:
-            findings = list_undecided(create_review_work(state), request.run_id)
-    except StateError as refusal:
-        raise ToolError(str(refusal)) from refusal
+    async with open_state(ctx) as state:
+        findings = list_undecided(create_review_work(state), request.run_id)
 
     return UndecidedFindings(run_id=request.run_id, findings=findings)
 

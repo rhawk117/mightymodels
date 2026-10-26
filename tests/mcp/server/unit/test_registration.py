@@ -212,7 +212,10 @@ class TestResolvingTool:
 
     def test_resolvers_reach_the_tool_as_full_outcomes(self, catalog: ToolCatalog) -> None:
         tool = self.register_answering(catalog, 'answer_note', refuse=False)
-        assert tool.resolved_params == {'answer': (NOTE_RESOLVER, True)}
+        ((marker, wants_union),) = tool.resolved_params.values()
+        assert list(tool.resolved_params) == ['answer']
+        assert marker.fn.__wrapped__ is NOTE_RESOLVER.fn
+        assert wants_union
         assert len(tool.resolver_plans) == 1
         assert tool.parameters == NoteRequest.model_json_schema(by_alias=True)
 

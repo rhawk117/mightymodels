@@ -1,9 +1,11 @@
 """Register tools that take one request model and the context, with complete metadata.
 
 The tool is built from the definition's models rather than from the handler's signature, so
-the handler's annotations are never evaluated at runtime. Core refusals (`StateError`) reach
-the client as tool errors carrying core's message; any other exception stays a crash the SDK
-reports without its text.
+the handler's annotations are never evaluated at runtime. Core refusals (`StateError`) and the
+operational database failures (a schema version mismatch, a busy, in-use or read-only database)
+reach the client as tool errors carrying core's message; any other exception stays a crash the SDK
+reports without its text. One `RefusalTranslator` does that and records the call for a handler and
+for every resolver, so a refusal from either is logged as `refused`.
 
 A definition may name resolvers, parameter name to `Resolve`. The SDK runs them before the
 handler, a resolver taking the whole request by the name `request`, and passes the handler each
@@ -12,15 +14,32 @@ reaches the handler to answer rather than aborting the call.
 """
 
 import inspect
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import wraps
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Concatenate, Self
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Concatenate,
+    Self,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
-from mcp.server.mcpserver.resolve import build_resolver_plans
+from mcp.server.mcpserver.resolve import Resolve, build_resolver_plans
 from mcp.server.mcpserver.tools import Tool
 from mcp.server.mcpserver.utilities.func_metadata import FuncMetadata
+from mightymodels_core.database.errors import (
+    BusyError,
+    DatabaseInUseError,
+    ReadOnlyDatabaseError,
+    SchemaVersionError,
+)
 from mightymodels_core.primitives import StateError
 from pydantic import BaseModel
 
@@ -29,9 +48,8 @@ from .dependencies import ServerDependencies
 from .requests import REQUEST_ARGUMENT, RequestModel
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Mapping
+    from collections.abc import Awaitable, Callable, Generator, Mapping
 
-    from mcp.server.mcpserver.resolve import Resolve
     from mcp.types import Icon, ToolAnnotations
 
     from .call_log import CallOutcome
@@ -43,6 +61,7 @@ type ToolHandler[R: RequestModel, V: BaseModel, **P = []] = Callable[
 
 CONTEXT_ARGUMENT = 'ctx'
 SLUG_ARGUMENT = 'slug'
+REFUSALS = (StateError, SchemaVersionError, BusyError, DatabaseInUseError, ReadOnlyDatabaseError)
 ANNOTATION_HINTS = ('read_only_hint', 'destructive_hint', 'idempotent_hint', 'open_world_hint')
 
 
@@ -135,11 +154,10 @@ class ToolDefinitionPolicy[R: RequestModel, V: BaseModel, **P]:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class RefusalTranslatingHandler[R: RequestModel, V: BaseModel, **P]:
+class RefusalTranslator:
     name: str
-    handler: ToolHandler[R, V, P]
 
-    def record_call(self, request: R, outcome: CallOutcome, started: float) -> None:
+    def record_call(self, request: object | None, outcome: CallOutcome, started: float) -> None:
         CallRecord(
             tool_name=self.name,
             slug=getattr(request, SLUG_ARGUMENT, None),
@@ -147,27 +165,90 @@ class RefusalTranslatingHandler[R: RequestModel, V: BaseModel, **P]:
             duration_ms=(perf_counter() - started) * 1000,
         ).emit()
 
-    async def run(self, request: R, ctx: ToolContext, *args: P.args, **kwargs: P.kwargs) -> V:
-        started = perf_counter()
+    @contextmanager
+    def guard(self, request: object | None, started: float) -> Generator[None]:
         try:
-            result = await self.handler(request, ctx, *args, **kwargs)
-        except StateError as refusal:
+            yield
+        except REFUSALS as refusal:
             self.record_call(request, 'refused', started)
             raise ToolError(str(refusal)) from refusal
         except Exception:
             self.record_call(request, 'error', started)
             raise
 
-        self.record_call(request, 'ok', started)
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RefusalTranslatingHandler[R: RequestModel, V: BaseModel, **P]:
+    translator: RefusalTranslator
+    handler: ToolHandler[R, V, P]
+
+    async def run(self, request: R, ctx: ToolContext, *args: P.args, **kwargs: P.kwargs) -> V:
+        started = perf_counter()
+        with self.translator.guard(request, started):
+            result = await self.handler(request, ctx, *args, **kwargs)
+
+        self.translator.record_call(request, 'ok', started)
         return result
+
+
+def create_guarded_resolver(
+    translator: RefusalTranslator, resolver: Callable[..., Any]
+) -> Callable[..., Any]:
+    if inspect.iscoroutinefunction(resolver):
+
+        @wraps(resolver)
+        async def guarded(**kwargs: Any) -> Any:
+            with translator.guard(kwargs.get(REQUEST_ARGUMENT), perf_counter()):
+                return await resolver(**kwargs)
+
+        return guarded
+
+    @wraps(resolver)
+    def guarded_sync(**kwargs: Any) -> Any:
+        with translator.guard(kwargs.get(REQUEST_ARGUMENT), perf_counter()):
+            return resolver(**kwargs)
+
+    return guarded_sync
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RefusalTranslatingResolvers:
+    translator: RefusalTranslator
+    guarded: dict[int, Callable[..., Any]] = field(default_factory=dict)
+
+    def wrap_marker(self, marker: Resolve) -> Resolve:
+        return Resolve(self.wrap(marker.fn))
+
+    def wrap_hint(self, hint: Any) -> Any:
+        if get_origin(hint) is not Annotated:
+            return hint
+
+        type_arg, *metadata = get_args(hint)
+        wrapped = [self.wrap_marker(m) if isinstance(m, Resolve) else m for m in metadata]
+        return Annotated[type_arg, *wrapped]
+
+    def wrap(self, resolver: Callable[..., Any]) -> Callable[..., Any]:
+        if known := self.guarded.get(id(resolver)):
+            return known
+
+        guarded = create_guarded_resolver(self.translator, resolver)
+        self.guarded[id(resolver)] = guarded
+        hints = get_type_hints(resolver, include_extras=True)
+        guarded.__annotations__ = {name: self.wrap_hint(hint) for name, hint in hints.items()}
+        return guarded
 
 
 def create_tool[R: RequestModel, V: BaseModel, **P](definition: ToolDefinition[R, V, P]) -> Tool:
     request_model = definition.request_model
-    translator = RefusalTranslatingHandler(name=definition.name, handler=definition.handler)
-    resolved_params = definition.resolved_params
+    translator = RefusalTranslator(name=definition.name)
+    handler = RefusalTranslatingHandler(translator=translator, handler=definition.handler)
+    resolvers = RefusalTranslatingResolvers(translator=translator)
+    resolved_params = {
+        name: (resolvers.wrap_marker(marker), wants_union)
+        for name, (marker, wants_union) in definition.resolved_params.items()
+    }
     return Tool(
-        fn=translator.run,
+        fn=handler.run,
         name=definition.name,
         title=definition.title,
         description=definition.description,

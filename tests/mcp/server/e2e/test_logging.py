@@ -20,6 +20,8 @@ from mightymodels_mcp.server.registration import ToolCatalog, ToolDefinition
 from mightymodels_mcp.server.requests import RequestModel
 from pydantic import BaseModel
 
+from tests.mcp.review.review_harness import create_review_harness
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
 
@@ -283,3 +285,16 @@ class TestRejectedRequestState:
         ]
         assert len(records) == 1
         assert 'requestState rejected on tools/call: unknown key' in records[0]
+
+
+@pytest.mark.usefixtures('logs')
+class TestResolverRefusalLogging:
+    async def test_resolver_refusal_is_logged_as_refused(
+        self, server_harness: ServerHarness, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        harness = await create_review_harness(server_harness)
+        result = await harness.call('review_dispose', {'run_id': '20200101-000000'})
+        assert result.is_error
+        calls = [r.__dict__ for r in caplog.records if r.name == CALL_LOGGER_NAME]
+        outcomes = {call['tool_name']: call['outcome'] for call in calls}
+        assert outcomes['review_dispose'] == 'refused'
