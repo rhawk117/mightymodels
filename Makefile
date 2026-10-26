@@ -2,9 +2,9 @@ SHELL := /usr/bin/env bash
 UV ?= uv
 .DEFAULT_GOAL := help
 
-.PHONY: help setup sync format lint quality pre-commit test check
+.PHONY: help setup sync format lint quality pre-commit test test.end-to-end check
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 format.markdown: ## Run mdformat
 	$(UV) run mdformat && $(UV) run mdformat --check .
@@ -28,8 +28,11 @@ format: ## Run the quality script's formatters
 lint: ## Run the quality script's linters
 	bash ./scripts/lint.sh
 
-test: ## Run the quality script's tests
-	./scripts/quality.sh --test
+test: ## Run the unit, agents and smoke tests
+	$(UV) run pytest -q -m "unit or agents or smoke"
+
+test.end-to-end: ## Run the end-to-end tests
+	$(UV) run pytest -q -m e2e
 
 quality: ## Run the full quality script
 	./scripts/quality.sh

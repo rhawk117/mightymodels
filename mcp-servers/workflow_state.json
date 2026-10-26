@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "workflow_state": {
+      "command": "uv",
+      "args": ["run", "--locked", "--no-dev", "--package", "mightymodels-mcp", "mightymodels-mcp"],
+      "env": {
+        "UV_PROJECT": "${CLAUDE_PLUGIN_ROOT}",
+        "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_ROOT}/.venv"
+      }
+    }
+  }
+}

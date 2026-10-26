@@ -21,19 +21,24 @@ settings.register_profile('thorough', parent=settings.get_profile('ci'), max_exa
 settings.load_profile(resolve_hypothesis_profile())
 
 TIER_DEPTH = 2
-TIER_NAMES = frozenset({'unit', 'integration', 'smoke'})
+CORE_TIER_NAMES = frozenset({'unit', 'integration', 'smoke'})
+TIER_NAMES_BY_TREE = {
+    'core': CORE_TIER_NAMES,
+    'mcp': CORE_TIER_NAMES | {'e2e'},
+}
 
 
-def get_core_relative_parts(root: Path, path: Path) -> tuple[str, ...] | None:
-    relative_parts = path.relative_to(root.joinpath('tests', 'core'), walk_up=True).parts
-    if relative_parts[0] == '..':
-        return None
-
-    return relative_parts
+def get_relative_parts(root: Path, path: Path, tree: str) -> tuple[str, ...]:
+    return path.relative_to(root.joinpath('tests', tree), walk_up=True).parts
 
 
-def has_tier_directory(relative_parts: tuple[str, ...]) -> bool:
-    return len(relative_parts) > TIER_DEPTH and relative_parts[1] in TIER_NAMES
+def get_tier_tree(root: Path, path: Path) -> tuple[str, tuple[str, ...]] | None:
+    located = ((tree, get_relative_parts(root, path, tree)) for tree in TIER_NAMES_BY_TREE)
+    return next(((tree, parts) for tree, parts in located if parts[0] != '..'), None)
+
+
+def has_tier_directory(tree: str, relative_parts: tuple[str, ...]) -> bool:
+    return len(relative_parts) > TIER_DEPTH and relative_parts[1] in TIER_NAMES_BY_TREE[tree]
 
 
 def is_test_module(config: pytest.Config, file_path: Path) -> bool:
@@ -47,13 +52,14 @@ def pytest_collect_file(file_path: Path, parent: pytest.Collector) -> None:
     if not is_test_module(parent.config, file_path):
         return
 
-    relative_parts = get_core_relative_parts(parent.config.rootpath, file_path)
-    if relative_parts is None or has_tier_directory(relative_parts):
+    located = get_tier_tree(parent.config.rootpath, file_path)
+    if located is None or has_tier_directory(*located):
         return
 
-    tiers = ', '.join(sorted(TIER_NAMES))
+    tree = located[0]
+    tiers = ', '.join(sorted(TIER_NAMES_BY_TREE[tree]))
     message = (
-        f'{file_path} is not under tests/core/<concept>/<tier>/, '
+        f'{file_path} is not under tests/{tree}/<concept>/<tier>/, '
         f'where the tier is one of the directories {tiers}'
     )
     raise pytest.UsageError(message)
@@ -61,11 +67,11 @@ def pytest_collect_file(file_path: Path, parent: pytest.Collector) -> None:
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     for item in items:
-        relative_parts = get_core_relative_parts(config.rootpath, item.path)
-        if relative_parts is None or not has_tier_directory(relative_parts):
+        located = get_tier_tree(config.rootpath, item.path)
+        if located is None or not has_tier_directory(*located):
             continue
 
-        item.add_marker(relative_parts[1])
+        item.add_marker(located[1][1])
 
 
 @pytest.fixture

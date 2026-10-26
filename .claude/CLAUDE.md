@@ -7,9 +7,10 @@ Every command goes through `make`. Each target delegates to uv or to `scripts/qu
 - `make setup` installs the pre-commit git hook and syncs every workspace package and dependency group. A fresh clone has no git hook, so run it before the first commit.
 - `make sync` syncs the workspace packages and dependency groups.
 - `make format` runs the formatters.
-- `make lint` runs ruff format and ruff check without fixing, mdformat, ty, and then the Claude CLI's strict plugin validation. It fails when `claude` is not on `PATH`.
+- `make lint` runs ruff format and ruff check without fixing, mdformat and ty.
 - `make typecheck` runs ty alone.
-- `make test` runs pytest with coverage.
+- `make test` runs `pytest -q -m "unit or agents or smoke"`, with coverage.
+- `make test.end-to-end` runs `pytest -q -m e2e`.
 - `make pre-commit` runs every pre-commit hook on all files, including the hygiene fixers and uv-lock.
 - `make check` runs lint, then test.
 
@@ -36,7 +37,7 @@ Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. 
 
 ## Verification
 
-`.github/workflows/ci.yml` defines CI's quality job, which runs the pre-commit hooks on all files and then the tests. Match it with `make pre-commit`, then `make test`. `make check` is the faster local loop, but it skips the hygiene and uv-lock hooks, so it can pass where CI fails.
+`.github/workflows/ci.yml` defines CI's quality job, which runs the pre-commit hooks on all files and then the tests. Match it with `make pre-commit`, then `uv run pytest -q -m "not integration"`, because `make test` skips the e2e tests and the unmarked tests that CI runs. `make check` is the faster local loop, but it skips the hygiene and uv-lock hooks, so it can pass where CI fails.
 
 ## Claude Code
 
