@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.crashouts import CrashoutEntry
 
-from mightymodels_mcp.review.tools import READS, WRITES, open_state
+from mightymodels_mcp.server.annotations import READS, WRITES
 from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition
+from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
 
 from .schemas import (
     CrashoutAddRequest,
@@ -48,25 +48,25 @@ def crashout_entry(request: CrashoutAddRequest) -> CrashoutEntry:
 
 async def crashout_add(request: CrashoutAddRequest, ctx: ToolContext) -> JournalView:
     """Journal one crashout; a blank field or an empty list of failures is refused."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return add_crashout(create_journal_work(state), crashout_entry(request))
 
 
 async def crashout_stats(_request: CrashoutStatsRequest, ctx: ToolContext) -> JournalView:
     """Show the patterns across the latest crashouts; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return show_crashout_stats(create_journal_work(state))
 
 
 async def crashout_last(_request: CrashoutLastRequest, ctx: ToolContext) -> JournalView:
     """Show the newest crashout; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return show_last_crashout(create_journal_work(state))
 
 
 async def similarity_search(request: SimilaritySearchRequest, ctx: ToolContext) -> JournalView:
     """Search the journaled rows for text like the query; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         asked = SimilarityQuery(query=request.query, kind=request.kind)
         return search_similar(create_journal_work(state), asked)
 

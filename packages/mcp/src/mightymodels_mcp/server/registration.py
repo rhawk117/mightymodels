@@ -49,8 +49,10 @@ from .requests import REQUEST_ARGUMENT, RequestModel
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Generator, Mapping
+    from contextlib import AbstractAsyncContextManager
 
     from mcp.types import Icon, ToolAnnotations
+    from mightymodels_core.edge import OpenState
 
     from .call_log import CallOutcome
 
@@ -58,6 +60,11 @@ type ToolContext = Context[ServerDependencies, Any]
 type ToolHandler[R: RequestModel, V: BaseModel, **P = []] = Callable[
     Concatenate[R, ToolContext, P], Awaitable[V]
 ]
+
+
+def open_tool_state(ctx: ToolContext) -> AbstractAsyncContextManager[OpenState]:
+    return ctx.request_context.lifespan_context.state.open()
+
 
 CONTEXT_ARGUMENT = 'ctx'
 SLUG_ARGUMENT = 'slug'

@@ -25,12 +25,12 @@ from mightymodels_mcp.contract.schemas import USER_APPROVER
 from mightymodels_mcp.forms.choices import Choice, ChoiceOutcome, ChoiceQuestion
 from mightymodels_mcp.forms.dispose import ReasonsForm, create_dispose_pages
 from mightymodels_mcp.forms.needs_input import needs_input_text
+from mightymodels_mcp.server.annotations import WRITES
 from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition
+from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
 
 from .schemas import Disposition, ReviewDisposeRequest, ReviewResolveRequest
-from .tools import WRITES, open_state
 from .use_cases import (
     DispositionsToRecord,
     create_review_work,
@@ -112,7 +112,7 @@ async def find_undecided(request: ReviewDisposeRequest, ctx: ResolverContext) ->
     if request.decisions is not None:
         return UndecidedFindings(run_id=request.run_id, findings=())
 
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         findings = list_undecided(create_review_work(state), request.run_id)
 
     return UndecidedFindings(run_id=request.run_id, findings=findings)
@@ -203,7 +203,7 @@ async def review_dispose(
         return ReviewView(text=text, run_id=request.run_id)
 
     dispositions = create_dispositions(request.run_id, decided_by(request, choice))
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return dispose_findings(create_review_work(state), dispositions)
 
 
@@ -215,7 +215,7 @@ async def review_resolve(request: ReviewResolveRequest, ctx: ToolContext) -> Rev
         commit=request.commit,
         reason=request.reason,
     )
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return resolve_finding(create_review_work(state), request.run_id, resolve)
 
 

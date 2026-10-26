@@ -11,7 +11,6 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from mcp.server.mcpserver.resolve import Elicit, Resolve
-from mcp.types import ToolAnnotations
 from mightymodels_core.tickets import branch_of
 from pydantic import BaseModel
 
@@ -23,8 +22,9 @@ from mightymodels_mcp.forms.choices import (
     answers_of,
 )
 from mightymodels_mcp.forms.needs_input import needs_input_text
+from mightymodels_mcp.server.annotations import CLOSES, READS, WRITES
 from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition
+from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
 
 from .close_facts import CloseAttempt, gather_close_facts
 from .schemas import (
@@ -49,9 +49,6 @@ from .use_cases import (
 from .views import CloseView, TicketView
 
 if TYPE_CHECKING:
-    from contextlib import AbstractAsyncContextManager
-
-    from mightymodels_core.edge import OpenState
     from mightymodels_core.git import Git
 
     from mightymodels_mcp.forms.choices import ChoiceOutcome
@@ -97,15 +94,6 @@ WRITE_ROUND = ChoiceRound(
     texts=(BRANCH_NAME,),
 )
 
-WRITES = ToolAnnotations(
-    read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
-)
-READS = ToolAnnotations(
-    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
-)
-CLOSES = ToolAnnotations(
-    read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=False
-)
 
 RoundAsk = Elicit[BaseModel] | BaseModel
 
@@ -121,10 +109,6 @@ def describe_unanswered(request: TicketWriteRequest) -> str:
     omitted = WRITE_ROUND.omitted_by(request).questions
     passed = (NAMED_BRANCH if question is BRANCH else question for question in omitted)
     return needs_input_text(passed)
-
-
-def open_state(ctx: ToolContext) -> AbstractAsyncContextManager[OpenState]:
-    return ctx.request_context.lifespan_context.state.open()
 
 
 async def name_branch(choices: WriteChoices, git: Git) -> str:
@@ -145,7 +129,7 @@ async def ticket_write(
         return TicketView(text=describe_unanswered(request))
 
     choices = create_write_choices(request, form)
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         branch = await name_branch(choices, state.git)
         ticket_answers = create_ticket_answers(request, choices, branch)
         return write_ticket(create_ticket_work(state), request.slug, ticket_answers)
@@ -153,25 +137,25 @@ async def ticket_write(
 
 async def ticket_validate(request: TicketRequest, ctx: ToolContext) -> TicketView:
     """Validate ticket.yml and stage the ticket with the investigations it declares."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return validate_ticket(create_ticket_work(state), request.slug)
 
 
 async def ticket_show(request: TicketRequest, ctx: ToolContext) -> TicketView:
     """Show a staged ticket's record."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return show_ticket(create_ticket_work(state), request.slug)
 
 
 async def ticket_update_context(request: TicketContextRequest, ctx: ToolContext) -> TicketView:
     """Replace the context lines of ticket.yml, then stage the ticket again."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return update_ticket_context(create_ticket_work(state), request.slug, request.context)
 
 
 async def close_check(request: TicketRequest, ctx: ToolContext) -> CloseView:
     """List what still blocks closing a ticket; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         work = create_ticket_work(state)
         prepared = prepare_close(work, request.slug)
         facts = await gather_close_facts(state.git, prepared)
@@ -180,7 +164,7 @@ async def close_check(request: TicketRequest, ctx: ToolContext) -> CloseView:
 
 async def close_ticket(request: CloseTicketRequest, ctx: ToolContext) -> CloseView:
     """Close a ticket with no live work left and write its archive."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         work = create_ticket_work(state)
         prepared = prepare_close(work, request.slug)
         facts = await gather_close_facts(state.git, prepared)

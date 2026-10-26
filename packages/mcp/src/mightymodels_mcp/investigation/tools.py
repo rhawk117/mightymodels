@@ -19,9 +19,9 @@ from pydantic import BaseModel
 
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
 from mightymodels_mcp.forms.needs_input import needs_input_text
-from mightymodels_mcp.review.tools import READS, WRITES, open_state
+from mightymodels_mcp.server.annotations import READS, WRITES
 from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition
+from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
 
 from .schemas import (
     InvestigationAddRequest,
@@ -93,7 +93,7 @@ async def investigation_start(
         return InvestigationView(text=needs_input_text(kind_round(request).questions))
 
     asked = StartRequest(target=request.target, kind=request.kind or form['kind'])
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return start_investigation(create_investigation_work(state), asked)
 
 
@@ -101,7 +101,7 @@ async def investigation_add(
     request: InvestigationAddRequest, ctx: ToolContext
 ) -> InvestigationView:
     """Add one round of entries to an investigation's ledger."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         entries = [incoming_entry(entry) for entry in request.entries]
         asked = AddRequest(round=request.round, entries=entries, head=head)
@@ -113,7 +113,7 @@ async def investigation_render(
     request: InvestigationRenderRequest, ctx: ToolContext
 ) -> InvestigationView:
     """Render an investigation's ledger; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return render_investigation(create_investigation_work(state), request.investigation_id)
 
 
@@ -121,7 +121,7 @@ async def investigation_knowns(
     request: InvestigationKnownsRequest, ctx: ToolContext
 ) -> InvestigationView:
     """Show the knowns table with each row current or a lead at HEAD; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         selection = KnownsSelection(kinds=request.kinds, limit=request.limit)
         asked = KnownsAtHead(investigation=request.investigation_id, selection=selection, head=head)
@@ -132,7 +132,7 @@ async def investigation_list(
     _request: InvestigationListRequest, ctx: ToolContext
 ) -> InvestigationView:
     """List the latest investigations with their rounds; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return list_investigations(create_investigation_work(state))
 
 

@@ -11,13 +11,13 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from mcp.server.mcpserver.resolve import Elicit, Resolve
-from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
 from mightymodels_mcp.forms.needs_input import needs_input_text
+from mightymodels_mcp.server.annotations import READS, WRITES
 from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition
+from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
 
 from .schemas import (
     USER_APPROVER,
@@ -35,10 +35,6 @@ from .use_cases import (
 from .views import ContractView, render_declined
 
 if TYPE_CHECKING:
-    from contextlib import AbstractAsyncContextManager
-
-    from mightymodels_core.edge import OpenState
-
     from mightymodels_mcp.forms.choices import ChoiceOutcome
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
 
@@ -48,12 +44,6 @@ APPROVE = 'approve'
 DECLINE = 'decline'
 PASS_APPROVER = f'approved_by "{USER_APPROVER}" on each command, once the user approved'
 
-WRITES = ToolAnnotations(
-    read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
-)
-READS = ToolAnnotations(
-    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
-)
 
 RoundAsk = Elicit[BaseModel] | BaseModel
 
@@ -88,10 +78,6 @@ def describe_unanswered(request: ContractApproveRequest) -> str:
     return needs_input_text([question])
 
 
-def open_state(ctx: ToolContext) -> AbstractAsyncContextManager[OpenState]:
-    return ctx.request_context.lifespan_context.state.open()
-
-
 async def contract_approve(
     request: ContractApproveRequest, ctx: ToolContext, *, answers: ChoiceOutcome
 ) -> ContractView:
@@ -104,7 +90,7 @@ async def contract_approve(
         return render_declined(DECLINE)
 
     commands = create_approved_commands(request, USER_APPROVER)
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         approval = ContractApproval(slug=request.slug, commands=commands, head=head)
         return approve_contract(create_contract_work(state), approval)
@@ -112,7 +98,7 @@ async def contract_approve(
 
 async def contract_status(request: ContractRequest, ctx: ToolContext) -> ContractView:
     """Show each approved command of a ticket with its latest receipt against the current HEAD."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         return show_contract_status(create_contract_work(state), request.slug, head)
 

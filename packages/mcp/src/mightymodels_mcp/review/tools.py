@@ -9,15 +9,15 @@ a module-level plain assignment and `ReviewStartRequest` a runtime import.
 from typing import TYPE_CHECKING, Any
 
 from mcp.server.mcpserver.resolve import Elicit, Resolve
-from mcp.types import ToolAnnotations
 from mightymodels_core.reviews import StartRequest
 from mightymodels_core.workspace import workspace_at
 from pydantic import BaseModel
 
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
 from mightymodels_mcp.forms.needs_input import needs_input_text
+from mightymodels_mcp.server.annotations import READS, WRITES
 from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition
+from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
 
 from .schemas import (
     ReviewAddRequest,
@@ -41,10 +41,6 @@ from .use_cases import (
 from .views import ReviewView
 
 if TYPE_CHECKING:
-    from contextlib import AbstractAsyncContextManager
-
-    from mightymodels_core.edge import OpenState
-
     from mightymodels_mcp.forms.choices import ChoiceOutcome
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
 
@@ -84,12 +80,6 @@ START_ROUND = ChoiceRound(
     message='Answer what the review still needs', questions=(SCOPE, DEPTH, EMPHASIS)
 )
 
-WRITES = ToolAnnotations(
-    read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
-)
-READS = ToolAnnotations(
-    read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
-)
 
 RoundAsk = Elicit[BaseModel] | BaseModel
 
@@ -125,10 +115,6 @@ def create_start_request(request: ReviewStartRequest, form: dict[str, Any]) -> S
     )
 
 
-def open_state(ctx: ToolContext) -> AbstractAsyncContextManager[OpenState]:
-    return ctx.request_context.lifespan_context.state.open()
-
-
 async def review_start(
     request: ReviewStartRequest, ctx: ToolContext, *, answers: ChoiceOutcome
 ) -> ReviewView:
@@ -138,7 +124,7 @@ async def review_start(
         return ReviewView(text=describe_unanswered(request))
 
     start = create_start_request(request, form)
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         workspace = workspace_at(state.checkout.toplevel)
         return start_review(
@@ -148,13 +134,13 @@ async def review_start(
 
 async def review_override(request: ReviewOverrideRequest, ctx: ToolContext) -> ReviewView:
     """Switch a run's heavier reviewer to the override model."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return override_review(create_review_work(state), request.run_id)
 
 
 async def review_add(request: ReviewAddRequest, ctx: ToolContext) -> ReviewView:
     """Read a reviewer's report from the run's directory and record its findings."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         workspace = workspace_at(state.checkout.toplevel)
         work = create_review_work(state)
         report = ReportToAdd(run_id=request.run_id, persona=request.persona)
@@ -163,19 +149,19 @@ async def review_add(request: ReviewAddRequest, ctx: ToolContext) -> ReviewView:
 
 async def review_gate(request: ReviewGateRequest, ctx: ToolContext) -> ReviewView:
     """List a run's findings in gate order with each one's decision; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return gate_review(create_review_work(state), request.run_id)
 
 
 async def review_report(request: ReviewReportRequest, ctx: ToolContext) -> ReviewView:
     """Render a run's report, in full or as a review comment; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return report_review(create_review_work(state), request.run_id, request.shape)
 
 
 async def review_list(_request: ReviewListRequest, ctx: ToolContext) -> ReviewView:
     """List the latest review runs with their findings and verdicts; changes nothing."""
-    async with open_state(ctx) as state:
+    async with open_tool_state(ctx) as state:
         return list_reviews(create_review_work(state))
 
 
