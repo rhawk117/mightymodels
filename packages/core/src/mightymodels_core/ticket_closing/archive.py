@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from mightymodels_core.reviews.services import LatestReview
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
     from mightymodels_core.ticket_closing.records import ClosingRecord
+    from mightymodels_core.ticket_decisions.records import TicketDecision
     from mightymodels_core.tickets.records import TicketRecord, Tracker
     from mightymodels_core.vocabulary.contract import Outcome
     from mightymodels_core.vocabulary.reviews import Depth
@@ -84,6 +85,7 @@ class ArchiveSources:
     ledgers: Sequence[Ledger]
     review: LatestReview | None
     decision_limit: int
+    ticket_decisions: Sequence[TicketDecision] = ()
 
 
 def archived_command(command: RecordedCommand, receipt: Receipt | None) -> ArchivedCommand:
@@ -138,12 +140,26 @@ def archived_review(review: LatestReview | None) -> ArchivedReview | None:
     )
 
 
-def archived_decisions(ledgers: Sequence[Ledger], limit: int) -> tuple[ArchivedDecision, ...]:
+def ticket_decision_text(decision: TicketDecision) -> str:
+    text = f'{decision.question}: {decision.answer}'
+    if decision.response is not None:
+        text = f'{text} - {decision.response}'
+
+    return text
+
+
+def archived_decisions(
+    ledgers: Sequence[Ledger], limit: int, ticket_decisions: Sequence[TicketDecision] = ()
+) -> tuple[ArchivedDecision, ...]:
     decisions = [
         ArchivedDecision(text=redact(one_line(record.text)), origin=ledger.origin_of(record))
         for ledger in ledgers
         for record in ledger.live_of_kind('decision')
     ]
+    decisions.extend(
+        ArchivedDecision(text=redact(one_line(ticket_decision_text(decision))), origin='ticket')
+        for decision in ticket_decisions
+    )
     return tuple(decisions[max(len(decisions) - limit, 0) :])
 
 
@@ -163,6 +179,8 @@ def create_archive_record(sources: ArchiveSources) -> ArchiveRecord:
             archived_command(command, sources.receipts.get(command.key))
             for command in sources.commands
         ),
-        decisions=archived_decisions(sources.ledgers, sources.decision_limit),
+        decisions=archived_decisions(
+            sources.ledgers, sources.decision_limit, sources.ticket_decisions
+        ),
         review=archived_review(sources.review),
     )

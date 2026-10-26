@@ -14,6 +14,7 @@ from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.investigations import SqliteInvestigationRepository
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository
 from mightymodels_core.ticket_closing import ClosingService, SqliteClosingRepository
+from mightymodels_core.ticket_decisions import SqliteTicketDecisionRepository
 from mightymodels_core.tickets import (
     SqliteTicketRepository,
     TicketService,
@@ -112,6 +113,7 @@ class TicketWork:
             review_decisions=review_decisions,
             investigations=investigations,
             closings=SqliteClosingRepository(unit=unit),
+            ticket_decisions=SqliteTicketDecisionRepository(unit=unit, clock=self.clock),
             clock=self.clock,
         )
         return tickets, closing

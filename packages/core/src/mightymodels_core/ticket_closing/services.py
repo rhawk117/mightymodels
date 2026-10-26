@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from mightymodels_core.ticket_closing.archive import ArchiveRecord
     from mightymodels_core.ticket_closing.records import CloseFacts, ClosingLines, OneLinedClosing
     from mightymodels_core.ticket_closing.repository import ClosingRepository
+    from mightymodels_core.ticket_decisions.repository import TicketDecisionRepository
     from mightymodels_core.tickets.records import TicketRecord
     from mightymodels_core.tickets.repository import TicketRepository
 
@@ -73,6 +74,7 @@ class ClosingService:
     review_decisions: ReviewDecisionService
     investigations: InvestigationRepository
     closings: ClosingRepository
+    ticket_decisions: TicketDecisionRepository
     clock: Clock
     options: ClosingOptions = field(default_factory=ClosingOptions)
 
@@ -151,4 +153,5 @@ class ClosingService:
             ledgers=linked_ledgers(self.investigations, ticket.investigations).ledgers,
             review=review,
             decision_limit=self.options.decision_limit,
+            ticket_decisions=self.ticket_decisions.decisions(ticket.id),
         )

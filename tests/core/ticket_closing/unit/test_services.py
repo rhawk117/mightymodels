@@ -15,6 +15,7 @@ from mightymodels_core.ticket_closing import (
     TicketMovedError,
     TooManyGotchasError,
 )
+from mightymodels_core.ticket_decisions import IncomingDecision
 from mightymodels_core.tickets import ClosedTicketError, NotStagedError
 
 from tests.core.contract.fakes import ContractLedger, FakeContractRepository
@@ -51,6 +52,7 @@ from tests.core.ticket_closing.closing_builders import (
     create_ticket_section,
 )
 from tests.core.ticket_closing.fakes import FakeClosingRepository
+from tests.core.ticket_decisions.fakes import FakeTicketDecisionRepository
 from tests.core.tickets.fakes import FakeTicketRepository
 
 if TYPE_CHECKING:
@@ -66,6 +68,7 @@ class ServiceHarness:
     service: ClosingService
     tickets: FakeTicketRepository
     closings: FakeClosingRepository
+    ticket_decisions: FakeTicketDecisionRepository
     ticket_id: int
 
     def request_for(
@@ -119,6 +122,12 @@ def seed_investigation(ledger: InvestigationLedger) -> None:
     investigations.append(LINKED, [create_decision_entry(1, 'use a policy')])
 
 
+def create_service_command() -> ApprovedCommand:
+    return ApprovedCommand(
+        key='T1.AC-1', argv=('true',), expect_exit=0, timeout=10, approved_by='the user'
+    )
+
+
 @pytest.fixture
 def service_harness() -> ServiceHarness:
     tickets = FakeTicketRepository(recorded_investigations=(LINKED,))
@@ -131,11 +140,11 @@ def service_harness() -> ServiceHarness:
     seed_review(review_ledger)
     seed_investigation(investigation_ledger)
     contracts = FakeContractRepository(ledger=ContractLedger())
-    command = ApprovedCommand(
-        key='T1.AC-1', argv=('true',), expect_exit=0, timeout=10, approved_by='the user'
+    contracts.approve(
+        record.id, [create_service_command()], Approval(at=SERVICE_MOMENT, head='base001')
     )
-    contracts.approve(record.id, [command], Approval(at=SERVICE_MOMENT, head='base001'))
     closings = FakeClosingRepository()
+    ticket_decisions = FakeTicketDecisionRepository(decided_at=SERVICE_MOMENT)
     clock = create_fake_clock(SERVICE_MOMENT)
     service = ClosingService(
         tickets=tickets,
@@ -149,9 +158,16 @@ def service_harness() -> ServiceHarness:
         ),
         investigations=FakeInvestigationRepository(ledger=investigation_ledger),
         closings=closings,
+        ticket_decisions=ticket_decisions,
         clock=clock,
     )
-    return ServiceHarness(service=service, tickets=tickets, closings=closings, ticket_id=record.id)
+    return ServiceHarness(
+        service=service,
+        tickets=tickets,
+        closings=closings,
+        ticket_decisions=ticket_decisions,
+        ticket_id=record.id,
+    )
 
 
 @pytest.fixture
@@ -297,3 +313,40 @@ class TestClose:
     def test_a_closed_ticket_cannot_be_closed_again(self, closed_harness: ServiceHarness) -> None:
         with pytest.raises(ClosedTicketError):
             closed_harness.service.close(SERVICE_SLUG, closed_harness.request())
+
+
+class TestArchivedTicketDecisions:
+    def test_ticket_decisions_follow_the_ledger_decisions_as_one_redacted_line(
+        self, service_harness: ServiceHarness
+    ) -> None:
+        decisions = service_harness.ticket_decisions
+        decisions.add(
+            service_harness.ticket_id,
+            IncomingDecision(
+                question='Which store?', answer='Other', response='sqlite\npassword=hunter2'
+            ),
+        )
+        decisions.add(
+            service_harness.ticket_id, IncomingDecision(question='Ship now?', answer='Yes')
+        )
+
+        archive = service_harness.service.close(SERVICE_SLUG, service_harness.request()).archive
+
+        assert [(item.text, item.origin) for item in archive.decisions] == [
+            ('use a policy', 'linked-probe e1'),
+            (redact('Which store?: Other - sqlite password=hunter2'), 'ticket'),
+            ('Ship now?: Yes', 'ticket'),
+        ]
+        assert 'hunter2' not in archive.decisions[1].text
+
+    def test_the_decisions_are_cut_to_the_limit_keeping_the_last(
+        self, service_harness: ServiceHarness
+    ) -> None:
+        for number in range(1, 5):
+            service_harness.ticket_decisions.add(
+                service_harness.ticket_id, IncomingDecision(question=f'Q{number}', answer='A')
+            )
+
+        archive = service_harness.service.close(SERVICE_SLUG, service_harness.request()).archive
+
+        assert [item.text for item in archive.decisions] == ['Q1: A', 'Q2: A', 'Q3: A', 'Q4: A']
