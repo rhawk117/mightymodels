@@ -92,7 +92,7 @@ def dispose_refusal_cases() -> pytest.MarkDecorator:
         Refusal(
             name=decision,
             tool='review_dispose',
-            arguments={'decisions': {'F1': {'decision': decision, 'reason': '  '}}},
+            arguments={'decisions': {'F1': {'decision': decision, 'reason': '  '}}, 'by': 'owner'},
             message=f'F1: {decision} needs a reason; nothing was written',
         )
         for decision in ('accept-risk', 'dismiss')
@@ -139,7 +139,7 @@ async def eleven(harness: ReviewHarness) -> StartedRun:
 async def chosen(harness: ReviewHarness) -> StartedRun:
     started = await harness.start_with_findings(2)
     decisions = {'F1': {'decision': 'fix'}, 'F2': {'decision': 'defer'}}
-    arguments = {'run_id': started.run_id, 'decisions': decisions}
+    arguments = {'run_id': started.run_id, 'decisions': decisions, 'by': 'owner'}
     view_of(await harness.call('review_dispose', arguments))
     return started
 
@@ -230,7 +230,7 @@ class TestReviewDispose:
     ) -> None:
         answerer = DisposeAnswerer()
         decisions = {'F1': {'decision': 'fix'}, 'F2': {'decision': 'dismiss', 'reason': 'noise'}}
-        arguments = {'run_id': eleven.run_id, 'decisions': decisions}
+        arguments = {'run_id': eleven.run_id, 'decisions': decisions, 'by': 'owner'}
 
         view = view_of(await harness.call('review_dispose', arguments, answerer))
 

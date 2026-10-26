@@ -195,12 +195,25 @@ class TestReviewDisposeRequest:
     def test_decisions_are_taken_with_a_blank_default_reason(self) -> None:
         given = {'F1': {'decision': 'fix'}, 'F2': {'decision': 'dismiss', 'reason': 'noise'}}
 
-        request = ReviewDisposeRequest.model_validate({'run_id': RUN_ID, 'decisions': given})
+        request = ReviewDisposeRequest.model_validate({
+            'run_id': RUN_ID,
+            'decisions': given,
+            'by': 'owner',
+        })
 
         assert request.decisions == {
             'F1': Disposition(decision='fix'),
             'F2': Disposition(decision='dismiss', reason='noise'),
         }
+
+    @pytest.mark.parametrize('by', [None, '', '  '])
+    def test_decisions_without_an_approver_are_refused(self, by: str | None) -> None:
+        given: dict[str, Any] = {'run_id': RUN_ID, 'decisions': {'F1': {'decision': 'fix'}}}
+        if by is not None:
+            given['by'] = by
+
+        with pytest.raises(ValidationError):
+            ReviewDisposeRequest.model_validate(given)
 
     @dispose_invalid_decision_cases()
     def test_invalid_decision_is_refused(self, decisions: dict[str, Any]) -> None:

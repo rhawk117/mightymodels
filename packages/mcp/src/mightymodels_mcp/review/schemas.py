@@ -7,11 +7,11 @@ stay core's rules, as do whether a decision has the reason it needs and whether 
 plain revision.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from mightymodels_core.primitives import RunId, parse_run_id
 from mightymodels_core.vocabulary.reviews import Decision, Depth, Emphasis, Persona, Result, Scope
-from pydantic import AfterValidator
+from pydantic import AfterValidator, model_validator
 
 from mightymodels_mcp.server.requests import (
     NameText,
@@ -77,6 +77,14 @@ class ReviewDisposeRequest(RequestModel):
     run_id: RunIdField
     decisions: dict[NameText, Disposition] | None = None
     by: NameText = ''
+
+    @model_validator(mode='after')
+    def require_approver_with_decisions(self) -> Self:
+        if self.decisions is not None and not self.by.strip():
+            message = 'by is required when decisions are given'
+            raise ValueError(message)
+
+        return self
 
 
 class ReviewResolveRequest(RequestModel):

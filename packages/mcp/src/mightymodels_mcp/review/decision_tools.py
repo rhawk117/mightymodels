@@ -187,7 +187,7 @@ def decided_by(request: ReviewDisposeRequest, choice: DisposeChoice) -> DecidedB
     if request.decisions is None:
         return DecidedBy(decisions=choice.decisions, by=USER_APPROVER)
 
-    return DecidedBy(decisions=request.decisions, by=request.by or USER_APPROVER)
+    return DecidedBy(decisions=request.decisions, by=request.by)
 
 
 def create_dispositions(run_id: RunId, decided: DecidedBy) -> DispositionsToRecord:
