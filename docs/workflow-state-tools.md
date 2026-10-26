@@ -2,7 +2,7 @@
 
 This page maps each call of the old `state` server to its tool on the new `workflow_state` server. The skills-and-agents port uses it to rewrite the old calls mechanically. Porting the skills and agents is not part of this change.
 
-The old server key was `state`, so its tools were named `mcp__plugin_mightymodels_state__<tool>`. Each took one argument, `{"request": {"action": ..., ...}}`, and the action chose the operation. The new server key is `workflow_state` (`.mcp.json`), so by the same naming rule each tool is named `mcp__plugin_mightymodels_workflow_state__<tool>`. It takes its fields as flat arguments, with no `request` wrapper and no `action`.
+The old server key was `state`, so its tools were named `mcp__plugin_mightymodels_state__<tool>`. Each took one argument, `{"request": {"action": ..., ...}}`, and the action chose the operation. The new server key is `workflow_state` (`mcp/workflow_state.json`), so by the same naming rule each tool is named `mcp__plugin_mightymodels_workflow_state__<tool>`. It takes its fields as flat arguments, with no `request` wrapper and no `action`.
 
 ## Tool map
 
