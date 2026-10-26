@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from mightymodels_mcp.server.entrypoint import create_catalog
+from mightymodels_mcp.main import create_catalog
 
 HEADING = '## Tool map'
 HINT_NAMES = ('read_only_hint', 'destructive_hint', 'idempotent_hint', 'open_world_hint')

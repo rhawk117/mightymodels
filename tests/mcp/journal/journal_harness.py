@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from mcp import Client
 from mightymodels_mcp.journal.use_cases import create_journal_work
+from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.app import create_server
 from mightymodels_mcp.server.dependencies import ServerDependencies
-from mightymodels_mcp.server.entrypoint import create_catalog
 
+from mcp import Client
 from tests.mcp.server.server_harness import view_of
 from tests.mcp.task.task_harness import RecordingOpener
 

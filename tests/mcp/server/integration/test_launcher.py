@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from mcp.client.client import Client
 from mcp.client.stdio import StdioServerParameters
-from mightymodels_mcp.server.entrypoint import create_catalog
+from mightymodels_mcp.main import create_catalog
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:

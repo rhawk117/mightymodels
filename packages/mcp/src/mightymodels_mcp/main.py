@@ -13,15 +13,19 @@ from mightymodels_mcp.investigation.tools import register_investigation_tools
 from mightymodels_mcp.journal.tools import register_journal_tools
 from mightymodels_mcp.review.decision_tools import register_decision_tools
 from mightymodels_mcp.review.tools import register_review_tools
+from mightymodels_mcp.server.app import create_server
+from mightymodels_mcp.server.call_log import (
+    InvalidLogLevelError,
+    LogSettings,
+    installed_logging,
+    parse_log_level,
+)
+from mightymodels_mcp.server.dependencies import ServerDependencies
+from mightymodels_mcp.server.registration import ToolCatalog
+from mightymodels_mcp.server.state import LocalStateOpener, discard_outdated_database
 from mightymodels_mcp.snapshot.tools import register_snapshot_tools
 from mightymodels_mcp.task.tools import register_task_tools
 from mightymodels_mcp.ticket.tools import register_ticket_tools
-
-from .app import create_server
-from .call_log import InvalidLogLevelError, LogSettings, installed_logging, parse_log_level
-from .dependencies import ServerDependencies
-from .registration import ToolCatalog
-from .state import LocalStateOpener, discard_outdated_database
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -29,12 +33,24 @@ if TYPE_CHECKING:
 REFUSED_START = 2
 
 
+REGISTRARS = (
+    register_ticket_tools,
+    register_task_tools,
+    register_contract_tools,
+    register_review_tools,
+    register_decision_tools,
+    register_snapshot_tools,
+    register_investigation_tools,
+    register_journal_tools,
+)
+
+
 def create_catalog() -> ToolCatalog:
-    tickets = register_ticket_tools(ToolCatalog())
-    reviews = register_review_tools(register_contract_tools(register_task_tools(tickets)))
-    snapshots = register_snapshot_tools(register_decision_tools(reviews))
-    investigations = register_investigation_tools(snapshots)
-    return register_journal_tools(investigations)
+    catalog = ToolCatalog()
+    for register in REGISTRARS:
+        register(catalog)
+
+    return catalog
 
 
 def run(environ: Mapping[str, str], cwd: Path) -> int:

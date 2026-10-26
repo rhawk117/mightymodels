@@ -5,9 +5,10 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
 import anyio
-from mcp import Client
 from mcp.types import ElicitRequestFormParams, ElicitResult
-from mightymodels_mcp.server.entrypoint import create_catalog
+from mightymodels_mcp.main import create_catalog
+
+from mcp import Client
 
 if TYPE_CHECKING:
     from mcp.client.session import ClientRequestContext

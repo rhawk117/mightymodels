@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING
 
 import anyio
 import pytest
-from mcp import Client
 from mcp.types import ToolAnnotations
-from mightymodels_mcp.server.entrypoint import create_catalog
+from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 
+from mcp import Client
 from tests.mcp.server.server_harness import view_of
 from tests.mcp.task.task_harness import RecordingOpener, TaskHarness
 from tests.mcp.ticket.ticket_harness import ANSWERED, SLUG, TicketHarness
