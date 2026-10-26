@@ -83,7 +83,7 @@ class UndecidedFindings:
         return pages[0] if pages else None
 
     def reasons_form(self, page: DisposePage, answers: BaseModel) -> ReasonsForm | None:
-        unchecked = page.select(answers, checked=False)
+        unchecked = page.unchecked_findings(answers)
         if not unchecked:
             return None
 
@@ -154,7 +154,7 @@ def choose_dispositions(
     if not isinstance(page, AcceptedElicitation):
         return unanswered(shown)
 
-    fixes = {finding.key: FIX for finding in shown.select(page.data, checked=True)}
+    fixes = {finding.key: FIX for finding in shown.checked_findings(page.data)}
     form = undecided.reasons_form(shown, page.data)
     if form is None:
         return DisposeChoice(decisions=fixes)

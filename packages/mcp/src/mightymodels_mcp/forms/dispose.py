@@ -72,9 +72,15 @@ class DisposePage:
     def ask(self) -> Elicit[BaseModel]:
         return Elicit(self.message, self.create_schema())
 
-    def select(self, answers: BaseModel, *, checked: bool) -> tuple[FindingRecord, ...]:
+    def checked_findings(self, answers: BaseModel) -> tuple[FindingRecord, ...]:
+        return tuple(finding for finding, ticked in self.answered(answers) if ticked)
+
+    def unchecked_findings(self, answers: BaseModel) -> tuple[FindingRecord, ...]:
+        return tuple(finding for finding, ticked in self.answered(answers) if not ticked)
+
+    def answered(self, answers: BaseModel) -> tuple[tuple[FindingRecord, bool], ...]:
         pairs = zip(self.field_names, self.findings, strict=True)
-        return tuple(finding for name, finding in pairs if getattr(answers, name) is checked)
+        return tuple((finding, getattr(answers, name) is True) for name, finding in pairs)
 
 
 def create_dispose_pages(

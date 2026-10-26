@@ -41,8 +41,8 @@ class TestDisposePages:
         page = self.pages[0]
         answers = page.create_schema().model_validate({'finding_2': True, 'finding_5': True})
 
-        checked = page.select(answers, checked=True)
-        unchecked = page.select(answers, checked=False)
+        checked = page.checked_findings(answers)
+        unchecked = page.unchecked_findings(answers)
         assert [finding.key for finding in checked] == ['MV-2', 'MV-5']
         assert len(unchecked) == PAGE_SIZE - 2
 
