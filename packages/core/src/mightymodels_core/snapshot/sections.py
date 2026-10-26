@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from mightymodels_core.reviews.services import LatestReview
     from mightymodels_core.snapshot.records import RepositoryFacts
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord, Transition
+    from mightymodels_core.ticket_decisions import TicketDecision
     from mightymodels_core.tickets.records import TicketRecord
     from mightymodels_core.vocabulary.investigations import EntryKind
 
@@ -132,6 +133,24 @@ def ledger_lines(ledgers: Sequence[Ledger], kind: EntryKind, limit: int) -> tupl
     ]
 
     return tuple(lines[-limit:])
+
+
+def ticket_decision_line(decision: TicketDecision) -> LedgerLine:
+    text = f'{decision.question}: {decision.answer}'
+    if decision.response is not None:
+        text = f'{text} - {decision.response}'
+
+    return LedgerLine(kind='decision', text=text, cite=None, origin='ticket')
+
+
+def decision_lines(
+    ledgers: Sequence[Ledger], decisions: Sequence[TicketDecision], limit: int
+) -> tuple[LedgerLine, ...]:
+    if limit <= 0:
+        return ()
+
+    lines = (*ledger_lines(ledgers, 'decision', limit), *map(ticket_decision_line, decisions))
+    return lines[-limit:]
 
 
 def ledger_warnings(linked: LinkedLedgers) -> tuple[str, ...]:

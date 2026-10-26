@@ -2,9 +2,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.snapshot import DEFAULT_LIMIT, SnapshotRequest, snapshot_markdown
+from mightymodels_core.ticket_decisions import IncomingDecision
+
+from tests.core.snapshot.snapshot_builders import seed_ticket_decision
 
 if TYPE_CHECKING:
-    from mightymodels_core.primitives import RunId, Slug
+    from mightymodels_core.database import Database
+    from mightymodels_core.primitives import Clock, RepositoryKey, RunId, Slug
     from mightymodels_core.snapshot import RepositoryFacts, SnapshotRecord
     from mightymodels_core.units_of_work import SnapshotRead
 
@@ -96,6 +100,32 @@ class TestSnapshotRead:
 
         assert [line.text for line in record.decisions] == ['use sqlite']
         assert [line.text for line in record.open_questions] == ['which cache size']
+
+    def test_ticket_decisions_follow_the_ledger_decisions(
+        self,
+        snapshot_read: SnapshotRead,
+        database: Database,
+        repository_key: RepositoryKey,
+        clock: Clock,
+        seeded: Slug,
+        repository_facts: RepositoryFacts,
+    ) -> None:
+        seed_ticket_decision(
+            database,
+            repository_key,
+            clock,
+            seeded,
+            IncomingDecision(question='Which cache?', answer='lru', response='keep it small'),
+        )
+
+        record = take_snapshot(snapshot_read, seeded, repository_facts)
+        limited = take_snapshot(snapshot_read, seeded, repository_facts, limit=1)
+
+        assert [(line.text, line.cite, line.origin) for line in record.decisions[1:]] == [
+            ('Which cache?: lru - keep it small', None, 'ticket')
+        ]
+        assert record.decisions[0].text == 'use sqlite'
+        assert [line.origin for line in limited.decisions] == ['ticket']
 
 
 class TestSnapshotReadLimitsAndHeadings:
