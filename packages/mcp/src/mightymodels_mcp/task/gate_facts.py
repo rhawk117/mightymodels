@@ -39,13 +39,53 @@ def brief_number(task_id: TaskId) -> int:
     return int(task_id[1:])
 
 
-async def compare_with_base(
-    git: Git, base: str | None, commit: str | None
-) -> tuple[bool, frozenset[str]]:
-    if base is None or commit is None:
-        return False, frozenset[str]()
+@dataclass(slots=True, kw_only=True, frozen=True)
+class BaseComparison:
+    resolves: bool
+    is_ancestor: bool
+    changed_files: frozenset[str]
 
-    return await git.is_ancestor(base, commit), frozenset(await git.changed_files(base, commit))
+
+async def compare_with_base(git: Git, seen_base: str | None, commit: str | None) -> BaseComparison:
+    base = None if seen_base is None else await git.resolve_commit(seen_base)
+    if base is None or commit is None:
+        return BaseComparison(
+            resolves=base is not None, is_ancestor=False, changed_files=frozenset()
+        )
+
+    return BaseComparison(
+        resolves=True,
+        is_ancestor=await git.is_ancestor(base, commit),
+        changed_files=frozenset(await git.changed_files(base, commit)),
+    )
+
+
+async def load_brief(sources: VerificationSources, request: TaskVerifyRequest) -> Brief | None:
+    if not is_plan_task(request.task_id):
+        return None
+
+    return read_brief(sources.workspace.task_brief(request.slug, brief_number(request.task_id)))
+
+
+async def resolve_named_commit(git: Git, brief: Brief | None) -> str | None:
+    if brief is None or brief.text is None:
+        return None
+
+    named = done_commit(brief.text)
+    if named is None:
+        return None
+
+    return await git.resolve_commit(named)
+
+
+async def gather_git_facts(git: Git, comparison: BaseComparison, brief: Brief | None) -> GitFacts:
+    return GitFacts(
+        head=await git.resolve_head(),
+        base_resolves=comparison.resolves,
+        base_is_ancestor=comparison.is_ancestor,
+        changed_files=comparison.changed_files,
+        named_commit=await resolve_named_commit(git, brief),
+    )
 
 
 async def gather_verification(
@@ -57,24 +97,12 @@ async def gather_verification(
         raise refusal
 
     commit = await git.resolve_commit(request.commit)
-    base = None if seen.base is None else await git.resolve_commit(seen.base)
-    is_ancestor, changed_files = await compare_with_base(git, base, commit)
-    brief = (
-        read_brief(sources.workspace.task_brief(request.slug, brief_number(request.task_id)))
-        if is_plan_task(request.task_id)
-        else None
-    )
-    named = None if brief is None or brief.text is None else done_commit(brief.text)
+    brief = await load_brief(sources, request)
+    comparison = await compare_with_base(git, seen.base, commit)
     return VerifyRequest(
         seen=seen,
-        commit=request.commit if commit is None else commit,
+        commit=commit or request.commit,
         assertions=request.assertions,
-        git=GitFacts(
-            head=await git.resolve_head(),
-            base_resolves=base is not None,
-            base_is_ancestor=is_ancestor,
-            changed_files=changed_files,
-            named_commit=None if named is None else await git.resolve_commit(named),
-        ),
+        git=await gather_git_facts(git, comparison, brief),
         brief=brief,
     )

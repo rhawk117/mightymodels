@@ -7,7 +7,12 @@ from mightymodels_core.primitives import Slug, TaskId
 from mightymodels_core.tasks import Brief
 from mightymodels_core.tasks.records import TaskRecord
 from mightymodels_core.workspace import workspace_of
-from mightymodels_mcp.task.gate_facts import VerificationSources, gather_verification
+from mightymodels_mcp.task.gate_facts import (
+    VerificationSources,
+    gather_verification,
+    load_brief,
+    resolve_named_commit,
+)
 from mightymodels_mcp.task.schemas import TaskVerifyRequest
 
 if TYPE_CHECKING:
@@ -181,3 +186,49 @@ class TestPlanTaskBrief:
         verify = await gather(FakeGit(), tmp_path, create_seen('R3'), create_request('R3'))
 
         assert verify.brief is None
+
+
+class TestLoadBrief:
+    @pytest.fixture
+    def sources(self, tmp_path: Path) -> VerificationSources:
+        return VerificationSources(git=FakeGit(), workspace=workspace_of(tmp_path))
+
+    async def test_load_brief_of_a_residual_task_is_none(
+        self, tmp_path: Path, sources: VerificationSources
+    ) -> None:
+        write_brief(tmp_path, 3, '## ASKED\n')
+
+        assert await load_brief(sources, create_request('R3')) is None
+
+    async def test_load_brief_of_a_plan_task_reads_the_file(
+        self, tmp_path: Path, sources: VerificationSources
+    ) -> None:
+        write_brief(tmp_path, 3, '## ASKED\n')
+
+        assert await load_brief(sources, create_request('T3')) == Brief(text='## ASKED\n')
+
+    async def test_load_brief_without_a_file_has_no_text(
+        self, sources: VerificationSources
+    ) -> None:
+        assert await load_brief(sources, create_request('T3')) == Brief(text=None)
+
+
+class TestResolveNamedCommit:
+    @pytest.mark.parametrize('brief', [None, Brief(text=None), Brief(text='## ASKED\n')])
+    async def test_resolve_named_commit_without_a_named_commit_asks_git_nothing(
+        self, brief: Brief | None
+    ) -> None:
+        git = FakeGit()
+
+        assert await resolve_named_commit(git, brief) is None
+        assert git.asked == []
+
+    async def test_resolve_named_commit_returns_the_resolved_commit(self) -> None:
+        git = FakeGit(resolving={NAMED: NAMED})
+
+        assert await resolve_named_commit(git, Brief(text=f'## DONE\ncommit: {NAMED}\n')) == NAMED
+
+    async def test_resolve_named_commit_drops_a_commit_git_cannot_resolve(self) -> None:
+        brief = Brief(text=f'## DONE\ncommit: {NAMED}\n')
+
+        assert await resolve_named_commit(FakeGit(), brief) is None
