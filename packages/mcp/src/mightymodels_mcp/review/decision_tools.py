@@ -22,7 +22,7 @@ from mightymodels_core.reviews import IncomingDisposition, ResolveRequest
 from pydantic import BaseModel, ConfigDict, Field
 
 from mightymodels_mcp.forms.choices import Choice, ChoiceOutcome, ChoiceQuestion
-from mightymodels_mcp.forms.dispose import ReasonsForm, create_dispose_pages
+from mightymodels_mcp.forms.dispose import REASON_CHOICES, ReasonsForm, create_dispose_pages
 from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.annotations import WRITES
 from mightymodels_mcp.server.dependencies import ServerDependencies
@@ -48,12 +48,8 @@ if TYPE_CHECKING:
     from mightymodels_mcp.forms.dispose import DisposePage
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
 
-DISPOSE_CHOICES = (
-    Choice(value='fix', title='Fix'),
-    Choice(value='defer', title='Defer'),
-    Choice(value='accept-risk', title='Accept the risk'),
-    Choice(value='dismiss', title='Dismiss'),
-)
+FIX_CHOICE = Choice(value='fix', title='Fix')
+DISPOSE_CHOICES = (FIX_CHOICE, *REASON_CHOICES)
 DISPOSE_PROMPT = 'decisions {"F…": {"decision": <choice>, "reason": "<why>"}}'
 FIX = Disposition(decision='fix')
 
