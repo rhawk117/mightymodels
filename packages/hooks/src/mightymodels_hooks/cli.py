@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Protocol, Self, TextIO, runtime_checkable
 import msgspec
 from mightymodels_core.edge import create_clock
 
+from mightymodels_hooks.dispatch import DispatchHandler
 from mightymodels_hooks.session_start import SessionStartHandler
 
 if TYPE_CHECKING:
@@ -49,7 +50,8 @@ def decode_payload(text: str) -> HookPayload | None:
 
 def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter:
     session_start = SessionStartHandler(environ=environ, stderr=stderr, clock=create_clock())
-    return HookRouter().mount({'session-start': session_start})
+    dispatch = DispatchHandler(environ=environ)
+    return HookRouter().mount({'session-start': session_start, 'dispatch-hook': dispatch})
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
