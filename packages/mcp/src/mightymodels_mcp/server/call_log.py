@@ -10,7 +10,7 @@ import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING, Literal, TextIO, cast, get_args
+from typing import TYPE_CHECKING, Literal, TextIO, TypeIs, get_args
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping
@@ -21,7 +21,7 @@ type CallOutcome = Literal['ok', 'refused', 'error']
 
 CALL_LOGGER_NAME = 'mightymodels_mcp.calls'
 LOG_LEVEL_VARIABLE = 'MIGHTYMODELS_LOG_LEVEL'
-LOG_LEVELS = cast('tuple[LogLevel, ...]', get_args(LogLevel.__value__))
+LEVEL_NAMES = get_args(LogLevel.__value__)
 DEFAULT_LOG_LEVEL: LogLevel = 'INFO'
 LOG_DIRECTORY = 'logs'
 LOG_FILE_NAME = 'mightymodels-mcp.log'
@@ -29,6 +29,13 @@ LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s %(message)s'
 CALL_MESSAGE = 'tool=%s slug=%s outcome=%s duration_ms=%.1f'
 
 call_logger = logging.getLogger(CALL_LOGGER_NAME)
+
+
+def is_log_level(value: object) -> TypeIs[LogLevel]:
+    return value in LEVEL_NAMES
+
+
+LOG_LEVELS = tuple(filter(is_log_level, LEVEL_NAMES))
 
 
 class InvalidLogLevelError(Exception):
