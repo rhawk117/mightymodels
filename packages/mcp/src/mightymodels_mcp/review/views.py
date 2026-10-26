@@ -218,5 +218,6 @@ def comment_report(report: ReviewReport, findings: Sequence[FindingRecord]) -> s
 
 def render_report(report: ReviewReport, shape: ReportShape) -> ReviewView:
     ordered = report.gate.ordered(report.findings)
-    text = (full_report if shape == 'full' else comment_report)(report, ordered)
+    render = full_report if shape == 'full' else comment_report
+    text = render(report, ordered)
     return ReviewView(text=text, run_id=report.run.run_id, verdict=report.verdict)

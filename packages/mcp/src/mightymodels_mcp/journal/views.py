@@ -106,10 +106,12 @@ def patterns_text(stats: CrashoutStats) -> str:
 
 
 def crashout_text(record: CrashoutRecord) -> str:
+    ticket = ABSENT if record.ticket_key is None else record.ticket_key
+    branch = ABSENT if record.branch is None else record.branch
     lines = [
         f'at: {timestamp(record)}',
-        f'ticket: {ABSENT if record.ticket_key is None else record.ticket_key}',
-        f'branch: {ABSENT if record.branch is None else record.branch}',
+        f'ticket: {ticket}',
+        f'branch: {branch}',
         f'severity: {record.severity}',
         f'verdict: {record.verdict}',
         'rant:',
