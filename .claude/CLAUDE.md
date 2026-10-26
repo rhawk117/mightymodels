@@ -37,7 +37,7 @@ Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. 
 
 ## Verification
 
-`.github/workflows/ci.yml` defines CI's quality job, which runs the pre-commit hooks on all files and then the tests. Match it with `make pre-commit`, then `make test`. `make check` is the faster local loop, but it skips the hygiene and uv-lock hooks, so it can pass where CI fails.
+`.github/workflows/ci.yml` defines CI's quality job, which runs the pre-commit hooks on all files and then the tests. Match it with `make pre-commit`, then `uv run pytest -q -m "not integration"`, because `make test` skips the e2e tests and the unmarked tests that CI runs. `make check` is the faster local loop, but it skips the hygiene and uv-lock hooks, so it can pass where CI fails.
 
 ## Claude Code
 
