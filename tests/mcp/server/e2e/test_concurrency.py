@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, Any
 
 import anyio
 import pytest
+from mcp import Client
 from mightymodels_core.database.errors import NestedUnitError
 from mightymodels_mcp.main import create_catalog
 
-from mcp import Client
 from tests.mcp.investigation.investigation_harness import TARGET
 from tests.mcp.journal.journal_harness import FIRST_ENTRY, create_journal_harness
 from tests.mcp.server.server_harness import view_of

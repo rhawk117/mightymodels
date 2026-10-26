@@ -2,12 +2,12 @@ from typing import TYPE_CHECKING, Literal
 
 import anyio
 import pytest
+from mcp import Client
 from mcp.types import ToolAnnotations
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT
 from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 
-from mcp import Client
 from tests.mcp.review.review_harness import (
     ALL_ANSWERED,
     REPORT_NAMES,

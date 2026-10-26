@@ -45,7 +45,7 @@ class TestLauncher:
     @pytest.fixture
     def servers(self) -> dict[str, DeclaredServer]:
         return PluginMcpConfig.model_validate_json(
-            CHECKOUT.joinpath('mcp', 'workflow_state.json').read_text()
+            CHECKOUT.joinpath('mcp-servers', 'workflow_state.json').read_text()
         ).servers
 
     @pytest.fixture
@@ -88,7 +88,7 @@ class TestPluginOnlyServer:
     def test_plugin_only_server_file_is_the_one_plugin_json_names(self) -> None:
         manifest = json.loads(CHECKOUT.joinpath('.claude-plugin', 'plugin.json').read_text())
 
-        assert manifest['mcpServers'] == './mcp/workflow_state.json'
+        assert manifest['mcpServers'] == './mcp-servers/workflow_state.json'
 
     def test_plugin_only_root_mcp_json_declares_no_servers(self) -> None:
         project_config = json.loads(CHECKOUT.joinpath('.mcp.json').read_text())

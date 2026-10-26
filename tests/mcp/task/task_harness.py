@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import anyio
+from mcp import Client
 from mightymodels_core.edge import OpenState
 from mightymodels_core.primitives import TaskId
 from mightymodels_core.tasks import Attempt, Transition
@@ -14,7 +15,6 @@ from mightymodels_mcp.server.app import create_server
 from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.task.use_cases import create_task_work
 
-from mcp import Client
 from tests.mcp.ticket.ticket_harness import SLUG
 
 if TYPE_CHECKING:

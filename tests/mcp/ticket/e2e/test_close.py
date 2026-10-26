@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import anyio
 import pytest
+from mcp import Client
 from mcp.types import ToolAnnotations
 from mightymodels_core.primitives import TaskId
 from mightymodels_core.tasks import Attempt, Transition
@@ -11,7 +12,6 @@ from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.ticket.use_cases import create_ticket_work
 
-from mcp import Client
 from tests.mcp.server.server_harness import view_of
 from tests.mcp.ticket.ticket_harness import ANSWERED, SLUG, TicketHarness
 

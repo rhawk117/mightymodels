@@ -3,11 +3,11 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mcp import Client
 from mcp.types import ToolAnnotations
 from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 
-from mcp import Client
 from tests.mcp.journal.journal_harness import FIRST_ENTRY, SECOND_ENTRY, create_journal_harness
 from tests.mcp.server.server_harness import view_of
 

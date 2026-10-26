@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mcp import Client
 from mcp.types import ToolAnnotations
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT
 from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 
-from mcp import Client
 from tests.mcp.review.review_harness import DisposeAnswerer, create_review_harness
 from tests.mcp.server.server_harness import view_of
 

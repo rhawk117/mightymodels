@@ -101,7 +101,7 @@ class PluginInventory:
 def claude_plugin(repository_root: Path) -> PluginInventory:
     plugin_paths = {
         'manifest': repository_root.joinpath('.claude-plugin', 'plugin.json'),
-        'mcp': repository_root.joinpath('mcp', 'workflow_state.json'),
+        'mcp': repository_root.joinpath('mcp-servers', 'workflow_state.json'),
         'hooks': repository_root.joinpath('hooks', 'hooks.json'),
     }
     plugin_files = {key: PluginManifestFile.read(path) for key, path in plugin_paths.items()}
