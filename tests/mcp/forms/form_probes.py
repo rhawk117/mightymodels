@@ -17,7 +17,6 @@ from mightymodels_mcp.forms.choices import (
     ChoiceQuestion,
     ChoiceRound,
     answers_of,
-    complete_request,
 )
 from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.icons import load_icon
@@ -67,6 +66,14 @@ def create_finding(position: int, severity: StoredSeverity = 'High') -> FindingR
 
 def create_findings(count: int) -> tuple[FindingRecord, ...]:
     return tuple(create_finding(position) for position in range(1, count + 1))
+
+
+def complete_request[R: BaseModel](request: R, outcome: ChoiceOutcome) -> R | None:
+    answers = answers_of(outcome)
+    if answers is None:
+        return None
+
+    return type(request).model_validate(request.model_dump() | answers)
 
 
 class ChainRequest(RequestModel):

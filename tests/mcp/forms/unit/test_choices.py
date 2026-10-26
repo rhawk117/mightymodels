@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mcp.server.elicitation import (
-    AcceptedElicitation,
     CancelledElicitation,
     DeclinedElicitation,
     render_elicitation_schema,
@@ -13,7 +12,6 @@ from mightymodels_mcp.forms.choices import (
     ChoiceRound,
     TextQuestion,
     answers_of,
-    complete_request,
 )
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT, needs_input_text
 from mightymodels_mcp.server.requests import NAME_LIMIT, RequestModel
@@ -73,16 +71,9 @@ class TestChoiceRound:
         with pytest.raises(ValidationError):
             REVIEW_ROUND.create_schema().model_validate({'mode': 'reckless', 'depth': 'diff'})
 
-    def test_accepted_answers_complete_the_request(self) -> None:
-        schema = REVIEW_ROUND.omitted_by(self.moded_request).create_schema()
-        outcome: ChoiceOutcome = AcceptedElicitation(data=schema.model_validate({'depth': 'diff'}))
-
-        assert complete_request(self.moded_request, outcome) == self.full_request
-
     @unanswered_outcome_cases()
     def test_unanswered_round_has_no_answers(self, outcome: ChoiceOutcome) -> None:
         assert answers_of(outcome) is None
-        assert complete_request(self.bare_request, outcome) is None
 
 
 class NamedRequest(RequestModel):

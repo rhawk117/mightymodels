@@ -115,11 +115,3 @@ def answers_of(outcome: ChoiceOutcome) -> dict[str, Any] | None:
         return None
 
     return outcome.data.model_dump()
-
-
-def complete_request[R: BaseModel](request: R, outcome: ChoiceOutcome) -> R | None:
-    answers = answers_of(outcome)
-    if answers is None:
-        return None
-
-    return type(request).model_validate(request.model_dump() | answers)
