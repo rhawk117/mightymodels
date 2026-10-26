@@ -16,7 +16,15 @@ from typing import Annotated, Any
 
 from mcp.server.elicitation import AcceptedElicitation, ElicitationResult
 from mcp.server.mcpserver.resolve import Elicit
-from pydantic import AfterValidator, BaseModel, Field, WithJsonSchema, create_model
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    Field,
+    WithJsonSchema,
+    create_model,
+)
+
+from mightymodels_mcp.server.requests import NAME_LIMIT
 
 ROUND_MODEL_NAME = 'ChoiceRound'
 
@@ -62,9 +70,15 @@ class TextQuestion:
     answers: str
     title: str
     description: str
+    max_length: int = NAME_LIMIT
 
     def create_field(self) -> tuple[Any, Any]:
-        return str | None, Field(default=None, title=self.title, description=self.description)
+        return str | None, Field(
+            default=None,
+            title=self.title,
+            description=self.description,
+            json_schema_extra={'maxLength': self.max_length},
+        )
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

@@ -10,15 +10,32 @@ branch of that name, so core's `branch_of` decides every branch the same way.
 
 from typing import Annotated, Any
 
+from mightymodels_core.primitives import StateError
 from mightymodels_core.primitives.value_types import SLUG_LIMIT
 from mightymodels_core.ticket_closing.records import ClosingLines
 from mightymodels_core.tickets import BranchChoice, TicketAnswers
 from mightymodels_core.vocabulary.tickets import TicketScope
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
-from mightymodels_mcp.server.requests import NameText, ProseText, RequestModel, SlugField
+from mightymodels_mcp.server.requests import (
+    NAME_LIMIT,
+    NameText,
+    ProseText,
+    RequestModel,
+    RevisionField,
+    SlugField,
+)
 
 type LinkedInvestigation = Annotated[str, StringConstraints(max_length=SLUG_LIMIT)]
+
+
+BRANCH_NAME_FIELD = 'branch_name'
+
+
+class BranchNameTooLongError(StateError):
+    def __init__(self, *, limit: int) -> None:
+        self.limit = limit
+        super().__init__(f'{BRANCH_NAME_FIELD} is longer than {limit} characters')
 
 
 class TicketRequest(RequestModel):
@@ -31,7 +48,7 @@ class TicketWriteRequest(RequestModel):
     context: tuple[ProseText, ...]
     scope: TicketScope | None = None
     compaction: bool | None = None
-    branch: NameText | None = None
+    branch: RevisionField | None = None
     issue: int | None = None
     jira: NameText | None = None
     reference_urls: tuple[ProseText, ...] = ()
@@ -60,6 +77,10 @@ class WriteChoices(BaseModel):
 
 
 def create_write_choices(request: TicketWriteRequest, form: dict[str, Any]) -> WriteChoices:
+    answered = form.get(BRANCH_NAME_FIELD) or ''
+    if len(answered) > NAME_LIMIT:
+        raise BranchNameTooLongError(limit=NAME_LIMIT)
+
     given = request.model_dump(include={'scope', 'compaction'}, exclude_none=True)
     named = {} if request.branch is None else {'branch': 'new', 'branch_name': request.branch}
     return WriteChoices.model_validate(given | named | form)

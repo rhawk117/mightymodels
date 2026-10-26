@@ -11,6 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from mcp.server.mcpserver.resolve import Elicit, Resolve
+from mightymodels_core.git.revisions import revision_error
 from mightymodels_core.tickets import branch_of
 from pydantic import BaseModel
 
@@ -115,6 +116,10 @@ async def name_branch(choices: WriteChoices, git: Git) -> str:
     named = branch_of(choices.branch, choices.branch_name or '', current)
     if not isinstance(named, str):
         raise named
+
+    refused = revision_error(named) if choices.branch == 'new' else None
+    if refused is not None:
+        raise refused
 
     return named
 

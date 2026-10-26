@@ -16,7 +16,7 @@ from mightymodels_mcp.forms.choices import (
     complete_request,
 )
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT, needs_input_text
-from mightymodels_mcp.server.requests import RequestModel
+from mightymodels_mcp.server.requests import NAME_LIMIT, RequestModel
 from pydantic import BaseModel, ValidationError
 
 from tests.mcp.forms.form_probes import DEPTH, MODE, REVIEW_ROUND, ChainRequest
@@ -128,6 +128,11 @@ class TestTextQuestion:
             'mode': 'quick',
             'label_text': None,
         }
+
+    def test_text_advertises_its_length_limit(self) -> None:
+        properties = self.render_properties(NAMED_ROUND)
+
+        assert properties['label_text']['maxLength'] == NAME_LIMIT
 
     def test_choice_questions_stay_choice_only(self) -> None:
         assert NAMED_ROUND.questions == (MODE,)

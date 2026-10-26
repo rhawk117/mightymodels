@@ -95,6 +95,11 @@ class TestTicketWriteRequest:
     def test_field_at_its_limit_is_accepted(self, change: dict[str, Any]) -> None:
         assert create_write_request(**change).slug == INTERVIEW['slug']
 
+    @pytest.mark.parametrize('branch', ['-x', 'my branch'])
+    def test_invalid_branch_is_refused(self, branch: str) -> None:
+        with pytest.raises(ValidationError):
+            create_write_request(branch=branch)
+
     def test_context_line_over_the_prose_limit_is_refused(self) -> None:
         with pytest.raises(ValidationError):
             TicketContextRequest(slug='probe-ticket', context=('x' * (PROSE_LIMIT + 1),))

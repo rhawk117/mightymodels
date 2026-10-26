@@ -145,6 +145,19 @@ class TestTicketWrite:
         assert 'a new branch needs a name' in str(result.content)
         assert not await harness.ticket_file.exists()
 
+    async def test_long_branch_answer_is_refused_naming_the_field(
+        self, harness: TicketHarness
+    ) -> None:
+        answers = {**self.new_branch, 'branch_name': 'b' * 256}
+
+        result = await harness.call(
+            'ticket_write', dict(INTERVIEW), RecordingAnswerer(answers=answers)
+        )
+
+        assert result.is_error
+        assert 'branch_name is longer than 255 characters' in str(result.content)
+        assert not await harness.ticket_file.exists()
+
     @unanswered_action_cases()
     async def test_unanswered_form_returns_the_needs_input_text(
         self, harness: TicketHarness, action: FormAction
