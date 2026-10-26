@@ -28,13 +28,13 @@ TIER_NAMES_BY_TREE = {
 }
 
 
-def get_tier_tree(root: Path, path: Path) -> tuple[str, tuple[str, ...]] | None:
-    for tree in TIER_NAMES_BY_TREE:
-        relative_parts = path.relative_to(root.joinpath('tests', tree), walk_up=True).parts
-        if relative_parts[0] != '..':
-            return tree, relative_parts
+def get_relative_parts(root: Path, path: Path, tree: str) -> tuple[str, ...]:
+    return path.relative_to(root.joinpath('tests', tree), walk_up=True).parts
 
-    return None
+
+def get_tier_tree(root: Path, path: Path) -> tuple[str, tuple[str, ...]] | None:
+    located = ((tree, get_relative_parts(root, path, tree)) for tree in TIER_NAMES_BY_TREE)
+    return next(((tree, parts) for tree, parts in located if parts[0] != '..'), None)
 
 
 def has_tier_directory(tree: str, relative_parts: tuple[str, ...]) -> bool:

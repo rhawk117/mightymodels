@@ -140,7 +140,8 @@ class ToolDefinitionPolicy[R: RequestModel, V: BaseModel, **P]:
 
     @property
     def has_title(self) -> bool:
-        return bool(self.definition.title)
+        title = self.definition.title
+        return bool(title and title.strip())
 
     @property
     def unset_hints(self) -> tuple[str, ...]:

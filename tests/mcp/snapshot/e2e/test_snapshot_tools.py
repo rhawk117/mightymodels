@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import anyio
 import pytest
 from mcp.types import ToolAnnotations
+from mightymodels_core.snapshot import MAX_LIMIT
 from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.icons import load_icon
 
@@ -20,6 +21,12 @@ READS = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
 QUERIES = ['refusal', 'current_branch', 'resolve_head', 'dirty_paths']
+
+
+def refused_limit_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'limit', [pytest.param(0, id='zero'), pytest.param(MAX_LIMIT + 1, id='one-over-max')]
+    )
 
 
 @pytest.fixture
@@ -98,6 +105,15 @@ class TestSnapshotTake:
 
     async def test_path_shaped_slug_is_refused(self, harness: TaskHarness) -> None:
         result = await harness.call('snapshot_take', {'slug': '../../etc'})
+
+        assert result.is_error
+        assert harness.git_calls == []
+
+    @refused_limit_cases()
+    async def test_limit_outside_the_bounds_is_refused(
+        self, harness: TaskHarness, limit: int
+    ) -> None:
+        result = await harness.call('snapshot_take', {'slug': SLUG, 'limit': limit})
 
         assert result.is_error
         assert harness.git_calls == []

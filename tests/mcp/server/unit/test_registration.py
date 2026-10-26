@@ -11,7 +11,6 @@ from mightymodels_core.edge import DataDirectoryMissingError
 from mightymodels_mcp.server.call_log import CALL_LOGGER_NAME
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.server.registration import (
-    ANNOTATION_HINTS,
     DuplicateToolNameError,
     IncompleteToolAnnotationsError,
     MissingToolIconError,
@@ -75,6 +74,7 @@ class AnswerNote:
         raise DataDirectoryMissingError(variable='VARIABLE', session_variable='SESSION')
 
 
+HINT_NAMES = ('read_only_hint', 'destructive_hint', 'idempotent_hint', 'open_world_hint')
 COMPLETE_ANNOTATIONS = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
@@ -124,6 +124,11 @@ def incomplete_definition_cases() -> pytest.MarkDecorator:
         definition=replace(complete, title=''),
         refusal=MissingToolTitleError,
     )
+    whitespace_title = IncompleteDefinition(
+        name='whitespace-title',
+        definition=replace(complete, title='  \t '),
+        refusal=MissingToolTitleError,
+    )
     unannotated = IncompleteDefinition(
         name='no-annotations',
         definition=replace(complete, annotations=None),
@@ -134,8 +139,8 @@ def incomplete_definition_cases() -> pytest.MarkDecorator:
         definition=replace(complete, icon=None),
         refusal=MissingToolIconError,
     )
-    unset_hints = [unset_hint_definition(hint) for hint in ANNOTATION_HINTS]
-    cases = [untitled, blank_title, unannotated, iconless, *unset_hints]
+    unset_hints = [unset_hint_definition(hint) for hint in HINT_NAMES]
+    cases = [untitled, blank_title, whitespace_title, unannotated, iconless, *unset_hints]
     return pytest.mark.parametrize('incomplete', [case.param for case in cases])
 
 
@@ -171,7 +176,7 @@ class TestToolCatalog:
         unannotated = replace(create_note_definition(), annotations=None)
         with pytest.raises(IncompleteToolAnnotationsError) as refused:
             catalog.register(unannotated)
-        assert refused.value.missing == ANNOTATION_HINTS
+        assert refused.value.missing == HINT_NAMES
 
     def test_duplicate_name_is_refused(self, catalog: ToolCatalog) -> None:
         catalog.register(create_note_definition())
