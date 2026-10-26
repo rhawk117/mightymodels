@@ -21,7 +21,7 @@ from .app import create_server
 from .call_log import InvalidLogLevelError, LogSettings, installed_logging, parse_log_level
 from .dependencies import ServerDependencies
 from .registration import ToolCatalog
-from .state import LocalStateOpener
+from .state import LocalStateOpener, discard_outdated_database
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -52,6 +52,7 @@ def run(environ: Mapping[str, str], cwd: Path) -> int:
     with installed_logging(
         LogSettings(level=level, data_directory=data_directory, stream=sys.stderr)
     ):
+        discard_outdated_database(data_directory)
         create_server(ServerDependencies(state=state), create_catalog()).run()
 
     return 0
