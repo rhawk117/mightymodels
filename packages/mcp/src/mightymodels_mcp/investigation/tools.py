@@ -20,8 +20,7 @@ from pydantic import BaseModel
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
 from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.annotations import READS, WRITES
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .schemas import (
     InvestigationAddRequest,
@@ -136,53 +135,55 @@ async def investigation_list(
         return list_investigations(create_investigation_work(state))
 
 
-def register_investigation_tools(catalog: ToolCatalog) -> ToolCatalog:
-    icon = load_icon('investigation')
-    start = ToolDefinition(
+INVESTIGATION_TOOLS = (
+    ToolSpec(
         name='investigation_start',
         title='Start an investigation',
         annotations=WRITES,
-        icon=icon,
+        icon='investigation',
         request_model=InvestigationStartRequest,
         result_model=InvestigationView,
         handler=investigation_start,
         resolvers={'answers': KIND_RESOLVER},
-    )
-    add = ToolDefinition(
+    ),
+    ToolSpec(
         name='investigation_add',
         title="Add to an investigation's ledger",
         annotations=WRITES,
-        icon=icon,
+        icon='investigation',
         request_model=InvestigationAddRequest,
         result_model=InvestigationView,
         handler=investigation_add,
-    )
-    render = ToolDefinition(
+    ),
+    ToolSpec(
         name='investigation_render',
         title="Show an investigation's ledger",
         annotations=READS,
-        icon=icon,
+        icon='investigation',
         request_model=InvestigationRenderRequest,
         result_model=InvestigationView,
         handler=investigation_render,
-    )
-    knowns = ToolDefinition(
+    ),
+    ToolSpec(
         name='investigation_knowns',
         title='Show the knowns table',
         annotations=READS,
-        icon=icon,
+        icon='investigation',
         request_model=InvestigationKnownsRequest,
         result_model=InvestigationView,
         handler=investigation_knowns,
-    )
-    listing = ToolDefinition(
+    ),
+    ToolSpec(
         name='investigation_list',
         title='List investigations',
         annotations=READS,
-        icon=icon,
+        icon='investigation',
         request_model=InvestigationListRequest,
         result_model=InvestigationView,
         handler=investigation_list,
-    )
-    opened = catalog.register(start).register(add).register(render)
-    return opened.register(knowns).register(listing)
+    ),
+)
+
+
+def register_investigation_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, INVESTIGATION_TOOLS)

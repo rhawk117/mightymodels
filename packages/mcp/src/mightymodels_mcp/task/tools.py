@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING
 from mightymodels_core.workspace import workspace_at
 
 from mightymodels_mcp.server.annotations import MARKS, READS, WRITES
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .gate_facts import VerificationSources, gather_verification
 from .schemas import (
@@ -81,61 +80,63 @@ async def failed_fix_record(request: FailedFixRequest, ctx: ToolContext) -> Task
         return record_failed_fix(create_task_work(state), request)
 
 
-def register_task_tools(catalog: ToolCatalog) -> ToolCatalog:
-    icon = load_icon('task')
-    start = ToolDefinition(
+TASK_TOOLS = (
+    ToolSpec(
         name='task_start',
         title='Start a task',
         annotations=WRITES,
-        icon=icon,
+        icon='task',
         request_model=TaskStartRequest,
         result_model=TaskView,
         handler=task_start,
-    )
-    verify = ToolDefinition(
+    ),
+    ToolSpec(
         name='task_verify',
         title='Verify a task',
         annotations=WRITES,
-        icon=icon,
+        icon='task',
         request_model=TaskVerifyRequest,
         result_model=TaskView,
         handler=task_verify,
-    )
-    mark = ToolDefinition(
+    ),
+    ToolSpec(
         name='task_mark',
         title='Mark a task',
         annotations=MARKS,
-        icon=icon,
+        icon='task',
         request_model=TaskMarkRequest,
         result_model=TaskView,
         handler=task_mark,
-    )
-    show = ToolDefinition(
+    ),
+    ToolSpec(
         name='task_show',
         title='Show the tasks',
         annotations=READS,
-        icon=icon,
+        icon='task',
         request_model=TaskRequest,
         result_model=TaskView,
         handler=task_show,
-    )
-    ready = ToolDefinition(
+    ),
+    ToolSpec(
         name='task_ready',
         title='Check the tasks are ready',
         annotations=READS,
-        icon=icon,
+        icon='task',
         request_model=TaskRequest,
         result_model=TaskView,
         handler=task_ready,
-    )
-    fix = ToolDefinition(
+    ),
+    ToolSpec(
         name='failed_fix_record',
         title='Record a failed fix',
         annotations=WRITES,
-        icon=load_icon('failed_fix'),
+        icon='failed_fix',
         request_model=FailedFixRequest,
         result_model=TaskView,
         handler=failed_fix_record,
-    )
-    opened = catalog.register(start).register(verify).register(mark)
-    return opened.register(show).register(ready).register(fix)
+    ),
+)
+
+
+def register_task_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, TASK_TOOLS)

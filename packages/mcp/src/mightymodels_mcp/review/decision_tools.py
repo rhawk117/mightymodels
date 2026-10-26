@@ -26,8 +26,7 @@ from mightymodels_mcp.forms.dispose import ReasonsForm, create_dispose_pages
 from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.annotations import WRITES
 from mightymodels_mcp.server.dependencies import ServerDependencies
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 from mightymodels_mcp.server.requests import USER_APPROVER
 
 from .schemas import Disposition, ReviewDisposeRequest, ReviewResolveRequest
@@ -220,25 +219,28 @@ async def review_resolve(request: ReviewResolveRequest, ctx: ToolContext) -> Rev
         return resolve_finding(create_review_work(state), request.run_id, resolve)
 
 
-def register_decision_tools(catalog: ToolCatalog) -> ToolCatalog:
-    icon = load_icon('review')
-    dispose = ToolDefinition(
+DECISION_TOOLS = (
+    ToolSpec(
         name='review_dispose',
         title="Decide a review's findings",
         annotations=WRITES,
-        icon=icon,
+        icon='review',
         request_model=ReviewDisposeRequest,
         result_model=ReviewView,
         handler=review_dispose,
         resolvers={'chosen': CHOSEN_RESOLVER},
-    )
-    resolve = ToolDefinition(
+    ),
+    ToolSpec(
         name='review_resolve',
         title='Resolve a review finding',
         annotations=WRITES,
-        icon=icon,
+        icon='review',
         request_model=ReviewResolveRequest,
         result_model=ReviewView,
         handler=review_resolve,
-    )
-    return catalog.register(dispose).register(resolve)
+    ),
+)
+
+
+def register_decision_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, DECISION_TOOLS)

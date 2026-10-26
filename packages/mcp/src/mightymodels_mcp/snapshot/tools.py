@@ -12,8 +12,7 @@ from mightymodels_core.snapshot.records import RepositoryFacts
 from mightymodels_core.workspace import workspace_at
 
 from mightymodels_mcp.server.annotations import READS
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .schemas import SnapshotTakeRequest
 from .use_cases import create_snapshot_work, take_snapshot
@@ -42,14 +41,18 @@ async def snapshot_take(request: SnapshotTakeRequest, ctx: ToolContext) -> Snaps
         return take_snapshot(create_snapshot_work(state), workspace, asked)
 
 
-def register_snapshot_tools(catalog: ToolCatalog) -> ToolCatalog:
-    take = ToolDefinition(
+SNAPSHOT_TOOLS = (
+    ToolSpec(
         name='snapshot_take',
         title='Take a snapshot',
         annotations=READS,
-        icon=load_icon('snapshot'),
+        icon='snapshot',
         request_model=SnapshotTakeRequest,
         result_model=SnapshotView,
         handler=snapshot_take,
-    )
-    return catalog.register(take)
+    ),
+)
+
+
+def register_snapshot_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, SNAPSHOT_TOOLS)

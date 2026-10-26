@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING
 from mightymodels_core.crashouts import CrashoutEntry
 
 from mightymodels_mcp.server.annotations import READS, WRITES
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .schemas import (
     CrashoutAddRequest,
@@ -71,42 +70,45 @@ async def similarity_search(request: SimilaritySearchRequest, ctx: ToolContext) 
         return search_similar(create_journal_work(state), asked)
 
 
-def register_journal_tools(catalog: ToolCatalog) -> ToolCatalog:
-    crashout = load_icon('crashout')
-    add = ToolDefinition(
+JOURNAL_TOOLS = (
+    ToolSpec(
         name='crashout_add',
         title='Journal a crashout',
         annotations=WRITES,
-        icon=crashout,
+        icon='crashout',
         request_model=CrashoutAddRequest,
         result_model=JournalView,
         handler=crashout_add,
-    )
-    stats = ToolDefinition(
+    ),
+    ToolSpec(
         name='crashout_stats',
         title='Show crashout patterns',
         annotations=READS,
-        icon=crashout,
+        icon='crashout',
         request_model=CrashoutStatsRequest,
         result_model=JournalView,
         handler=crashout_stats,
-    )
-    last = ToolDefinition(
+    ),
+    ToolSpec(
         name='crashout_last',
         title='Show the last crashout',
         annotations=READS,
-        icon=crashout,
+        icon='crashout',
         request_model=CrashoutLastRequest,
         result_model=JournalView,
         handler=crashout_last,
-    )
-    search = ToolDefinition(
+    ),
+    ToolSpec(
         name='similarity_search',
         title='Search for similar rows',
         annotations=READS,
-        icon=load_icon('similarity'),
+        icon='similarity',
         request_model=SimilaritySearchRequest,
         result_model=JournalView,
         handler=similarity_search,
-    )
-    return catalog.register(add).register(stats).register(last).register(search)
+    ),
+)
+
+
+def register_journal_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, JOURNAL_TOOLS)

@@ -23,10 +23,12 @@ from typing import (
     Annotated,
     Any,
     Concatenate,
+    Protocol,
     Self,
     get_args,
     get_origin,
     get_type_hints,
+    runtime_checkable,
 )
 
 from mcp.server.mcpserver import Context
@@ -45,6 +47,7 @@ from pydantic import BaseModel
 
 from .call_log import CallRecord
 from .dependencies import ServerDependencies
+from .icons import load_icon
 from .requests import REQUEST_ARGUMENT, RequestModel
 
 if TYPE_CHECKING:
@@ -55,6 +58,7 @@ if TYPE_CHECKING:
     from mightymodels_core.edge import OpenState
 
     from .call_log import CallOutcome
+    from .icons import IconName
 
 type ToolContext = Context[ServerDependencies, Any]
 type ToolHandler[R: RequestModel, V: BaseModel, **P = []] = Callable[
@@ -288,3 +292,42 @@ class ToolCatalog:
 
     def list_tools(self) -> list[Tool]:
         return list(self.tools.values())
+
+
+@runtime_checkable
+class ToolRegistrar(Protocol):
+    def register_in(self, catalog: ToolCatalog) -> ToolCatalog: ...
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ToolSpec[R: RequestModel, V: BaseModel, **P = []]:
+    name: str
+    title: str
+    annotations: ToolAnnotations
+    icon: IconName
+    request_model: type[R]
+    result_model: type[V]
+    handler: ToolHandler[R, V, P]
+    resolvers: Mapping[str, Resolve] = field(default_factory=dict)
+
+    def define(self) -> ToolDefinition[R, V, P]:
+        return ToolDefinition(
+            name=self.name,
+            title=self.title,
+            annotations=self.annotations,
+            icon=load_icon(self.icon),
+            request_model=self.request_model,
+            result_model=self.result_model,
+            handler=self.handler,
+            resolvers=self.resolvers,
+        )
+
+    def register_in(self, catalog: ToolCatalog) -> ToolCatalog:
+        return catalog.register(self.define())
+
+
+def register_specs(catalog: ToolCatalog, specs: tuple[ToolRegistrar, ...]) -> ToolCatalog:
+    for spec in specs:
+        spec.register_in(catalog)
+
+    return catalog

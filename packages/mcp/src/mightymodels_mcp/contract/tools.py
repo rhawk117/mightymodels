@@ -17,8 +17,7 @@ from pydantic import BaseModel
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
 from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.annotations import READS, WRITES
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 from mightymodels_mcp.server.requests import USER_APPROVER
 from mightymodels_mcp.server.state import create_work
 
@@ -104,25 +103,28 @@ async def contract_status(request: ContractRequest, ctx: ToolContext) -> Contrac
         return show_contract_status(create_work(state, TaskWork), request.slug, head)
 
 
-def register_contract_tools(catalog: ToolCatalog) -> ToolCatalog:
-    icon = load_icon('contract')
-    approve = ToolDefinition(
+CONTRACT_TOOLS = (
+    ToolSpec(
         name='contract_approve',
         title='Approve the contract commands',
         annotations=WRITES,
-        icon=icon,
+        icon='contract',
         request_model=ContractApproveRequest,
         result_model=ContractView,
         handler=contract_approve,
         resolvers={'answers': APPROVAL_RESOLVER},
-    )
-    status = ToolDefinition(
+    ),
+    ToolSpec(
         name='contract_status',
         title='Show the contract status',
         annotations=READS,
-        icon=icon,
+        icon='contract',
         request_model=ContractRequest,
         result_model=ContractView,
         handler=contract_status,
-    )
-    return catalog.register(approve).register(status)
+    ),
+)
+
+
+def register_contract_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, CONTRACT_TOOLS)

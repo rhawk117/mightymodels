@@ -16,8 +16,7 @@ from pydantic import BaseModel
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
 from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.annotations import READS, WRITES
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .schemas import (
     ReviewAddRequest,
@@ -165,62 +164,64 @@ async def review_list(_request: ReviewListRequest, ctx: ToolContext) -> ReviewVi
         return list_reviews(create_review_work(state))
 
 
-def register_review_tools(catalog: ToolCatalog) -> ToolCatalog:
-    icon = load_icon('review')
-    start = ToolDefinition(
+REVIEW_TOOLS = (
+    ToolSpec(
         name='review_start',
         title='Start a review',
         annotations=WRITES,
-        icon=icon,
+        icon='review',
         request_model=ReviewStartRequest,
         result_model=ReviewView,
         handler=review_start,
         resolvers={'answers': START_ROUND_RESOLVER},
-    )
-    override = ToolDefinition(
+    ),
+    ToolSpec(
         name='review_override',
         title="Override a review's models",
         annotations=WRITES,
-        icon=icon,
+        icon='review',
         request_model=ReviewOverrideRequest,
         result_model=ReviewView,
         handler=review_override,
-    )
-    add = ToolDefinition(
+    ),
+    ToolSpec(
         name='review_add',
         title="Add a reviewer's report",
         annotations=WRITES,
-        icon=icon,
+        icon='review',
         request_model=ReviewAddRequest,
         result_model=ReviewView,
         handler=review_add,
-    )
-    gate = ToolDefinition(
+    ),
+    ToolSpec(
         name='review_gate',
         title='Gate a review',
         annotations=READS,
-        icon=icon,
+        icon='review',
         request_model=ReviewGateRequest,
         result_model=ReviewView,
         handler=review_gate,
-    )
-    report = ToolDefinition(
+    ),
+    ToolSpec(
         name='review_report',
         title='Report a review',
         annotations=READS,
-        icon=icon,
+        icon='review',
         request_model=ReviewReportRequest,
         result_model=ReviewView,
         handler=review_report,
-    )
-    listing = ToolDefinition(
+    ),
+    ToolSpec(
         name='review_list',
         title='List the reviews',
         annotations=READS,
-        icon=icon,
+        icon='review',
         request_model=ReviewListRequest,
         result_model=ReviewView,
         handler=review_list,
-    )
-    opened = catalog.register(start).register(override).register(add)
-    return opened.register(gate).register(report).register(listing)
+    ),
+)
+
+
+def register_review_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, REVIEW_TOOLS)

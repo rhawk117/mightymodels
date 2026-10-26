@@ -23,8 +23,7 @@ from mightymodels_mcp.forms.choices import (
 )
 from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.annotations import CLOSES, READS, WRITES
-from mightymodels_mcp.server.icons import load_icon
-from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .close_facts import CloseAttempt, gather_close_facts
 from .schemas import (
@@ -174,63 +173,64 @@ async def close_ticket(request: CloseTicketRequest, ctx: ToolContext) -> CloseVi
         )
 
 
-def register_ticket_tools(catalog: ToolCatalog) -> ToolCatalog:
-    icon = load_icon('ticket')
-    write = ToolDefinition(
+TICKET_TOOLS = (
+    ToolSpec(
         name='ticket_write',
         title='Write a ticket',
         annotations=WRITES,
-        icon=icon,
+        icon='ticket',
         request_model=TicketWriteRequest,
         result_model=TicketView,
         handler=ticket_write,
         resolvers={'answers': WRITE_ROUND_RESOLVER},
-    )
-    validate = ToolDefinition(
+    ),
+    ToolSpec(
         name='ticket_validate',
         title='Validate a ticket',
         annotations=WRITES,
-        icon=icon,
+        icon='ticket',
         request_model=TicketRequest,
         result_model=TicketView,
         handler=ticket_validate,
-    )
-    show = ToolDefinition(
+    ),
+    ToolSpec(
         name='ticket_show',
         title='Show a ticket',
         annotations=READS,
-        icon=icon,
+        icon='ticket',
         request_model=TicketRequest,
         result_model=TicketView,
         handler=ticket_show,
-    )
-    update_context = ToolDefinition(
+    ),
+    ToolSpec(
         name='ticket_update_context',
         title="Update a ticket's context",
         annotations=WRITES,
-        icon=icon,
+        icon='ticket',
         request_model=TicketContextRequest,
         result_model=TicketView,
         handler=ticket_update_context,
-    )
-    close_icon = load_icon('close')
-    check = ToolDefinition(
+    ),
+    ToolSpec(
         name='close_check',
         title='Check a ticket for live work',
         annotations=READS,
-        icon=close_icon,
+        icon='close',
         request_model=TicketRequest,
         result_model=CloseView,
         handler=close_check,
-    )
-    close = ToolDefinition(
+    ),
+    ToolSpec(
         name='close_ticket',
         title='Close a ticket',
         annotations=CLOSES,
-        icon=close_icon,
+        icon='close',
         request_model=CloseTicketRequest,
         result_model=CloseView,
         handler=close_ticket,
-    )
-    opened = catalog.register(write).register(validate).register(show).register(update_context)
-    return opened.register(check).register(close)
+    ),
+)
+
+
+def register_ticket_tools(catalog: ToolCatalog) -> ToolCatalog:
+    return register_specs(catalog, TICKET_TOOLS)
