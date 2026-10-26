@@ -1,13 +1,18 @@
 """Route a hook's JSON stdin to the subcommand handler registered for it."""
 
+import asyncio
+import os
 import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, Self, TextIO, runtime_checkable
 
 import msgspec
+from mightymodels_core.edge import create_clock
+
+from mightymodels_hooks.session_start import SessionStartHandler
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 REFUSED = 2
 
@@ -16,7 +21,7 @@ type HookPayload = dict[str, object]
 
 @runtime_checkable
 class HookHandler(Protocol):
-    def handle(self, payload: HookPayload) -> str | None: ...
+    async def handle(self, payload: HookPayload) -> str | None: ...
 
 
 type HookHandlers = dict[str, HookHandler]
@@ -42,8 +47,9 @@ def decode_payload(text: str) -> HookPayload | None:
         return None
 
 
-def create_hook_router() -> HookRouter:
-    return HookRouter()
+def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter:
+    session_start = SessionStartHandler(environ=environ, stderr=stderr, clock=create_clock())
+    return HookRouter().mount({'session-start': session_start})
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -57,7 +63,7 @@ class HookCommand:
         self.stderr.write(f'mightymodels-hooks: {message}\n')
         return REFUSED
 
-    def run(self, argv: Sequence[str]) -> int:
+    async def run(self, argv: Sequence[str]) -> int:
         if len(argv) != 1:
             return self.refuse('expected exactly one subcommand')
 
@@ -69,7 +75,7 @@ class HookCommand:
         if payload is None:
             return self.refuse('stdin is not a JSON object')
 
-        output = handler.handle(payload)
+        output = await handler.handle(payload)
         if output is not None:
             self.stdout.write(output)
 
@@ -78,9 +84,9 @@ class HookCommand:
 
 def main() -> int:
     command = HookCommand(
-        router=create_hook_router(),
+        router=create_hook_router(os.environ, sys.stderr),
         stdin=sys.stdin,
         stdout=sys.stdout,
         stderr=sys.stderr,
     )
-    return command.run(sys.argv[1:])
+    return asyncio.run(command.run(sys.argv[1:]))
