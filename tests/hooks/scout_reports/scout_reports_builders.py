@@ -1,0 +1,83 @@
+"""Payloads, a keeper over a real data directory and the rows it leaves."""
+
+import sqlite3
+from contextlib import closing
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from mightymodels_core.edge import DATABASE_NAME, PLUGIN_DATA_VARIABLE
+from mightymodels_core.primitives import SystemClock
+from mightymodels_hooks.scout_reports import (
+    ScoutReportKeeper,
+    SubagentHandbackHandler,
+    SubagentRecordHandler,
+)
+
+if TYPE_CHECKING:
+    import io
+    from pathlib import Path
+
+    from mightymodels_hooks.cli import HookPayload
+
+CODE_SCOUT = 'mightymodels:triage:code-scout'
+WEB_SCOUT = 'mightymodels:triage:web-scout'
+AGENT_ID = 'a1b2'
+REPORT = 'The queue drains in src/queue.py:12.'
+CLOSING_TEXT = 'Done.'
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class StoredRow:
+    scout: str
+    target: str
+    report: str
+
+
+def stop_payload(agent_type: str, **given: object) -> HookPayload:
+    stop: HookPayload = {
+        'hook_event_name': 'SubagentStop',
+        'agent_type': agent_type,
+        'agent_id': AGENT_ID,
+        'last_assistant_message': REPORT,
+    }
+    return stop | given
+
+
+def handback_payload(agent_type: str, message: object = REPORT, **given: object) -> HookPayload:
+    handback: HookPayload = {
+        'hook_event_name': 'PostToolUse',
+        'tool_name': 'SubagentHandback',
+        'agent_type': agent_type,
+        'agent_id': AGENT_ID,
+        'tool_input': {'message': message},
+    }
+    return handback | given
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ScoutHarness:
+    checkout: Path
+    data_directory: Path
+    stderr: io.StringIO
+
+    @property
+    def keeper(self) -> ScoutReportKeeper:
+        environ = {PLUGIN_DATA_VARIABLE: str(self.data_directory)}
+        return ScoutReportKeeper(environ=environ, stderr=self.stderr, clock=SystemClock())
+
+    async def stop(self, payload: HookPayload) -> str | None:
+        handler = SubagentRecordHandler(keeper=self.keeper)
+        return await handler.handle({**payload, 'cwd': str(self.checkout)})
+
+    async def hand_back(self, payload: HookPayload) -> str | None:
+        handler = SubagentHandbackHandler(keeper=self.keeper)
+        return await handler.handle({**payload, 'cwd': str(self.checkout)})
+
+    def rows(self) -> list[StoredRow]:
+        database = self.data_directory.joinpath(DATABASE_NAME)
+        if not database.is_file():
+            return []
+
+        with closing(sqlite3.connect(database)) as connection:
+            found = connection.execute('SELECT scout, target, report FROM scout_reports')
+            return [StoredRow(scout=s, target=t, report=r) for s, t, r in found]

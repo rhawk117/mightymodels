@@ -12,6 +12,11 @@ from mightymodels_core.edge import create_clock
 from mightymodels_hooks.completion_gate import CompletionGateHandler
 from mightymodels_hooks.dispatch import DispatchHandler
 from mightymodels_hooks.main_thread import MainThreadHandler
+from mightymodels_hooks.scout_reports import (
+    ScoutReportKeeper,
+    SubagentHandbackHandler,
+    SubagentRecordHandler,
+)
 from mightymodels_hooks.session_start import SessionStartHandler
 
 if TYPE_CHECKING:
@@ -55,11 +60,14 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
     dispatch = DispatchHandler(environ=environ)
     main_thread = MainThreadHandler(environ=environ)
     completion_gate = CompletionGateHandler(environ=environ, stderr=stderr)
+    keeper = ScoutReportKeeper(environ=environ, stderr=stderr, clock=create_clock())
     return HookRouter().mount({
         'session-start': session_start,
         'dispatch-hook': dispatch,
         'main-thread-hook': main_thread,
         'completion-gate': completion_gate,
+        'subagent-record': SubagentRecordHandler(keeper=keeper),
+        'subagent-handback': SubagentHandbackHandler(keeper=keeper),
     })
 
 
