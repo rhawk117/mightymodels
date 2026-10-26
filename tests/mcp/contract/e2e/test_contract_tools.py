@@ -35,9 +35,8 @@ READS = ToolAnnotations(
 CHECK = MappingProxyType({'id': 'T1.check', 'argv': ('uv', 'run', 'pytest', '-q')})
 LINT = MappingProxyType({'id': 'T1.lint', 'argv': ('uv', 'run', 'ruff', 'check')})
 STATUS = MappingProxyType({'slug': SLUG})
-FORM_MESSAGE = (
-    'Approve these verification commands?\nT1.check: uv run pytest -q\nT1.lint: uv run ruff check'
-)
+FORM_MESSAGE = 'Approve these verification commands?'
+FORM_TITLE = f'{FORM_MESSAGE}\nT1.check: uv run pytest -q\nT1.lint: uv run ruff check'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -177,7 +176,7 @@ class TestContractApprove:
 
         assert view['passing'] is False
         assert view['text'] == (
-            f'{NEEDS_INPUT}\n{FORM_MESSAGE}\nchoices: approve, decline\n'
+            f'{NEEDS_INPUT}\n{FORM_TITLE}\nchoices: approve, decline\n'
             'pass: approved_by "user" on each command, once the user approved\n'
         )
         assert await harness.status_rows() == ['no matching commands']

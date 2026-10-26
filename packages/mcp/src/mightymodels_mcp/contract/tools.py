@@ -63,7 +63,7 @@ def create_approval_question(request: ContractApproveRequest) -> ChoiceQuestion:
 
 def create_approval_round(request: ContractApproveRequest) -> ChoiceRound:
     asked = (create_approval_question(request),) if leaves_approver_blank(request) else ()
-    return ChoiceRound(message=f'{APPROVE_MESSAGE}{describe_commands(request)}', questions=asked)
+    return ChoiceRound(message=APPROVE_MESSAGE, questions=asked)
 
 
 def ask_approval(request: ContractApproveRequest) -> RoundAsk:
