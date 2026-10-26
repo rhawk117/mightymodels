@@ -567,6 +567,12 @@ requires-dist = [
 name = "mightymodels-hooks"
 version = "0.1.0"
 source = { editable = "packages/hooks" }
+dependencies = [
+    { name = "mightymodels-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "mightymodels-core", editable = "packages/core" }]
 
 [[package]]
 name = "mightymodels-mcp"

@@ -1,0 +1,86 @@
+"""Route a hook's JSON stdin to the subcommand handler registered for it."""
+
+import sys
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Protocol, Self, TextIO, runtime_checkable
+
+import msgspec
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+REFUSED = 2
+
+type HookPayload = dict[str, object]
+
+
+@runtime_checkable
+class HookHandler(Protocol):
+    def handle(self, payload: HookPayload) -> str | None: ...
+
+
+type HookHandlers = dict[str, HookHandler]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class HookRouter:
+    handlers: HookHandlers = field(default_factory=dict)
+
+    def mount(self, handlers: HookHandlers) -> Self:
+        self.handlers.update(handlers)
+        return self
+
+    def find_handler(self, name: str) -> HookHandler | None:
+        return self.handlers.get(name)
+
+
+def decode_payload(text: str) -> HookPayload | None:
+    decoder = msgspec.json.Decoder[dict[str, object]](dict[str, object])
+    try:
+        return decoder.decode(text)
+    except msgspec.DecodeError:
+        return None
+
+
+def create_hook_router() -> HookRouter:
+    return HookRouter()
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class HookCommand:
+    router: HookRouter
+    stdin: TextIO
+    stdout: TextIO
+    stderr: TextIO
+
+    def refuse(self, message: str) -> int:
+        self.stderr.write(f'mightymodels-hooks: {message}\n')
+        return REFUSED
+
+    def run(self, argv: Sequence[str]) -> int:
+        if len(argv) != 1:
+            return self.refuse('expected exactly one subcommand')
+
+        handler = self.router.find_handler(argv[0])
+        if handler is None:
+            return self.refuse(f'unknown subcommand {argv[0]!r}')
+
+        payload = decode_payload(self.stdin.read())
+        if payload is None:
+            return self.refuse('stdin is not a JSON object')
+
+        output = handler.handle(payload)
+        if output is not None:
+            self.stdout.write(output)
+
+        return 0
+
+
+def main() -> int:
+    command = HookCommand(
+        router=create_hook_router(),
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
+    return command.run(sys.argv[1:])
