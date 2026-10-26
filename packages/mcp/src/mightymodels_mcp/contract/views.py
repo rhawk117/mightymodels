@@ -2,9 +2,8 @@
 
 from typing import TYPE_CHECKING
 
+from mightymodels_core.primitives import short_head
 from pydantic import BaseModel, ConfigDict
-
-from mightymodels_mcp.task.views import short_head
 
 if TYPE_CHECKING:
     from mightymodels_core.contract.policy import ReceiptAssessment

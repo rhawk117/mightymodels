@@ -21,7 +21,6 @@ from mcp.server.mcpserver.resolve import Elicit, Resolve
 from mightymodels_core.reviews import IncomingDisposition, ResolveRequest
 from pydantic import BaseModel, ConfigDict, Field
 
-from mightymodels_mcp.contract.schemas import USER_APPROVER
 from mightymodels_mcp.forms.choices import Choice, ChoiceOutcome, ChoiceQuestion
 from mightymodels_mcp.forms.dispose import ReasonsForm, create_dispose_pages
 from mightymodels_mcp.forms.needs_input import needs_input_text
@@ -29,6 +28,7 @@ from mightymodels_mcp.server.annotations import WRITES
 from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.requests import USER_APPROVER
 
 from .schemas import Disposition, ReviewDisposeRequest, ReviewResolveRequest
 from .use_cases import (

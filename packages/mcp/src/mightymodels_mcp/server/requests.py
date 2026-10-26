@@ -13,6 +13,7 @@ from mightymodels_core.primitives import Slug, parse_slug
 from pydantic import AfterValidator, ConfigDict, StringConstraints
 
 REQUEST_ARGUMENT = 'request'
+USER_APPROVER = 'user'
 NAME_LIMIT = 255
 PROSE_LIMIT = 4000
 

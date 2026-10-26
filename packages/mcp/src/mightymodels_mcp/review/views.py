@@ -10,6 +10,8 @@ from mightymodels_core.primitives import short_head
 from mightymodels_core.reviews import OverridePolicy, Verdict
 from pydantic import BaseModel, ConfigDict
 
+from mightymodels_mcp.server.views import duplicates_text
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -24,12 +26,10 @@ if TYPE_CHECKING:
         ReviewRunRecord,
         RunListing,
     )
-    from mightymodels_core.similarity.records import Duplicate, Match
     from mightymodels_core.vocabulary.reviews import StoredSeverity
 
     from mightymodels_mcp.review.schemas import ReportShape
 
-EXCERPT_LENGTH = 120
 COMMENT_LIMIT = 10
 UNDECIDED = 'undecided'
 NO_FINDINGS = 'no findings recorded\n'
@@ -44,22 +44,6 @@ class ReviewView(BaseModel):
     text: str
     run_id: str | None = None
     verdict: Verdict | None = None
-
-
-def excerpt(text: str) -> str:
-    one_line = ' '.join(text.split())
-    return one_line if len(one_line) <= EXCERPT_LENGTH else f'{one_line[:EXCERPT_LENGTH]}...'
-
-
-def match_line(match: Match) -> str:
-    return f'{match.kind} {match.reference} (overlap {match.overlap:.2f}): {excerpt(match.text)}\n'
-
-
-def duplicates_text(duplicates: Sequence[Duplicate]) -> str:
-    return ''.join(
-        f'near-duplicate: {duplicate.written} resembles {match_line(duplicate.earlier)}'
-        for duplicate in duplicates
-    )
 
 
 def render_started(run: ReviewRunRecord, relative: str) -> ReviewView:

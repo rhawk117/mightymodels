@@ -9,7 +9,6 @@ from mightymodels_core.contract.records import ApprovedCommand
 
 from mightymodels_mcp.server.requests import NameText, RequestModel, SlugField
 
-USER_APPROVER = 'user'
 DEFAULT_TIMEOUT = 300
 
 

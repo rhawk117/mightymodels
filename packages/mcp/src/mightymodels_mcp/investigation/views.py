@@ -14,7 +14,7 @@ from mightymodels_core.investigations.records import INVESTIGATIONS_LISTED
 from mightymodels_core.primitives import short_head
 from pydantic import BaseModel, ConfigDict
 
-from mightymodels_mcp.review.views import duplicates_text
+from mightymodels_mcp.server.views import duplicates_text
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

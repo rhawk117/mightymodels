@@ -13,7 +13,7 @@ from mightymodels_mcp.journal.views import (
     render_matches,
     render_stats,
 )
-from mightymodels_mcp.review.views import EXCERPT_LENGTH
+from mightymodels_mcp.server.views import EXCERPT_LENGTH
 
 AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 

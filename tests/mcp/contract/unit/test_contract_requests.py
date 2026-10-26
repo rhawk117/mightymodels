@@ -3,12 +3,11 @@ from typing import Any
 
 import pytest
 from mightymodels_mcp.contract.schemas import (
-    USER_APPROVER,
     ContractApproveRequest,
     leaves_approver_blank,
 )
 from mightymodels_mcp.contract.schemas import create_approved_commands as approved_commands_of
-from mightymodels_mcp.server.requests import NAME_LIMIT
+from mightymodels_mcp.server.requests import NAME_LIMIT, USER_APPROVER
 from pydantic import ValidationError
 
 COMMAND = MappingProxyType({'id': 'T1.check', 'argv': ('uv', 'run', 'pytest')})

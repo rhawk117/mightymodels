@@ -14,7 +14,7 @@ from mightymodels_core.vocabulary.crashouts import CrashoutSeverity, Verdict
 from mightymodels_core.vocabulary.similarity import SimilarityKind
 from pydantic import BaseModel, ConfigDict
 
-from mightymodels_mcp.review.views import duplicates_text, match_line
+from mightymodels_mcp.server.views import duplicates_text, match_line
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

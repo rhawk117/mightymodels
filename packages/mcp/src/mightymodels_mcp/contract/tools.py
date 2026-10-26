@@ -18,9 +18,9 @@ from mightymodels_mcp.forms.needs_input import needs_input_text
 from mightymodels_mcp.server.annotations import READS, WRITES
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
+from mightymodels_mcp.server.requests import USER_APPROVER
 
 from .schemas import (
-    USER_APPROVER,
     ContractApproveRequest,
     ContractRequest,
     create_approved_commands,
