@@ -53,7 +53,7 @@ The counts come from this command, run at the repository root:
 rg --no-config -uu -o --no-filename 'mcp__plugin_mightymodels_state__\w+' .ref/mightymodels/skills .ref/mightymodels/agents | sort | uniq -c
 ```
 
-Its scope is the skills and agents of the old plugin only, which hold 77 calls in 18 files. All of `.ref` holds 82 matches, because its tests hold 4 and its README holds 1. The `.ref` copy is untracked, so these counts are a record and no test reads them.
+Its scope is the skills and agents of the old plugin only, which hold 77 calls in 18 files. Over all of `.ref` the same pattern matches 80 times: these 77 and 3 in `tests/test_agent_frontmatter.py`. The `.ref` copy is untracked, so these counts are a record and no test reads them.
 
 | Old tool | Calls |
 | --- | --- |
