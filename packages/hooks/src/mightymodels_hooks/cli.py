@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Protocol, Self, TextIO, runtime_checkable
 import msgspec
 from mightymodels_core.edge import create_clock
 
+from mightymodels_hooks.completion_gate import CompletionGateHandler
 from mightymodels_hooks.dispatch import DispatchHandler
 from mightymodels_hooks.main_thread import MainThreadHandler
 from mightymodels_hooks.session_start import SessionStartHandler
@@ -53,10 +54,12 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
     session_start = SessionStartHandler(environ=environ, stderr=stderr, clock=create_clock())
     dispatch = DispatchHandler(environ=environ)
     main_thread = MainThreadHandler(environ=environ)
+    completion_gate = CompletionGateHandler(environ=environ, stderr=stderr)
     return HookRouter().mount({
         'session-start': session_start,
         'dispatch-hook': dispatch,
         'main-thread-hook': main_thread,
+        'completion-gate': completion_gate,
     })
 
 
