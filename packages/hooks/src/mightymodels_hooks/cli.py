@@ -12,6 +12,7 @@ from mightymodels_core.edge import create_clock
 from mightymodels_hooks.completion_gate import CompletionGateHandler
 from mightymodels_hooks.dispatch import DispatchHandler
 from mightymodels_hooks.main_thread import MainThreadHandler
+from mightymodels_hooks.pre_compact import PreCompactHandler
 from mightymodels_hooks.scout_reports import (
     ScoutReportKeeper,
     SubagentHandbackHandler,
@@ -66,6 +67,7 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
         'dispatch-hook': dispatch,
         'main-thread-hook': main_thread,
         'completion-gate': completion_gate,
+        'pre-compact': PreCompactHandler(environ=environ, stderr=stderr),
         'subagent-record': SubagentRecordHandler(keeper=keeper),
         'subagent-handback': SubagentHandbackHandler(keeper=keeper),
     })
