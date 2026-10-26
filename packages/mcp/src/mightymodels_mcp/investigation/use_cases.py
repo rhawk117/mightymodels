@@ -8,8 +8,9 @@ knowns and list open a read unit.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.edge import create_clock
 from mightymodels_core.units_of_work import InvestigationWork
+
+from mightymodels_mcp.server.state import create_work
 
 from .views import (
     render_added,
@@ -28,11 +29,7 @@ if TYPE_CHECKING:
 
 
 def create_investigation_work(state: OpenState) -> InvestigationWork:
-    return InvestigationWork(
-        database=state.database,
-        repository_key=state.checkout.repository_key(),
-        clock=create_clock(),
-    )
+    return create_work(state, InvestigationWork)
 
 
 def start_investigation(work: InvestigationWork, request: StartRequest) -> InvestigationView:

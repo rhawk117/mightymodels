@@ -7,8 +7,9 @@ the records it returns from the same unit.
 
 from typing import TYPE_CHECKING
 
-from mightymodels_core.edge import create_clock
 from mightymodels_core.units_of_work import TaskWork
+
+from mightymodels_mcp.server.state import create_work
 
 from .schemas import create_mark_request, create_start_request
 from .views import (
@@ -32,11 +33,7 @@ if TYPE_CHECKING:
 
 
 def create_task_work(state: OpenState) -> TaskWork:
-    return TaskWork(
-        database=state.database,
-        repository_key=state.checkout.repository_key(),
-        clock=create_clock(),
-    )
+    return create_work(state, TaskWork)
 
 
 def start_task(work: TaskWork, request: TaskStartRequest, head: str | None) -> TaskView:

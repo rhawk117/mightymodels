@@ -7,8 +7,9 @@ agent to write the two files.
 
 from typing import TYPE_CHECKING
 
-from mightymodels_core.edge import create_clock
 from mightymodels_core.units_of_work import SnapshotRead
+
+from mightymodels_mcp.server.state import create_work
 
 from .views import render_snapshot
 
@@ -21,11 +22,7 @@ if TYPE_CHECKING:
 
 
 def create_snapshot_work(state: OpenState) -> SnapshotRead:
-    return SnapshotRead(
-        database=state.database,
-        repository_key=state.checkout.repository_key(),
-        clock=create_clock(),
-    )
+    return create_work(state, SnapshotRead)
 
 
 def take_snapshot(

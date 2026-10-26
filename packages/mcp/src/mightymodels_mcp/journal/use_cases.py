@@ -8,8 +8,9 @@ open a read unit.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.edge import create_clock
 from mightymodels_core.units_of_work import JournalWork
+
+from mightymodels_mcp.server.state import create_work
 
 from .views import render_journaled, render_last, render_matches, render_stats
 
@@ -28,11 +29,7 @@ class SimilarityQuery:
 
 
 def create_journal_work(state: OpenState) -> JournalWork:
-    return JournalWork(
-        database=state.database,
-        repository_key=state.checkout.repository_key(),
-        clock=create_clock(),
-    )
+    return create_work(state, JournalWork)
 
 
 def add_crashout(work: JournalWork, entry: CrashoutEntry) -> JournalView:

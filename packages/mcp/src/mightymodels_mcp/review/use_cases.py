@@ -9,12 +9,13 @@ the path core builds for it, never from one assembled here.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.edge import create_clock
 from mightymodels_core.primitives import StateError, create_routing_table
 from mightymodels_core.reviews import parse_report
 from mightymodels_core.reviews.policy.review import create_persona_specs
 from mightymodels_core.reviews.records import RUNS_LISTED
 from mightymodels_core.units_of_work import ReviewWork
+
+from mightymodels_mcp.server.state import create_work
 
 from .views import (
     render_added,
@@ -58,11 +59,7 @@ class ReportMissingError(StateError):
 
 
 def create_review_work(state: OpenState) -> ReviewWork:
-    return ReviewWork(
-        database=state.database,
-        repository_key=state.checkout.repository_key(),
-        clock=create_clock(),
-    )
+    return create_work(state, ReviewWork)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

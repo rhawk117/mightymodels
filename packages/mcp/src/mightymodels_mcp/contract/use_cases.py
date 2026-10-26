@@ -7,27 +7,16 @@ A unit holds the database connection synchronously and must never be held across
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.edge import create_clock
-from mightymodels_core.units_of_work import TaskWork
-
 from .views import render_approved, render_status
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.contract.records import ApprovedCommand
-    from mightymodels_core.edge import OpenState
     from mightymodels_core.primitives import Slug
+    from mightymodels_core.units_of_work import TaskWork
 
     from .views import ContractView
-
-
-def create_contract_work(state: OpenState) -> TaskWork:
-    return TaskWork(
-        database=state.database,
-        repository_key=state.checkout.repository_key(),
-        clock=create_clock(),
-    )
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

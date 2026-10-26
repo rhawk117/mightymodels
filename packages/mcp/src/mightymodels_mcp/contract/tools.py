@@ -11,6 +11,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from mcp.server.mcpserver.resolve import Elicit, Resolve
+from mightymodels_core.units_of_work import TaskWork
 from pydantic import BaseModel
 
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
@@ -19,6 +20,7 @@ from mightymodels_mcp.server.annotations import READS, WRITES
 from mightymodels_mcp.server.icons import load_icon
 from mightymodels_mcp.server.registration import ToolDefinition, open_tool_state
 from mightymodels_mcp.server.requests import USER_APPROVER
+from mightymodels_mcp.server.state import create_work
 
 from .schemas import (
     ContractApproveRequest,
@@ -29,7 +31,6 @@ from .schemas import (
 from .use_cases import (
     ContractApproval,
     approve_contract,
-    create_contract_work,
     show_contract_status,
 )
 from .views import ContractView, render_declined
@@ -93,14 +94,14 @@ async def contract_approve(
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         approval = ContractApproval(slug=request.slug, commands=commands, head=head)
-        return approve_contract(create_contract_work(state), approval)
+        return approve_contract(create_work(state, TaskWork), approval)
 
 
 async def contract_status(request: ContractRequest, ctx: ToolContext) -> ContractView:
     """Show each approved command of a ticket with its latest receipt against the current HEAD."""
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
-        return show_contract_status(create_contract_work(state), request.slug, head)
+        return show_contract_status(create_work(state, TaskWork), request.slug, head)
 
 
 def register_contract_tools(catalog: ToolCatalog) -> ToolCatalog:
