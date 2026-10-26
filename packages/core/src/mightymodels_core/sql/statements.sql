@@ -584,3 +584,19 @@ SELECT json_object('id', id)
 FROM scout_reports
 WHERE repository_id = :repository_id AND scout = :scout AND target = :target
 LIMIT 1;
+
+-- name: upsert_session_pointer
+INSERT INTO session_pointers (repository_id, session_id, kind, key, written_at)
+VALUES (:repository_id, :session_id, :kind, :key, :written_at)
+ON CONFLICT (repository_id, session_id) DO UPDATE
+SET kind = excluded.kind, key = excluded.key, written_at = excluded.written_at;
+
+-- name: session_pointer_of_session
+SELECT json_object('kind', kind, 'key', key, 'written_at', written_at)
+FROM session_pointers
+WHERE repository_id = :repository_id AND session_id = :session_id
+LIMIT 1;
+
+-- name: prune_session_pointers
+DELETE FROM session_pointers
+WHERE repository_id = :repository_id AND written_at < :cutoff;

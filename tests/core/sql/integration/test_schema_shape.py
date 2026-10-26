@@ -32,6 +32,7 @@ TABLES = frozenset({
     'crashouts',
     'similarity',
     'scout_reports',
+    'session_pointers',
     'closings',
 })
 
