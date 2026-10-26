@@ -1,4 +1,4 @@
-"""The ticket decision repository over a core unit, working within one ticket id."""
+"""The ticket decision repository over a core unit, taking the ticket id per call."""
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -34,13 +34,12 @@ def decision_of(row: TicketDecisionRow) -> TicketDecision:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class SqliteTicketDecisionRepository:
     unit: Unit
-    ticket_id: int
     clock: Clock
 
-    def add(self, decision: IncomingDecision) -> None:
+    def add(self, ticket_id: int, decision: IncomingDecision) -> None:
         stored = decision.redacted()
         params = AddTicketDecisionParams(
-            ticket_id=self.ticket_id,
+            ticket_id=ticket_id,
             question=stored.question,
             answer=stored.answer,
             response=stored.response,
@@ -49,6 +48,6 @@ class SqliteTicketDecisionRepository:
         )
         self.unit.run(ADD_TICKET_DECISION, params)
 
-    def decisions(self) -> tuple[TicketDecision, ...]:
-        params = TicketDecisionsParams(ticket_id=self.ticket_id)
+    def decisions(self, ticket_id: int) -> tuple[TicketDecision, ...]:
+        params = TicketDecisionsParams(ticket_id=ticket_id)
         return tuple(decision_of(row) for row in self.unit.all(TICKET_DECISIONS, params))

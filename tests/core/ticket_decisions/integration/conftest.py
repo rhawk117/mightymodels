@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.database import Database, Unit
+    from mightymodels_core.ticket_decisions import IncomingDecision, TicketDecision
 
 DATABASE_FILE = 'mightymodels.db'
 NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
@@ -30,7 +31,19 @@ class FixedClock:
         return self.moment
 
 
-type DecisionsFor = Callable[[str], SqliteTicketDecisionRepository]
+@dataclass(slots=True, kw_only=True, frozen=True)
+class StagedDecisions:
+    repository: SqliteTicketDecisionRepository
+    ticket_id: int
+
+    def add(self, decision: IncomingDecision) -> None:
+        self.repository.add(self.ticket_id, decision)
+
+    def decisions(self) -> tuple[TicketDecision, ...]:
+        return self.repository.decisions(self.ticket_id)
+
+
+type DecisionsFor = Callable[[str], StagedDecisions]
 
 
 @pytest.fixture
@@ -56,7 +69,7 @@ def unit(database: Database) -> Generator[Unit]:
         yield opened
 
 
-def stage_decisions(unit: Unit, slug: str) -> SqliteTicketDecisionRepository:
+def stage_decisions(unit: Unit, slug: str) -> StagedDecisions:
     repository = unit.one(ENSURE_REPOSITORY, RepositoryKeyParams(repository_key='owner/repo'))
     assert repository is not None
     params = StageTicketParams(
@@ -76,14 +89,15 @@ def stage_decisions(unit: Unit, slug: str) -> SqliteTicketDecisionRepository:
     )
     staged = unit.one(STAGE_TICKET, params)
     assert staged is not None
-    return SqliteTicketDecisionRepository(
-        unit=unit, ticket_id=staged.id, clock=FixedClock(moment=NOW)
+    repository_of_decisions = SqliteTicketDecisionRepository(
+        unit=unit, clock=FixedClock(moment=NOW)
     )
+    return StagedDecisions(repository=repository_of_decisions, ticket_id=staged.id)
 
 
 @pytest.fixture
 def decisions_for(unit: Unit) -> DecisionsFor:
-    def build(slug: str) -> SqliteTicketDecisionRepository:
+    def build(slug: str) -> StagedDecisions:
         return stage_decisions(unit, slug)
 
     return build
