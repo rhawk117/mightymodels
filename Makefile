@@ -4,7 +4,7 @@ UV ?= uv
 
 .PHONY: help setup sync format lint quality pre-commit test test.end-to-end check
 help: ## Show available targets
-	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 format.markdown: ## Run mdformat
 	$(UV) run mdformat && $(UV) run mdformat --check .
