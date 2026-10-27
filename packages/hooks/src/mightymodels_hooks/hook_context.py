@@ -5,8 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mightymodels_core.database import DatabaseError, open_database
-from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from, open_state
+from mightymodels_core.database import ConnectionOptions, DatabaseError, open_database
+from mightymodels_core.edge import (
+    PLUGIN_DATA_VARIABLE,
+    data_directory_from,
+    exclude_state_from_git,
+    open_state,
+)
 from mightymodels_core.primitives import StateError
 from mightymodels_core.primitives.value_types import ARCHIVES_DIRECTORY
 from mightymodels_core.units_of_work import read_entry
@@ -22,6 +27,8 @@ if TYPE_CHECKING:
 
 NUL = '\0'
 STATE_UNREADABLE = (StateError, DatabaseError, OSError)
+HOOK_BUSY_TIMEOUT_SECONDS = 5.0
+HOOK_OPTIONS = ConnectionOptions(busy_timeout_seconds=HOOK_BUSY_TIMEOUT_SECONDS)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -29,10 +36,21 @@ class LookupOnlyBackends:
     """Opens the plugin database like core does but leaves `.git/info/exclude` alone."""
 
     def connect(self, path: Path, spec: DatabaseSpec) -> Database:
-        return open_database(path, spec)
+        return open_database(path, spec, HOOK_OPTIONS)
 
     async def exclude(self, _git: Git, /) -> None:
         return None
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ShortTimeoutBackends:
+    """Opens the plugin database with the hook busy timeout and excludes like core."""
+
+    def connect(self, path: Path, spec: DatabaseSpec) -> Database:
+        return open_database(path, spec, HOOK_OPTIONS)
+
+    async def exclude(self, git: Git, /) -> None:
+        await exclude_state_from_git(git)
 
 
 def directory_of(cwd: str | None) -> Path:

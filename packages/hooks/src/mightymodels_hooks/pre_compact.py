@@ -22,7 +22,11 @@ from mightymodels_core.snapshot.records import RepositoryFacts
 from mightymodels_core.units_of_work import SnapshotRead, UnknownRepositoryError
 from mightymodels_core.workspace import workspace_at
 
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
+from mightymodels_hooks.hook_context import (
+    STATE_UNREADABLE,
+    ShortTimeoutBackends,
+    create_hook_context_at,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -68,7 +72,9 @@ def write_files(files: RecordFiles, record: SnapshotRecord) -> None:
 
 
 async def write_snapshot(context: HookContext) -> None:
-    async with open_state(context.data_directory(), context.start()) as state:
+    async with open_state(
+        context.data_directory(), context.start(), backends=ShortTimeoutBackends()
+    ) as state:
         facts = await repository_facts(state.git)
         work = SnapshotRead(
             database=state.database,

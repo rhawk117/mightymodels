@@ -19,7 +19,11 @@ from mightymodels_core.edge import open_state
 from mightymodels_core.session_pointers import SqliteSessionPointerRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError, write_entry
 
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
+from mightymodels_hooks.hook_context import (
+    STATE_UNREADABLE,
+    ShortTimeoutBackends,
+    create_hook_context_at,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -111,7 +115,9 @@ class SessionPointerHandler:
     fields: PointerFields = field(default_factory=create_pointer_fields)
 
     async def point(self, context: HookContext, session_id: str, target: PointerTarget) -> None:
-        async with open_state(context.data_directory(), context.start()) as state:
+        async with open_state(
+            context.data_directory(), context.start(), backends=ShortTimeoutBackends()
+        ) as state:
             with write_entry(state.database, state.checkout.repository_key()) as entry:
                 pointers = SqliteSessionPointerRepository(
                     unit=entry.unit, repository_id=entry.repository_id, clock=self.clock

@@ -23,7 +23,11 @@ from mightymodels_core.primitives import StateError
 from mightymodels_core.similarity import IncomingReport, SimilarityOptions
 from mightymodels_core.units_of_work import JournalWork
 
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
+from mightymodels_hooks.hook_context import (
+    STATE_UNREADABLE,
+    ShortTimeoutBackends,
+    create_hook_context_at,
+)
 from mightymodels_hooks.workers import plugin_caller, worker_named
 
 if TYPE_CHECKING:
@@ -91,7 +95,9 @@ class ScoutReportKeeper:
         self.stderr.write(f'mightymodels-hooks: {command}: {error}\n')
 
     async def store(self, context: HookContext, incoming: IncomingReport) -> None:
-        async with open_state(context.data_directory(), context.start()) as state:
+        async with open_state(
+            context.data_directory(), context.start(), backends=ShortTimeoutBackends()
+        ) as state:
             work = JournalWork(
                 database=state.database,
                 repository_key=state.checkout.repository_key(),
