@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE
+from mightymodels_hooks.payloads import PreCompactPayload
 from mightymodels_hooks.pre_compact import PreCompactHandler
 
 from tests.hooks.dispatch.dispatch_builders import SLUG
@@ -13,8 +14,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from tests.hooks.dispatch.dispatch_builders import DispatchHarness
-
-PRE_COMPACT_PAYLOAD_EVENT = 'PreCompact'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -31,10 +30,7 @@ class PreCompactHarness:
         return PreCompactHandler(environ=environ, stderr=self.stderr)
 
     async def compact(self) -> str | None:
-        payload = {
-            'hook_event_name': PRE_COMPACT_PAYLOAD_EVENT,
-            'cwd': str(self.dispatch.checkout),
-        }
+        payload = PreCompactPayload(cwd=str(self.dispatch.checkout))
         return await self.handler().handle(payload)
 
     def written(self) -> list[str]:

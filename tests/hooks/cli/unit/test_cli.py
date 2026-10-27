@@ -3,7 +3,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_hooks.cli import REFUSED, HookCommand, HookRouter, create_hook_router
+from mightymodels_hooks.cli import (
+    REFUSED,
+    HookCommand,
+    HookRouter,
+    PayloadRoute,
+    create_hook_router,
+    route_dict,
+)
+from mightymodels_hooks.payloads import SessionStartPayload
 
 if TYPE_CHECKING:
     from mightymodels_hooks.cli import HookPayload
@@ -18,6 +26,12 @@ class EchoHandler:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class CwdHandler:
+    async def handle(self, payload: SessionStartPayload) -> str | None:
+        return f'cwd={payload.cwd}'
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Outcome:
     code: int
     stdout: str
@@ -26,7 +40,11 @@ class Outcome:
 
 class TestHookCommand:
     router = HookRouter(
-        handlers={'echo': EchoHandler(reply='ok'), 'quiet': EchoHandler(reply=None)}
+        handlers={
+            'echo': route_dict(EchoHandler(reply='ok')),
+            'quiet': route_dict(EchoHandler(reply=None)),
+            'start': PayloadRoute(payload_type=SessionStartPayload, handler=CwdHandler()),
+        }
     )
 
     async def run_command(self, argv: list[str], stdin: str) -> Outcome:
@@ -57,6 +75,25 @@ class TestHookCommand:
         outcome = await self.run_command(['echo'], stdin)
         assert outcome.code == REFUSED
         assert outcome.stdout == ''
+
+    async def test_typed_subcommand_receives_its_struct(self) -> None:
+        stdin = '{"hook_event_name": "SessionStart", "cwd": "/work", "extra": 1}'
+        outcome = await self.run_command(['start'], stdin)
+        assert (outcome.code, outcome.stdout) == (0, 'cwd=/work')
+
+    @pytest.mark.parametrize(
+        'stdin',
+        [
+            '{"hook_event_name": "PreCompact"}',
+            '{"hook_event_name": "SessionStart", "cwd": 7}',
+        ],
+    )
+    async def test_payload_that_does_not_decode_is_refused(self, stdin: str) -> None:
+        outcome = await self.run_command(['start'], stdin)
+        assert outcome.code == REFUSED
+        assert outcome.stdout == ''
+        assert outcome.stderr.startswith('mightymodels-hooks: ')
+        assert outcome.stderr.count('\n') == 1
 
 
 class TestHookRouter:

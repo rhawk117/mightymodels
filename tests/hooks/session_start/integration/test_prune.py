@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from mightymodels_core.edge import export_line, open_state
 from mightymodels_core.session_pointers import POINTER_RETENTION, SqliteSessionPointerRepository
 from mightymodels_core.units_of_work import write_entry
+from mightymodels_hooks.payloads import SessionStartPayload
 
 from tests.core.primitives.clock import create_fake_clock
 from tests.hooks.session_start.integration.conftest import NOW
@@ -44,7 +45,7 @@ class TestSessionStart:
     ) -> None:
         await self.record_pointer(harness, 'stale', self.stale)
         await self.record_pointer(harness, 'fresh', self.fresh)
-        await harness.handler().handle({'cwd': str(harness.checkout)})
+        await harness.handler().handle(SessionStartPayload(cwd=str(harness.checkout)))
         assert not await self.holds_pointer(harness, 'stale')
         assert await self.holds_pointer(harness, 'fresh')
 
@@ -52,8 +53,8 @@ class TestSessionStart:
         self, harness: SessionStartHarness
     ) -> None:
         handler = harness.handler()
-        await handler.handle({'cwd': str(harness.checkout)})
-        await handler.handle({'cwd': str(harness.checkout)})
+        await handler.handle(SessionStartPayload(cwd=str(harness.checkout)))
+        await handler.handle(SessionStartPayload(cwd=str(harness.checkout)))
         assert harness.env_file.read_text(encoding='utf-8') == export_line(harness.data_directory)
 
     async def test_unopenable_database_still_exports_and_notes_it(
@@ -62,7 +63,9 @@ class TestSessionStart:
         blocker = tmp_path.joinpath('regular-file')
         blocker.write_text('', encoding='utf-8')
         data_directory = blocker.joinpath('data')
-        output = await harness.handler(data_directory).handle({'cwd': str(harness.checkout)})
+        output = await harness.handler(data_directory).handle(
+            SessionStartPayload(cwd=str(harness.checkout))
+        )
         assert output is None
         assert harness.env_file.read_text(encoding='utf-8') == export_line(data_directory)
         assert harness.stderr.getvalue().startswith('mightymodels-hooks: session-start:')

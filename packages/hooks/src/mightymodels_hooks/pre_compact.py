@@ -22,7 +22,7 @@ from mightymodels_core.snapshot.records import RepositoryFacts
 from mightymodels_core.units_of_work import SnapshotRead, UnknownRepositoryError
 from mightymodels_core.workspace import workspace_at
 
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -31,8 +31,8 @@ if TYPE_CHECKING:
     from mightymodels_core.snapshot import SnapshotRecord
     from mightymodels_core.workspace import RecordFiles
 
-    from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.hook_context import HookContext
+    from mightymodels_hooks.payloads import PreCompactPayload
 
 
 async def repository_facts(git: Git) -> RepositoryFacts:
@@ -88,8 +88,8 @@ class PreCompactHandler:
     environ: Mapping[str, str]
     stderr: TextIO
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        context = create_hook_context(self.environ, payload)
+    async def handle(self, payload: PreCompactPayload) -> str | None:
+        context = create_hook_context_at(self.environ, payload.cwd)
         if not context.has_ticket_directory():
             return None
 

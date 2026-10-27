@@ -37,9 +37,13 @@ class LookupOnlyBackends:
         return None
 
 
+def directory_of(cwd: str | None) -> Path:
+    return Path.cwd() if cwd is None or cwd == '' else Path(cwd)
+
+
 def start_directory(payload: HookPayload) -> Path:
     cwd = payload.get('cwd')
-    return Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
+    return directory_of(cwd if isinstance(cwd, str) else None)
 
 
 def ticket_directories(state_directory: Path) -> list[Path]:
@@ -99,3 +103,7 @@ class HookContext:
 
 def create_hook_context(environ: Mapping[str, str], payload: HookPayload) -> HookContext:
     return HookContext(environ=environ, cwd=start_directory(payload))
+
+
+def create_hook_context_at(environ: Mapping[str, str], cwd: str | None) -> HookContext:
+    return HookContext(environ=environ, cwd=directory_of(cwd))

@@ -30,14 +30,14 @@ from mightymodels_core.session_pointers import SqliteSessionPointerRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError, read_entry, write_entry
 from mightymodels_core.workspace import find_root
 
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, LookupOnlyBackends, start_directory
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, LookupOnlyBackends, directory_of
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from mightymodels_core.primitives import Clock
 
-    from mightymodels_hooks.cli import HookPayload
+    from mightymodels_hooks.payloads import SessionStartPayload
 
 ENV_FILE_VARIABLE = 'CLAUDE_ENV_FILE'
 
@@ -98,13 +98,13 @@ class SessionStartHandler:
                 )
                 return pointers.prune()
 
-    async def handle(self, payload: HookPayload) -> str | None:
+    async def handle(self, payload: SessionStartPayload) -> str | None:
         exported = export_data_directory(self.environ)
         if isinstance(exported, StateError):
             self.note(exported)
             return None
 
-        start = find_root(self.environ, start_directory(payload))
+        start = find_root(self.environ, directory_of(payload.cwd))
         try:
             await self.prune_pointers(exported, start)
         except STATE_UNREADABLE as error:

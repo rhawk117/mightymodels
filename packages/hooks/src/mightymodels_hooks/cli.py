@@ -4,7 +4,7 @@ import asyncio
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, Self, TextIO, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, Self, TextIO
 
 import msgspec
 from mightymodels_core.edge import create_clock
@@ -13,6 +13,7 @@ from mightymodels_hooks.ask_recorder import AskRecorderHandler
 from mightymodels_hooks.completion_gate import CompletionGateHandler, create_implementers
 from mightymodels_hooks.dispatch import DispatchHandler, create_dispatch_rules
 from mightymodels_hooks.main_thread import MainThreadHandler
+from mightymodels_hooks.payloads import PreCompactPayload, SessionStartPayload
 from mightymodels_hooks.pre_compact import PreCompactHandler
 from mightymodels_hooks.scout_reports import (
     ScoutReportKeeper,
@@ -31,12 +32,40 @@ REFUSED = 2
 type HookPayload = dict[str, object]
 
 
-@runtime_checkable
-class HookHandler(Protocol):
-    async def handle(self, payload: HookPayload) -> str | None: ...
+class PayloadHandler[Payload](Protocol):
+    async def handle(self, payload: Payload) -> str | None: ...
 
 
-type HookHandlers = dict[str, HookHandler]
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Delivery:
+    output: str | None
+
+
+class HookRoute(Protocol):
+    async def deliver(self, text: str) -> Delivery | msgspec.DecodeError: ...
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class PayloadRoute[Payload]:
+    """A handler with the payload type its stdin decodes into."""
+
+    payload_type: type[Payload]
+    handler: PayloadHandler[Payload]
+
+    async def deliver(self, text: str) -> Delivery | msgspec.DecodeError:
+        try:
+            payload = msgspec.json.decode(text, type=self.payload_type)
+        except msgspec.DecodeError as error:
+            return error
+
+        return Delivery(output=await self.handler.handle(payload))
+
+
+def route_dict(handler: PayloadHandler[HookPayload]) -> PayloadRoute[HookPayload]:
+    return PayloadRoute(payload_type=dict[str, object], handler=handler)
+
+
+type HookHandlers = dict[str, HookRoute]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -47,16 +76,8 @@ class HookRouter:
         self.handlers.update(handlers)
         return self
 
-    def find_handler(self, name: str) -> HookHandler | None:
+    def find_handler(self, name: str) -> HookRoute | None:
         return self.handlers.get(name)
-
-
-def decode_payload(text: str) -> HookPayload | None:
-    decoder = msgspec.json.Decoder[dict[str, object]](dict[str, object])
-    try:
-        return decoder.decode(text)
-    except msgspec.DecodeError:
-        return None
 
 
 def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter:
@@ -70,17 +91,27 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
         environ=environ, stderr=stderr, clock=create_clock(), scouts=create_scouts()
     )
     return HookRouter().mount({
-        'session-start': session_start,
-        'dispatch-hook': dispatch,
-        'main-thread-hook': main_thread,
-        'completion-gate': completion_gate,
-        'pre-compact': PreCompactHandler(environ=environ, stderr=stderr),
-        'subagent-record': SubagentRecordHandler(keeper=keeper),
-        'subagent-handback': SubagentHandbackHandler(keeper=keeper),
-        'session-pointer': SessionPointerHandler(
-            environ=environ, stderr=stderr, clock=create_clock(), fields=create_pointer_fields()
+        'session-start': PayloadRoute(payload_type=SessionStartPayload, handler=session_start),
+        'dispatch-hook': route_dict(dispatch),
+        'main-thread-hook': route_dict(main_thread),
+        'completion-gate': route_dict(completion_gate),
+        'pre-compact': PayloadRoute(
+            payload_type=PreCompactPayload,
+            handler=PreCompactHandler(environ=environ, stderr=stderr),
         ),
-        'ask-recorder': AskRecorderHandler(environ=environ, stderr=stderr, clock=create_clock()),
+        'subagent-record': route_dict(SubagentRecordHandler(keeper=keeper)),
+        'subagent-handback': route_dict(SubagentHandbackHandler(keeper=keeper)),
+        'session-pointer': route_dict(
+            SessionPointerHandler(
+                environ=environ,
+                stderr=stderr,
+                clock=create_clock(),
+                fields=create_pointer_fields(),
+            )
+        ),
+        'ask-recorder': route_dict(
+            AskRecorderHandler(environ=environ, stderr=stderr, clock=create_clock())
+        ),
     })
 
 
@@ -99,17 +130,16 @@ class HookCommand:
         if len(argv) != 1:
             return self.refuse('expected exactly one subcommand')
 
-        handler = self.router.find_handler(argv[0])
-        if handler is None:
+        route = self.router.find_handler(argv[0])
+        if route is None:
             return self.refuse(f'unknown subcommand {argv[0]!r}')
 
-        payload = decode_payload(self.stdin.read())
-        if payload is None:
-            return self.refuse('stdin is not a JSON object')
+        delivery = await route.deliver(self.stdin.read())
+        if isinstance(delivery, msgspec.DecodeError):
+            return self.refuse(f'stdin is not a valid hook payload: {delivery}')
 
-        output = await handler.handle(payload)
-        if output is not None:
-            self.stdout.write(output)
+        if delivery.output is not None:
+            self.stdout.write(delivery.output)
 
         return 0
 
