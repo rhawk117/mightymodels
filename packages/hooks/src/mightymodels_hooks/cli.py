@@ -10,16 +10,17 @@ import msgspec
 from mightymodels_core.edge import create_clock
 
 from mightymodels_hooks.ask_recorder import AskRecorderHandler
-from mightymodels_hooks.completion_gate import CompletionGateHandler
-from mightymodels_hooks.dispatch import DispatchHandler
+from mightymodels_hooks.completion_gate import CompletionGateHandler, create_implementers
+from mightymodels_hooks.dispatch import DispatchHandler, create_dispatch_rules
 from mightymodels_hooks.main_thread import MainThreadHandler
 from mightymodels_hooks.pre_compact import PreCompactHandler
 from mightymodels_hooks.scout_reports import (
     ScoutReportKeeper,
     SubagentHandbackHandler,
     SubagentRecordHandler,
+    create_scouts,
 )
-from mightymodels_hooks.session_pointer import SessionPointerHandler
+from mightymodels_hooks.session_pointer import SessionPointerHandler, create_pointer_fields
 from mightymodels_hooks.session_start import SessionStartHandler
 
 if TYPE_CHECKING:
@@ -60,10 +61,14 @@ def decode_payload(text: str) -> HookPayload | None:
 
 def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter:
     session_start = SessionStartHandler(environ=environ, stderr=stderr, clock=create_clock())
-    dispatch = DispatchHandler(environ=environ)
+    dispatch = DispatchHandler(environ=environ, rules=create_dispatch_rules())
     main_thread = MainThreadHandler(environ=environ)
-    completion_gate = CompletionGateHandler(environ=environ, stderr=stderr)
-    keeper = ScoutReportKeeper(environ=environ, stderr=stderr, clock=create_clock())
+    completion_gate = CompletionGateHandler(
+        environ=environ, stderr=stderr, implementers=create_implementers()
+    )
+    keeper = ScoutReportKeeper(
+        environ=environ, stderr=stderr, clock=create_clock(), scouts=create_scouts()
+    )
     return HookRouter().mount({
         'session-start': session_start,
         'dispatch-hook': dispatch,
@@ -73,7 +78,7 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
         'subagent-record': SubagentRecordHandler(keeper=keeper),
         'subagent-handback': SubagentHandbackHandler(keeper=keeper),
         'session-pointer': SessionPointerHandler(
-            environ=environ, stderr=stderr, clock=create_clock()
+            environ=environ, stderr=stderr, clock=create_clock(), fields=create_pointer_fields()
         ),
         'ask-recorder': AskRecorderHandler(environ=environ, stderr=stderr, clock=create_clock()),
     })

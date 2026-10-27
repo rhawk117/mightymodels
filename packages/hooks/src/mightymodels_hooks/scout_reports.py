@@ -16,7 +16,6 @@ on standard output.
 """
 
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import TYPE_CHECKING, TextIO
 
 from mightymodels_core.edge import open_state
@@ -36,10 +35,7 @@ if TYPE_CHECKING:
     from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.hook_context import HookContext
 
-SCOUTS: Mapping[AgentName, Scout] = MappingProxyType({
-    'code-scout': 'code-scout',
-    'web-scout': 'web-scout',
-})
+type Scouts = dict[AgentName, Scout]
 LAST_MESSAGE_KEY = 'last_assistant_message'
 TOOL_INPUT_KEY = 'tool_input'
 MESSAGE_KEY = 'message'
@@ -51,10 +47,14 @@ class NoReportError(StateError):
         super().__init__('the scout left no report text, so there is no report to keep')
 
 
-def scout_named(payload: HookPayload) -> Scout | None:
+def create_scouts() -> Scouts:
+    return {'code-scout': 'code-scout', 'web-scout': 'web-scout'}
+
+
+def scout_named(payload: HookPayload, scouts: Scouts) -> Scout | None:
     caller = plugin_caller(payload)
     worker = None if caller is None else worker_named(caller)
-    return None if worker is None else SCOUTS.get(worker)
+    return None if worker is None else scouts.get(worker)
 
 
 def target_of(scout: Scout, payload: HookPayload) -> str:
@@ -65,8 +65,10 @@ def target_of(scout: Scout, payload: HookPayload) -> str:
     return f'{scout} {agent_id}'[: SimilarityOptions().name_limit]
 
 
-def scout_report_of(payload: HookPayload, report: object) -> IncomingReport | NoReportError | None:
-    scout = scout_named(payload)
+def scout_report_of(
+    payload: HookPayload, report: object, scouts: Scouts | None = None
+) -> IncomingReport | NoReportError | None:
+    scout = scout_named(payload, scouts or create_scouts())
     if scout is None:
         return None
 
@@ -86,6 +88,7 @@ class ScoutReportKeeper:
     environ: Mapping[str, str]
     stderr: TextIO
     clock: Clock
+    scouts: Scouts
 
     def note(self, command: str, error: Exception) -> None:
         self.stderr.write(f'mightymodels-hooks: {command}: {error}\n')
@@ -102,7 +105,7 @@ class ScoutReportKeeper:
                     unit.similarity.store_report(incoming)
 
     async def keep(self, command: str, payload: HookPayload, report: object) -> None:
-        incoming = scout_report_of(payload, report)
+        incoming = scout_report_of(payload, report, self.scouts)
         if incoming is None:
             return
 

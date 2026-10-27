@@ -12,7 +12,7 @@ from mightymodels_core.tasks import Attempt, SqliteTaskRepository, TaskRecord
 from mightymodels_core.tasks.gates import GitFacts
 from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import write_entry
-from mightymodels_hooks.completion_gate import CompletionGateHandler
+from mightymodels_hooks.completion_gate import CompletionGateHandler, create_implementers
 from mightymodels_hooks.completion_state import PlanTask, ResidualFacts
 
 from tests.core.git.git_builders import commit_file
@@ -85,7 +85,9 @@ class CompletionHarness:
 
     def handler(self) -> CompletionGateHandler:
         environ = {PLUGIN_DATA_VARIABLE: str(self.dispatch.data_directory)}
-        return CompletionGateHandler(environ=environ, stderr=self.stderr)
+        return CompletionGateHandler(
+            environ=environ, stderr=self.stderr, implementers=create_implementers()
+        )
 
     async def stop(self, agent_type: str | None = ENGINEER, *, active: bool = False) -> Reply:
         payload = {**stop_payload(agent_type, stop_hook_active=active), 'cwd': str(self.checkout)}

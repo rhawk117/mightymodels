@@ -3,16 +3,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_hooks.cli import create_hook_router
-from mightymodels_hooks.session_pointer import SLUG_BEARING_TOOLS
+from mightymodels_hooks.session_pointer import create_pointer_fields
 
 from tests.hooks.registration.registration_builders import ROOT, read_registered_hooks
 
 if TYPE_CHECKING:
     from tests.hooks.registration.registration_builders import RegisteredHook
 
-POINTER_MATCHER = (
-    '^mcp__plugin_mightymodels_workflow_state__(' + '|'.join(SLUG_BEARING_TOOLS) + ')$'
-)
+POINTER_TOOLS = create_pointer_fields().tool_names
+POINTER_MATCHER = '^mcp__plugin_mightymodels_workflow_state__(' + '|'.join(POINTER_TOOLS) + ')$'
 EXPECTED = [
     ('SessionStart', None, 'hook.sh', 'session-start'),
     ('PreToolUse', 'Agent', 'dispatch-hook.sh', None),
@@ -57,7 +56,7 @@ class TestHooksJson:
         assert all(router.find_handler(name) is not None for name in named)
 
     def test_the_pointer_matcher_names_twenty_tools(self) -> None:
-        assert len(SLUG_BEARING_TOOLS) == 20
+        assert len(POINTER_TOOLS) == 20
 
     @pytest.mark.parametrize('script', ['dispatch-hook.sh', 'main-thread-hook.sh'])
     def test_fixed_wrappers_take_no_subcommand(self, script: str) -> None:

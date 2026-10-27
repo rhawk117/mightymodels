@@ -10,7 +10,7 @@ from mightymodels_core.tasks import Attempt, SqliteTaskRepository
 from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import write_entry
 from mightymodels_hooks.branch_state import BranchTickets
-from mightymodels_hooks.dispatch import DispatchHandler, dispatch_ruling
+from mightymodels_hooks.dispatch import DispatchHandler, create_dispatch_rules, dispatch_ruling
 from mightymodels_hooks.rulings import hook_output
 
 from tests.core.tasks.repository_builders import create_ticket_section, create_transition
@@ -87,7 +87,9 @@ async def judge(
     target: object, fake: FakeStartedTasks | None = None, caller: str | None = None
 ) -> Verdict:
     payload = dispatch_payload(target, caller)
-    ruling: Ruling = await dispatch_ruling(payload, fake or FakeStartedTasks())
+    ruling: Ruling = await dispatch_ruling(
+        payload, fake or FakeStartedTasks(), create_dispatch_rules()
+    )
     return verdict_of(None if ruling is None else json.dumps(hook_output(ruling)))
 
 
@@ -108,7 +110,9 @@ class DispatchHarness:
     data_directory: Path
 
     def handler(self) -> DispatchHandler:
-        return DispatchHandler(environ={PLUGIN_DATA_VARIABLE: str(self.data_directory)})
+        return DispatchHandler(
+            environ={PLUGIN_DATA_VARIABLE: str(self.data_directory)}, rules=create_dispatch_rules()
+        )
 
     async def verdict(self, target: object, caller: str | None = None) -> Verdict:
         payload = {**dispatch_payload(target, caller), 'cwd': str(self.checkout)}

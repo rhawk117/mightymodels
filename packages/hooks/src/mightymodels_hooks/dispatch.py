@@ -25,9 +25,8 @@ intern that the rows let through is denied unless the intern has a task in progr
 whose branch is checked out and every such task owns exactly one file.
 """
 
-from dataclasses import dataclass
-from types import MappingProxyType
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
 
 from mightymodels_core.primitives import AgentName, encode_compact
 
@@ -66,20 +65,6 @@ SEVERAL_TICKETS = (
     'mightymodels did not check the dispatch of {target} for a started task: the checked-out '
     'branch has {count} unclosed tickets ({names}), and the hook acts only when it has one'
 )
-DISPATCH_RULES: Mapping[AgentName, frozenset[AgentName]] = MappingProxyType({
-    'code-scout': NO_TARGETS,
-    'web-scout': NO_TARGETS,
-    'qualitylens': NO_TARGETS,
-    'fact-checker': NO_TARGETS,
-    'engineer': frozenset({'code-scout'}),
-    'architect': frozenset({'code-scout'}),
-    'intern': NO_TARGETS,
-    'gitty-up': NO_TARGETS,
-    'wingman': NO_TARGETS,
-    'terry-toolchain': NO_TARGETS,
-    'merge-vader': frozenset({'code-scout', 'web-scout', 'qualitylens'}),
-    'uncle-bob': frozenset({'code-scout', 'qualitylens'}),
-})
 STARTED_BEFORE_DISPATCH = frozenset({'engineer', 'architect'})
 ESCALATIONS = frozenset({'architect', 'wingman'})
 BLOCK_GOES_TO_THE_OWNER_FIRST = (
@@ -107,16 +92,44 @@ def allowed_names(allowed: frozenset[AgentName]) -> str:
     return ', '.join(sorted(allowed)) or 'nothing'
 
 
-def allowed_for(caller: str) -> frozenset[AgentName]:
-    worker = worker_named(caller)
-    return NO_TARGETS if worker is None else DISPATCH_RULES[worker]
+type DispatchRows = dict[AgentName, frozenset[AgentName]]
 
 
-def denial_for_worker(caller: str, target: object) -> str | None:
+@dataclass(slots=True, kw_only=True, frozen=True)
+class DispatchRules:
+    rows: DispatchRows = field(default_factory=dict)
+
+    def mount(self, rows: DispatchRows) -> Self:
+        self.rows.update(rows)
+        return self
+
+    def allowed_for(self, caller: str) -> frozenset[AgentName]:
+        worker = worker_named(caller)
+        return NO_TARGETS if worker is None else self.rows[worker]
+
+
+def create_dispatch_rules() -> DispatchRules:
+    return DispatchRules().mount({
+        'code-scout': NO_TARGETS,
+        'web-scout': NO_TARGETS,
+        'qualitylens': NO_TARGETS,
+        'fact-checker': NO_TARGETS,
+        'engineer': frozenset({'code-scout'}),
+        'architect': frozenset({'code-scout'}),
+        'intern': NO_TARGETS,
+        'gitty-up': NO_TARGETS,
+        'wingman': NO_TARGETS,
+        'terry-toolchain': NO_TARGETS,
+        'merge-vader': frozenset({'code-scout', 'web-scout', 'qualitylens'}),
+        'uncle-bob': frozenset({'code-scout', 'qualitylens'}),
+    })
+
+
+def denial_for_worker(caller: str, target: object, rules: DispatchRules) -> str | None:
     if not isinstance(target, str):
         return f'{caller} was refused a dispatch: the hook input names no target type'
 
-    allowed = allowed_for(caller)
+    allowed = rules.allowed_for(caller)
     worker = worker_named(target)
     if worker is not None and worker in allowed:
         return None
@@ -195,10 +208,12 @@ async def started_ruling(caller: str | None, target: AgentName, started: Started
     return None
 
 
-async def dispatch_ruling(fields: Mapping[str, object], started: StartedTasks) -> Ruling:
+async def dispatch_ruling(
+    fields: Mapping[str, object], started: StartedTasks, rules: DispatchRules
+) -> Ruling:
     caller = plugin_caller(fields)
     target = target_of(fields)
-    if caller is not None and (refused := denial_for_worker(caller, target)) is not None:
+    if caller is not None and (refused := denial_for_worker(caller, target, rules)) is not None:
         return Denied(reason=refused)
 
     worker = worker_named(target) if isinstance(target, str) else None
@@ -208,8 +223,9 @@ async def dispatch_ruling(fields: Mapping[str, object], started: StartedTasks) -
 @dataclass(slots=True, kw_only=True, frozen=True)
 class DispatchHandler:
     environ: Mapping[str, str]
+    rules: DispatchRules
 
     async def handle(self, payload: HookPayload) -> str | None:
         state = BranchState(context=create_hook_context(self.environ, payload))
-        ruling = await dispatch_ruling(payload, state)
+        ruling = await dispatch_ruling(payload, state, self.rules)
         return None if ruling is None else encode_compact(hook_output(ruling)).decode()

@@ -11,6 +11,7 @@ from mightymodels_hooks.scout_reports import (
     ScoutReportKeeper,
     SubagentHandbackHandler,
     SubagentRecordHandler,
+    create_scouts,
 )
 
 if TYPE_CHECKING:
@@ -63,7 +64,9 @@ class ScoutHarness:
     @property
     def keeper(self) -> ScoutReportKeeper:
         environ = {PLUGIN_DATA_VARIABLE: str(self.data_directory)}
-        return ScoutReportKeeper(environ=environ, stderr=self.stderr, clock=SystemClock())
+        return ScoutReportKeeper(
+            environ=environ, stderr=self.stderr, clock=SystemClock(), scouts=create_scouts()
+        )
 
     async def stop(self, payload: HookPayload) -> str | None:
         handler = SubagentRecordHandler(keeper=self.keeper)

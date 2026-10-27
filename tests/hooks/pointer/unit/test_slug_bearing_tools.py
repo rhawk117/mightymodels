@@ -1,4 +1,4 @@
-from mightymodels_hooks.session_pointer import SLUG_BEARING_TOOLS, TOOL_FIELDS
+from mightymodels_hooks.session_pointer import create_pointer_fields
 from mightymodels_mcp.main import create_catalog
 
 POINTER_FIELDS = ('slug', 'ticket', 'investigation_id')
@@ -13,5 +13,7 @@ class TestSlugBearingTools:
             if fields:
                 bearing[tool.name] = fields[0]
 
-        assert set(SLUG_BEARING_TOOLS) == set(bearing)
-        assert dict(TOOL_FIELDS) == bearing
+        pointer_fields = create_pointer_fields()
+
+        assert set(pointer_fields.tool_names) == set(bearing)
+        assert pointer_fields.tools == bearing

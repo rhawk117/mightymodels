@@ -21,7 +21,6 @@ say why on standard error.
 """
 
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import TYPE_CHECKING, TextIO
 
 from mightymodels_core.primitives import encode_compact
@@ -45,11 +44,7 @@ if TYPE_CHECKING:
     from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.completion_state import PlanTask, ResidualFacts, Unfinished
 
-IMPLEMENTERS: Mapping[AgentName, TaskWorker] = MappingProxyType({
-    'engineer': 'engineer',
-    'architect': 'architect',
-    'intern': 'intern',
-})
+type Implementers = dict[AgentName, TaskWorker]
 STOP_HOOK_ACTIVE_KEY = 'stop_hook_active'
 BRIEF_MISSING = 'its brief {brief} is missing'
 NO_DONE_COMMIT = 'its brief {brief} has no DONE half naming a commit'
@@ -61,6 +56,10 @@ FINISH_A_RESIDUAL = (
     'Commit the fix inside the files the residual owns and take each receipt named with '
     '`mightymodels verify run --slug {slug} --id <id>`, then report.'
 )
+
+
+def create_implementers() -> Implementers:
+    return {'engineer': 'engineer', 'architect': 'architect', 'intern': 'intern'}
 
 
 def brief_lack(task: PlanTask) -> str | None:
@@ -130,11 +129,12 @@ def unfinished_reason(unfinished: Unfinished) -> str | None:
 class CompletionGateHandler:
     environ: Mapping[str, str]
     stderr: TextIO
+    implementers: Implementers
 
     async def handle(self, payload: HookPayload) -> str | None:
         caller = plugin_caller(payload)
         worker = None if caller is None else worker_named(caller)
-        implementer = None if worker is None else IMPLEMENTERS.get(worker)
+        implementer = None if worker is None else self.implementers.get(worker)
         if implementer is None or payload.get(STOP_HOOK_ACTIVE_KEY) is True:
             return None
 
