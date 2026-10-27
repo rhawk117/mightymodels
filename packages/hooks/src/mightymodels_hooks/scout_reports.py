@@ -25,9 +25,8 @@ from mightymodels_core.similarity import IncomingReport, SimilarityOptions
 from mightymodels_core.units_of_work import JournalWork
 
 from mightymodels_hooks.branch_state import STATE_UNREADABLE
-from mightymodels_hooks.dispatch import plugin_caller
 from mightymodels_hooks.hook_context import create_hook_context
-from mightymodels_hooks.workers import worker_named
+from mightymodels_hooks.workers import plugin_caller, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

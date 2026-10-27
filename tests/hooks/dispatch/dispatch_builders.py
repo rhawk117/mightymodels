@@ -10,7 +10,8 @@ from mightymodels_core.tasks import Attempt, SqliteTaskRepository
 from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import write_entry
 from mightymodels_hooks.branch_state import BranchTickets
-from mightymodels_hooks.dispatch import DispatchHandler, dispatch_ruling, hook_output
+from mightymodels_hooks.dispatch import DispatchHandler, dispatch_ruling
+from mightymodels_hooks.rulings import hook_output
 
 from tests.core.tasks.repository_builders import create_ticket_section, create_transition
 
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
         StartedOrUnreadable,
     )
     from mightymodels_hooks.cli import HookPayload
-    from mightymodels_hooks.dispatch import Ruling
+    from mightymodels_hooks.rulings import Ruling
 
 SLUG = Slug('port-it')
 BRANCH = 'feat/port-it'

@@ -33,7 +33,8 @@ from mightymodels_core.primitives import AgentName, encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
 from mightymodels_hooks.hook_context import create_hook_context
-from mightymodels_hooks.workers import PLUGIN_PREFIX, agent_type, worker_named
+from mightymodels_hooks.rulings import Asked, Denied, Unjudged, hook_output
+from mightymodels_hooks.workers import agent_type, plugin_caller, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -46,11 +47,8 @@ if TYPE_CHECKING:
         StartedOrUnreadable,
     )
     from mightymodels_hooks.cli import HookPayload
+    from mightymodels_hooks.rulings import Ruling
 
-AGENT_TYPE_KEY = 'agent_type'
-HOOK_EVENT = 'PreToolUse'
-DENY = 'deny'
-ASK = 'ask'
 NO_TARGETS = frozenset[AgentName]()
 TINY_OWNED_FILES = 1
 NO_STARTED_TASK = 'no task is started for the intern on the ticket whose branch is checked out'
@@ -93,24 +91,6 @@ BLOCK_GOES_TO_THE_OWNER_FIRST = (
 )
 
 
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Denied:
-    reason: str
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Asked:
-    reason: str
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Unjudged:
-    warning: str
-
-
-type Ruling = Denied | Asked | Unjudged | None
-
-
 @runtime_checkable
 class StartedTasks(Protocol):
     async def started_by(self, worker: TaskWorker) -> StartedOrUnreadable: ...
@@ -142,11 +122,6 @@ def denial_for_worker(caller: str, target: object) -> str | None:
         return None
 
     return f'{caller} may not dispatch {target}; it may dispatch: {allowed_names(allowed)}'
-
-
-def plugin_caller(fields: Mapping[str, object]) -> str | None:
-    caller = fields.get(AGENT_TYPE_KEY)
-    return caller if isinstance(caller, str) and caller.startswith(PLUGIN_PREFIX) else None
 
 
 def intern_refusal(why: str) -> str:
@@ -228,19 +203,6 @@ async def dispatch_ruling(fields: Mapping[str, object], started: StartedTasks) -
 
     worker = worker_named(target) if isinstance(target, str) else None
     return None if worker is None else await started_ruling(caller, worker, started)
-
-
-def hook_output(ruling: Denied | Asked | Unjudged) -> dict[str, object]:
-    if isinstance(ruling, Unjudged):
-        return {'systemMessage': ruling.warning}
-
-    return {
-        'hookSpecificOutput': {
-            'hookEventName': HOOK_EVENT,
-            'permissionDecision': ASK if isinstance(ruling, Asked) else DENY,
-            'permissionDecisionReason': ruling.reason,
-        }
-    }
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

@@ -10,9 +10,12 @@ from typing import TYPE_CHECKING
 from mightymodels_core.primitives import create_routing_table
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from mightymodels_core.primitives import AgentName
 
 PLUGIN_PREFIX = 'mightymodels:'
+AGENT_TYPE_KEY = 'agent_type'
 
 
 def agent_type(name: AgentName) -> str:
@@ -22,3 +25,8 @@ def agent_type(name: AgentName) -> str:
 def worker_named(name: str) -> AgentName | None:
     folders = create_routing_table().folders
     return next((worker for worker in folders if name in {worker, agent_type(worker)}), None)
+
+
+def plugin_caller(fields: Mapping[str, object]) -> str | None:
+    caller = fields.get(AGENT_TYPE_KEY)
+    return caller if isinstance(caller, str) and caller.startswith(PLUGIN_PREFIX) else None

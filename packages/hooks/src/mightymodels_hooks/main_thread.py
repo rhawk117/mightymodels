@@ -26,16 +26,17 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from mightymodels_core.primitives import encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
-from mightymodels_hooks.dispatch import Asked, Denied, Unjudged, hook_output, plugin_caller
 from mightymodels_hooks.hook_context import create_hook_context
 from mightymodels_hooks.push_command import names_a_push
+from mightymodels_hooks.rulings import Asked, Denied, Unjudged, hook_output
+from mightymodels_hooks.workers import plugin_caller
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from mightymodels_hooks.branch_state import BranchTicketsOrUnreadable, LandingOrUnreadable
     from mightymodels_hooks.cli import HookPayload
-    from mightymodels_hooks.dispatch import Ruling
+    from mightymodels_hooks.rulings import Ruling
 
 EDIT_TOOLS = frozenset({'Edit', 'Write'})
 BASH_TOOL = 'Bash'
