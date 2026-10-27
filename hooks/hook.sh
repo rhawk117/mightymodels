@@ -2,18 +2,10 @@
 set -u
 
 here=$(cd -- "$(dirname -- "$0")" && pwd -P)
-root=${CLAUDE_PLUGIN_ROOT:-${here%/*}}
-export UV_PROJECT="${root}"
-export UV_PROJECT_ENVIRONMENT="${root}/.venv"
+# shellcheck source=/dev/null
+. "${here}/lib.sh"
 
-run_launcher() {
-  if test -n "${MIGHTYMODELS_HOOK_LAUNCHER:-}"; then
-    exec "${MIGHTYMODELS_HOOK_LAUNCHER}" "$@"
-  fi
-  exec uv run --locked --no-dev --package mightymodels-hooks mightymodels-hooks "$@"
-}
-
-if output=$(run_launcher "$@"); then
+if output=$(run_launcher "${MIGHTYMODELS_HOOK_LAUNCHER:-}" "$@"); then
   test -z "${output}" || printf '%s\n' "${output}"
   exit 0
 fi
