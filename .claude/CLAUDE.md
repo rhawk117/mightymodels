@@ -16,7 +16,7 @@ Every command goes through `make`. Each target delegates to uv or to `scripts/qu
 
 ## Stack
 
-Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. `.github/actions/bootstrap/action.yml` defines the CI setup and pins uv 0.13.1 and Claude Code 2.1.301.
+Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. `.github/workflows/ci.yml` sets up CI: `astral-sh/setup-uv` takes its uv version from the `UV_VERSION` repository variable, and `actions/setup-node` takes its Node version from the `NODE_VERSION` repository variable.
 
 ## Layout
 
