@@ -14,6 +14,7 @@ output; an unreadable database is said on standard error, with exit 0.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TextIO
 
+import msgspec
 from mightymodels_core.edge import open_state
 from mightymodels_core.primitives import Slug
 from mightymodels_core.session_pointers import SqliteSessionPointerRepository
@@ -28,10 +29,9 @@ from mightymodels_core.units_of_work import (
 from mightymodels_hooks.hook_context import (
     STATE_UNREADABLE,
     LookupOnlyBackends,
-    create_hook_context,
+    create_hook_context_at,
 )
 from mightymodels_hooks.recorder_state import Answered, DecisionRecorder
-from mightymodels_hooks.session_pointer import session_id_of
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -40,15 +40,17 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives import Clock
     from mightymodels_core.session_pointers import SessionPointer
 
-    from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.hook_context import HookContext
+    from mightymodels_hooks.payloads import PostToolUsePayload
 
-TOOL_RESPONSE_KEY = 'tool_response'
-ANSWERS_KEY = 'answers'
-ANNOTATIONS_KEY = 'annotations'
-RESPONSE_KEY = 'response'
 NOTES_KEY = 'notes'
-AFK_KEY = 'afkTimeoutMs'
+
+
+class AskResponse(msgspec.Struct, frozen=True, kw_only=True):
+    answers: dict[str, object] | None = None
+    annotations: object = None
+    response: object = None
+    afk_timeout: object = msgspec.field(name='afkTimeoutMs', default=msgspec.UNSET)
 
 
 def text_of(value: object) -> str | None:
@@ -63,26 +65,28 @@ def note_of(annotations: object, question: str) -> str | None:
     return text_of(annotation.get(NOTES_KEY)) if isinstance(annotation, dict) else None
 
 
-def answers_of(payload: HookPayload) -> list[Answered]:
-    result = payload.get(TOOL_RESPONSE_KEY)
-    if not isinstance(result, dict) or AFK_KEY in result:
+def response_of(payload: PostToolUsePayload) -> AskResponse | None:
+    try:
+        return msgspec.convert(payload.tool_response, AskResponse)
+    except msgspec.ValidationError:
+        return None
+
+
+def answers_of(payload: PostToolUsePayload) -> list[Answered]:
+    result = response_of(payload)
+    if result is None or result.afk_timeout is not msgspec.UNSET or result.answers is None:
         return []
 
-    answers = result.get(ANSWERS_KEY)
-    if not isinstance(answers, dict):
-        return []
-
-    response = text_of(result.get(RESPONSE_KEY))
-    annotations = result.get(ANNOTATIONS_KEY)
+    response = text_of(result.response)
     return [
         Answered(
             question=question,
             answer=answer,
             response=response,
-            note=note_of(annotations, question),
+            note=note_of(result.annotations, question),
         )
-        for question, answer in answers.items()
-        if isinstance(question, str) and isinstance(answer, str) and answer
+        for question, answer in result.answers.items()
+        if isinstance(answer, str) and answer
     ]
 
 
@@ -137,13 +141,13 @@ class AskRecorderHandler:
         with work.write() as unit:
             recorder.record_ledger(unit.investigations, key, head)
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        session_id = session_id_of(payload)
+    async def handle(self, payload: PostToolUsePayload) -> str | None:
+        session_id = payload.session_id or None
         answers = answers_of(payload)
         if session_id is None or not answers:
             return None
 
-        context = create_hook_context(self.environ, payload)
+        context = create_hook_context_at(self.environ, payload.cwd)
         try:
             await self.record(context, session_id, answers)
         except UnknownRepositoryError:

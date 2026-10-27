@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import msgspec
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, open_state
 from mightymodels_core.investigations import StartRequest
 from mightymodels_core.primitives import Slug, SystemClock
@@ -12,6 +13,7 @@ from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.tickets.policy import OpenTicket
 from mightymodels_core.units_of_work import InvestigationWork, read_entry, write_entry
 from mightymodels_hooks.ask_recorder import AskRecorderHandler
+from mightymodels_hooks.payloads import PostToolUsePayload
 
 from tests.core.tasks.repository_builders import create_ticket_section
 
@@ -22,7 +24,6 @@ if TYPE_CHECKING:
     from mightymodels_core.investigations import LedgerRecord
     from mightymodels_core.schemas.session_pointers import PointerKind
     from mightymodels_core.ticket_decisions import TicketDecision
-    from mightymodels_hooks.cli import HookPayload
 
 SESSION_ID = 'session-1'
 TICKET = Slug('port-it')
@@ -31,28 +32,23 @@ SECOND = 'Which checks run before a merge?'
 SECRET = 'sk-' + 'a1B2c3D4' * 4
 
 
-def ask_payload(answers: object, annotations: object = None, **result: object) -> HookPayload:
+def ask_payload(
+    answers: object, annotations: object = None, **result: object
+) -> PostToolUsePayload:
     tool_response: dict[str, object] = {'questions': [], 'answers': answers}
     if annotations is not None:
         tool_response['annotations'] = annotations
 
-    return {
-        'hook_event_name': 'PostToolUse',
-        'session_id': SESSION_ID,
-        'tool_name': 'AskUserQuestion',
-        'tool_input': {'questions': []},
-        'tool_response': tool_response | result,
-    }
+    return real_payload(tool_response | result)
 
 
-def real_payload(result: dict[str, object]) -> HookPayload:
-    return {
-        'hook_event_name': 'PostToolUse',
-        'session_id': SESSION_ID,
-        'tool_name': 'AskUserQuestion',
-        'tool_input': {'questions': []},
-        'tool_response': result,
-    }
+def real_payload(result: dict[str, object]) -> PostToolUsePayload:
+    return PostToolUsePayload(
+        session_id=SESSION_ID,
+        tool_name='AskUserQuestion',
+        tool_input={'questions': []},
+        tool_response=result,
+    )
 
 
 def two_answers() -> dict[str, str]:
@@ -69,8 +65,8 @@ class RecorderHarness:
         environ = {PLUGIN_DATA_VARIABLE: str(self.data_directory)}
         return AskRecorderHandler(environ=environ, stderr=self.stderr, clock=SystemClock())
 
-    async def record(self, payload: HookPayload) -> str | None:
-        return await self.handler().handle({**payload, 'cwd': str(self.checkout)})
+    async def record(self, payload: PostToolUsePayload) -> str | None:
+        return await self.handler().handle(msgspec.structs.replace(payload, cwd=str(self.checkout)))
 
     async def point(self, kind: PointerKind, key: str) -> None:
         async with open_state(self.data_directory, self.checkout) as state:

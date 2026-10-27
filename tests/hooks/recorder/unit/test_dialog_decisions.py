@@ -1,5 +1,6 @@
 import pytest
 from mightymodels_hooks.ask_recorder import answers_of
+from mightymodels_hooks.payloads import PostToolUsePayload
 from mightymodels_hooks.recorder_state import Answered, ledger_text
 
 from tests.hooks.recorder.recorder_builders import FIRST, SECOND, ask_payload, two_answers
@@ -39,7 +40,7 @@ class TestAnswersOf:
         assert answers_of(ask_payload({FIRST: 'Redis'}, response=response))[0].response is None
 
     def test_a_payload_without_a_tool_response_gives_nothing(self) -> None:
-        assert answers_of({'session_id': 's'}) == []
+        assert answers_of(PostToolUsePayload(session_id='s')) == []
 
 
 class TestLedgerText:

@@ -120,8 +120,9 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
                 fields=create_pointer_fields(),
             ),
         ),
-        'ask-recorder': route_dict(
-            AskRecorderHandler(environ=environ, stderr=stderr, clock=create_clock())
+        'ask-recorder': PayloadRoute(
+            payload_type=PostToolUsePayload,
+            handler=AskRecorderHandler(environ=environ, stderr=stderr, clock=create_clock()),
         ),
     })
 

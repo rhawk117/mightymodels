@@ -1,10 +1,13 @@
 from typing import TYPE_CHECKING
 
+import msgspec
 import pytest
 
 from tests.hooks.recorder.recorder_builders import ask_payload, two_answers
 
 if TYPE_CHECKING:
+    from mightymodels_hooks.payloads import PostToolUsePayload
+
     from tests.hooks.recorder.recorder_builders import RecorderHarness
 
 
@@ -12,7 +15,10 @@ def silent_payloads() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(
         'payload',
         [
-            pytest.param({**ask_payload(two_answers()), 'session_id': None}, id='no-session'),
+            pytest.param(
+                msgspec.structs.replace(ask_payload(two_answers()), session_id=None),
+                id='no-session',
+            ),
             pytest.param(ask_payload(None), id='no-answers'),
             pytest.param(ask_payload('Redis'), id='answers-not-an-object'),
             pytest.param(ask_payload(two_answers(), afkTimeoutMs=500), id='afk'),
@@ -23,7 +29,9 @@ def silent_payloads() -> pytest.MarkDecorator:
 class TestNothingWritten:
     async def test_a_session_with_no_pointer_writes_nothing(self, harness: RecorderHarness) -> None:
         ticket_id = await harness.stage_ticket()
-        output = await harness.record({**ask_payload(two_answers()), 'session_id': 'other'})
+        output = await harness.record(
+            msgspec.structs.replace(ask_payload(two_answers()), session_id='other')
+        )
         assert output is None
         assert await harness.ticket_decisions(ticket_id) == ()
         assert harness.stderr.getvalue() == ''
@@ -36,7 +44,7 @@ class TestNothingWritten:
 
     @silent_payloads()
     async def test_a_payload_the_recorder_cannot_use_writes_nothing(
-        self, harness: RecorderHarness, payload: dict[str, object]
+        self, harness: RecorderHarness, payload: PostToolUsePayload
     ) -> None:
         ticket_id = await harness.stage_ticket()
         output = await harness.record(payload)
