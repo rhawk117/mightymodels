@@ -6,16 +6,16 @@ from mightymodels_core.edge import PLUGIN_DATA_VARIABLE
 from mightymodels_core.primitives import StateError
 from mightymodels_hooks.branch_state import BlockedTask, BranchTickets, StartedTask
 from mightymodels_hooks.cli import REFUSED, HookCommand, create_hook_router
-from mightymodels_hooks.workers import Worker, agent_type
+from mightymodels_hooks.workers import agent_type
 
 from tests.hooks.dispatch.dispatch_builders import SLUG, FakeStartedTasks, judge, one_ticket
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-ENGINEER = agent_type(Worker.ENGINEER)
-ARCHITECT = agent_type(Worker.ARCHITECT)
-INTERN = agent_type(Worker.INTERN)
+ENGINEER = agent_type('engineer')
+ARCHITECT = agent_type('architect')
+INTERN = agent_type('intern')
 BLOCK = BlockedTask(id='T2', status='blocked', reasons=('stuck on the schema',))
 UNREADABLE = StateError('the database is locked')
 
@@ -31,10 +31,10 @@ class TestWorkerCallers:
     @pytest.mark.parametrize(
         ('caller', 'target'),
         [
-            (agent_type(Worker.ENGINEER), 'code-scout'),
-            (agent_type(Worker.ENGINEER), agent_type(Worker.CODE_SCOUT)),
-            (agent_type(Worker.MERGE_VADER), 'web-scout'),
-            (agent_type(Worker.UNCLE_BOB), 'qualitylens'),
+            (agent_type('engineer'), 'code-scout'),
+            (agent_type('engineer'), agent_type('code-scout')),
+            (agent_type('merge-vader'), 'web-scout'),
+            (agent_type('uncle-bob'), 'qualitylens'),
         ],
     )
     async def test_dispatch_inside_the_row_is_not_judged(self, caller: str, target: str) -> None:
@@ -43,11 +43,11 @@ class TestWorkerCallers:
     @pytest.mark.parametrize(
         ('caller', 'target'),
         [
-            (agent_type(Worker.ENGINEER), 'wingman'),
-            (agent_type(Worker.CODE_SCOUT), 'code-scout'),
-            (agent_type(Worker.UNCLE_BOB), 'web-scout'),
+            (agent_type('engineer'), 'wingman'),
+            (agent_type('code-scout'), 'code-scout'),
+            (agent_type('uncle-bob'), 'web-scout'),
             ('mightymodels:workers:nobody', 'code-scout'),
-            (agent_type(Worker.ENGINEER), None),
+            (agent_type('engineer'), None),
         ],
     )
     async def test_dispatch_outside_the_row_is_denied(self, caller: str, target: object) -> None:
@@ -98,7 +98,7 @@ class TestMainThreadStartedTask:
 class TestEscalation:
     blocked = one_ticket(in_progress=('T1',), blocked=(BLOCK,))
 
-    @pytest.mark.parametrize('target', [ARCHITECT, 'wingman', agent_type(Worker.WINGMAN)])
+    @pytest.mark.parametrize('target', [ARCHITECT, 'wingman', agent_type('wingman')])
     async def test_block_with_auto_escalate_off_is_asked_about(self, target: str) -> None:
         verdict = await judge(target, FakeStartedTasks(tickets=self.blocked))
         assert (verdict.decision, 'T2 blocked: stuck on the schema' in verdict.detail) == (

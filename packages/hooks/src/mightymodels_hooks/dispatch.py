@@ -29,11 +29,11 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from mightymodels_core.primitives import encode_compact
+from mightymodels_core.primitives import AgentName, encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
 from mightymodels_hooks.hook_context import create_hook_context
-from mightymodels_hooks.workers import PLUGIN_PREFIX, Worker, agent_type, worker_named
+from mightymodels_hooks.workers import PLUGIN_PREFIX, agent_type, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -51,7 +51,7 @@ AGENT_TYPE_KEY = 'agent_type'
 HOOK_EVENT = 'PreToolUse'
 DENY = 'deny'
 ASK = 'ask'
-NO_TARGETS = frozenset[Worker]()
+NO_TARGETS = frozenset[AgentName]()
 TINY_OWNED_FILES = 1
 NO_STARTED_TASK = 'no task is started for the intern on the ticket whose branch is checked out'
 STARTED_UNREADABLE = 'the started task could not be read ({error})'
@@ -68,22 +68,22 @@ SEVERAL_TICKETS = (
     'mightymodels did not check the dispatch of {target} for a started task: the checked-out '
     'branch has {count} unclosed tickets ({names}), and the hook acts only when it has one'
 )
-DISPATCH_RULES: Mapping[Worker, frozenset[Worker]] = MappingProxyType({
-    Worker.CODE_SCOUT: NO_TARGETS,
-    Worker.WEB_SCOUT: NO_TARGETS,
-    Worker.QUALITYLENS: NO_TARGETS,
-    Worker.FACT_CHECKER: NO_TARGETS,
-    Worker.ENGINEER: frozenset({Worker.CODE_SCOUT}),
-    Worker.ARCHITECT: frozenset({Worker.CODE_SCOUT}),
-    Worker.INTERN: NO_TARGETS,
-    Worker.GITTY_UP: NO_TARGETS,
-    Worker.WINGMAN: NO_TARGETS,
-    Worker.TERRY_TOOLCHAIN: NO_TARGETS,
-    Worker.MERGE_VADER: frozenset({Worker.CODE_SCOUT, Worker.WEB_SCOUT, Worker.QUALITYLENS}),
-    Worker.UNCLE_BOB: frozenset({Worker.CODE_SCOUT, Worker.QUALITYLENS}),
+DISPATCH_RULES: Mapping[AgentName, frozenset[AgentName]] = MappingProxyType({
+    'code-scout': NO_TARGETS,
+    'web-scout': NO_TARGETS,
+    'qualitylens': NO_TARGETS,
+    'fact-checker': NO_TARGETS,
+    'engineer': frozenset({'code-scout'}),
+    'architect': frozenset({'code-scout'}),
+    'intern': NO_TARGETS,
+    'gitty-up': NO_TARGETS,
+    'wingman': NO_TARGETS,
+    'terry-toolchain': NO_TARGETS,
+    'merge-vader': frozenset({'code-scout', 'web-scout', 'qualitylens'}),
+    'uncle-bob': frozenset({'code-scout', 'qualitylens'}),
 })
-STARTED_BEFORE_DISPATCH = frozenset({Worker.ENGINEER, Worker.ARCHITECT})
-ESCALATIONS = frozenset({Worker.ARCHITECT, Worker.WINGMAN})
+STARTED_BEFORE_DISPATCH = frozenset({'engineer', 'architect'})
+ESCALATIONS = frozenset({'architect', 'wingman'})
 BLOCK_GOES_TO_THE_OWNER_FIRST = (
     '{target} was held for the owner: ticket {slug}, whose branch is checked out, has a task a '
     'block stopped ({blocks}), and its `auto-escalate` is off. Approve this dispatch to '
@@ -123,11 +123,11 @@ def target_of(fields: Mapping[str, object]) -> object:
     return tool_input.get('subagent_type') if isinstance(tool_input, dict) else None
 
 
-def allowed_names(allowed: frozenset[Worker]) -> str:
+def allowed_names(allowed: frozenset[AgentName]) -> str:
     return ', '.join(sorted(allowed)) or 'nothing'
 
 
-def allowed_for(caller: str) -> frozenset[Worker]:
+def allowed_for(caller: str) -> frozenset[AgentName]:
     worker = worker_named(caller)
     return NO_TARGETS if worker is None else DISPATCH_RULES[worker]
 
@@ -151,8 +151,8 @@ def plugin_caller(fields: Mapping[str, object]) -> str | None:
 
 def intern_refusal(why: str) -> str:
     return (
-        f'{agent_type(Worker.INTERN)} was refused: {why}. The intern takes only a tiny task, '
-        f'one that owns exactly one file; dispatch {agent_type(Worker.ENGINEER)} instead.'
+        f'{agent_type("intern")} was refused: {why}. The intern takes only a tiny task, '
+        f'one that owns exactly one file; dispatch {agent_type("engineer")} instead.'
     )
 
 
@@ -201,7 +201,7 @@ def escalation_ruling(target: str, tickets: BranchTicketsOrUnreadable) -> Ruling
     return Asked(reason=reason)
 
 
-def ticket_ruling(target: Worker, tickets: BranchTicketsOrUnreadable) -> Ruling:
+def ticket_ruling(target: AgentName, tickets: BranchTicketsOrUnreadable) -> Ruling:
     named = agent_type(target)
     if target in STARTED_BEFORE_DISPATCH and (unstarted := unstarted_ruling(named, tickets)):
         return unstarted
@@ -209,8 +209,8 @@ def ticket_ruling(target: Worker, tickets: BranchTicketsOrUnreadable) -> Ruling:
     return escalation_ruling(named, tickets) if target in ESCALATIONS else None
 
 
-async def started_ruling(caller: str | None, target: Worker, started: StartedTasks) -> Ruling:
-    if target is Worker.INTERN:
+async def started_ruling(caller: str | None, target: AgentName, started: StartedTasks) -> Ruling:
+    if target == 'intern':
         refused = intern_denial(await started.started_by('intern'))
         return None if refused is None else Denied(reason=refused)
 

@@ -36,20 +36,21 @@ from mightymodels_hooks.branch_state import STATE_UNREADABLE
 from mightymodels_hooks.completion_state import CompletionState
 from mightymodels_hooks.dispatch import plugin_caller
 from mightymodels_hooks.hook_context import create_hook_context
-from mightymodels_hooks.workers import Worker, worker_named
+from mightymodels_hooks.workers import worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
+    from mightymodels_core.primitives import AgentName
     from mightymodels_core.vocabulary.tasks import Worker as TaskWorker
 
     from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.completion_state import PlanTask, ResidualFacts, Unfinished
 
-IMPLEMENTERS: Mapping[Worker, TaskWorker] = MappingProxyType({
-    Worker.ENGINEER: 'engineer',
-    Worker.ARCHITECT: 'architect',
-    Worker.INTERN: 'intern',
+IMPLEMENTERS: Mapping[AgentName, TaskWorker] = MappingProxyType({
+    'engineer': 'engineer',
+    'architect': 'architect',
+    'intern': 'intern',
 })
 STOP_HOOK_ACTIVE_KEY = 'stop_hook_active'
 BRIEF_MISSING = 'its brief {brief} is missing'

@@ -27,20 +27,20 @@ from mightymodels_core.units_of_work import JournalWork
 from mightymodels_hooks.branch_state import STATE_UNREADABLE
 from mightymodels_hooks.dispatch import plugin_caller
 from mightymodels_hooks.hook_context import create_hook_context
-from mightymodels_hooks.workers import Worker, worker_named
+from mightymodels_hooks.workers import worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from mightymodels_core.primitives import Clock
+    from mightymodels_core.primitives import AgentName, Clock
     from mightymodels_core.vocabulary.similarity import Scout
 
     from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.hook_context import HookContext
 
-SCOUTS: Mapping[Worker, Scout] = MappingProxyType({
-    Worker.CODE_SCOUT: 'code-scout',
-    Worker.WEB_SCOUT: 'web-scout',
+SCOUTS: Mapping[AgentName, Scout] = MappingProxyType({
+    'code-scout': 'code-scout',
+    'web-scout': 'web-scout',
 })
 LAST_MESSAGE_KEY = 'last_assistant_message'
 TOOL_INPUT_KEY = 'tool_input'
