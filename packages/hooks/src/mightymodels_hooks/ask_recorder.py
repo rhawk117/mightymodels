@@ -25,8 +25,11 @@ from mightymodels_core.units_of_work import (
     write_entry,
 )
 
-from mightymodels_hooks.branch_state import STATE_UNREADABLE
-from mightymodels_hooks.hook_context import LookupOnlyBackends, create_hook_context
+from mightymodels_hooks.hook_context import (
+    STATE_UNREADABLE,
+    LookupOnlyBackends,
+    create_hook_context,
+)
 from mightymodels_hooks.recorder_state import Answered, DecisionRecorder
 from mightymodels_hooks.session_pointer import session_id_of
 

@@ -1,24 +1,29 @@
 """Where a hook runs: the environment, the working directory and the ticket directories near it."""
 
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mightymodels_core.database import open_database
-from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from
+from mightymodels_core.database import DatabaseError, open_database
+from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from, open_state
+from mightymodels_core.primitives import StateError
 from mightymodels_core.primitives.value_types import ARCHIVES_DIRECTORY
+from mightymodels_core.units_of_work import read_entry
 from mightymodels_core.workspace import STATE_DIRECTORY, find_root
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import AsyncGenerator, Mapping
 
     from mightymodels_core.database import Database, DatabaseSpec
-    from mightymodels_core.edge import DataDirectory
+    from mightymodels_core.edge import DataDirectory, OpenState
     from mightymodels_core.git import Git
+    from mightymodels_core.units_of_work import Entry
 
     from mightymodels_hooks.cli import HookPayload
 
 NUL = '\0'
+STATE_UNREADABLE = (StateError, DatabaseError, OSError)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -73,6 +78,13 @@ class HookContext:
 
     def has_ticket_directory(self) -> bool:
         return any(map(ticket_directories, self.state_directories()))
+
+    @asynccontextmanager
+    async def branch_entry(self) -> AsyncGenerator[tuple[OpenState, str | None, Entry]]:
+        async with open_state(self.data_directory(), self.start()) as state:
+            branch = await state.git.current_branch()
+            with read_entry(state.database, state.checkout.repository_key()) as entry:
+                yield state, branch, entry
 
     def ticket_directory_holds(self, file_path: str) -> bool:
         if NUL in file_path:

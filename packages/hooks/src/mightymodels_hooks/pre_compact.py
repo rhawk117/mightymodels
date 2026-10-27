@@ -22,8 +22,7 @@ from mightymodels_core.snapshot.records import RepositoryFacts
 from mightymodels_core.units_of_work import SnapshotRead, UnknownRepositoryError
 from mightymodels_core.workspace import workspace_at
 
-from mightymodels_hooks.branch_state import STATE_UNREADABLE
-from mightymodels_hooks.hook_context import create_hook_context
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

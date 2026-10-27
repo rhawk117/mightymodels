@@ -18,7 +18,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
-from mightymodels_core.database import DatabaseError
 from mightymodels_core.edge import (
     PLUGIN_DATA_VARIABLE,
     DataDirectoryMissingError,
@@ -31,7 +30,7 @@ from mightymodels_core.session_pointers import SqliteSessionPointerRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError, read_entry, write_entry
 from mightymodels_core.workspace import find_root
 
-from mightymodels_hooks.hook_context import LookupOnlyBackends, start_directory
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, LookupOnlyBackends, start_directory
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -108,7 +107,7 @@ class SessionStartHandler:
         start = find_root(self.environ, start_directory(payload))
         try:
             await self.prune_pointers(exported, start)
-        except (StateError, DatabaseError, OSError) as error:
+        except STATE_UNREADABLE as error:
             self.note(error)
 
         return None

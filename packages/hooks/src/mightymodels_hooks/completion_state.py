@@ -14,9 +14,10 @@ from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.edge import open_state
 from mightymodels_core.tasks import SqliteTaskRepository
 from mightymodels_core.tasks.gates import GitFacts, is_plan_task
-from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError, read_entry
 from mightymodels_core.workspace import workspace_of
+
+from mightymodels_hooks.branch_state import branch_ticket
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -67,12 +68,12 @@ class StartedRows:
 
 
 def started_rows(entry: Entry, branch: str | None, worker: Worker) -> StartedRows | None:
-    tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
-    slug = None if branch is None else tickets.unclosed_on_branch(branch)
-    if slug is None:
+    ticket = branch_ticket(entry, branch).ticket
+    if ticket is None:
         return None
 
-    ticket_id = tickets.staged_ticket(slug).id
+    slug = ticket.slug
+    ticket_id = ticket.id
     tasks = SqliteTaskRepository(unit=entry.unit)
     contracts = SqliteContractRepository(unit=entry.unit)
     started = tasks.in_progress_started_by(ticket_id, worker)

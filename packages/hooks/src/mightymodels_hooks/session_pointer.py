@@ -19,8 +19,7 @@ from mightymodels_core.edge import open_state
 from mightymodels_core.session_pointers import SqliteSessionPointerRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError, write_entry
 
-from mightymodels_hooks.branch_state import STATE_UNREADABLE
-from mightymodels_hooks.hook_context import create_hook_context
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

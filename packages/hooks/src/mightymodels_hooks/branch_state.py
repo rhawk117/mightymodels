@@ -9,29 +9,29 @@ as the error, so the caller can tell none from unreadable.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from mightymodels_core.contract import SqliteContractRepository
-from mightymodels_core.database import DatabaseError
-from mightymodels_core.edge import open_state
-from mightymodels_core.primitives import StateError
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository, TaskReadService
 from mightymodels_core.tasks.gates import STUCK, get_receipt_problem
 from mightymodels_core.tickets import SqliteTicketRepository
-from mightymodels_core.units_of_work import UnknownRepositoryError, read_entry
+from mightymodels_core.units_of_work import UnknownRepositoryError
+
+from mightymodels_hooks.hook_context import STATE_UNREADABLE
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from mightymodels_core.contract import Receipt, RecordedCommand
+    from mightymodels_core.edge import OpenState
     from mightymodels_core.primitives import TaskId
     from mightymodels_core.tasks import TaskRecord
+    from mightymodels_core.tickets import TicketRecord
     from mightymodels_core.units_of_work import Entry
     from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
 
     from mightymodels_hooks.hook_context import HookContext
 
-STATE_UNREADABLE = (StateError, DatabaseError, OSError)
 IN_PROGRESS: frozenset[TaskStatus] = frozenset({'in-progress'})
 
 
@@ -60,6 +60,12 @@ class BranchTickets:
 class Landing:
     unclosed: tuple[str, ...] = ()
     unproven: tuple[str, ...] = ()
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class BranchTicket:
+    unclosed: tuple[str, ...] = ()
+    ticket: TicketRecord | None = None
 
 
 type StartedOrUnreadable = tuple[StartedTask, ...] | Exception
@@ -105,23 +111,35 @@ def ticket_reads_of(entry: Entry, ticket_id: int) -> TicketReads:
     )
 
 
-def started_on_branch(entry: Entry, branch: str | None, worker: Worker) -> tuple[StartedTask, ...]:
-    tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
-    slug = None if branch is None else tickets.unclosed_on_branch(branch)
-    if slug is None:
-        return ()
-
-    return ticket_reads_of(entry, tickets.staged_ticket(slug).id).started_by(worker)
+def tickets_of(entry: Entry) -> SqliteTicketRepository:
+    return SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
 
 
-def tickets_on_branch(entry: Entry, branch: str | None) -> BranchTickets:
-    tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
+def branch_ticket(entry: Entry, branch: str | None) -> BranchTicket:
+    tickets = tickets_of(entry)
     unclosed = [] if branch is None else tickets.all_unclosed_on_branch(branch)
     names = tuple(map(str, unclosed))
     if len(unclosed) != 1:
+        return BranchTicket(unclosed=names)
+
+    return BranchTicket(unclosed=names, ticket=tickets.staged_ticket(unclosed[0]))
+
+
+def started_on_branch(entry: Entry, branch: str | None, worker: Worker) -> tuple[StartedTask, ...]:
+    ticket = branch_ticket(entry, branch).ticket
+    if ticket is None:
+        return ()
+
+    return ticket_reads_of(entry, ticket.id).started_by(worker)
+
+
+def tickets_on_branch(entry: Entry, branch: str | None) -> BranchTickets:
+    found = branch_ticket(entry, branch)
+    ticket = found.ticket
+    names = found.unclosed
+    if ticket is None:
         return BranchTickets(unclosed=names)
 
-    ticket = tickets.staged_ticket(unclosed[0])
     reads = ticket_reads_of(entry, ticket.id)
     records = reads.tasks.tasks(ticket.id)
     return BranchTickets(
@@ -157,79 +175,75 @@ def live_commands(
 
 
 def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Landing:
-    tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
-    unclosed = [] if branch is None else tickets.all_unclosed_on_branch(branch)
-    names = tuple(map(str, unclosed))
-    if len(unclosed) != 1:
-        return Landing(unclosed=names)
+    found = branch_ticket(entry, branch)
+    ticket = found.ticket
+    if ticket is None:
+        return Landing(unclosed=found.unclosed)
 
-    reads = ticket_reads_of(entry, tickets.staged_ticket(unclosed[0]).id)
+    tickets = tickets_of(entry)
+    reads = ticket_reads_of(entry, ticket.id)
     contracts = SqliteContractRepository(unit=entry.unit)
     service = TaskReadService(
         tickets=tickets, tasks=reads.tasks, attempts=reads.attempts, contracts=contracts
     )
-    readiness = service.ready(unclosed[0], head)
+    readiness = service.ready(ticket.slug, head)
     live = live_commands(contracts, reads.ticket_id, readiness.records)
     receipts = contracts.latest_receipts(reads.ticket_id)
     unproven = (*readiness.problems, *not_proven_in_landing(live, receipts, head))
-    return Landing(unclosed=names, unproven=unproven)
+    return Landing(unclosed=found.unclosed, unproven=unproven)
+
+
+@runtime_checkable
+class BranchRead[T](Protocol):
+    async def read(self, state: OpenState, branch: str | None, entry: Entry, /) -> T: ...
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class StartedRead:
+    worker: Worker
+
+    async def read(
+        self, _state: OpenState, branch: str | None, entry: Entry
+    ) -> tuple[StartedTask, ...]:
+        return started_on_branch(entry, branch, self.worker)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class TicketsRead:
+    async def read(self, _state: OpenState, branch: str | None, entry: Entry) -> BranchTickets:
+        return tickets_on_branch(entry, branch)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class LandingRead:
+    async def read(self, state: OpenState, branch: str | None, entry: Entry) -> Landing:
+        return landing_on_branch(entry, branch, await state.git.resolve_head())
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class BranchState:
     context: HookContext
 
-    async def read_started(self, worker: Worker) -> tuple[StartedTask, ...]:
-        async with open_state(self.context.data_directory(), self.context.start()) as state:
-            branch = await state.git.current_branch()
-            with read_entry(state.database, state.checkout.repository_key()) as entry:
-                return started_on_branch(entry, branch, worker)
+    async def guarded[T](self, work: BranchRead[T], empty: T) -> T | Exception:
+        if not self.context.has_ticket_directory():
+            return empty
 
-    async def read_tickets(self) -> BranchTickets:
-        async with open_state(self.context.data_directory(), self.context.start()) as state:
-            branch = await state.git.current_branch()
-            with read_entry(state.database, state.checkout.repository_key()) as entry:
-                return tickets_on_branch(entry, branch)
-
-    async def read_landing(self) -> Landing:
-        async with open_state(self.context.data_directory(), self.context.start()) as state:
-            branch = await state.git.current_branch()
-            head = await state.git.resolve_head()
-            with read_entry(state.database, state.checkout.repository_key()) as entry:
-                return landing_on_branch(entry, branch, head)
+        try:
+            async with self.context.branch_entry() as (state, branch, entry):
+                return await work.read(state, branch, entry)
+        except UnknownRepositoryError:
+            return empty
+        except STATE_UNREADABLE as error:
+            return error
 
     def ticket_directory_holds(self, file_path: str) -> bool:
         return self.context.ticket_directory_holds(file_path)
 
     async def started_by(self, worker: Worker) -> StartedOrUnreadable:
-        if not self.context.has_ticket_directory():
-            return ()
-
-        try:
-            return await self.read_started(worker)
-        except UnknownRepositoryError:
-            return ()
-        except STATE_UNREADABLE as error:
-            return error
+        return await self.guarded(StartedRead(worker=worker), ())
 
     async def tickets_on_branch(self) -> BranchTicketsOrUnreadable:
-        if not self.context.has_ticket_directory():
-            return BranchTickets()
-
-        try:
-            return await self.read_tickets()
-        except UnknownRepositoryError:
-            return BranchTickets()
-        except STATE_UNREADABLE as error:
-            return error
+        return await self.guarded(TicketsRead(), BranchTickets())
 
     async def landing_on_branch(self) -> LandingOrUnreadable:
-        if not self.context.has_ticket_directory():
-            return Landing()
-
-        try:
-            return await self.read_landing()
-        except UnknownRepositoryError:
-            return Landing()
-        except STATE_UNREADABLE as error:
-            return error
+        return await self.guarded(LandingRead(), Landing())

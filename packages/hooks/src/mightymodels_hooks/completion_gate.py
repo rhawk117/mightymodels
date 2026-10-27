@@ -32,9 +32,8 @@ from mightymodels_core.tasks.gates import (
     done_commit,
 )
 
-from mightymodels_hooks.branch_state import STATE_UNREADABLE
 from mightymodels_hooks.completion_state import CompletionState
-from mightymodels_hooks.hook_context import create_hook_context
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context
 from mightymodels_hooks.workers import plugin_caller, worker_named
 
 if TYPE_CHECKING:
