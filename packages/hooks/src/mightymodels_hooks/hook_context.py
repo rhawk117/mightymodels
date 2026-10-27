@@ -1,0 +1,116 @@
+"""Where a hook runs: the environment, the working directory and the ticket directories near it."""
+
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from mightymodels_core.database import ConnectionOptions, DatabaseError, open_database
+from mightymodels_core.edge import (
+    PLUGIN_DATA_VARIABLE,
+    data_directory_from,
+    exclude_state_from_git,
+    open_state,
+)
+from mightymodels_core.primitives import StateError
+from mightymodels_core.primitives.value_types import ARCHIVES_DIRECTORY
+from mightymodels_core.units_of_work import read_entry
+from mightymodels_core.workspace import STATE_DIRECTORY, find_root
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Mapping
+
+    from mightymodels_core.database import Database, DatabaseSpec
+    from mightymodels_core.edge import DataDirectory, OpenState
+    from mightymodels_core.git import Git
+    from mightymodels_core.units_of_work import Entry
+
+NUL = '\0'
+STATE_UNREADABLE = (StateError, DatabaseError, OSError)
+HOOK_BUSY_TIMEOUT_SECONDS = 5.0
+HOOK_OPTIONS = ConnectionOptions(busy_timeout_seconds=HOOK_BUSY_TIMEOUT_SECONDS)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class LookupOnlyBackends:
+    """Opens the plugin database like core does but leaves `.git/info/exclude` alone."""
+
+    def connect(self, path: Path, spec: DatabaseSpec) -> Database:
+        return open_database(path, spec, HOOK_OPTIONS)
+
+    async def exclude(self, _git: Git, /) -> None:
+        return None
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ShortTimeoutBackends:
+    """Opens the plugin database with the hook busy timeout and excludes like core."""
+
+    def connect(self, path: Path, spec: DatabaseSpec) -> Database:
+        return open_database(path, spec, HOOK_OPTIONS)
+
+    async def exclude(self, git: Git, /) -> None:
+        await exclude_state_from_git(git)
+
+
+def directory_of(cwd: str | None) -> Path:
+    return Path.cwd() if cwd is None or cwd == '' else Path(cwd)
+
+
+def ticket_directories(state_directory: Path) -> list[Path]:
+    if not state_directory.is_dir():
+        return []
+
+    return [
+        entry
+        for entry in state_directory.iterdir()
+        if entry.is_dir() and entry.name != ARCHIVES_DIRECTORY
+    ]
+
+
+def in_a_ticket_directory(resolved: Path, state_directory: Path) -> bool:
+    if not resolved.is_relative_to(state_directory):
+        return False
+
+    below = resolved.relative_to(state_directory).parts
+    return len(below) > 1 and below[0] != ARCHIVES_DIRECTORY
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class HookContext:
+    environ: Mapping[str, str]
+    cwd: Path
+
+    def data_directory(self) -> DataDirectory:
+        return data_directory_from(self.environ, PLUGIN_DATA_VARIABLE)
+
+    def start(self) -> Path:
+        return find_root(self.environ, self.cwd)
+
+    def state_directories(self) -> list[Path]:
+        start = self.start()
+        return [directory.joinpath(STATE_DIRECTORY) for directory in (start, *start.parents)]
+
+    def has_ticket_directory(self) -> bool:
+        return any(map(ticket_directories, self.state_directories()))
+
+    @asynccontextmanager
+    async def branch_entry(self) -> AsyncGenerator[tuple[OpenState, str | None, Entry]]:
+        async with open_state(self.data_directory(), self.start()) as state:
+            branch = await state.git.current_branch()
+            with read_entry(state.database, state.checkout.repository_key()) as entry:
+                yield state, branch, entry
+
+    def ticket_directory_holds(self, file_path: str) -> bool:
+        if NUL in file_path:
+            return False
+
+        resolved = self.cwd.joinpath(file_path).resolve()
+        return any(
+            in_a_ticket_directory(resolved, state_directory.resolve())
+            for state_directory in self.state_directories()
+        )
+
+
+def create_hook_context_at(environ: Mapping[str, str], cwd: str | None) -> HookContext:
+    return HookContext(environ=environ, cwd=directory_of(cwd))

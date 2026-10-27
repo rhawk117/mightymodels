@@ -332,6 +332,33 @@ CREATE TABLE scout_reports (
 ) STRICT;
 CREATE INDEX ix_scout_reports_target ON scout_reports (repository_id, scout, target);
 
+CREATE TABLE session_pointers (
+  id INTEGER CONSTRAINT pk_session_pointers PRIMARY KEY,
+  repository_id INTEGER NOT NULL,
+  session_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  key TEXT NOT NULL,
+  written_at INTEGER NOT NULL,
+  CONSTRAINT fk_session_pointers_repository FOREIGN KEY (repository_id)
+    REFERENCES repositories (id) ON DELETE RESTRICT,
+  CONSTRAINT uq_session_pointers_session UNIQUE (repository_id, session_id),
+  CONSTRAINT ck_session_pointers_kind CHECK (kind IN ('ticket', 'investigation'))
+) STRICT;
+CREATE INDEX ix_session_pointers_written_at ON session_pointers (repository_id, written_at);
+
+CREATE TABLE ticket_decisions (
+  id INTEGER CONSTRAINT pk_ticket_decisions PRIMARY KEY,
+  ticket_id INTEGER NOT NULL,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  response TEXT,
+  note TEXT,
+  decided_at INTEGER NOT NULL,
+  CONSTRAINT fk_ticket_decisions_ticket FOREIGN KEY (ticket_id)
+    REFERENCES tickets (id) ON DELETE CASCADE
+) STRICT;
+CREATE INDEX ix_ticket_decisions_ticket ON ticket_decisions (ticket_id, id);
+
 CREATE TABLE closings (
   id INTEGER CONSTRAINT pk_closings PRIMARY KEY,
   ticket_id INTEGER NOT NULL,

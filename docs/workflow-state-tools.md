@@ -90,3 +90,16 @@ The per-file table comes from the same pattern with `rg --no-config -uu -c` over
 | `skills/stick-the-landing/SKILL.md` | 7 | `contract` 2, `task` 5 |
 | `skills/what-we-know/SKILL.md` | 5 | `investigation` 3, `similarity` 2 |
 | `skills/whats-broken/SKILL.md` | 3 | `contract` 2, `task` 1 |
+
+## The AskUserQuestion recorder and the session pointer
+
+The recorder, a PostToolUse hook on `AskUserQuestion`, is the only Decision record for
+AskUserQuestion answers. The skills port must drop the skills' own gate-Decision writes, because
+a skill that also writes one records the same answer twice.
+
+The session pointer tells the recorder which ticket or investigation a session works on. A
+PostToolUse hook sets it after each of the 20 slug-bearing workflow_state tools. A `slug` or
+`ticket` in `tool_input` points the session at a ticket, and an `investigation_id` points it at
+an investigation. The latest call wins. There is no ticket-directory gate: the pointer follows
+the call, whether or not a ticket directory exists. The recorder writes nothing for a session
+with no pointer.

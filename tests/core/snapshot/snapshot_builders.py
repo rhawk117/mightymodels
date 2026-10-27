@@ -15,8 +15,15 @@ from mightymodels_core.reviews import StartRequest as ReviewStartRequest
 from mightymodels_core.snapshot import RepositoryFacts
 from mightymodels_core.tasks import MarkRequest
 from mightymodels_core.tasks import StartRequest as TaskStartRequest
-from mightymodels_core.tickets import TicketSection, Tracker
-from mightymodels_core.units_of_work import InvestigationWork, ReviewWork, SnapshotRead, TaskWork
+from mightymodels_core.ticket_decisions import SqliteTicketDecisionRepository
+from mightymodels_core.tickets import SqliteTicketRepository, TicketSection, Tracker
+from mightymodels_core.units_of_work import (
+    InvestigationWork,
+    ReviewWork,
+    SnapshotRead,
+    TaskWork,
+    write_entry,
+)
 
 from tests.core.primitives.clock import create_fake_clock
 
@@ -27,6 +34,7 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Database
     from mightymodels_core.primitives import Clock, RunId
     from mightymodels_core.schemas.contract import Outcome
+    from mightymodels_core.ticket_decisions import IncomingDecision
 
 HEAD = 'a' * 40
 MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
@@ -134,6 +142,19 @@ def seed_ticket(
         unit.tasks.start(slug, start)
         unit.tasks.mark(slug, MarkRequest(task_key=TaskId('T1'), to='blocked', reason='a wall'))
     return slug
+
+
+def seed_ticket_decision(
+    database: Database,
+    repository_key: RepositoryKey,
+    clock: Clock,
+    slug: Slug,
+    decision: IncomingDecision,
+) -> None:
+    with write_entry(database, repository_key) as entry:
+        tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
+        decisions = SqliteTicketDecisionRepository(unit=entry.unit, clock=clock)
+        decisions.add(tickets.staged_ticket(slug).id, decision)
 
 
 def seed_review(

@@ -19,6 +19,7 @@ from mightymodels_core.investigations.ledger import linked_ledgers
 from mightymodels_core.snapshot.records import DEFAULT_LIMIT, SnapshotRecord
 from mightymodels_core.snapshot.sections import (
     check_states,
+    decision_lines,
     failed_attempts,
     git_warnings,
     ledger_lines,
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     from mightymodels_core.reviews.services import ReviewDecisionService
     from mightymodels_core.snapshot.records import RepositoryFacts
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
+    from mightymodels_core.ticket_decisions import TicketDecisionRepository
     from mightymodels_core.tickets.repository import TicketRepository
 
 
@@ -56,6 +58,7 @@ class SnapshotService:
     contracts: ContractRepository
     investigations: InvestigationRepository
     reviews: ReviewDecisionService
+    ticket_decisions: TicketDecisionRepository
     clock: Clock
 
     def take(self, request: SnapshotRequest) -> SnapshotRecord:
@@ -75,7 +78,9 @@ class SnapshotService:
             tasks=tuple(task_state(task, attempts) for task in self.tasks.tasks(ticket.id)),
             checks=check_states(commands, receipts, repository.head),
             works=passing_commands(commands, receipts, limit),
-            decisions=ledger_lines(linked.ledgers, 'decision', limit),
+            decisions=decision_lines(
+                linked.ledgers, self.ticket_decisions.decisions(ticket.id), limit
+            ),
             open_questions=ledger_lines(linked.ledgers, 'open', limit),
             do_not_retry=failed_attempts(stuck),
             review=review_state(self.reviews.latest_review(request.slug), limit),
