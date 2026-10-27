@@ -14,6 +14,7 @@ from mightymodels_hooks.completion_gate import CompletionGateHandler, create_imp
 from mightymodels_hooks.dispatch import DispatchHandler, create_dispatch_rules
 from mightymodels_hooks.main_thread import MainThreadHandler
 from mightymodels_hooks.payloads import (
+    PostToolUsePayload,
     PreCompactPayload,
     PreToolUsePayload,
     SessionStartPayload,
@@ -104,15 +105,20 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
             payload_type=PreCompactPayload,
             handler=PreCompactHandler(environ=environ, stderr=stderr),
         ),
-        'subagent-record': route_dict(SubagentRecordHandler(keeper=keeper)),
-        'subagent-handback': route_dict(SubagentHandbackHandler(keeper=keeper)),
-        'session-pointer': route_dict(
-            SessionPointerHandler(
+        'subagent-record': PayloadRoute(
+            payload_type=SubagentStopPayload, handler=SubagentRecordHandler(keeper=keeper)
+        ),
+        'subagent-handback': PayloadRoute(
+            payload_type=PostToolUsePayload, handler=SubagentHandbackHandler(keeper=keeper)
+        ),
+        'session-pointer': PayloadRoute(
+            payload_type=PostToolUsePayload,
+            handler=SessionPointerHandler(
                 environ=environ,
                 stderr=stderr,
                 clock=create_clock(),
                 fields=create_pointer_fields(),
-            )
+            ),
         ),
         'ask-recorder': route_dict(
             AskRecorderHandler(environ=environ, stderr=stderr, clock=create_clock())

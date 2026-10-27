@@ -23,8 +23,9 @@ from mightymodels_core.primitives import StateError
 from mightymodels_core.similarity import IncomingReport, SimilarityOptions
 from mightymodels_core.units_of_work import JournalWork
 
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context
-from mightymodels_hooks.workers import plugin_caller, worker_named
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
+from mightymodels_hooks.payloads import plugin_caller_of
+from mightymodels_hooks.workers import worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -32,14 +33,12 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives import AgentName, Clock
     from mightymodels_core.vocabulary.similarity import Scout
 
-    from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.hook_context import HookContext
+    from mightymodels_hooks.payloads import PostToolUsePayload, SubagentStopPayload
 
 type Scouts = dict[AgentName, Scout]
-LAST_MESSAGE_KEY = 'last_assistant_message'
-TOOL_INPUT_KEY = 'tool_input'
+type ScoutPayload = PostToolUsePayload | SubagentStopPayload
 MESSAGE_KEY = 'message'
-AGENT_ID_KEY = 'agent_id'
 
 
 class NoReportError(StateError):
@@ -51,36 +50,35 @@ def create_scouts() -> Scouts:
     return {'code-scout': 'code-scout', 'web-scout': 'web-scout'}
 
 
-def scout_named(payload: HookPayload, scouts: Scouts) -> Scout | None:
-    caller = plugin_caller(payload)
+def scout_named(payload: ScoutPayload, scouts: Scouts) -> Scout | None:
+    caller = plugin_caller_of(payload.agent_type)
     worker = None if caller is None else worker_named(caller)
     return None if worker is None else scouts.get(worker)
 
 
-def target_of(scout: Scout, payload: HookPayload) -> str:
-    agent_id = payload.get(AGENT_ID_KEY)
-    if not isinstance(agent_id, str) or not agent_id:
+def target_of(scout: Scout, payload: ScoutPayload) -> str:
+    if payload.agent_id is None or payload.agent_id == '':
         return scout
 
-    return f'{scout} {agent_id}'[: SimilarityOptions().name_limit]
+    return f'{scout} {payload.agent_id}'[: SimilarityOptions().name_limit]
 
 
 def scout_report_of(
-    payload: HookPayload, report: object, scouts: Scouts | None = None
+    payload: ScoutPayload, report: str | None, scouts: Scouts | None = None
 ) -> IncomingReport | NoReportError | None:
     scout = scout_named(payload, scouts or create_scouts())
     if scout is None:
         return None
 
-    if not isinstance(report, str) or not report.strip():
+    if report is None or not report.strip():
         return NoReportError()
 
     return IncomingReport(scout=scout, target=target_of(scout, payload), report=report)
 
 
-def handback_message_of(payload: HookPayload) -> object:
-    tool_input = payload.get(TOOL_INPUT_KEY)
-    return tool_input.get(MESSAGE_KEY) if isinstance(tool_input, dict) else None
+def handback_message_of(payload: PostToolUsePayload) -> str | None:
+    message = None if payload.tool_input is None else payload.tool_input.get(MESSAGE_KEY)
+    return message if isinstance(message, str) else None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -104,7 +102,7 @@ class ScoutReportKeeper:
                 if not unit.similarity.has_report_of(incoming):
                     unit.similarity.store_report(incoming)
 
-    async def keep(self, command: str, payload: HookPayload, report: object) -> None:
+    async def keep(self, command: str, payload: ScoutPayload, report: str | None) -> None:
         incoming = scout_report_of(payload, report, self.scouts)
         if incoming is None:
             return
@@ -114,7 +112,7 @@ class ScoutReportKeeper:
             return
 
         try:
-            await self.store(create_hook_context(self.environ, payload), incoming)
+            await self.store(create_hook_context_at(self.environ, payload.cwd), incoming)
         except STATE_UNREADABLE as error:
             self.note(command, error)
 
@@ -123,8 +121,8 @@ class ScoutReportKeeper:
 class SubagentRecordHandler:
     keeper: ScoutReportKeeper
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        await self.keeper.keep('subagent-record', payload, payload.get(LAST_MESSAGE_KEY))
+    async def handle(self, payload: SubagentStopPayload) -> str | None:
+        await self.keeper.keep('subagent-record', payload, payload.last_assistant_message)
         return None
 
 
@@ -132,6 +130,6 @@ class SubagentRecordHandler:
 class SubagentHandbackHandler:
     keeper: ScoutReportKeeper
 
-    async def handle(self, payload: HookPayload) -> str | None:
+    async def handle(self, payload: PostToolUsePayload) -> str | None:
         await self.keeper.keep('subagent-handback', payload, handback_message_of(payload))
         return None

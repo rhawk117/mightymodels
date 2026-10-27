@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 OTHER_AGENTS = ('mightymodels:workers:engineer', 'general-purpose', 'code-scout')
 BLANK_MESSAGES = (None, '', '   ', 7)
+BLANK_FINAL_MESSAGES = (None, '', '   ')
 SCOUT_AGENTS = {CODE_SCOUT: 'code-scout', WEB_SCOUT: 'web-scout'}
 
 
@@ -40,8 +41,8 @@ def other_agent_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('agent_type', OTHER_AGENTS)
 
 
-def blank_message_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize('message', [pytest.param(m, id=repr(m)) for m in BLANK_MESSAGES])
+def blank_message_cases(messages: tuple[object, ...] = BLANK_MESSAGES) -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('message', [pytest.param(m, id=repr(m)) for m in messages])
 
 
 class TestHandback:
@@ -119,7 +120,7 @@ class TestStop:
 
         assert [row.scout for row in harness.rows()] == ['code-scout', 'web-scout']
 
-    @blank_message_cases()
+    @blank_message_cases(BLANK_FINAL_MESSAGES)
     async def test_a_stop_without_a_final_message_writes_nothing_and_exits_quietly(
         self, harness: ScoutHarness, message: object
     ) -> None:

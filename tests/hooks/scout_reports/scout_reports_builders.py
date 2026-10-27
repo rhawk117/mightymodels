@@ -5,8 +5,10 @@ from contextlib import closing
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import msgspec
 from mightymodels_core.edge import DATABASE_NAME, PLUGIN_DATA_VARIABLE
 from mightymodels_core.primitives import SystemClock
+from mightymodels_hooks.payloads import PostToolUsePayload, SubagentStopPayload
 from mightymodels_hooks.scout_reports import (
     ScoutReportKeeper,
     SubagentHandbackHandler,
@@ -55,6 +57,17 @@ def handback_payload(agent_type: str, message: object = REPORT, **given: object)
     return handback | given
 
 
+def stop_event(agent_type: str, **given: object) -> SubagentStopPayload:
+    return msgspec.convert(stop_payload(agent_type, **given), type=SubagentStopPayload)
+
+
+def handback_event(
+    agent_type: str, message: object = REPORT, **given: object
+) -> PostToolUsePayload:
+    payload = handback_payload(agent_type, message, **given)
+    return msgspec.convert(payload, type=PostToolUsePayload)
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ScoutHarness:
     checkout: Path
@@ -70,11 +83,13 @@ class ScoutHarness:
 
     async def stop(self, payload: HookPayload) -> str | None:
         handler = SubagentRecordHandler(keeper=self.keeper)
-        return await handler.handle({**payload, 'cwd': str(self.checkout)})
+        located = {**payload, 'cwd': str(self.checkout)}
+        return await handler.handle(msgspec.convert(located, type=SubagentStopPayload))
 
     async def hand_back(self, payload: HookPayload) -> str | None:
         handler = SubagentHandbackHandler(keeper=self.keeper)
-        return await handler.handle({**payload, 'cwd': str(self.checkout)})
+        located = {**payload, 'cwd': str(self.checkout)}
+        return await handler.handle(msgspec.convert(located, type=PostToolUsePayload))
 
     def rows(self) -> list[StoredRow]:
         database = self.data_directory.joinpath(DATABASE_NAME)

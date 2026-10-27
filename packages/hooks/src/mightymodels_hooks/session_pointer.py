@@ -19,7 +19,7 @@ from mightymodels_core.edge import open_state
 from mightymodels_core.session_pointers import SqliteSessionPointerRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError, write_entry
 
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -29,9 +29,8 @@ if TYPE_CHECKING:
 
     from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.hook_context import HookContext
+    from mightymodels_hooks.payloads import PostToolUsePayload
 
-TOOL_NAME_KEY = 'tool_name'
-TOOL_INPUT_KEY = 'tool_input'
 SESSION_ID_KEY = 'session_id'
 TOOL_SEPARATOR = '__'
 
@@ -42,12 +41,8 @@ class PointerTarget:
     key: str
 
 
-def tool_of(payload: HookPayload) -> str | None:
-    name = payload.get(TOOL_NAME_KEY)
-    if not isinstance(name, str):
-        return None
-
-    return name.rsplit(TOOL_SEPARATOR, 1)[-1]
+def tool_of(tool_name: str | None) -> str | None:
+    return None if tool_name is None else tool_name.rsplit(TOOL_SEPARATOR, 1)[-1]
 
 
 def session_id_of(payload: HookPayload) -> str | None:
@@ -72,11 +67,11 @@ class PointerFields:
         self.tools.update(tools)
         return self
 
-    def target_of(self, payload: HookPayload) -> PointerTarget | None:
-        tool = tool_of(payload)
+    def target_of(self, payload: PostToolUsePayload) -> PointerTarget | None:
+        tool = tool_of(payload.tool_name)
         name = None if tool is None else self.tools.get(tool)
-        tool_input = payload.get(TOOL_INPUT_KEY)
-        if name is None or not isinstance(tool_input, dict):
+        tool_input = payload.tool_input
+        if name is None or tool_input is None:
             return None
 
         key = tool_input.get(name)
@@ -114,7 +109,7 @@ def create_pointer_fields() -> PointerFields:
     )
 
 
-def pointer_target_of(payload: HookPayload) -> PointerTarget | None:
+def pointer_target_of(payload: PostToolUsePayload) -> PointerTarget | None:
     return create_pointer_fields().target_of(payload)
 
 
@@ -133,13 +128,13 @@ class SessionPointerHandler:
                 )
                 pointers.record(session_id, target.kind, target.key)
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        session_id = session_id_of(payload)
+    async def handle(self, payload: PostToolUsePayload) -> str | None:
+        session_id = payload.session_id or None
         target = self.fields.target_of(payload)
         if session_id is None or target is None:
             return None
 
-        context = create_hook_context(self.environ, payload)
+        context = create_hook_context_at(self.environ, payload.cwd)
         try:
             await self.point(context, session_id, target)
         except UnknownRepositoryError:

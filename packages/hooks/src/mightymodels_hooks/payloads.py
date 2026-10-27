@@ -34,6 +34,8 @@ class PostToolUsePayload(
     tool_name: str | None = None
     tool_input: dict[str, object] | None = None
     tool_response: object = None
+    agent_type: str | None = None
+    agent_id: str | None = None
 
 
 class SubagentStopPayload(
