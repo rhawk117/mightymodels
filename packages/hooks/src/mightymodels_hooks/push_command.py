@@ -8,6 +8,9 @@ command substitution and no here-document are read the same way. So `echo "git p
 pushd`, `git stash push` and a commit message that says `git push` are no push. A variable where
 git's options go is passed over as an option. A command that cannot be split into words, because
 a quote never closes, is held as a push when it has the words `git` and `push`.
+
+Two pushes are not found: one inside an interpreter string, such as `python3 -c "...git push..."`,
+and one behind a git alias.
 """
 
 import re

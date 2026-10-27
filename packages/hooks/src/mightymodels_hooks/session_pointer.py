@@ -7,9 +7,8 @@ so a later hook knows which ledger the session is working in. The latest call wi
 uses.
 
 A payload with no `session_id`, a tool outside that list or a call whose field is missing, null or
-blank writes nothing. So does a repository the database has not recorded. The hook never blocks
-and prints nothing on standard output; an unreadable database is said on standard error, with
-exit 0.
+blank writes nothing. The hook records the repository on first write. It never blocks and prints
+nothing on standard output; an unreadable database is said on standard error, with exit 0.
 """
 
 from dataclasses import dataclass, field
@@ -17,7 +16,7 @@ from typing import TYPE_CHECKING, Self, TextIO
 
 from mightymodels_core.edge import open_state
 from mightymodels_core.session_pointers import SqliteSessionPointerRepository
-from mightymodels_core.units_of_work import UnknownRepositoryError, write_entry
+from mightymodels_core.units_of_work import write_entry
 
 from mightymodels_hooks.hook_context import (
     STATE_UNREADABLE,
@@ -133,8 +132,6 @@ class SessionPointerHandler:
         context = create_hook_context_at(self.environ, payload.cwd)
         try:
             await self.point(context, session_id, target)
-        except UnknownRepositoryError:
-            return None
         except STATE_UNREADABLE as error:
             self.stderr.write(f'mightymodels-hooks: session-pointer: {error}\n')
 

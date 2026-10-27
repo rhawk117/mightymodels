@@ -3,16 +3,17 @@
 An investigation takes each answer as a `decision` entry from the user, in labeled lines, stamped
 with the ledger's latest round (1 for an empty ledger). A ticket takes each as a ticket decision
 row. Both redact on write. A decision whose redacted text is over the limit is skipped alone and
-said on standard error, and the dialog's other decisions are still recorded.
+said on standard error, and the dialog's other decisions are still recorded. The limit is the
+investigation policy's prose limit, applied to the whole labeled text of a ledger entry; a ticket
+decision limits each field on its own.
 """
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TextIO
 
-from mightymodels_core.investigations import AddRequest, IncomingEntry
+from mightymodels_core.investigations import AddRequest, IncomingEntry, InvestigationOptions
 from mightymodels_core.primitives import RedactedTextTooLongError, redaction_within
 from mightymodels_core.ticket_decisions import (
-    DECISION_TEXT_LIMIT,
     IncomingDecision,
     SqliteTicketDecisionRepository,
 )
@@ -47,7 +48,7 @@ def ledger_text(answered: Answered) -> str:
 def ledger_entry_of(answered: Answered) -> IncomingEntry | RedactedTextTooLongError:
     text = ledger_text(answered)
     try:
-        redaction_within(text, 'decision', DECISION_TEXT_LIMIT)
+        redaction_within(text, 'decision', InvestigationOptions().prose_limit)
     except RedactedTextTooLongError as error:
         return error
 
