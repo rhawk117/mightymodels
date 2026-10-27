@@ -1,7 +1,5 @@
 """The session pointer repository over a real sqlite unit, with a clock the test sets."""
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING
 
@@ -11,24 +9,16 @@ from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.session_pointers import SqliteSessionPointerRepository
 
+from tests.core.session_pointers.session_pointers_builders import FixedClock
+
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Generator
+    from datetime import datetime
     from pathlib import Path
 
     from mightymodels_core.database import Database, Unit
 
-NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class FixedClock:
-    moment: datetime
-
-    def now(self) -> datetime:
-        return self.moment
-
-
-type PointersAt = Callable[[str, datetime], SqliteSessionPointerRepository]
+    from tests.core.session_pointers.session_pointers_builders import PointersAt
 
 
 @pytest.fixture

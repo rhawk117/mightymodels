@@ -9,7 +9,11 @@ from mightymodels_core.schemas.ticket_decisions import (
 )
 from mightymodels_core.ticket_decisions import IncomingDecision
 
-from tests.core.ticket_decisions.integration.conftest import DATABASE_FILE, NOW, stage_decisions
+from tests.core.ticket_decisions.ticket_decisions_builders import (
+    DATABASE_FILE,
+    NOW,
+    stage_decisions,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path

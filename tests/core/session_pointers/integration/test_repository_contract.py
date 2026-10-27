@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.session_pointers import POINTER_RETENTION
 
-from tests.core.session_pointers.integration.conftest import NOW
+from tests.core.session_pointers.session_pointers_builders import NOW
 
 if TYPE_CHECKING:
-    from tests.core.session_pointers.integration.conftest import PointersAt
+    from tests.core.session_pointers.session_pointers_builders import PointersAt
 
 KEY = 'owner/repo'
 

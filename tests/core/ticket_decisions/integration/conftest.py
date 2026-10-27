@@ -1,17 +1,13 @@
 """The ticket decision repository over a real sqlite unit, with a clock the test sets."""
 
-from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.schemas import DECLARATIONS
-from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
-from mightymodels_core.schemas.tickets import STAGE_TICKET, StageTicketParams
-from mightymodels_core.ticket_decisions import SqliteTicketDecisionRepository
 
-from tests.core.ticket_decisions.ticket_decisions_builders import FixedClock, StagedDecisions
+from tests.core.ticket_decisions.ticket_decisions_builders import DATABASE_FILE, stage_decisions
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -19,10 +15,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.database import Database, Unit
 
-    from tests.core.ticket_decisions.ticket_decisions_builders import DecisionsFor
-
-DATABASE_FILE = 'mightymodels.db'
-NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+    from tests.core.ticket_decisions.ticket_decisions_builders import DecisionsFor, StagedDecisions
 
 
 @pytest.fixture
@@ -46,32 +39,6 @@ def database(tmp_path: Path, database_spec: DatabaseSpec) -> Generator[Database]
 def unit(database: Database) -> Generator[Unit]:
     with database.write() as opened:
         yield opened
-
-
-def stage_decisions(unit: Unit, slug: str) -> StagedDecisions:
-    repository = unit.one(ENSURE_REPOSITORY, RepositoryKeyParams(repository_key='owner/repo'))
-    assert repository is not None
-    params = StageTicketParams(
-        repository_id=repository.id,
-        slug=slug,
-        ticket=f'ticket {slug}',
-        summary='summary',
-        branch='main',
-        scope='med',
-        plan_first=False,
-        auto_escalate=False,
-        issue=None,
-        jira=None,
-        models={},
-        context=[],
-        validated_at=NOW,
-    )
-    staged = unit.one(STAGE_TICKET, params)
-    assert staged is not None
-    repository_of_decisions = SqliteTicketDecisionRepository(
-        unit=unit, clock=FixedClock(moment=NOW)
-    )
-    return StagedDecisions(repository=repository_of_decisions, ticket_id=staged.id)
 
 
 @pytest.fixture
