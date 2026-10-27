@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Protocol, Self, TextIO, runtime_checkable
 import msgspec
 from mightymodels_core.edge import create_clock
 
+from mightymodels_hooks.ask_recorder import AskRecorderHandler
 from mightymodels_hooks.completion_gate import CompletionGateHandler
 from mightymodels_hooks.dispatch import DispatchHandler
 from mightymodels_hooks.main_thread import MainThreadHandler
@@ -74,6 +75,7 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
         'session-pointer': SessionPointerHandler(
             environ=environ, stderr=stderr, clock=create_clock()
         ),
+        'ask-recorder': AskRecorderHandler(environ=environ, stderr=stderr, clock=create_clock()),
     })
 
 
