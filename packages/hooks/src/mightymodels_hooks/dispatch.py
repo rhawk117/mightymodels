@@ -32,9 +32,8 @@ from mightymodels_core.primitives import AgentName, encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
 from mightymodels_hooks.hook_context import create_hook_context_at
-from mightymodels_hooks.payloads import plugin_caller_of
 from mightymodels_hooks.rulings import Asked, Denied, Unjudged, hook_output
-from mightymodels_hooks.workers import agent_type, worker_named
+from mightymodels_hooks.workers import agent_type, plugin_caller, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -211,7 +210,7 @@ async def started_ruling(caller: str | None, target: AgentName, started: Started
 async def dispatch_ruling(
     payload: PreToolUsePayload, started: StartedTasks, rules: DispatchRules
 ) -> Ruling:
-    caller = plugin_caller_of(payload.agent_type)
+    caller = plugin_caller(payload.agent_type)
     target = target_of(payload)
     if caller is not None and (refused := denial_for_worker(caller, target, rules)) is not None:
         return Denied(reason=refused)

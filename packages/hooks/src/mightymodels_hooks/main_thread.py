@@ -27,9 +27,9 @@ from mightymodels_core.primitives import encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
 from mightymodels_hooks.hook_context import create_hook_context_at
-from mightymodels_hooks.payloads import plugin_caller_of
 from mightymodels_hooks.push_command import names_a_push
 from mightymodels_hooks.rulings import Asked, Denied, Unjudged, hook_output
+from mightymodels_hooks.workers import plugin_caller
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -142,7 +142,7 @@ async def tool_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Rul
 
 
 async def main_thread_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Ruling:
-    if plugin_caller_of(payload.agent_type) is not None:
+    if plugin_caller(payload.agent_type) is not None:
         return None
 
     return await tool_ruling(payload, ticket)

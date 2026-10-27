@@ -33,8 +33,7 @@ from mightymodels_core.tasks.gates import (
 
 from mightymodels_hooks.completion_state import CompletionState
 from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
-from mightymodels_hooks.payloads import plugin_caller_of
-from mightymodels_hooks.workers import worker_named
+from mightymodels_hooks.workers import plugin_caller, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -132,7 +131,7 @@ class CompletionGateHandler:
     implementers: Implementers
 
     async def handle(self, payload: SubagentStopPayload) -> str | None:
-        caller = plugin_caller_of(payload.agent_type)
+        caller = plugin_caller(payload.agent_type)
         worker = None if caller is None else worker_named(caller)
         implementer = None if worker is None else self.implementers.get(worker)
         if implementer is None or payload.stop_hook_active is True:

@@ -24,8 +24,7 @@ from mightymodels_core.similarity import IncomingReport, SimilarityOptions
 from mightymodels_core.units_of_work import JournalWork
 
 from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
-from mightymodels_hooks.payloads import plugin_caller_of
-from mightymodels_hooks.workers import worker_named
+from mightymodels_hooks.workers import plugin_caller, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -51,7 +50,7 @@ def create_scouts() -> Scouts:
 
 
 def scout_named(payload: ScoutPayload, scouts: Scouts) -> Scout | None:
-    caller = plugin_caller_of(payload.agent_type)
+    caller = plugin_caller(payload.agent_type)
     worker = None if caller is None else worker_named(caller)
     return None if worker is None else scouts.get(worker)
 

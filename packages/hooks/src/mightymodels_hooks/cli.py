@@ -51,8 +51,6 @@ class HookRoute(Protocol):
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class PayloadRoute[Payload]:
-    """A handler with the payload type its stdin decodes into."""
-
     payload_type: type[Payload]
     handler: PayloadHandler[Payload]
 
