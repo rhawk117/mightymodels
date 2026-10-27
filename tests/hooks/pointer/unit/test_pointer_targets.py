@@ -1,5 +1,5 @@
 import pytest
-from mightymodels_hooks.session_pointer import PointerTarget, pointer_target_of, session_id_of
+from mightymodels_hooks.session_pointer import PointerTarget, pointer_target_of
 
 from tests.hooks.pointer.pointer_builders import pointer_payload
 
@@ -32,12 +32,3 @@ class TestPointerTargetOf:
     def test_a_payload_without_a_tool_name_names_nothing(self) -> None:
         payload = pointer_payload('task_show', {'slug': 'a'}, tool_name=None)
         assert pointer_target_of(payload) is None
-
-
-class TestSessionIdOf:
-    def test_a_session_id_is_read(self) -> None:
-        assert session_id_of({'session_id': 's'}) == 's'
-
-    @pytest.mark.parametrize('value', [None, '', 3])
-    def test_a_blank_or_mistyped_session_id_is_none(self, value: object) -> None:
-        assert session_id_of({'session_id': value}) is None

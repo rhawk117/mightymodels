@@ -16,14 +16,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.session_pointers import SessionPointer
-    from mightymodels_hooks.cli import HookPayload
 
 SESSION_ID = 'session-1'
 SERVER_PREFIX = 'mcp__plugin_mightymodels_workflow_state__'
 
 
 def pointer_payload(tool: str, tool_input: object, **given: object) -> PostToolUsePayload:
-    payload: HookPayload = {
+    payload: dict[str, object] = {
         'hook_event_name': 'PostToolUse',
         'session_id': SESSION_ID,
         'tool_name': f'{SERVER_PREFIX}{tool}',

@@ -1,6 +1,5 @@
 import io
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_hooks.cli import (
@@ -9,20 +8,16 @@ from mightymodels_hooks.cli import (
     HookRouter,
     PayloadRoute,
     create_hook_router,
-    route_dict,
 )
 from mightymodels_hooks.payloads import SessionStartPayload
-
-if TYPE_CHECKING:
-    from mightymodels_hooks.cli import HookPayload
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class EchoHandler:
     reply: str | None
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        return self.reply and f'{self.reply}:{sorted(payload)}'
+    async def handle(self, payload: SessionStartPayload) -> str | None:
+        return self.reply and f'{self.reply}:{payload.cwd}'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -41,8 +36,10 @@ class Outcome:
 class TestHookCommand:
     router = HookRouter(
         handlers={
-            'echo': route_dict(EchoHandler(reply='ok')),
-            'quiet': route_dict(EchoHandler(reply=None)),
+            'echo': PayloadRoute(payload_type=SessionStartPayload, handler=EchoHandler(reply='ok')),
+            'quiet': PayloadRoute(
+                payload_type=SessionStartPayload, handler=EchoHandler(reply=None)
+            ),
             'start': PayloadRoute(payload_type=SessionStartPayload, handler=CwdHandler()),
         }
     )
@@ -57,8 +54,8 @@ class TestHookCommand:
         )
 
     async def test_registered_subcommand_receives_the_payload(self) -> None:
-        outcome = await self.run_command(['echo'], '{"a": 1}')
-        assert (outcome.code, outcome.stdout) == (0, "ok:['a']")
+        outcome = await self.run_command(['echo'], '{"cwd": "/work"}')
+        assert (outcome.code, outcome.stdout) == (0, 'ok:/work')
 
     async def test_handler_without_output_writes_nothing(self) -> None:
         outcome = await self.run_command(['quiet'], '{}')

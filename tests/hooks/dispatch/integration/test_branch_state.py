@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_hooks.hook_context import create_hook_context
+from mightymodels_hooks.hook_context import create_hook_context_at
 
 from tests.hooks.dispatch.dispatch_builders import SLUG, SeededTask
 
@@ -101,7 +101,7 @@ class TestTicketDirectory:
     async def test_ticket_directory_holds_the_files_below_it(
         self, harness: DispatchHarness
     ) -> None:
-        context = create_hook_context({}, {'cwd': str(harness.checkout)})
+        context = create_hook_context_at({}, str(harness.checkout))
         inside = f'.mightymodels/{SLUG}/ticket.yml'
         assert (
             context.ticket_directory_holds(inside),

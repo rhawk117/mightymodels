@@ -20,8 +20,6 @@ if TYPE_CHECKING:
     import io
     from pathlib import Path
 
-    from mightymodels_hooks.cli import HookPayload
-
 CODE_SCOUT = 'mightymodels:triage:code-scout'
 WEB_SCOUT = 'mightymodels:triage:web-scout'
 AGENT_ID = 'a1b2'
@@ -36,8 +34,8 @@ class StoredRow:
     report: str
 
 
-def stop_payload(agent_type: str, **given: object) -> HookPayload:
-    stop: HookPayload = {
+def stop_payload(agent_type: str, **given: object) -> dict[str, object]:
+    stop: dict[str, object] = {
         'hook_event_name': 'SubagentStop',
         'agent_type': agent_type,
         'agent_id': AGENT_ID,
@@ -46,8 +44,10 @@ def stop_payload(agent_type: str, **given: object) -> HookPayload:
     return stop | given
 
 
-def handback_payload(agent_type: str, message: object = REPORT, **given: object) -> HookPayload:
-    handback: HookPayload = {
+def handback_payload(
+    agent_type: str, message: object = REPORT, **given: object
+) -> dict[str, object]:
+    handback: dict[str, object] = {
         'hook_event_name': 'PostToolUse',
         'tool_name': 'SubagentHandback',
         'agent_type': agent_type,
@@ -81,12 +81,12 @@ class ScoutHarness:
             environ=environ, stderr=self.stderr, clock=SystemClock(), scouts=create_scouts()
         )
 
-    async def stop(self, payload: HookPayload) -> str | None:
+    async def stop(self, payload: dict[str, object]) -> str | None:
         handler = SubagentRecordHandler(keeper=self.keeper)
         located = {**payload, 'cwd': str(self.checkout)}
         return await handler.handle(msgspec.convert(located, type=SubagentStopPayload))
 
-    async def hand_back(self, payload: HookPayload) -> str | None:
+    async def hand_back(self, payload: dict[str, object]) -> str | None:
         handler = SubagentHandbackHandler(keeper=self.keeper)
         located = {**payload, 'cwd': str(self.checkout)}
         return await handler.handle(msgspec.convert(located, type=PostToolUsePayload))

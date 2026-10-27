@@ -27,11 +27,9 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives import Clock
     from mightymodels_core.schemas.session_pointers import PointerKind
 
-    from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.hook_context import HookContext
     from mightymodels_hooks.payloads import PostToolUsePayload
 
-SESSION_ID_KEY = 'session_id'
 TOOL_SEPARATOR = '__'
 
 
@@ -43,14 +41,6 @@ class PointerTarget:
 
 def tool_of(tool_name: str | None) -> str | None:
     return None if tool_name is None else tool_name.rsplit(TOOL_SEPARATOR, 1)[-1]
-
-
-def session_id_of(payload: HookPayload) -> str | None:
-    session_id = payload.get(SESSION_ID_KEY)
-    if not isinstance(session_id, str) or not session_id:
-        return None
-
-    return session_id
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

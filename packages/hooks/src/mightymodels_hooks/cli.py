@@ -35,8 +35,6 @@ if TYPE_CHECKING:
 
 REFUSED = 2
 
-type HookPayload = dict[str, object]
-
 
 class PayloadHandler[Payload](Protocol):
     async def handle(self, payload: Payload) -> str | None: ...
@@ -65,10 +63,6 @@ class PayloadRoute[Payload]:
             return error
 
         return Delivery(output=await self.handler.handle(payload))
-
-
-def route_dict(handler: PayloadHandler[HookPayload]) -> PayloadRoute[HookPayload]:
-    return PayloadRoute(payload_type=dict[str, object], handler=handler)
 
 
 type HookHandlers = dict[str, HookRoute]

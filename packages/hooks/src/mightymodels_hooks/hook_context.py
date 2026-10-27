@@ -20,8 +20,6 @@ if TYPE_CHECKING:
     from mightymodels_core.git import Git
     from mightymodels_core.units_of_work import Entry
 
-    from mightymodels_hooks.cli import HookPayload
-
 NUL = '\0'
 STATE_UNREADABLE = (StateError, DatabaseError, OSError)
 
@@ -39,11 +37,6 @@ class LookupOnlyBackends:
 
 def directory_of(cwd: str | None) -> Path:
     return Path.cwd() if cwd is None or cwd == '' else Path(cwd)
-
-
-def start_directory(payload: HookPayload) -> Path:
-    cwd = payload.get('cwd')
-    return directory_of(cwd if isinstance(cwd, str) else None)
 
 
 def ticket_directories(state_directory: Path) -> list[Path]:
@@ -99,10 +92,6 @@ class HookContext:
             in_a_ticket_directory(resolved, state_directory.resolve())
             for state_directory in self.state_directories()
         )
-
-
-def create_hook_context(environ: Mapping[str, str], payload: HookPayload) -> HookContext:
-    return HookContext(environ=environ, cwd=start_directory(payload))
 
 
 def create_hook_context_at(environ: Mapping[str, str], cwd: str | None) -> HookContext:
