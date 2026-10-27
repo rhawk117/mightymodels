@@ -136,11 +136,7 @@ def ledger_lines(ledgers: Sequence[Ledger], kind: EntryKind, limit: int) -> tupl
 
 
 def ticket_decision_line(decision: TicketDecision) -> LedgerLine:
-    text = f'{decision.question}: {decision.answer}'
-    if decision.response is not None:
-        text = f'{text} - {decision.response}'
-
-    return LedgerLine(kind='decision', text=text, cite=None, origin='ticket')
+    return LedgerLine(kind='decision', text=decision.line, cite=None, origin='ticket')
 
 
 def decision_lines(

@@ -110,7 +110,7 @@ class TestArchivedDecisions:
         )
         second = create_ledger(SECOND, create_entry(1, 'keep   it\n sync'))
 
-        assert archived_decisions([first, second], 4) == (
+        assert archived_decisions([first, second], 4, ()) == (
             ArchivedDecision(text=redact('use a policy'), origin='first-probe e1'),
             ArchivedDecision(text=redact('keep it sync'), origin='second-probe e1'),
         )
@@ -119,13 +119,13 @@ class TestArchivedDecisions:
         retired = create_entry(1, 'old choice')
         current = replace(create_entry(2, 'new choice'), supersedes=(1,))
 
-        decisions = archived_decisions([create_ledger(FIRST, retired, current)], 4)
+        decisions = archived_decisions([create_ledger(FIRST, retired, current)], 4, ())
 
         assert [decision.text for decision in decisions] == ['new choice']
 
     def test_only_the_latest_decisions_up_to_the_limit_are_kept(self) -> None:
         entries = [create_entry(seq, f'choice {seq}') for seq in range(1, 6)]
 
-        decisions = archived_decisions([create_ledger(FIRST, *entries)], 2)
+        decisions = archived_decisions([create_ledger(FIRST, *entries)], 2, ())
 
         assert [decision.text for decision in decisions] == ['choice 4', 'choice 5']

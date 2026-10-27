@@ -38,3 +38,11 @@ class TicketDecision:
     response: str | None
     note: str | None
     decided_at: datetime
+
+    @property
+    def line(self) -> str:
+        text = f'{self.question}: {self.answer}'
+        if self.response is not None:
+            text = f'{text} - {self.response}'
+
+        return text

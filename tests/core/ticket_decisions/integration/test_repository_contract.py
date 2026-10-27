@@ -3,6 +3,10 @@
 import sqlite3
 from typing import TYPE_CHECKING
 
+from mightymodels_core.schemas.ticket_decisions import (
+    ADD_TICKET_DECISION,
+    AddTicketDecisionParams,
+)
 from mightymodels_core.ticket_decisions import IncomingDecision
 
 from tests.core.ticket_decisions.integration.conftest import DATABASE_FILE, NOW, stage_decisions
@@ -10,7 +14,7 @@ from tests.core.ticket_decisions.integration.conftest import DATABASE_FILE, NOW,
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mightymodels_core.database import Database
+    from mightymodels_core.database import Database, Unit
 
     from tests.core.ticket_decisions.integration.conftest import DecisionsFor
 
@@ -72,6 +76,27 @@ class TestSqliteTicketDecisionRepository:
         )
 
         (decision,) = decisions.decisions()
+
+        assert decision.question == f'use {SCRUBBED}?'
+        assert decision.answer == f'yes {SCRUBBED}'
+        assert decision.response == f'ok {SCRUBBED}'
+        assert decision.note == f'see {SCRUBBED}'
+
+    def test_a_raw_row_holding_a_secret_is_redacted_on_read(self, unit: Unit) -> None:
+        staged = stage_decisions(unit, 'one')
+        unit.run(
+            ADD_TICKET_DECISION,
+            AddTicketDecisionParams(
+                ticket_id=staged.ticket_id,
+                question=f'use {GITHUB_TOKEN}?',
+                answer=f'yes {GITHUB_TOKEN}',
+                response=f'ok {GITHUB_TOKEN}',
+                note=f'see {GITHUB_TOKEN}',
+                decided_at=int(NOW.timestamp()),
+            ),
+        )
+
+        (decision,) = staged.decisions()
 
         assert decision.question == f'use {SCRUBBED}?'
         assert decision.answer == f'yes {SCRUBBED}'

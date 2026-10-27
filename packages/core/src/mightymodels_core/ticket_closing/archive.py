@@ -85,7 +85,7 @@ class ArchiveSources:
     ledgers: Sequence[Ledger]
     review: LatestReview | None
     decision_limit: int
-    ticket_decisions: Sequence[TicketDecision] = ()
+    ticket_decisions: Sequence[TicketDecision]
 
 
 def archived_command(command: RecordedCommand, receipt: Receipt | None) -> ArchivedCommand:
@@ -140,16 +140,8 @@ def archived_review(review: LatestReview | None) -> ArchivedReview | None:
     )
 
 
-def ticket_decision_text(decision: TicketDecision) -> str:
-    text = f'{decision.question}: {decision.answer}'
-    if decision.response is not None:
-        text = f'{text} - {decision.response}'
-
-    return text
-
-
 def archived_decisions(
-    ledgers: Sequence[Ledger], limit: int, ticket_decisions: Sequence[TicketDecision] = ()
+    ledgers: Sequence[Ledger], limit: int, ticket_decisions: Sequence[TicketDecision]
 ) -> tuple[ArchivedDecision, ...]:
     decisions = [
         ArchivedDecision(text=redact(one_line(record.text)), origin=ledger.origin_of(record))
@@ -157,7 +149,7 @@ def archived_decisions(
         for record in ledger.live_of_kind('decision')
     ]
     decisions.extend(
-        ArchivedDecision(text=redact(one_line(ticket_decision_text(decision))), origin='ticket')
+        ArchivedDecision(text=redact(one_line(decision.line)), origin='ticket')
         for decision in ticket_decisions
     )
     return tuple(decisions[max(len(decisions) - limit, 0) :])
