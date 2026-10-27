@@ -9,8 +9,9 @@ export is looked for as the text the hook writes, where a line starts. When the 
 variable or the env file is missing the hook says so on standard error and stops with exit 0.
 
 The export is written before the database opens. Pruning pointers older than the retention is
-housekeeping, so a database that cannot be opened is noted on standard error and the hook still
-exits 0.
+housekeeping, done only in a repository the database has recorded (an unknown one is left
+untouched: no row, no `.git/info/exclude` entry), so a database that cannot be opened is noted on
+standard error and the hook still exits 0.
 """
 
 from dataclasses import dataclass
@@ -27,8 +28,10 @@ from mightymodels_core.edge import (
 )
 from mightymodels_core.primitives import StateError
 from mightymodels_core.session_pointers import SqliteSessionPointerRepository
-from mightymodels_core.units_of_work import write_entry
+from mightymodels_core.units_of_work import UnknownRepositoryError, read_entry, write_entry
 from mightymodels_core.workspace import find_root
+
+from mightymodels_hooks.hook_context import LookupOnlyBackends, start_directory
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -72,11 +75,6 @@ def export_data_directory(environ: Mapping[str, str]) -> Path | StateError:
     return data_directory
 
 
-def start_directory(payload: HookPayload) -> Path:
-    cwd = payload.get('cwd')
-    return Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
-
-
 @dataclass(slots=True, kw_only=True, frozen=True)
 class SessionStartHandler:
     environ: Mapping[str, str]
@@ -87,8 +85,15 @@ class SessionStartHandler:
         self.stderr.write(f'mightymodels-hooks: session-start: {error}\n')
 
     async def prune_pointers(self, data_directory: Path, start: Path) -> int:
-        async with open_state(data_directory, start) as state:
-            with write_entry(state.database, state.checkout.repository_key()) as entry:
+        async with open_state(data_directory, start, backends=LookupOnlyBackends()) as state:
+            repository_key = state.checkout.repository_key()
+            try:
+                with read_entry(state.database, repository_key):
+                    pass
+            except UnknownRepositoryError:
+                return 0
+
+            with write_entry(state.database, repository_key) as entry:
                 pointers = SqliteSessionPointerRepository(
                     unit=entry.unit, repository_id=entry.repository_id, clock=self.clock
                 )

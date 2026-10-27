@@ -1,23 +1,40 @@
 """Where a hook runs: the environment, the working directory and the ticket directories near it."""
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from mightymodels_core.database import open_database
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from
 from mightymodels_core.primitives.value_types import ARCHIVES_DIRECTORY
 from mightymodels_core.workspace import STATE_DIRECTORY, find_root
 
-from mightymodels_hooks.session_start import start_directory
-
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from pathlib import Path
 
+    from mightymodels_core.database import Database, DatabaseSpec
     from mightymodels_core.edge import DataDirectory
+    from mightymodels_core.git import Git
 
     from mightymodels_hooks.cli import HookPayload
 
 NUL = '\0'
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class LookupOnlyBackends:
+    """Opens the plugin database like core does but leaves `.git/info/exclude` alone."""
+
+    def connect(self, path: Path, spec: DatabaseSpec) -> Database:
+        return open_database(path, spec)
+
+    async def exclude(self, _git: Git, /) -> None:
+        return None
+
+
+def start_directory(payload: HookPayload) -> Path:
+    cwd = payload.get('cwd')
+    return Path(cwd) if isinstance(cwd, str) and cwd else Path.cwd()
 
 
 def ticket_directories(state_directory: Path) -> list[Path]:

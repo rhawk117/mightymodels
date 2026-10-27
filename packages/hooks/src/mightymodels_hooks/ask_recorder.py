@@ -26,7 +26,7 @@ from mightymodels_core.units_of_work import (
 )
 
 from mightymodels_hooks.branch_state import STATE_UNREADABLE
-from mightymodels_hooks.hook_context import create_hook_context
+from mightymodels_hooks.hook_context import LookupOnlyBackends, create_hook_context
 from mightymodels_hooks.recorder_state import Answered, DecisionRecorder
 from mightymodels_hooks.session_pointer import session_id_of
 
@@ -92,7 +92,9 @@ class AskRecorderHandler:
     async def record(
         self, context: HookContext, session_id: str, answers: Sequence[Answered]
     ) -> None:
-        async with open_state(context.data_directory(), context.start()) as state:
+        async with open_state(
+            context.data_directory(), context.start(), backends=LookupOnlyBackends()
+        ) as state:
             pointer = self.pointer_of(state, session_id)
             if pointer is None:
                 return
