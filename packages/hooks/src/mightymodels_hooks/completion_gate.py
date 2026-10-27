@@ -148,4 +148,4 @@ class CompletionGateHandler:
         if reason is None:
             return None
 
-        return encode_compact({'decision': 'block', 'reason': reason}).decode() + '\n'
+        return encode_compact({'decision': 'block', 'reason': reason}).decode()

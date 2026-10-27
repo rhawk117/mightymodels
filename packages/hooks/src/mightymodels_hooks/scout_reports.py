@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from mightymodels_core.primitives import AgentName, Clock
+    from mightymodels_core.units_of_work import JournalUnit
     from mightymodels_core.vocabulary.similarity import Scout
 
     from mightymodels_hooks.hook_context import HookContext
@@ -84,6 +85,13 @@ def handback_message_of(payload: PostToolUsePayload) -> str | None:
     return message if isinstance(message, str) else None
 
 
+def store_once(unit: JournalUnit, incoming: IncomingReport) -> None:
+    if unit.similarity.has_report_of(incoming):
+        return
+
+    unit.similarity.store_report(incoming)
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ScoutReportKeeper:
     environ: Mapping[str, str]
@@ -104,8 +112,7 @@ class ScoutReportKeeper:
                 clock=self.clock,
             )
             with work.write() as unit:
-                if not unit.similarity.has_report_of(incoming):
-                    unit.similarity.store_report(incoming)
+                store_once(unit, incoming)
 
     async def keep(self, command: str, payload: ScoutPayload, report: str | None) -> None:
         incoming = scout_report_of(payload, report, self.scouts)
