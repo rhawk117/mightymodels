@@ -1,8 +1,7 @@
-from typing import TYPE_CHECKING
-
 import pytest
 from mightymodels_core.primitives import StateError
 from mightymodels_hooks.branch_state import BranchTickets, Landing
+from mightymodels_hooks.payloads import PreToolUsePayload
 
 from tests.hooks.dispatch.dispatch_builders import SLUG
 from tests.hooks.main_thread.main_thread_builders import (
@@ -16,9 +15,6 @@ from tests.hooks.main_thread.main_thread_builders import (
     one_unclosed,
     several_unclosed,
 )
-
-if TYPE_CHECKING:
-    from mightymodels_hooks.cli import HookPayload
 
 UNREADABLE = StateError('the database is locked')
 
@@ -88,7 +84,9 @@ class TestCallers:
         'payload',
         [edit_payload('Edit', OUTSIDE_PATH, WORKER), bash_payload(PUSH, WORKER)],
     )
-    async def test_plugin_worker_passes_through_without_a_read(self, payload: HookPayload) -> None:
+    async def test_plugin_worker_passes_through_without_a_read(
+        self, payload: PreToolUsePayload
+    ) -> None:
         fake = FakeTicketOnBranch(tickets=one_unclosed(), landing=UNREADABLE)
         verdict = await judge(payload, fake)
         assert (verdict.decision, fake.reads) == (None, [])
@@ -96,15 +94,14 @@ class TestCallers:
     @pytest.mark.parametrize(
         'payload',
         [
-            {},
-            {'tool_name': 'Read', 'tool_input': {'file_path': OUTSIDE_PATH}},
-            {'tool_name': 'Edit', 'tool_input': 'text'},
-            {'tool_name': 'Edit', 'tool_input': {'file_path': 3}},
+            PreToolUsePayload(),
+            PreToolUsePayload(tool_name='Read', tool_input={'file_path': OUTSIDE_PATH}),
+            PreToolUsePayload(tool_name='Edit', tool_input={'file_path': 3}),
             bash_payload(['git', 'push']),
         ],
     )
     async def test_payload_the_gate_does_not_cover_is_not_judged(
-        self, payload: HookPayload
+        self, payload: PreToolUsePayload
     ) -> None:
         fake = FakeTicketOnBranch(tickets=BranchTickets(unclosed=(SLUG,)), landing=UNREADABLE)
         verdict = await judge(payload, fake)

@@ -13,7 +13,12 @@ from mightymodels_hooks.ask_recorder import AskRecorderHandler
 from mightymodels_hooks.completion_gate import CompletionGateHandler, create_implementers
 from mightymodels_hooks.dispatch import DispatchHandler, create_dispatch_rules
 from mightymodels_hooks.main_thread import MainThreadHandler
-from mightymodels_hooks.payloads import PreCompactPayload, SessionStartPayload
+from mightymodels_hooks.payloads import (
+    PreCompactPayload,
+    PreToolUsePayload,
+    SessionStartPayload,
+    SubagentStopPayload,
+)
 from mightymodels_hooks.pre_compact import PreCompactHandler
 from mightymodels_hooks.scout_reports import (
     ScoutReportKeeper,
@@ -92,9 +97,9 @@ def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter
     )
     return HookRouter().mount({
         'session-start': PayloadRoute(payload_type=SessionStartPayload, handler=session_start),
-        'dispatch-hook': route_dict(dispatch),
-        'main-thread-hook': route_dict(main_thread),
-        'completion-gate': route_dict(completion_gate),
+        'dispatch-hook': PayloadRoute(payload_type=PreToolUsePayload, handler=dispatch),
+        'main-thread-hook': PayloadRoute(payload_type=PreToolUsePayload, handler=main_thread),
+        'completion-gate': PayloadRoute(payload_type=SubagentStopPayload, handler=completion_gate),
         'pre-compact': PayloadRoute(
             payload_type=PreCompactPayload,
             handler=PreCompactHandler(environ=environ, stderr=stderr),

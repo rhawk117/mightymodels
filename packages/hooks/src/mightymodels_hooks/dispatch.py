@@ -31,9 +31,10 @@ from typing import TYPE_CHECKING, Protocol, Self, runtime_checkable
 from mightymodels_core.primitives import AgentName, encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
-from mightymodels_hooks.hook_context import create_hook_context
+from mightymodels_hooks.hook_context import create_hook_context_at
+from mightymodels_hooks.payloads import plugin_caller_of
 from mightymodels_hooks.rulings import Asked, Denied, Unjudged, hook_output
-from mightymodels_hooks.workers import agent_type, plugin_caller, worker_named
+from mightymodels_hooks.workers import agent_type, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -45,7 +46,7 @@ if TYPE_CHECKING:
         BranchTicketsOrUnreadable,
         StartedOrUnreadable,
     )
-    from mightymodels_hooks.cli import HookPayload
+    from mightymodels_hooks.payloads import PreToolUsePayload
     from mightymodels_hooks.rulings import Ruling
 
 NO_TARGETS = frozenset[AgentName]()
@@ -83,9 +84,8 @@ class StartedTasks(Protocol):
     async def tickets_on_branch(self) -> BranchTicketsOrUnreadable: ...
 
 
-def target_of(fields: Mapping[str, object]) -> object:
-    tool_input = fields.get('tool_input')
-    return tool_input.get('subagent_type') if isinstance(tool_input, dict) else None
+def target_of(payload: PreToolUsePayload) -> object:
+    return None if payload.tool_input is None else payload.tool_input.get('subagent_type')
 
 
 def allowed_names(allowed: frozenset[AgentName]) -> str:
@@ -209,10 +209,10 @@ async def started_ruling(caller: str | None, target: AgentName, started: Started
 
 
 async def dispatch_ruling(
-    fields: Mapping[str, object], started: StartedTasks, rules: DispatchRules
+    payload: PreToolUsePayload, started: StartedTasks, rules: DispatchRules
 ) -> Ruling:
-    caller = plugin_caller(fields)
-    target = target_of(fields)
+    caller = plugin_caller_of(payload.agent_type)
+    target = target_of(payload)
     if caller is not None and (refused := denial_for_worker(caller, target, rules)) is not None:
         return Denied(reason=refused)
 
@@ -225,7 +225,7 @@ class DispatchHandler:
     environ: Mapping[str, str]
     rules: DispatchRules
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        state = BranchState(context=create_hook_context(self.environ, payload))
+    async def handle(self, payload: PreToolUsePayload) -> str | None:
+        state = BranchState(context=create_hook_context_at(self.environ, payload.cwd))
         ruling = await dispatch_ruling(payload, state, self.rules)
         return None if ruling is None else encode_compact(hook_output(ruling)).decode()

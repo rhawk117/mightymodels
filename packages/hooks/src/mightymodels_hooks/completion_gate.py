@@ -32,8 +32,9 @@ from mightymodels_core.tasks.gates import (
 )
 
 from mightymodels_hooks.completion_state import CompletionState
-from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context
-from mightymodels_hooks.workers import plugin_caller, worker_named
+from mightymodels_hooks.hook_context import STATE_UNREADABLE, create_hook_context_at
+from mightymodels_hooks.payloads import plugin_caller_of
+from mightymodels_hooks.workers import worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -41,11 +42,10 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives import AgentName
     from mightymodels_core.vocabulary.tasks import Worker as TaskWorker
 
-    from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.completion_state import PlanTask, ResidualFacts, Unfinished
+    from mightymodels_hooks.payloads import SubagentStopPayload
 
 type Implementers = dict[AgentName, TaskWorker]
-STOP_HOOK_ACTIVE_KEY = 'stop_hook_active'
 BRIEF_MISSING = 'its brief {brief} is missing'
 NO_DONE_COMMIT = 'its brief {brief} has no DONE half naming a commit'
 NOTHING_COMMITTED = 'no commit follows its base'
@@ -131,14 +131,14 @@ class CompletionGateHandler:
     stderr: TextIO
     implementers: Implementers
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        caller = plugin_caller(payload)
+    async def handle(self, payload: SubagentStopPayload) -> str | None:
+        caller = plugin_caller_of(payload.agent_type)
         worker = None if caller is None else worker_named(caller)
         implementer = None if worker is None else self.implementers.get(worker)
-        if implementer is None or payload.get(STOP_HOOK_ACTIVE_KEY) is True:
+        if implementer is None or payload.stop_hook_active is True:
             return None
 
-        state = CompletionState(context=create_hook_context(self.environ, payload))
+        state = CompletionState(context=create_hook_context_at(self.environ, payload.cwd))
         try:
             unfinished = await state.unfinished(implementer)
         except STATE_UNREADABLE as error:

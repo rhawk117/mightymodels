@@ -14,6 +14,7 @@ from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import write_entry
 from mightymodels_hooks.completion_gate import CompletionGateHandler, create_implementers
 from mightymodels_hooks.completion_state import PlanTask, ResidualFacts
+from mightymodels_hooks.payloads import SubagentStopPayload
 
 from tests.core.git.git_builders import commit_file
 from tests.core.tasks.repository_builders import create_ticket_section, create_transition
@@ -68,10 +69,10 @@ class Reply:
         return json.loads(self.output or '{}')
 
 
-def stop_payload(agent_type: str | None, *, stop_hook_active: bool = False) -> dict[str, object]:
-    payload: dict[str, object] = {'hook_event_name': 'SubagentStop'}
-    payload['stop_hook_active'] = stop_hook_active
-    return payload if agent_type is None else {**payload, 'agent_type': agent_type}
+def stop_payload(
+    agent_type: str | None, *, stop_hook_active: bool = False, cwd: str | None = None
+) -> SubagentStopPayload:
+    return SubagentStopPayload(agent_type=agent_type, stop_hook_active=stop_hook_active, cwd=cwd)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -90,7 +91,7 @@ class CompletionHarness:
         )
 
     async def stop(self, agent_type: str | None = ENGINEER, *, active: bool = False) -> Reply:
-        payload = {**stop_payload(agent_type, stop_hook_active=active), 'cwd': str(self.checkout)}
+        payload = stop_payload(agent_type, stop_hook_active=active, cwd=str(self.checkout))
         return Reply(output=await self.handler().handle(payload))
 
     def write_brief(self, number: int, text: str) -> Path:

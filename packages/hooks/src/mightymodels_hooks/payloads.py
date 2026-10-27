@@ -6,6 +6,8 @@ Fields Claude Code may leave out are optional and fields the hooks do not read a
 
 import msgspec
 
+from mightymodels_hooks.workers import PLUGIN_PREFIX
+
 
 class SessionStartPayload(
     msgspec.Struct, frozen=True, kw_only=True, tag_field='hook_event_name', tag='SessionStart'
@@ -21,6 +23,7 @@ class PreToolUsePayload(
     cwd: str | None = None
     tool_name: str | None = None
     tool_input: dict[str, object] | None = None
+    agent_type: str | None = None
 
 
 class PostToolUsePayload(
@@ -49,6 +52,10 @@ class PreCompactPayload(
 ):
     session_id: str | None = None
     cwd: str | None = None
+
+
+def plugin_caller_of(agent_type: str | None) -> str | None:
+    return agent_type if agent_type is not None and agent_type.startswith(PLUGIN_PREFIX) else None
 
 
 type HookEventPayload = (

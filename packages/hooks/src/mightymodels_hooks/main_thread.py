@@ -26,16 +26,16 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from mightymodels_core.primitives import encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
-from mightymodels_hooks.hook_context import create_hook_context
+from mightymodels_hooks.hook_context import create_hook_context_at
+from mightymodels_hooks.payloads import plugin_caller_of
 from mightymodels_hooks.push_command import names_a_push
 from mightymodels_hooks.rulings import Asked, Denied, Unjudged, hook_output
-from mightymodels_hooks.workers import plugin_caller
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from mightymodels_hooks.branch_state import BranchTicketsOrUnreadable, LandingOrUnreadable
-    from mightymodels_hooks.cli import HookPayload
+    from mightymodels_hooks.payloads import PreToolUsePayload
     from mightymodels_hooks.rulings import Ruling
 
 EDIT_TOOLS = frozenset({'Edit', 'Write'})
@@ -124,10 +124,10 @@ def push_ruling(landing: LandingOrUnreadable) -> Ruling:
     return Denied(reason=PUSH_HELD.format(slug=landing.unclosed[0], unproven=unproven))
 
 
-async def tool_ruling(fields: Mapping[str, object], ticket: TicketOnBranch) -> Ruling:
-    tool = fields.get('tool_name')
-    tool_input = fields.get('tool_input')
-    if not isinstance(tool, str) or not isinstance(tool_input, dict):
+async def tool_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Ruling:
+    tool = payload.tool_name
+    tool_input = payload.tool_input
+    if tool is None or tool_input is None:
         return None
 
     file_path = tool_input.get('file_path')
@@ -141,18 +141,18 @@ async def tool_ruling(fields: Mapping[str, object], ticket: TicketOnBranch) -> R
     return None
 
 
-async def main_thread_ruling(fields: Mapping[str, object], ticket: TicketOnBranch) -> Ruling:
-    if plugin_caller(fields) is not None:
+async def main_thread_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Ruling:
+    if plugin_caller_of(payload.agent_type) is not None:
         return None
 
-    return await tool_ruling(fields, ticket)
+    return await tool_ruling(payload, ticket)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class MainThreadHandler:
     environ: Mapping[str, str]
 
-    async def handle(self, payload: HookPayload) -> str | None:
-        state = BranchState(context=create_hook_context(self.environ, payload))
+    async def handle(self, payload: PreToolUsePayload) -> str | None:
+        state = BranchState(context=create_hook_context_at(self.environ, payload.cwd))
         ruling = await main_thread_ruling(payload, state)
         return None if ruling is None else encode_compact(hook_output(ruling)).decode()

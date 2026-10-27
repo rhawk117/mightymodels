@@ -11,6 +11,7 @@ from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import write_entry
 from mightymodels_hooks.branch_state import BranchTickets
 from mightymodels_hooks.dispatch import DispatchHandler, create_dispatch_rules, dispatch_ruling
+from mightymodels_hooks.payloads import PreToolUsePayload
 from mightymodels_hooks.rulings import hook_output
 
 from tests.core.tasks.repository_builders import create_ticket_section, create_transition
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
         BranchTicketsOrUnreadable,
         StartedOrUnreadable,
     )
-    from mightymodels_hooks.cli import HookPayload
     from mightymodels_hooks.rulings import Ruling
 
 SLUG = Slug('port-it')
@@ -63,10 +63,11 @@ class SeededTask:
     reasons: tuple[str, ...] = ()
 
 
-def dispatch_payload(target: object, caller: str | None = None) -> HookPayload:
+def dispatch_payload(
+    target: object, caller: str | None = None, cwd: str | None = None
+) -> PreToolUsePayload:
     tool_input = {'subagent_type': target, 'prompt': CLAIM}
-    payload: HookPayload = {'tool_name': 'Agent', 'tool_input': tool_input}
-    return payload if caller is None else {**payload, 'agent_type': caller}
+    return PreToolUsePayload(tool_name='Agent', tool_input=tool_input, agent_type=caller, cwd=cwd)
 
 
 def verdict_of(output: str | None) -> Verdict:
@@ -115,7 +116,7 @@ class DispatchHarness:
         )
 
     async def verdict(self, target: object, caller: str | None = None) -> Verdict:
-        payload = {**dispatch_payload(target, caller), 'cwd': str(self.checkout)}
+        payload = dispatch_payload(target, caller, str(self.checkout))
         return verdict_of(await self.handler().handle(payload))
 
     async def seed(self, tasks: tuple[SeededTask, ...], *, auto_escalate: bool = False) -> None:

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+import msgspec
 from mightymodels_core.contract import Approval, ApprovedCommand, Receipt, SqliteContractRepository
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, open_state
 from mightymodels_core.primitives import Slug, redact
@@ -12,6 +13,7 @@ from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import write_entry
 from mightymodels_hooks.branch_state import BranchTickets, Landing
 from mightymodels_hooks.main_thread import MainThreadHandler, main_thread_ruling
+from mightymodels_hooks.payloads import PreToolUsePayload
 from mightymodels_hooks.rulings import hook_output
 
 from tests.core.tasks.repository_builders import create_ticket_section
@@ -26,7 +28,6 @@ if TYPE_CHECKING:
 
     from mightymodels_core.vocabulary.contract import Phase
     from mightymodels_hooks.branch_state import BranchTicketsOrUnreadable, LandingOrUnreadable
-    from mightymodels_hooks.cli import HookPayload
 
     from tests.hooks.dispatch.dispatch_builders import DispatchHarness, Verdict
 
@@ -58,16 +59,12 @@ class FakeTicketOnBranch:
         return self.landing
 
 
-def edit_payload(tool: str, file_path: str, caller: str | None = None) -> HookPayload:
-    return with_caller({'tool_name': tool, 'tool_input': {'file_path': file_path}}, caller)
+def edit_payload(tool: str, file_path: str, caller: str | None = None) -> PreToolUsePayload:
+    return PreToolUsePayload(tool_name=tool, tool_input={'file_path': file_path}, agent_type=caller)
 
 
-def bash_payload(command: object, caller: str | None = None) -> HookPayload:
-    return with_caller({'tool_name': 'Bash', 'tool_input': {'command': command}}, caller)
-
-
-def with_caller(payload: HookPayload, caller: str | None) -> HookPayload:
-    return payload if caller is None else {**payload, 'agent_type': caller}
+def bash_payload(command: object, caller: str | None = None) -> PreToolUsePayload:
+    return PreToolUsePayload(tool_name='Bash', tool_input={'command': command}, agent_type=caller)
 
 
 def one_unclosed() -> BranchTickets:
@@ -78,7 +75,7 @@ def several_unclosed() -> BranchTickets:
     return BranchTickets(unclosed=(SLUG, OTHER_SLUG))
 
 
-async def judge(payload: HookPayload, fake: FakeTicketOnBranch) -> Verdict:
+async def judge(payload: PreToolUsePayload, fake: FakeTicketOnBranch) -> Verdict:
     ruling = await main_thread_ruling(payload, fake)
     return verdict_of(None if ruling is None else json.dumps(hook_output(ruling)))
 
@@ -94,8 +91,9 @@ class MainThreadHarness:
     def handler(self) -> MainThreadHandler:
         return MainThreadHandler(environ={PLUGIN_DATA_VARIABLE: str(self.dispatch.data_directory)})
 
-    async def verdict(self, payload: HookPayload) -> Verdict:
-        return verdict_of(await self.handler().handle({**payload, 'cwd': str(self.checkout)}))
+    async def verdict(self, payload: PreToolUsePayload) -> Verdict:
+        located = msgspec.structs.replace(payload, cwd=str(self.checkout))
+        return verdict_of(await self.handler().handle(located))
 
     async def stage_other_ticket(self, slug: Slug) -> None:
         section = replace(create_ticket_section(slug), branch=BRANCH)
