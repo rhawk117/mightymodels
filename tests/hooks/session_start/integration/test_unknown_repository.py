@@ -7,7 +7,7 @@ from mightymodels_hooks.hook_context import LookupOnlyBackends
 from mightymodels_hooks.payloads import SessionStartPayload
 
 if TYPE_CHECKING:
-    from tests.hooks.session_start.integration.conftest import SessionStartHarness
+    from tests.hooks.session_start.session_start_builders import SessionStartHarness
 
 
 class TestUnknownRepository:

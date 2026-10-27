@@ -1,6 +1,5 @@
 """The ticket decision repository over a real sqlite unit, with a clock the test sets."""
 
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING
@@ -12,38 +11,18 @@ from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, Repository
 from mightymodels_core.schemas.tickets import STAGE_TICKET, StageTicketParams
 from mightymodels_core.ticket_decisions import SqliteTicketDecisionRepository
 
+from tests.core.ticket_decisions.ticket_decisions_builders import FixedClock, StagedDecisions
+
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Generator
     from pathlib import Path
 
     from mightymodels_core.database import Database, Unit
-    from mightymodels_core.ticket_decisions import IncomingDecision, TicketDecision
+
+    from tests.core.ticket_decisions.ticket_decisions_builders import DecisionsFor
 
 DATABASE_FILE = 'mightymodels.db'
 NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class FixedClock:
-    moment: datetime
-
-    def now(self) -> datetime:
-        return self.moment
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class StagedDecisions:
-    repository: SqliteTicketDecisionRepository
-    ticket_id: int
-
-    def add(self, decision: IncomingDecision) -> None:
-        self.repository.add(self.ticket_id, decision)
-
-    def decisions(self) -> tuple[TicketDecision, ...]:
-        return self.repository.decisions(self.ticket_id)
-
-
-type DecisionsFor = Callable[[str], StagedDecisions]
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.database import Database, Unit
 
-    from tests.core.ticket_decisions.integration.conftest import DecisionsFor
+    from tests.core.ticket_decisions.ticket_decisions_builders import DecisionsFor
 
 GITHUB_TOKEN = 'ghp_' + 'a' * 36
 SCRUBBED = '[REDACTED:github-token]'

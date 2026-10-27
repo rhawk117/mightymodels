@@ -7,13 +7,13 @@ from mightymodels_core.units_of_work import write_entry
 from mightymodels_hooks.payloads import SessionStartPayload
 
 from tests.core.primitives.clock import create_fake_clock
-from tests.hooks.session_start.integration.conftest import NOW
+from tests.hooks.session_start.session_start_builders import NOW
 
 if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
-    from tests.hooks.session_start.integration.conftest import SessionStartHarness
+    from tests.hooks.session_start.session_start_builders import SessionStartHarness
 
 
 class TestSessionStart:
