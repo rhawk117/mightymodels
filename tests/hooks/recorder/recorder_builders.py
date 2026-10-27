@@ -45,6 +45,16 @@ def ask_payload(answers: object, annotations: object = None, **result: object) -
     }
 
 
+def real_payload(result: dict[str, object]) -> HookPayload:
+    return {
+        'hook_event_name': 'PostToolUse',
+        'session_id': SESSION_ID,
+        'tool_name': 'AskUserQuestion',
+        'tool_input': {'questions': []},
+        'tool_response': result,
+    }
+
+
 def two_answers() -> dict[str, str]:
     return {FIRST: 'Redis', SECOND: 'Lint, Tests'}
 
