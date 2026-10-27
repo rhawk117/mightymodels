@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from mightymodels_core.schemas.session_pointers import PointerKind
+    from mightymodels_core.vocabulary.session_pointers import PointerKind
 
 POINTER_RETENTION = timedelta(days=30)
 

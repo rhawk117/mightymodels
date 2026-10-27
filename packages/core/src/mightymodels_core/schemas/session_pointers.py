@@ -1,15 +1,14 @@
 """The pointer from a Claude Code session to the ticket or investigation it last worked in."""
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
+from mightymodels_core.vocabulary.session_pointers import PointerKind
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
-
-type PointerKind = Literal['ticket', 'investigation']
 
 
 class UpsertSessionPointerParams(Struct, frozen=True, kw_only=True, gc=False):

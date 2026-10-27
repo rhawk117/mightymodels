@@ -17,7 +17,7 @@ from mightymodels_core.session_pointers.records import POINTER_RETENTION, Sessio
 if TYPE_CHECKING:
     from mightymodels_core.database import Unit
     from mightymodels_core.primitives import Clock
-    from mightymodels_core.schemas.session_pointers import PointerKind
+    from mightymodels_core.vocabulary.session_pointers import PointerKind
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

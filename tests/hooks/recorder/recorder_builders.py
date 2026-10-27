@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.investigations import LedgerRecord
-    from mightymodels_core.schemas.session_pointers import PointerKind
     from mightymodels_core.ticket_decisions import TicketDecision
+    from mightymodels_core.vocabulary.session_pointers import PointerKind
 
 SESSION_ID = 'session-1'
 TICKET = Slug('port-it')

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from mightymodels_core.primitives import Clock
-    from mightymodels_core.schemas.session_pointers import PointerKind
+    from mightymodels_core.vocabulary.session_pointers import PointerKind
 
     from mightymodels_hooks.hook_context import HookContext
     from mightymodels_hooks.payloads import PostToolUsePayload
