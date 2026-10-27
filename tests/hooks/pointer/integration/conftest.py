@@ -1,4 +1,4 @@
-"""A real git checkout with a ticket directory, a data directory and the handler over them."""
+"""A real git checkout, with or without a ticket directory, and a data directory."""
 
 import io
 from typing import TYPE_CHECKING
@@ -21,9 +21,13 @@ async def checkout(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def harness(checkout: Path, tmp_path: Path) -> PointerHarness:
-    harness = PointerHarness(
+def bare_harness(checkout: Path, tmp_path: Path) -> PointerHarness:
+    return PointerHarness(
         checkout=checkout, data_directory=tmp_path.joinpath('plugin data'), stderr=io.StringIO()
     )
-    harness.make_ticket_directory()
-    return harness
+
+
+@pytest.fixture
+def harness(bare_harness: PointerHarness) -> PointerHarness:
+    bare_harness.make_ticket_directory()
+    return bare_harness

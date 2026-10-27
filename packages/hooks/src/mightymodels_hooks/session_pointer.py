@@ -6,9 +6,9 @@ so a later hook knows which ledger the session is working in. The latest call wi
 `SLUG_BEARING_TOOLS` lists the tools the hook acts on, which is also the matcher the wiring uses.
 
 A payload with no `session_id`, a tool outside that list or a call whose field is missing, null or
-blank writes nothing. So does a repository with no ticket directory or no state. The hook never
-blocks and prints nothing on standard output; an unreadable database is said on standard error,
-with exit 0.
+blank writes nothing. So does a repository the database has not recorded. The hook never blocks
+and prints nothing on standard output; an unreadable database is said on standard error, with
+exit 0.
 """
 
 from dataclasses import dataclass
@@ -123,9 +123,6 @@ class SessionPointerHandler:
             return None
 
         context = create_hook_context(self.environ, payload)
-        if not context.has_ticket_directory():
-            return None
-
         try:
             await self.point(context, session_id, target)
         except UnknownRepositoryError:

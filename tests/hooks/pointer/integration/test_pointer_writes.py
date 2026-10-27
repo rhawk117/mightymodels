@@ -74,10 +74,13 @@ class TestPointerWrites:
         assert await harness.pointer() is None
         assert harness.stderr.getvalue() == ''
 
-    async def test_a_repository_with_no_ticket_directory_writes_nothing(
-        self, harness: PointerHarness
+    async def test_a_call_in_a_repository_with_no_ticket_directory_points_at_the_investigation(
+        self, bare_harness: PointerHarness
     ) -> None:
-        harness.checkout.joinpath('.mightymodels', 'port-it').rmdir()
-        output = await harness.point(pointer_payload('task_start', {'slug': 'port-it'}))
+        payload = pointer_payload('investigation_add', {'investigation_id': 'inv-1'})
+        output = await bare_harness.point(payload)
+        found = await bare_harness.pointer()
         assert output is None
-        assert await harness.pointer() is None
+        assert found is not None
+        assert (found.kind, found.key) == ('investigation', 'inv-1')
+        assert bare_harness.stderr.getvalue() == ''
