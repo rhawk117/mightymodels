@@ -19,8 +19,31 @@ from tests.hooks.main_thread.main_thread_builders import (
 UNREADABLE = StateError('the database is locked')
 
 
+def edit_tool_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('tool', ['Edit', 'Write'])
+
+
+def worker_payload_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'payload',
+        [edit_payload('Edit', OUTSIDE_PATH, WORKER), bash_payload(PUSH, WORKER)],
+    )
+
+
+def uncovered_payload_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'payload',
+        [
+            PreToolUsePayload(),
+            PreToolUsePayload(tool_name='Read', tool_input={'file_path': OUTSIDE_PATH}),
+            PreToolUsePayload(tool_name='Edit', tool_input={'file_path': 3}),
+            bash_payload(['git', 'push']),
+        ],
+    )
+
+
 class TestEdits:
-    @pytest.mark.parametrize('tool', ['Edit', 'Write'])
+    @edit_tool_cases()
     async def test_edit_outside_the_ticket_directories_is_asked(self, tool: str) -> None:
         fake = FakeTicketOnBranch(tickets=one_unclosed())
         verdict = await judge(edit_payload(tool, OUTSIDE_PATH), fake)
@@ -80,10 +103,7 @@ class TestPushes:
 
 
 class TestCallers:
-    @pytest.mark.parametrize(
-        'payload',
-        [edit_payload('Edit', OUTSIDE_PATH, WORKER), bash_payload(PUSH, WORKER)],
-    )
+    @worker_payload_cases()
     async def test_plugin_worker_passes_through_without_a_read(
         self, payload: PreToolUsePayload
     ) -> None:
@@ -91,15 +111,7 @@ class TestCallers:
         verdict = await judge(payload, fake)
         assert (verdict.decision, fake.reads) == (None, [])
 
-    @pytest.mark.parametrize(
-        'payload',
-        [
-            PreToolUsePayload(),
-            PreToolUsePayload(tool_name='Read', tool_input={'file_path': OUTSIDE_PATH}),
-            PreToolUsePayload(tool_name='Edit', tool_input={'file_path': 3}),
-            bash_payload(['git', 'push']),
-        ],
-    )
+    @uncovered_payload_cases()
     async def test_payload_the_gate_does_not_cover_is_not_judged(
         self, payload: PreToolUsePayload
     ) -> None:

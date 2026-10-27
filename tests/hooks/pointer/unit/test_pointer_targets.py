@@ -4,6 +4,14 @@ from mightymodels_hooks.session_pointer import PointerTarget, pointer_target_of
 from tests.hooks.pointer.pointer_builders import pointer_payload
 
 
+def unlisted_tool_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('tool', ['investigation_start', 'Write', 'unknown'])
+
+
+def blank_field_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('value', [None, '', '  ', 7])
+
+
 class TestPointerTargetOf:
     def test_a_slug_names_a_ticket(self) -> None:
         target = pointer_target_of(pointer_payload('task_show', {'slug': 'port-it'}))
@@ -21,11 +29,11 @@ class TestPointerTargetOf:
         payload = pointer_payload('task_show', {'slug': 'a'}, tool_name='x__y__task_show')
         assert pointer_target_of(payload) == PointerTarget(kind='ticket', key='a')
 
-    @pytest.mark.parametrize('tool', ['investigation_start', 'Write', 'unknown'])
+    @unlisted_tool_cases()
     def test_a_tool_outside_the_list_names_nothing(self, tool: str) -> None:
         assert pointer_target_of(pointer_payload(tool, {'slug': 'port-it'})) is None
 
-    @pytest.mark.parametrize('value', [None, '', '  ', 7])
+    @blank_field_cases()
     def test_a_blank_or_mistyped_field_names_nothing(self, value: object) -> None:
         assert pointer_target_of(pointer_payload('task_show', {'slug': value})) is None
 

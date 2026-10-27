@@ -22,6 +22,18 @@ def missing_agent_id_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('agent_id', [pytest.param(None, id='none'), ''])
 
 
+def blank_report_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('report', [None, '', '  \n'])
+
+
+def other_agent_type_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('agent_type', ['mightymodels:workers:engineer', 'code-scout'])
+
+
+def non_text_message_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('message', [None, 7, ['text']])
+
+
 class TestScoutReportOf:
     def test_a_scout_report_is_targeted_by_scout_and_agent_id(self) -> None:
         incoming = scout_report_of(stop_event(CODE_SCOUT), REPORT)
@@ -43,11 +55,11 @@ class TestScoutReportOf:
         assert isinstance(incoming, IncomingReport)
         assert len(incoming.target) == NAME_LIMIT
 
-    @pytest.mark.parametrize('report', [None, '', '  \n'])
+    @blank_report_cases()
     def test_a_missing_or_blank_report_is_no_report(self, report: str | None) -> None:
         assert isinstance(scout_report_of(stop_event(CODE_SCOUT), report), NoReportError)
 
-    @pytest.mark.parametrize('agent_type', ['mightymodels:workers:engineer', 'code-scout'])
+    @other_agent_type_cases()
     def test_another_agent_type_is_none(self, agent_type: str) -> None:
         assert scout_report_of(stop_event(agent_type), REPORT) is None
 
@@ -56,7 +68,7 @@ class TestHandbackMessageOf:
     def test_it_reads_the_tool_input_message(self) -> None:
         assert handback_message_of(handback_event(CODE_SCOUT)) == REPORT
 
-    @pytest.mark.parametrize('message', [None, 7, ['text']])
+    @non_text_message_cases()
     def test_a_message_that_is_not_text_is_none(self, message: object) -> None:
         assert handback_message_of(handback_event(CODE_SCOUT, message)) is None
 

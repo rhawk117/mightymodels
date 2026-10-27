@@ -33,6 +33,24 @@ class Outcome:
     stderr: str
 
 
+def bad_subcommand_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('argv', [['nope'], [], ['echo', 'extra']])
+
+
+def non_object_stdin_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('stdin', ['', 'not json', '[1]', '"s"', 'null'])
+
+
+def undecodable_payload_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'stdin',
+        [
+            '{"hook_event_name": "PreCompact"}',
+            '{"hook_event_name": "SessionStart", "cwd": 7}',
+        ],
+    )
+
+
 class TestHookCommand:
     router = HookRouter(
         handlers={
@@ -61,13 +79,13 @@ class TestHookCommand:
         outcome = await self.run_command(['quiet'], '{}')
         assert (outcome.code, outcome.stdout) == (0, '')
 
-    @pytest.mark.parametrize('argv', [['nope'], [], ['echo', 'extra']])
+    @bad_subcommand_cases()
     async def test_bad_subcommand_is_refused(self, argv: list[str]) -> None:
         outcome = await self.run_command(argv, '{}')
         assert outcome.code == REFUSED
         assert outcome.stderr.startswith('mightymodels-hooks:')
 
-    @pytest.mark.parametrize('stdin', ['', 'not json', '[1]', '"s"', 'null'])
+    @non_object_stdin_cases()
     async def test_non_object_stdin_is_refused(self, stdin: str) -> None:
         outcome = await self.run_command(['echo'], stdin)
         assert outcome.code == REFUSED
@@ -78,13 +96,7 @@ class TestHookCommand:
         outcome = await self.run_command(['start'], stdin)
         assert (outcome.code, outcome.stdout) == (0, 'cwd=/work')
 
-    @pytest.mark.parametrize(
-        'stdin',
-        [
-            '{"hook_event_name": "PreCompact"}',
-            '{"hook_event_name": "SessionStart", "cwd": 7}',
-        ],
-    )
+    @undecodable_payload_cases()
     async def test_payload_that_does_not_decode_is_refused(self, stdin: str) -> None:
         outcome = await self.run_command(['start'], stdin)
         assert outcome.code == REFUSED

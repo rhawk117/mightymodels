@@ -2,8 +2,8 @@ import pytest
 from mightymodels_hooks.push_command import names_a_push
 
 
-class TestPushes:
-    @pytest.mark.parametrize(
+def pushing_command_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         'command',
         [
             'git push',
@@ -30,12 +30,10 @@ class TestPushes:
             "git push 'unclosed",
         ],
     )
-    def test_command_that_pushes_is_found(self, command: str) -> None:
-        assert names_a_push(command)
 
 
-class TestNoPush:
-    @pytest.mark.parametrize(
+def non_pushing_command_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         'command',
         [
             '',
@@ -50,5 +48,15 @@ class TestNoPush:
             "echo 'unclosed",
         ],
     )
+
+
+class TestPushes:
+    @pushing_command_cases()
+    def test_command_that_pushes_is_found(self, command: str) -> None:
+        assert names_a_push(command)
+
+
+class TestNoPush:
+    @non_pushing_command_cases()
     def test_command_that_does_not_push_is_passed(self, command: str) -> None:
         assert not names_a_push(command)

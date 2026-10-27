@@ -1,4 +1,5 @@
 import io
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
@@ -12,6 +13,8 @@ from tests.hooks.dispatch.dispatch_builders import SLUG, FakeStartedTasks, judge
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from _pytest.mark import ParameterSet
 
 ENGINEER = agent_type('engineer')
 ARCHITECT = agent_type('architect')
@@ -27,31 +30,102 @@ def started(*owned_counts: int) -> tuple[StartedTask, ...]:
     )
 
 
-class TestWorkerCallers:
-    @pytest.mark.parametrize(
-        ('caller', 'target'),
-        [
-            (agent_type('engineer'), 'code-scout'),
-            (agent_type('engineer'), agent_type('code-scout')),
-            (agent_type('merge-vader'), 'web-scout'),
-            (agent_type('uncle-bob'), 'qualitylens'),
-        ],
-    )
-    async def test_dispatch_inside_the_row_is_not_judged(self, caller: str, target: str) -> None:
-        assert (await judge(target, caller=caller)).decision is None
+@dataclass(slots=True, kw_only=True, frozen=True)
+class WorkerDispatch:
+    name: str
+    caller: str
+    target: object
+    marks: tuple[pytest.MarkDecorator, ...] = ()
 
-    @pytest.mark.parametrize(
-        ('caller', 'target'),
+    @property
+    def param(self) -> ParameterSet:
+        return pytest.param(self, id=self.name, marks=self.marks)
+
+
+def worker_dispatch_inside_row_cases() -> pytest.MarkDecorator:
+    bare_name = WorkerDispatch(
+        name='engineer-bare-name', caller=agent_type('engineer'), target='code-scout'
+    )
+    qualified_name = WorkerDispatch(
+        name='engineer-qualified-name',
+        caller=agent_type('engineer'),
+        target=agent_type('code-scout'),
+    )
+    merge_vader = WorkerDispatch(
+        name='merge-vader-web-scout', caller=agent_type('merge-vader'), target='web-scout'
+    )
+    uncle_bob = WorkerDispatch(
+        name='uncle-bob-qualitylens', caller=agent_type('uncle-bob'), target='qualitylens'
+    )
+    return pytest.mark.parametrize(
+        'dispatch', [bare_name.param, qualified_name.param, merge_vader.param, uncle_bob.param]
+    )
+
+
+def worker_dispatch_outside_row_cases() -> pytest.MarkDecorator:
+    wingman = WorkerDispatch(
+        name='engineer-wingman', caller=agent_type('engineer'), target='wingman'
+    )
+    scout_to_scout = WorkerDispatch(
+        name='scout-code-scout', caller=agent_type('code-scout'), target='code-scout'
+    )
+    uncle_bob = WorkerDispatch(
+        name='uncle-bob-web-scout', caller=agent_type('uncle-bob'), target='web-scout'
+    )
+    unknown_caller = WorkerDispatch(
+        name='unknown-caller', caller='mightymodels:workers:nobody', target='code-scout'
+    )
+    no_target = WorkerDispatch(name='no-target', caller=agent_type('engineer'), target=None)
+    return pytest.mark.parametrize(
+        'dispatch',
         [
-            (agent_type('engineer'), 'wingman'),
-            (agent_type('code-scout'), 'code-scout'),
-            (agent_type('uncle-bob'), 'web-scout'),
-            ('mightymodels:workers:nobody', 'code-scout'),
-            (agent_type('engineer'), None),
+            wingman.param,
+            scout_to_scout.param,
+            uncle_bob.param,
+            unknown_caller.param,
+            no_target.param,
         ],
     )
-    async def test_dispatch_outside_the_row_is_denied(self, caller: str, target: object) -> None:
-        assert (await judge(target, caller=caller)).decision == 'deny'
+
+
+def idle_target_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('target', [ENGINEER, ARCHITECT, 'engineer'])
+
+
+def outside_caller_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('caller', ['Explore', 'other-plugin:agent', 'mightymodels'])
+
+
+def escalation_target_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('target', [ARCHITECT, 'wingman', agent_type('wingman')])
+
+
+def intern_tasks_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'tasks',
+        [
+            pytest.param((), id='none'),
+            pytest.param(started(2), id='two'),
+            pytest.param(started(1, 3), id='mixed'),
+            pytest.param(started(0), id='zero'),
+        ],
+    )
+
+
+def unreadable_stdin_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'stdin', ['', 'not json', '[1, 2]', '"agent_type": "mightymodels:']
+    )
+
+
+class TestWorkerCallers:
+    @worker_dispatch_inside_row_cases()
+    async def test_dispatch_inside_the_row_is_not_judged(self, dispatch: WorkerDispatch) -> None:
+        assert (await judge(dispatch.target, caller=dispatch.caller)).decision is None
+
+    @worker_dispatch_outside_row_cases()
+    async def test_dispatch_outside_the_row_is_denied(self, dispatch: WorkerDispatch) -> None:
+        assert (await judge(dispatch.target, caller=dispatch.caller)).decision == 'deny'
 
     async def test_worker_dispatch_reads_no_state(self) -> None:
         fake = FakeStartedTasks()
@@ -60,7 +134,7 @@ class TestWorkerCallers:
 
 
 class TestMainThreadStartedTask:
-    @pytest.mark.parametrize('target', [ENGINEER, ARCHITECT, 'engineer'])
+    @idle_target_cases()
     async def test_dispatch_with_no_task_in_progress_is_denied_whatever_the_prompt_claims(
         self, target: str
     ) -> None:
@@ -84,7 +158,7 @@ class TestMainThreadStartedTask:
         verdict = await judge(ENGINEER, FakeStartedTasks(tickets=UNREADABLE))
         assert (verdict.decision, 'locked' in verdict.detail) == ('deny', True)
 
-    @pytest.mark.parametrize('caller', ['Explore', 'other-plugin:agent', 'mightymodels'])
+    @outside_caller_cases()
     async def test_caller_outside_the_plugin_is_the_main_thread(self, caller: str) -> None:
         fake = FakeStartedTasks(tickets=one_ticket())
         assert (await judge(ENGINEER, fake, caller=caller)).decision == 'deny'
@@ -98,7 +172,7 @@ class TestMainThreadStartedTask:
 class TestEscalation:
     blocked = one_ticket(in_progress=('T1',), blocked=(BLOCK,))
 
-    @pytest.mark.parametrize('target', [ARCHITECT, 'wingman', agent_type('wingman')])
+    @escalation_target_cases()
     async def test_block_with_auto_escalate_off_is_asked_about(self, target: str) -> None:
         verdict = await judge(target, FakeStartedTasks(tickets=self.blocked))
         assert (verdict.decision, 'T2 blocked: stuck on the schema' in verdict.detail) == (
@@ -122,9 +196,7 @@ class TestEscalation:
 
 
 class TestIntern:
-    @pytest.mark.parametrize(
-        'tasks', [(), started(2), started(1, 3), started(0)], ids=['none', 'two', 'mixed', 'zero']
-    )
+    @intern_tasks_cases()
     async def test_intern_is_denied_unless_its_task_owns_exactly_one_file(
         self, tasks: Sequence[StartedTask]
     ) -> None:
@@ -146,6 +218,6 @@ class TestUnreadableInput:
         command = HookCommand(router=router, stdin=io.StringIO(stdin), stdout=stdout, stderr=stderr)
         return await command.run(['dispatch-hook']), stdout.getvalue()
 
-    @pytest.mark.parametrize('stdin', ['', 'not json', '[1, 2]', '"agent_type": "mightymodels:'])
+    @unreadable_stdin_cases()
     async def test_unreadable_stdin_exits_two_with_no_ruling(self, stdin: str) -> None:
         assert await self.run_dispatch(stdin) == (REFUSED, '')

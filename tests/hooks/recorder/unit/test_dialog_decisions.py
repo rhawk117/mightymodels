@@ -6,6 +6,22 @@ from mightymodels_hooks.recorder_state import Answered, ledger_text
 from tests.hooks.recorder.recorder_builders import FIRST, SECOND, ask_payload, two_answers
 
 
+def malformed_annotation_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'annotations', ['text', [1], {FIRST: 'text'}, {FIRST: {'notes': 3}}]
+    )
+
+
+def malformed_answers_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'answers', [None, 'Redis', ['Redis'], {}, {FIRST: 3}, {FIRST: ''}]
+    )
+
+
+def blank_response_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('response', [None, 3, ''])
+
+
 class TestAnswersOf:
     def test_each_answered_question_is_one_decision(self) -> None:
         assert answers_of(ask_payload(two_answers())) == [
@@ -24,18 +40,18 @@ class TestAnswersOf:
         )
         assert answers_of(payload)[1].note is None
 
-    @pytest.mark.parametrize('annotations', ['text', [1], {FIRST: 'text'}, {FIRST: {'notes': 3}}])
+    @malformed_annotation_cases()
     def test_a_malformed_annotation_gives_no_note(self, annotations: object) -> None:
         assert answers_of(ask_payload({FIRST: 'Redis'}, annotations))[0].note is None
 
-    @pytest.mark.parametrize('answers', [None, 'Redis', ['Redis'], {}, {FIRST: 3}, {FIRST: ''}])
+    @malformed_answers_cases()
     def test_missing_or_malformed_answers_give_nothing(self, answers: object) -> None:
         assert answers_of(ask_payload(answers)) == []
 
     def test_an_afk_timeout_gives_nothing(self) -> None:
         assert answers_of(ask_payload(two_answers(), afkTimeoutMs=1000)) == []
 
-    @pytest.mark.parametrize('response', [None, 3, ''])
+    @blank_response_cases()
     def test_a_blank_response_is_dropped(self, response: object) -> None:
         assert answers_of(ask_payload({FIRST: 'Redis'}, response=response))[0].response is None
 

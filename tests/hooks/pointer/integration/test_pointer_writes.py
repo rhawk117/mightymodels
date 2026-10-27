@@ -37,6 +37,10 @@ def silent_cases() -> pytest.MarkDecorator:
     )
 
 
+def missing_session_id_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('session_id', [None, ''])
+
+
 class TestPointerWrites:
     @target_cases()
     async def test_a_call_points_the_session_at_what_it_names(
@@ -56,7 +60,7 @@ class TestPointerWrites:
         assert found is not None
         assert (found.kind, found.key) == ('investigation', 'inv-1')
 
-    @pytest.mark.parametrize('session_id', [None, ''])
+    @missing_session_id_cases()
     async def test_a_payload_without_a_session_id_writes_nothing(
         self, harness: PointerHarness, session_id: object
     ) -> None:
