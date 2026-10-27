@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING
 
-from tests.hooks.wrappers.conftest import FAILING_LAUNCHER, SUCCEEDING_LAUNCHER
+from tests.hooks.wrappers.wrapper_builders import FAILING_LAUNCHER, SUCCEEDING_LAUNCHER
 
 if TYPE_CHECKING:
-    from tests.hooks.wrappers.conftest import WrapperRunner
+    from tests.hooks.wrappers.wrapper_builders import WrapperRunner
 
 
 class TestGenericWrapper:

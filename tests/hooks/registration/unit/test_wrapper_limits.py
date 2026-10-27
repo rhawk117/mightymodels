@@ -1,8 +1,12 @@
 import re
+from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.hooks.registration.registration_builders import ROOT, read_registered_hooks
+from tests.hooks.registration.registration_builders import ROOT
+
+if TYPE_CHECKING:
+    from tests.hooks.registration.registration_builders import RegisteredHook
 
 LAUNCHER_ARGV = 'uv run --locked --no-dev --package mightymodels-hooks mightymodels-hooks'
 DEFAULT_PATTERN = re.compile(
@@ -43,12 +47,12 @@ class TestWrapperLimits:
 
     @wrapper_cases()
     def test_pre_tool_use_timeout_outlasts_the_wrapper_kill(
-        self, script: str, variable: str
+        self, registered_hooks: list[RegisteredHook], script: str, variable: str
     ) -> None:
         default_seconds = read_default_seconds(script, variable)
         registered = [
             hook
-            for hook in read_registered_hooks()
+            for hook in registered_hooks
             if hook.event == 'PreToolUse' and hook.script == script
         ]
 

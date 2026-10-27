@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.hooks.wrappers.conftest import (
+from tests.hooks.wrappers.wrapper_builders import (
     FAILING_LAUNCHER,
     HANGING_LAUNCHER,
     SUCCEEDING_LAUNCHER,
@@ -11,7 +11,7 @@ from tests.hooks.wrappers.conftest import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from tests.hooks.wrappers.conftest import (
+    from tests.hooks.wrappers.wrapper_builders import (
         WrapperRunner,
     )
 
@@ -20,7 +20,33 @@ ENGINEER = {'tool_input': {'subagent_type': 'mightymodels:workers:engineer'}}
 BARE_ARCHITECT = {'tool_input': {'subagent_type': 'architect'}}
 INTERN = {'tool_input': {'subagent_type': 'mightymodels:workers:intern'}}
 SCOUT = {'tool_input': {'subagent_type': 'mightymodels:triage:code-scout'}}
-BROKEN_LAUNCHERS = pytest.mark.parametrize('launcher', [FAILING_LAUNCHER, HANGING_LAUNCHER])
+
+
+def broken_launcher_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'launcher',
+        [
+            pytest.param(FAILING_LAUNCHER, id='failing'),
+            pytest.param(HANGING_LAUNCHER, id='hanging'),
+        ],
+    )
+
+
+def implementer_dispatch_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'payload',
+        [
+            pytest.param(ENGINEER, id='engineer'),
+            pytest.param(BARE_ARCHITECT, id='bare-architect'),
+            pytest.param(INTERN, id='intern'),
+        ],
+    )
+
+
+def unticketed_dispatch_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'payload', [pytest.param(ENGINEER, id='engineer'), pytest.param(SCOUT, id='scout')]
+    )
 
 
 class TestDispatchWrapper:
@@ -31,7 +57,7 @@ class TestDispatchWrapper:
 
         assert (outcome.code, outcome.stdout) == (0, '{}\n')
 
-    @BROKEN_LAUNCHERS
+    @broken_launcher_cases()
     def test_refuses_a_mightymodels_worker_when_the_launcher_breaks(
         self, dispatch_runner: WrapperRunner, launcher: str
     ) -> None:
@@ -40,8 +66,8 @@ class TestDispatchWrapper:
         assert outcome.code == 2
         assert 'refused' in outcome.stderr
 
-    @BROKEN_LAUNCHERS
-    @pytest.mark.parametrize('payload', [ENGINEER, BARE_ARCHITECT, INTERN])
+    @broken_launcher_cases()
+    @implementer_dispatch_cases()
     def test_refuses_an_implementer_dispatch_when_a_ticket_dir_exists(
         self, dispatch_runner: WrapperRunner, launcher: str, payload: Mapping[str, object]
     ) -> None:
@@ -50,8 +76,8 @@ class TestDispatchWrapper:
         assert outcome.code == 2
         assert 'refused' in outcome.stderr
 
-    @BROKEN_LAUNCHERS
-    @pytest.mark.parametrize('payload', [ENGINEER, SCOUT])
+    @broken_launcher_cases()
+    @unticketed_dispatch_cases()
     def test_lets_other_dispatches_through_without_a_ticket_dir(
         self, dispatch_runner: WrapperRunner, launcher: str, payload: Mapping[str, object]
     ) -> None:
@@ -60,7 +86,7 @@ class TestDispatchWrapper:
         assert outcome.code == 0
         assert 'was not checked' in outcome.stderr
 
-    @BROKEN_LAUNCHERS
+    @broken_launcher_cases()
     def test_lets_a_non_implementer_dispatch_through_with_a_ticket_dir(
         self, dispatch_runner: WrapperRunner, launcher: str
     ) -> None:
