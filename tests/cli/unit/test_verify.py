@@ -59,6 +59,7 @@ class TestReceiptText:
 
 
 class TestRefusals:
+    @pytest.mark.usefixtures('session_data_directory')
     def test_an_invalid_slug_is_refused(self, capsys: pytest.CaptureFixture[str]) -> None:
         assert main(['verify', 'run', '--slug', '../escape', '--all']) == 2
 

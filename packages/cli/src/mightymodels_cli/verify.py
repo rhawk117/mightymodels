@@ -2,8 +2,9 @@
 
 It opens the state as the server's lifespan does, builds the contract runner over the contract
 service of one write unit, and renders each receipt the run recorded. A refusal (an invalid slug,
-a missing data directory, a start outside a repository, git missing, a ticket without a contract)
-goes to standard error as one line, and the exit code says refused instead of failed.
+a missing data directory, a start outside a repository, git missing, a ticket without a contract,
+a database the schema or another process turns away) goes to standard error as one line,
+and the exit code says refused instead of failed.
 """
 
 import asyncio
@@ -13,6 +14,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract import ContractRunner, RunRequest
+from mightymodels_core.database.errors import (
+    BusyError,
+    DatabaseInUseError,
+    ReadOnlyDatabaseError,
+    SchemaVersionError,
+)
 from mightymodels_core.edge import (
     SESSION_DATA_VARIABLE,
     create_clock,
@@ -35,6 +42,7 @@ EXIT_PASSED = 0
 EXIT_FAILED = 1
 EXIT_REFUSED = 2
 MILLISECONDS = 1000
+REFUSALS = (StateError, SchemaVersionError, BusyError, DatabaseInUseError, ReadOnlyDatabaseError)
 
 
 def receipt_text(receipt: Receipt) -> str:
@@ -51,7 +59,7 @@ def result_text(result: RunResult) -> str:
     return ''.join(receipt_text(receipt) for receipt in result.receipts)
 
 
-def refused(error: StateError) -> int:
+def refused(error: Exception) -> int:
     sys.stderr.write(f'error: {error}\n')
     return EXIT_REFUSED
 
@@ -85,7 +93,7 @@ async def run_contracts(arguments: argparse.Namespace) -> int:
     try:
         async with open_state(data_directory, start) as state:
             result = await run_in(state, request)
-    except StateError as error:
+    except REFUSALS as error:
         return refused(error)
 
     sys.stdout.write(result_text(result))
