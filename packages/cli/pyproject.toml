@@ -1,0 +1,21 @@
+[project]
+name = "mightymodels-cli"
+version = "0.1.0"
+description = "The mightymodels command line"
+authors = [
+    { name = "rhawk117", email = "noplaceLike127dot0dot0dot1@proton.me" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "mightymodels-core",
+]
+
+[project.scripts]
+mightymodels = "mightymodels_cli.main:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+mightymodels-core = { workspace = true }

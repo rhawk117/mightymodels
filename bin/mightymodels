@@ -1,0 +1,9 @@
+#!/bin/sh
+set -u
+
+here=$(cd -- "$(dirname -- "$0")" && pwd -P)
+root=${here%/*}
+export UV_PROJECT="${root}"
+export UV_PROJECT_ENVIRONMENT="${root}/.venv"
+
+exec uv run --locked --no-dev --package mightymodels-cli mightymodels "$@"
