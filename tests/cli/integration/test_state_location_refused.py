@@ -33,6 +33,7 @@ NOT_A_REPOSITORY = 'is not inside a git repository'
 NEEDS_GIT = 'this needs git and no git executable is on PATH'
 MISMATCHES = (
     pytest.param((f'PRAGMA user_version = {ANOTHER_VERSION}',), ANOTHER_VERSION, id='another'),
+    pytest.param(OLD_TABLES, 0, id='unstamped-with-tables'),
     pytest.param(
         ('PRAGMA journal_mode = WAL', f'PRAGMA user_version = {ANOTHER_VERSION}'),
         ANOTHER_VERSION,
@@ -73,15 +74,6 @@ class TestASchemaVersionMismatch:
         assert code == REFUSED
         assert f'the file is at schema version {found}' in capsys.readouterr().err
         assert mismatched.has_nothing_beside_it()
-
-    @pytest.mark.parametrize(
-        'mismatched', [('PRAGMA journal_mode = WAL', 'PRAGMA user_version = 99')], indirect=True
-    )
-    def test_a_file_already_in_write_ahead_log_mode_is_left_as_it_was(
-        self, mismatched: KeptFile
-    ) -> None:
-        main(VERIFY_RUN)
-
         assert mismatched.is_as_it_was()
 
 

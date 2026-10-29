@@ -78,6 +78,21 @@ def read_user_version(connection: sqlite3.Connection) -> int:
         return int(connection.execute('PRAGMA user_version').fetchone()[0])
 
 
+def has_tables(connection: sqlite3.Connection) -> bool:
+    with translate_errors('schema check'):
+        return connection.execute('SELECT 1 FROM sqlite_schema LIMIT 1').fetchone() is not None
+
+
+def get_foreign_file_problem(
+    connection: sqlite3.Connection, schema: Schema
+) -> SchemaVersionError | None:
+    found = read_user_version(connection)
+    if found == schema.version or (found == 0 and not has_tables(connection)):
+        return None
+
+    return SchemaVersionError(found=found, expected=schema.version)
+
+
 def configure(connection: sqlite3.Connection, options: ConnectionOptions) -> None:
     pragmas = (
         f'PRAGMA foreign_keys = {options.foreign_keys_pragma}',
@@ -148,6 +163,9 @@ def get_pragma_problem(
 
 
 def prepare(connection: sqlite3.Connection, schema: Schema, options: ConnectionOptions) -> None:
+    if foreign := get_foreign_file_problem(connection, schema):
+        raise foreign
+
     configure(connection, options)
     if problem := get_pragma_problem(connection, options):
         raise problem
