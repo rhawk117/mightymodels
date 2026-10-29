@@ -1,8 +1,10 @@
 """The `mightymodels` command line: one argparse tree, one branch per command."""
 
 import argparse
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from mightymodels_cli.review_metrics.command import review_metrics
 from mightymodels_cli.review_signals.command import review_signals
 from mightymodels_cli.verify import verify_run
 
@@ -15,6 +17,9 @@ REVIEW_SIGNALS_COMMAND = 'review-signals'
 CODE_CHURN_REPORT = 'code-churn'
 CHANGE_COUPLING_REPORT = 'change-coupling'
 CODE_HOTSPOTS_REPORT = 'code-hotspots'
+REVIEW_METRICS_COMMAND = 'review-metrics'
+DEFAULT_MAX_LISTED = 50
+DEFAULT_PACKAGE_DEPTH = 1
 DEFAULT_MAX_COMMITS = 500
 DEFAULT_LIMIT = 25
 DEFAULT_MIN_SHARED = 3
@@ -71,6 +76,22 @@ def add_review_signals(commands: argparse._SubParsersAction[argparse.ArgumentPar
         add_window(sub)
 
 
+def add_review_metrics(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    metrics = commands.add_parser(
+        REVIEW_METRICS_COMMAND,
+        help='measure code structure for a review: sizes, fan-in, fan-out, cycles',
+    )
+    metrics.add_argument('root', type=Path)
+    metrics.add_argument('--out', type=Path, default=None)
+    metrics.add_argument('--max-listed', type=int, default=DEFAULT_MAX_LISTED)
+    metrics.add_argument(
+        '--package-depth',
+        type=int,
+        default=DEFAULT_PACKAGE_DEPTH,
+        help='path components per component rollup; use 2+ for single-package repos',
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='mightymodels', description='mightymodels command line tools.'
@@ -78,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest='command', required=True)
     add_verify_run(commands)
     add_review_signals(commands)
+    add_review_metrics(commands)
     return parser
 
 
@@ -85,5 +107,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     if arguments.command == REVIEW_SIGNALS_COMMAND:
         return review_signals(arguments)
+    if arguments.command == REVIEW_METRICS_COMMAND:
+        return review_metrics(arguments)
 
     return verify_run(arguments)

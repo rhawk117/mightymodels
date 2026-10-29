@@ -31,6 +31,12 @@ class TestLauncher:
         assert code == 0
         assert 'review-signals' in stdout
 
+    def test_help_lists_review_metrics_from_any_directory(self, tmp_path: Path) -> None:
+        code, stdout = asyncio.run(run_in(tmp_path, str(LAUNCHER), '--help'))
+
+        assert code == 0
+        assert 'review-metrics' in stdout
+
     def test_the_launcher_is_committed_executable(self) -> None:
         _, stdout = asyncio.run(run_in(ROOT, 'git', 'ls-files', '-s', 'bin/mightymodels'))
 
