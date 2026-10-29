@@ -1,7 +1,7 @@
 import pytest
 from mightymodels_cli.main import build_parser, main
 
-pytestmark = pytest.mark.unit
+pytestmark = [pytest.mark.unit, pytest.mark.usefixtures('session_data_directory')]
 
 SLUG = 'port-cli'
 

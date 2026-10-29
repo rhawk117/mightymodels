@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.smoke
+pytestmark = [pytest.mark.smoke, pytest.mark.usefixtures('session_data_directory')]
 
 ROOT = Path(__file__).resolve().parents[3]
 LAUNCHER = ROOT / 'bin' / 'mightymodels'
