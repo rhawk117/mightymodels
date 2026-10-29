@@ -553,10 +553,14 @@ version = "0.1.0"
 source = { editable = "packages/cli" }
 dependencies = [
     { name = "mightymodels-core" },
+    { name = "msgspec" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "mightymodels-core", editable = "packages/core" }]
+requires-dist = [
+    { name = "mightymodels-core", editable = "packages/core" },
+    { name = "msgspec", specifier = ">=0.22.0" },
+]
 
 [[package]]
 name = "mightymodels-core"
