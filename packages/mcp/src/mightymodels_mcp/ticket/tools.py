@@ -127,7 +127,10 @@ async def name_branch(choices: WriteChoices, git: Git) -> str:
 async def ticket_write(
     request: TicketWriteRequest, ctx: ToolContext, *, answers: ChoiceOutcome
 ) -> TicketView:
-    """Write ticket.yml for a new ticket; asks the scope, compaction and branch the call omits."""
+    """Write ticket.yml for a new ticket. Use when starting work that has no ticket yet. Asks the
+    user the scope, compaction and branch the call omits. Refused if the ticket exists; use
+    ticket_update_context to change one.
+    """
     form = answers_of(answers)
     if form is None:
         return TicketView(text=describe_unanswered(request))
@@ -140,25 +143,34 @@ async def ticket_write(
 
 
 async def ticket_validate(request: TicketRequest, ctx: ToolContext) -> TicketView:
-    """Validate ticket.yml and stage the ticket with the investigations it declares."""
+    """Validate ticket.yml and stage the ticket with the investigations it declares. Use after
+    writing or hand-editing ticket.yml, before planning work against it. Does not create the
+    file.
+    """
     async with open_tool_state(ctx) as state:
         return validate_ticket(create_ticket_work(state), request.slug)
 
 
 async def ticket_show(request: TicketRequest, ctx: ToolContext) -> TicketView:
-    """Show a staged ticket's record."""
+    """Show a staged ticket's record. Use when you need its scope, context or investigations again,
+    for instance when resuming work.
+    """
     async with open_tool_state(ctx) as state:
         return show_ticket(create_ticket_work(state), request.slug)
 
 
 async def ticket_update_context(request: TicketContextRequest, ctx: ToolContext) -> TicketView:
-    """Replace the context lines of ticket.yml, then stage the ticket again."""
+    """Replace the context lines of ticket.yml, then stage the ticket again. Use when what the
+    ticket should carry changes mid-work. Replaces all context lines, not one.
+    """
     async with open_tool_state(ctx) as state:
         return update_ticket_context(create_ticket_work(state), request.slug, request.context)
 
 
 async def close_check(request: TicketRequest, ctx: ToolContext) -> CloseView:
-    """List what still blocks closing a ticket; changes nothing."""
+    """List what still blocks closing a ticket; changes nothing. Use before close_ticket to see
+    what live work remains.
+    """
     async with open_tool_state(ctx) as state:
         work = create_ticket_work(state)
         prepared = prepare_close(work, request.slug)
@@ -167,7 +179,9 @@ async def close_check(request: TicketRequest, ctx: ToolContext) -> CloseView:
 
 
 async def close_ticket(request: CloseTicketRequest, ctx: ToolContext) -> CloseView:
-    """Close a ticket with no live work left and write its archive."""
+    """Close a ticket with no live work left and write its archive. Use once close_check reports
+    nothing blocking. Final: refused on a closed ticket, and a closed ticket cannot be reopened.
+    """
     async with open_tool_state(ctx) as state:
         work = create_ticket_work(state)
         prepared = prepare_close(work, request.slug)

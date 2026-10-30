@@ -23,7 +23,9 @@ if TYPE_CHECKING:
 
 
 async def snapshot_take(request: SnapshotTakeRequest, ctx: ToolContext) -> SnapshotView:
-    """Take a snapshot of a staged ticket; changes nothing, the agent writes the two files."""
+    """Take a snapshot of a staged ticket. Use when handing the work to the next session or after
+    compaction. Changes nothing: you write the two files from its result.
+    """
     async with open_tool_state(ctx) as state:
         git = state.git
         refusal = await git.refusal()
