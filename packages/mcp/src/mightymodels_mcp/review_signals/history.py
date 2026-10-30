@@ -10,6 +10,7 @@ import shutil
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
+from anyio import to_thread
 from mightymodels_core.git import GIT_TIMEOUT_SECONDS
 from mightymodels_core.process import FailedRun, get_process_runner
 
@@ -182,17 +183,37 @@ def without_deleted_files(root: Path, commit: Commit) -> Commit:
     return replace(commit, changes=present)
 
 
-async def load_history(options: SignalsOptions, git: GitSource) -> History:
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Located:
+    root: Path
+    target: str
+    executable: str
+
+
+def locate_target(git: GitSource, options: SignalsOptions) -> Located:
     root = repository_root(git.root)
     if git.executable is None:
         raise GitMissingError
-    target = checked_target(root, options.target)
+
+    return Located(
+        root=root, target=checked_target(root, options.target), executable=git.executable
+    )
+
+
+def history_from_output(located: Located, window: Window, stdout: str) -> History:
+    commits = [without_deleted_files(located.root, commit) for commit in parse_log(stdout)]
+    return History(root=located.root, target=located.target, window=window, commits=commits)
+
+
+async def load_history(options: SignalsOptions, git: GitSource) -> History:
+    located = await to_thread.run_sync(locate_target, git, options)
     window = window_from(options)
-    argv = log_argv(git.executable, target, window)
-    run = await git.processes.run(argv, timeout=git.timeout, cwd=root)
+    argv = log_argv(located.executable, located.target, window)
+    run = await git.processes.run(argv, timeout=git.timeout, cwd=located.root)
     if isinstance(run, FailedRun):
         raise GitFailedError(detail=run.detail)
+
     if run.exit != 0:
         raise GitFailedError(detail=run.stderr.strip())
-    commits = [without_deleted_files(root, commit) for commit in parse_log(run.stdout)]
-    return History(root=root, target=target, window=window, commits=commits)
+
+    return await to_thread.run_sync(history_from_output, located, window, run.stdout)

@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import anyio
@@ -11,6 +12,8 @@ from tests.mcp.ticket.ticket_harness import SLUG
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from mcp.types import CallToolResult
 
     from tests.mcp.review.review_harness import ReviewHarness
     from tests.mcp.server.server_harness import ServerHarness
@@ -31,13 +34,6 @@ def write_source(repository: Path) -> None:
     repository.joinpath('pkg', 'mod.py').write_text('def one():\n    return 1\n', encoding='utf-8')
 
 
-class SlowMeasure:
-    def measure(self, root: Path) -> list[object]:
-        assert root
-        time.sleep(SLOW_SECONDS)
-        return []
-
-
 class Ticker:
     def __init__(self) -> None:
         self.ticks = 0
@@ -46,6 +42,26 @@ class Ticker:
         while not done.is_set():
             await anyio.sleep(TICK_SECONDS)
             self.ticks += 1
+
+
+@dataclass(slots=True, kw_only=True)
+class SlowMeasure:
+    ticker: Ticker
+    ticks_before: int | None = None
+    ticks_after: int | None = None
+
+    @property
+    def ticks_inside(self) -> int:
+        assert self.ticks_before is not None
+        assert self.ticks_after is not None
+        return self.ticks_after - self.ticks_before
+
+    def measure(self, root: Path) -> list[object]:
+        assert root
+        self.ticks_before = self.ticker.ticks
+        time.sleep(SLOW_SECONDS)
+        self.ticks_after = self.ticker.ticks
+        return []
 
 
 class TestReviewMetrics:
@@ -106,15 +122,18 @@ class TestReviewMetrics:
         self, harness: ReviewHarness, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         started = await harness.start()
-        monkeypatch.setattr(
-            'mightymodels_mcp.review_metrics.use_cases.collect_metrics', SlowMeasure().measure
-        )
         ticker = Ticker()
+        slow = SlowMeasure(ticker=ticker)
+        monkeypatch.setattr(
+            'mightymodels_mcp.review_metrics.use_cases.collect_metrics', slow.measure
+        )
         done = anyio.Event()
+        results: list[CallToolResult] = []
 
         async with anyio.create_task_group() as group:
             group.start_soon(ticker.run, done)
-            view_of(await harness.call('review_metrics', {'run_id': started.run_id}))
+            results.append(await harness.call('review_metrics', {'run_id': started.run_id}))
             done.set()
 
-        assert ticker.ticks >= MIN_TICKS
+        assert not results[0].is_error
+        assert slow.ticks_inside >= MIN_TICKS

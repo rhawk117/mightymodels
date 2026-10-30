@@ -1,17 +1,23 @@
 import json
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import anyio
 import pytest
 from mcp import Client
 from mightymodels_mcp.main import create_catalog
+from mightymodels_mcp.review_signals.history import without_deleted_files
+from mightymodels_mcp.review_signals.reports import code_hotspots
 from mightymodels_mcp.server.app import create_server
 
 from tests.core.git.git_builders import run_git
 from tests.mcp.server.server_harness import view_of
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from _pytest.mark import ParameterSet
     from mcp.types import CallToolResult
 
     from tests.mcp.server.server_harness import ServerHarness
@@ -43,6 +49,11 @@ async def commit(server: ServerHarness, names: list[str]) -> None:
 
 
 @pytest.fixture
+def ticker() -> Ticker:
+    return Ticker()
+
+
+@pytest.fixture
 async def history(server_harness: ServerHarness) -> ServerHarness:
     for index in range(FILE_COUNT):
         await commit(server_harness, [f'file_{index:02}.py'])
@@ -65,6 +76,52 @@ class Ticker:
         while not done.is_set():
             await anyio.sleep(TICK_SECONDS)
             self.ticks += 1
+
+
+@dataclass(slots=True, kw_only=True)
+class SlowStandIn:
+    ticker: Ticker
+    real: Callable[..., Any]
+    ticks_before: int | None = None
+    ticks_after: int | None = None
+
+    @property
+    def ticks_inside(self) -> int:
+        assert self.ticks_before is not None
+        assert self.ticks_after is not None
+        return self.ticks_after - self.ticks_before
+
+    def call(self, *arguments: Any) -> Any:
+        if self.ticks_before is None:
+            self.ticks_before = self.ticker.ticks
+            time.sleep(SLOW_SECONDS)
+            self.ticks_after = self.ticker.ticks
+        return self.real(*arguments)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class SlowTarget:
+    name: str
+    path: str
+    real: Callable[..., Any]
+
+    @property
+    def param(self) -> ParameterSet:
+        return pytest.param(self, id=self.name)
+
+
+def slow_stand_in_cases() -> pytest.MarkDecorator:
+    report = SlowTarget(
+        name='report',
+        path='mightymodels_mcp.review_signals.tools.code_hotspots',
+        real=code_hotspots,
+    )
+    parsing = SlowTarget(
+        name='parsing',
+        path='mightymodels_mcp.review_signals.history.without_deleted_files',
+        real=without_deleted_files,
+    )
+    return pytest.mark.parametrize('target', [report.param, parsing.param])
 
 
 def signals_of(result: CallToolResult) -> list[dict[str, Any]]:
@@ -130,19 +187,23 @@ class TestSignalsTools:
         assert signals_of(coupled)
         assert refused.is_error
 
+    @slow_stand_in_cases()
     async def test_loop_stays_responsive_during_a_report(
-        self, history: ServerHarness, monkeypatch: pytest.MonkeyPatch
+        self,
+        history: ServerHarness,
+        monkeypatch: pytest.MonkeyPatch,
+        ticker: Ticker,
+        target: SlowTarget,
     ) -> None:
-        def slow_hotspots(*_: object) -> None:
-            time.sleep(SLOW_SECONDS)
-
-        monkeypatch.setattr('mightymodels_mcp.review_signals.tools.code_hotspots', slow_hotspots)
-        ticker = Ticker()
+        stand_in = SlowStandIn(ticker=ticker, real=target.real)
+        monkeypatch.setattr(target.path, stand_in.call)
         done = anyio.Event()
+        results: list[CallToolResult] = []
 
         async with anyio.create_task_group() as group:
             group.start_soon(ticker.run, done)
-            await call(history, 'signals_code_hotspots', {})
+            results.append(await call(history, 'signals_code_hotspots', {}))
             done.set()
 
-        assert ticker.ticks >= MIN_TICKS
+        assert not results[0].is_error
+        assert stand_in.ticks_inside >= MIN_TICKS
