@@ -33,6 +33,9 @@ One row per registered tool, 33 in all. The old action of `snapshot` is `none`, 
 | `review` | `dispose` | `review_dispose` | `run_id`, `decisions`, `by` | Decide a review's findings | false | false | false | false |
 | `review` | `resolve` | `review_resolve` | `run_id`, `finding`, `result`, `commit`, `reason` | Resolve a review finding | false | false | false | false |
 | `review` | `metrics` | `review_metrics` | `run_id`, `package_depth`, `max_listed` | Measure the code for a review | false | false | false | false |
+| `signals` | `code-churn` | `signals_code_churn` | `target`, `since`, `baseline_ref`, `max_commits`, `all_history`, `limit` | Measure code churn | true | false | true | false |
+| `signals` | `change-coupling` | `signals_change_coupling` | `target`, `since`, `baseline_ref`, `max_commits`, `all_history`, `limit`, `min_shared`, `max_changeset` | Measure change coupling | true | false | true | false |
+| `signals` | `code-hotspots` | `signals_code_hotspots` | `target`, `since`, `baseline_ref`, `max_commits`, `all_history`, `limit` | Measure code hotspots | true | false | true | false |
 | `snapshot` | `none` | `snapshot_take` | `slug`, `limit` | Take a snapshot | true | false | true | false |
 | `investigation` | `start` | `investigation_start` | `target`, `kind` | Start an investigation | false | false | false | false |
 | `investigation` | `add` | `investigation_add` | `investigation_id`, `round`, `entries` | Add to an investigation's ledger | false | false | false | false |
