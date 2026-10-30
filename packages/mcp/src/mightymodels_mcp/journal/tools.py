@@ -46,25 +46,33 @@ def crashout_entry(request: CrashoutAddRequest) -> CrashoutEntry:
 
 
 async def crashout_add(request: CrashoutAddRequest, ctx: ToolContext) -> JournalView:
-    """Journal one crashout; a blank field or an empty list of failures is refused."""
+    """Journal one crashout. Use after a session goes wrong, to record the rant, failures, root
+    cause and corrective action. A blank field or an empty list of failures is refused.
+    """
     async with open_tool_state(ctx) as state:
         return add_crashout(create_journal_work(state), crashout_entry(request))
 
 
 async def crashout_stats(_request: CrashoutStatsRequest, ctx: ToolContext) -> JournalView:
-    """Show the patterns across the latest crashouts; changes nothing."""
+    """Show the patterns across the latest crashouts; changes nothing. Use to spot a recurring
+    failure. For one entry, use crashout_last.
+    """
     async with open_tool_state(ctx) as state:
         return show_crashout_stats(create_journal_work(state))
 
 
 async def crashout_last(_request: CrashoutLastRequest, ctx: ToolContext) -> JournalView:
-    """Show the newest crashout; changes nothing."""
+    """Show the newest crashout; changes nothing. Use to recall the last recorded failure. For
+    patterns across many, use crashout_stats.
+    """
     async with open_tool_state(ctx) as state:
         return show_last_crashout(create_journal_work(state))
 
 
 async def similarity_search(request: SimilaritySearchRequest, ctx: ToolContext) -> JournalView:
-    """Search the journaled rows for text like the query; changes nothing."""
+    """Search the journaled rows for text like the query; changes nothing. Use before journaling or
+    fixing, to see whether a similar failure was recorded.
+    """
     async with open_tool_state(ctx) as state:
         asked = SimilarityQuery(query=request.query, kind=request.kind)
         return search_similar(create_journal_work(state), asked)

@@ -37,14 +37,20 @@ if TYPE_CHECKING:
 
 
 async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
-    """Start a task for a worker on the files it owns."""
+    """Start a task for a worker on the files it owns. Use just before dispatching that worker, so
+    its owned files and acceptance criteria are on record. Refused if the task is too large
+    unless the user approved it.
+    """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         return start_task(create_task_work(state), request, head)
 
 
 async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> TaskView:
-    """Verify a task against the reported commit, its contract receipts and its brief."""
+    """Verify a task against the reported commit, its contract receipts and its brief. Use when a
+    worker reports done, before the task closes. To record a failure or block instead, use
+    task_mark.
+    """
     async with open_tool_state(ctx) as state:
         work = create_task_work(state)
         seen = prepare_verification(work, request.slug, request.task_id)
@@ -56,26 +62,35 @@ async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> TaskView:
 
 
 async def task_mark(request: TaskMarkRequest, ctx: ToolContext) -> TaskView:
-    """Mark a task failed, blocked or superseded, with the reason."""
+    """Mark a task failed, blocked or superseded, with the reason. Use when a worker reports it
+    cannot finish or the plan changed. To close a task as done, use task_verify.
+    """
     async with open_tool_state(ctx) as state:
         return mark_task(create_task_work(state), request)
 
 
 async def task_show(request: TaskRequest, ctx: ToolContext) -> TaskView:
-    """Show the tasks of a ticket with their attempts."""
+    """Show the tasks of a ticket with their attempts. Use to see each task's status and history.
+    To learn whether the ticket can close, use task_ready.
+    """
     async with open_tool_state(ctx) as state:
         return show_tasks(create_task_work(state), request.slug)
 
 
 async def task_ready(request: TaskRequest, ctx: ToolContext) -> TaskView:
-    """Say whether the tasks of a ticket are ready to close at the current HEAD."""
+    """Say whether the tasks of a ticket are ready to close at the current HEAD. Use before
+    close_check or when finishing. For the commands themselves, use contract_status.
+    """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         return check_ready(create_task_work(state), request.slug, head)
 
 
 async def failed_fix_record(request: FailedFixRequest, ctx: ToolContext) -> TaskView:
-    """Record a fix that failed, with the hypothesis it tested."""
+    """Record a fix that failed, with the hypothesis it tested. Use when a verification still fails
+    after an attempted fix, before trying the next one. Refused once the task's three attempts
+    are spent.
+    """
     async with open_tool_state(ctx) as state:
         return record_failed_fix(create_task_work(state), request)
 

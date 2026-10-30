@@ -81,7 +81,10 @@ def describe_unanswered(request: ContractApproveRequest) -> str:
 async def contract_approve(
     request: ContractApproveRequest, ctx: ToolContext, *, answers: ChoiceOutcome
 ) -> ContractView:
-    """Approve verification commands for a ticket; asks the user once when an approver is blank."""
+    """Approve verification commands for a ticket. Use when the plan fixes the commands that prove
+    each acceptance criterion, before work starts. Asks the user when the approver is blank.
+    Refused for ids already approved.
+    """
     form = answers_of(answers)
     if form is None:
         return ContractView(text=describe_unanswered(request), passing=False)
@@ -97,7 +100,9 @@ async def contract_approve(
 
 
 async def contract_status(request: ContractRequest, ctx: ToolContext) -> ContractView:
-    """Show each approved command of a ticket with its latest receipt against the current HEAD."""
+    """Show each approved command of a ticket with its latest receipt against the current HEAD. Use
+    to see which verifications still need a run. For task readiness overall, use task_ready.
+    """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         return show_contract_status(create_work(state, TaskWork), request.slug, head)

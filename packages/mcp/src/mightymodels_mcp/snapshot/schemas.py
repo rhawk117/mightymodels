@@ -7,7 +7,10 @@ from pydantic import Field
 
 from mightymodels_mcp.server.requests import RequestModel, SlugField
 
-type LimitField = Annotated[int, Field(ge=1, le=MAX_LIMIT)]
+type LimitField = Annotated[
+    int,
+    Field(ge=1, le=MAX_LIMIT, description='How many entries each list in the snapshot keeps.'),
+]
 
 
 class SnapshotTakeRequest(RequestModel):

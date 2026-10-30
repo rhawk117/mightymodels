@@ -10,7 +10,7 @@ from typing import Annotated, Any, override
 from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase
 from mightymodels_core.git.revisions import revision_error
 from mightymodels_core.primitives import Slug, parse_slug
-from pydantic import AfterValidator, ConfigDict, StringConstraints
+from pydantic import AfterValidator, ConfigDict, Field, StringConstraints
 
 REQUEST_ARGUMENT = 'request'
 USER_APPROVER = 'user'
@@ -38,7 +38,11 @@ def validate_slug(raw: str) -> Slug:
     raise ValueError(message) from parsed
 
 
-type SlugField = Annotated[Slug, AfterValidator(validate_slug)]
+type SlugField = Annotated[
+    Slug,
+    AfterValidator(validate_slug),
+    Field(description='The ticket slug, the name of its directory under .mightymodels.'),
+]
 
 
 def validate_revision(raw: str) -> str:
@@ -51,5 +55,8 @@ def validate_revision(raw: str) -> str:
 
 
 type RevisionField = Annotated[
-    str, StringConstraints(max_length=NAME_LIMIT), AfterValidator(validate_revision)
+    str,
+    StringConstraints(max_length=NAME_LIMIT),
+    AfterValidator(validate_revision),
+    Field(description='A git revision: a branch, tag or commit hash.'),
 ]

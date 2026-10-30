@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from mightymodels_mcp.forms.choices import Choice, ChoiceOutcome, ChoiceQuestion
 from mightymodels_mcp.forms.dispose import REASON_CHOICES, ReasonsForm, create_dispose_pages
 from mightymodels_mcp.forms.needs_input import needs_input_text
-from mightymodels_mcp.server.annotations import WRITES
+from mightymodels_mcp.server.annotations import REPLACES
 from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 from mightymodels_mcp.server.requests import USER_APPROVER
@@ -192,7 +192,9 @@ def create_dispositions(run_id: RunId, decided: DecidedBy) -> DispositionsToReco
 async def review_dispose(
     request: ReviewDisposeRequest, ctx: ToolContext, *, chosen: AcceptedElicitation[DisposeChoice]
 ) -> ReviewView:
-    """Decide a run's findings; asks a page of them to fix, then why for each one left unchecked."""
+    """Decide what to do with a run's findings; asks which to fix, then why for each left unchecked.
+    Use after review_gate shows undecided findings. Overwrites a prior decision.
+    """
     choice = chosen.data
     if choice.unanswered is not None:
         text = needs_input_text((unanswered_question(choice.unanswered),))
@@ -204,7 +206,9 @@ async def review_dispose(
 
 
 async def review_resolve(request: ReviewResolveRequest, ctx: ToolContext) -> ReviewView:
-    """Record how a finding chosen for fix turned out: fixed at a commit, failed or blocked."""
+    """Record how a finding chosen for fix turned out: fixed at a commit, failed or blocked. Use
+    after a fix is attempted. To decide a finding first, use review_dispose.
+    """
     resolve = ResolveRequest(
         finding_key=request.finding,
         result=request.result,
@@ -219,7 +223,7 @@ DECISION_TOOLS = (
     ToolSpec(
         name='review_dispose',
         title="Decide a review's findings",
-        annotations=WRITES,
+        annotations=REPLACES,
         icon='review',
         request_model=ReviewDisposeRequest,
         result_model=ReviewView,
@@ -229,7 +233,7 @@ DECISION_TOOLS = (
     ToolSpec(
         name='review_resolve',
         title='Resolve a review finding',
-        annotations=WRITES,
+        annotations=REPLACES,
         icon='review',
         request_model=ReviewResolveRequest,
         result_model=ReviewView,

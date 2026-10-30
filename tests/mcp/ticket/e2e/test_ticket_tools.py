@@ -33,6 +33,16 @@ WRITES = ToolAnnotations(
 READS = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
+REPLACES = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False
+)
+REFRESHES = ToolAnnotations(
+    read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False
+)
+
+
+def without_stamp(section: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in section.items() if key != 'validated_at'}
 
 
 def unanswered_action_cases() -> pytest.MarkDecorator:
@@ -46,9 +56,9 @@ def unanswered_action_cases() -> pytest.MarkDecorator:
 def listed_tool_cases() -> pytest.MarkDecorator:
     tools: list[ParameterSet] = [
         pytest.param('ticket_write', 'Write a ticket', WRITES, id='write'),
-        pytest.param('ticket_validate', 'Validate a ticket', WRITES, id='validate'),
+        pytest.param('ticket_validate', 'Validate a ticket', REFRESHES, id='validate'),
         pytest.param('ticket_show', 'Show a ticket', READS, id='show'),
-        pytest.param('ticket_update_context', "Update a ticket's context", WRITES, id='context'),
+        pytest.param('ticket_update_context', "Update a ticket's context", REPLACES, id='context'),
     ]
     return pytest.mark.parametrize(('name', 'title', 'annotations'), tools)
 
@@ -189,6 +199,19 @@ class TestStagedTicket:
 
         assert view['text'] == STAGED_TEXT
         assert view['staged']['slug'] == SLUG
+
+    async def test_update_context_twice_with_the_same_lines_gives_the_same_ticket(
+        self, staged: TicketHarness
+    ) -> None:
+        arguments = {'slug': SLUG, 'context': ['a new line']}
+        first = view_of(await staged.call('ticket_update_context', arguments))
+
+        second = view_of(await staged.call('ticket_update_context', arguments))
+
+        assert without_stamp(second['staged']['section']) == without_stamp(
+            first['staged']['section']
+        )
+        assert second['text'] == first['text']
 
     async def test_update_context_restages_with_the_new_lines(self, staged: TicketHarness) -> None:
         arguments = {'slug': SLUG, 'context': ['a new line']}

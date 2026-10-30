@@ -48,6 +48,7 @@ from pydantic import BaseModel
 from .call_log import CallRecord
 from .dependencies import ServerDependencies
 from .icons import load_icon
+from .published_schema import inline_refs
 from .requests import REQUEST_ARGUMENT, RequestModel
 
 if TYPE_CHECKING:
@@ -264,7 +265,7 @@ def create_tool[R: RequestModel, V: BaseModel, **P](definition: ToolDefinition[R
         name=definition.name,
         title=definition.title,
         description=definition.description,
-        parameters=request_model.model_json_schema(by_alias=True),
+        parameters=inline_refs(request_model.model_json_schema(by_alias=True)),
         fn_metadata=FuncMetadata(arg_model=request_model, output_model=definition.result_model),
         is_async=True,
         context_kwarg=CONTEXT_ARGUMENT,

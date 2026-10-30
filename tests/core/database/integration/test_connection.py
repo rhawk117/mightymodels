@@ -1,3 +1,4 @@
+import sqlite3
 from contextlib import closing
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -99,6 +100,28 @@ class TestOpen:
         with pytest.raises(SchemaVersionError) as refused:
             open_database(database_path, spec, ConnectionOptions())
         assert (refused.value.found, refused.value.expected) == (FIXTURE_VERSION, 8)
+
+    def test_unstamped_file_with_tables_refuses_to_open_and_is_left_as_it_was(
+        self, database_path: Path, database_spec: DatabaseSpec
+    ) -> None:
+        with closing(sqlite3.connect(database_path)) as connection:
+            connection.execute('CREATE TABLE old (id INTEGER PRIMARY KEY)')
+        before = database_path.read_bytes()
+        with pytest.raises(SchemaVersionError) as refused:
+            open_database(database_path, database_spec, ConnectionOptions())
+        assert refused.value.found == 0
+        assert database_path.read_bytes() == before
+
+    def test_foreign_version_refuses_before_the_journal_mode_changes(
+        self, database_path: Path, database_spec: DatabaseSpec
+    ) -> None:
+        with closing(sqlite3.connect(database_path)) as connection:
+            connection.execute('PRAGMA user_version = 99')
+        before = database_path.read_bytes()
+        with pytest.raises(SchemaVersionError) as refused:
+            open_database(database_path, database_spec, ConnectionOptions())
+        assert refused.value.found == 99
+        assert database_path.read_bytes() == before
 
     def test_schema_without_a_version_refuses_to_open(
         self, database_path: Path, database_spec: DatabaseSpec, tmp_path: Path
