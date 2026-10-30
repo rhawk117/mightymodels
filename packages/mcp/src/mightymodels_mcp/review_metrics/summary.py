@@ -14,7 +14,7 @@ from mightymodels_mcp.review_metrics.components import (
     package_metrics,
     tarjan_sccs,
 )
-from mightymodels_mcp.review_metrics.shapes import (
+from mightymodels_mcp.review_metrics.domain import (
     DEFAULT_SUMMARY_OPTIONS,
     DEPTH_LIMIT,
     FILE_LOC_LIMIT,
@@ -33,7 +33,7 @@ from mightymodels_mcp.review_metrics.views import (
 )
 
 if TYPE_CHECKING:
-    from mightymodels_mcp.review_metrics.shapes import (
+    from mightymodels_mcp.review_metrics.domain import (
         FileMetric,
         FunctionMetric,
         Graph,

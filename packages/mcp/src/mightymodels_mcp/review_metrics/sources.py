@@ -14,7 +14,7 @@ from mightymodels_mcp.review_metrics.script_source import analyze_js
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mightymodels_mcp.review_metrics.shapes import FileMetric
+    from mightymodels_mcp.review_metrics.domain import FileMetric
 
 LOGGER = logging.getLogger(__name__)
 

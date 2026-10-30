@@ -6,14 +6,14 @@ The imports are reliable, the function numbers are approximate and each one says
 import re
 from typing import TYPE_CHECKING
 
+from mightymodels_mcp.review_metrics.domain import FileMetric, FunctionMetric
 from mightymodels_mcp.review_metrics.files import count_loc, is_test_path
-from mightymodels_mcp.review_metrics.shapes import FileMetric, FunctionMetric
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from mightymodels_mcp.review_metrics.shapes import Language
+    from mightymodels_mcp.review_metrics.domain import Language
 
 MIN_CAPTURE_GROUPS = 2
 OPENING_BRACKETS = '([{<'

@@ -13,7 +13,7 @@ from mightymodels_core.units_of_work import ReviewWork
 from mightymodels_mcp.server.state import create_work
 
 from .components import build_module_graph
-from .shapes import SummaryOptions
+from .domain import SummaryOptions
 from .sources import collect_metrics
 from .summary import render_summary, summarize
 

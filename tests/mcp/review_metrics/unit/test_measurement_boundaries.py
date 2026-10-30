@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_mcp.review_metrics.components import package_of
+from mightymodels_mcp.review_metrics.domain import FileMetric, FunctionMetric
 from mightymodels_mcp.review_metrics.files import is_test_path
 from mightymodels_mcp.review_metrics.python_source import analyze_python
 from mightymodels_mcp.review_metrics.script_source import js_param_stats
-from mightymodels_mcp.review_metrics.shapes import FileMetric, FunctionMetric
 from mightymodels_mcp.review_metrics.sources import read_source
 from mightymodels_mcp.review_metrics.summary import LOC_RULE, PARAMS_RULE, violation_group
 

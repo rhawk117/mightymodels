@@ -7,7 +7,7 @@ from mightymodels_mcp.review_metrics.components import (
     build_module_graph,
     module_lookup,
 )
-from mightymodels_mcp.review_metrics.shapes import SummaryOptions
+from mightymodels_mcp.review_metrics.domain import SummaryOptions
 from mightymodels_mcp.review_metrics.sources import collect_metrics
 from mightymodels_mcp.review_metrics.summary import summarize
 

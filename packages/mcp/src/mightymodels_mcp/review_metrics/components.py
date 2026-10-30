@@ -20,7 +20,7 @@ from mightymodels_mcp.review_metrics.views import PackageMetric, PackageReport
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from mightymodels_mcp.review_metrics.shapes import (
+    from mightymodels_mcp.review_metrics.domain import (
         FileMetric,
         Graph,
     )

@@ -6,7 +6,7 @@ import pytest
 from mightymodels_mcp.review_metrics.components import tarjan_sccs
 
 if TYPE_CHECKING:
-    from mightymodels_mcp.review_metrics.shapes import Graph
+    from mightymodels_mcp.review_metrics.domain import Graph
 
 
 class TestTarjanSccs:

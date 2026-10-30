@@ -4,8 +4,8 @@ import ast
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from mightymodels_mcp.review_metrics.domain import FileMetric, FunctionMetric
 from mightymodels_mcp.review_metrics.files import count_loc, is_test_path
-from mightymodels_mcp.review_metrics.shapes import FileMetric, FunctionMetric
 
 if TYPE_CHECKING:
     from pathlib import Path
