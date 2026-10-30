@@ -13,6 +13,7 @@ from mightymodels_mcp.investigation.tools import register_investigation_tools
 from mightymodels_mcp.journal.tools import register_journal_tools
 from mightymodels_mcp.review.decision_tools import register_decision_tools
 from mightymodels_mcp.review.tools import register_review_tools
+from mightymodels_mcp.review_metrics.tools import register_review_metrics_tools
 from mightymodels_mcp.server.app import create_server
 from mightymodels_mcp.server.call_log import (
     InvalidLogLevelError,
@@ -39,6 +40,7 @@ REGISTRARS = (
     register_contract_tools,
     register_review_tools,
     register_decision_tools,
+    register_review_metrics_tools,
     register_snapshot_tools,
     register_investigation_tools,
     register_journal_tools,

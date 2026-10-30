@@ -6,7 +6,7 @@ The old server key was `state`, so its tools were named `mcp__plugin_mightymodel
 
 ## Tool map
 
-One row per registered tool, 32 in all. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
+One row per registered tool, 33 in all. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
 
 | Old tool | Old action | New tool | Input fields | Title | Read-only | Destructive | Idempotent | Open world |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -32,6 +32,7 @@ One row per registered tool, 32 in all. The old action of `snapshot` is `none`, 
 | `review` | `list` | `review_list` | none | List the reviews | true | false | true | false |
 | `review` | `dispose` | `review_dispose` | `run_id`, `decisions`, `by` | Decide a review's findings | false | false | false | false |
 | `review` | `resolve` | `review_resolve` | `run_id`, `finding`, `result`, `commit`, `reason` | Resolve a review finding | false | false | false | false |
+| `review` | `metrics` | `review_metrics` | `run_id`, `package_depth`, `max_listed` | Measure the code for a review | false | false | false | false |
 | `snapshot` | `none` | `snapshot_take` | `slug`, `limit` | Take a snapshot | true | false | true | false |
 | `investigation` | `start` | `investigation_start` | `target`, `kind` | Start an investigation | false | false | false | false |
 | `investigation` | `add` | `investigation_add` | `investigation_id`, `round`, `entries` | Add to an investigation's ledger | false | false | false | false |
