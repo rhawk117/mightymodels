@@ -11,7 +11,7 @@ from anyio import to_thread
 from mightymodels_mcp.server.annotations import READS
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
-from .history import Report, create_git_source, load_history
+from .history import create_git_source, load_history
 from .reports import (
     ChurnSignal,
     CouplingSignal,
@@ -20,7 +20,7 @@ from .reports import (
     code_churn,
     code_hotspots,
 )
-from .schemas import ChangeCouplingRequest, CodeChurnRequest, CodeHotspotsRequest
+from .schemas import ChangeCouplingRequest, CodeChurnRequest, CodeHotspotsRequest, Report
 from .use_cases import options_of, root_of
 
 if TYPE_CHECKING:

@@ -8,13 +8,19 @@ or does not answer, and a git that exits non-zero each surface as a `SignalsErro
 
 import shutil
 from dataclasses import dataclass, replace
-from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from mightymodels_core.git import GIT_TIMEOUT_SECONDS
-from mightymodels_core.primitives import StateError
 from mightymodels_core.process import FailedRun, get_process_runner
-from pydantic import BaseModel, ConfigDict
+
+from .errors import (
+    GitFailedError,
+    GitMissingError,
+    NoRepositoryError,
+    TargetNotUnicodeError,
+    TargetOutsideError,
+)
+from .schemas import Report, ScannedHistory
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -22,44 +28,10 @@ if TYPE_CHECKING:
     from mightymodels_core.process import ProcessRunner
 
     from .options import SignalsOptions
+    from .schemas import Analysis
 
 NUMSTAT_FIELDS = 3
 RECORD = '\x1e'
-
-
-class Analysis(StrEnum):
-    CHURN = 'code-churn'
-    COUPLING = 'change-coupling'
-    HOTSPOTS = 'code-hotspots'
-
-
-class SignalsError(StateError):
-    pass
-
-
-class NoRepositoryError(SignalsError):
-    def __init__(self, *, cwd: Path) -> None:
-        super().__init__(f'{cwd} is not inside a git repository')
-
-
-class TargetOutsideError(SignalsError):
-    def __init__(self, *, target: str) -> None:
-        super().__init__(f'--target {target!r} is outside the repository')
-
-
-class TargetNotUnicodeError(SignalsError):
-    def __init__(self, *, path: str) -> None:
-        super().__init__(f'--target resolves to {path!r}, which is not valid Unicode')
-
-
-class GitMissingError(SignalsError):
-    def __init__(self) -> None:
-        super().__init__('git is not on PATH')
-
-
-class GitFailedError(SignalsError):
-    def __init__(self, *, detail: str) -> None:
-        super().__init__(f'git log failed: {detail}')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -85,26 +57,6 @@ class Window:
 class Commit:
     sha: str
     changes: dict[str, tuple[int, int]]
-
-
-class ScannedHistory(BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
-
-    since: str | None
-    baseline_ref: str | None
-    max_commits: int | None
-    commits_scanned: int
-    truncated: bool
-
-
-class Report[Signal](BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
-
-    analysis: Analysis
-    target: str
-    history: ScannedHistory
-    signals: list[Signal]
-    limitations: list[str]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

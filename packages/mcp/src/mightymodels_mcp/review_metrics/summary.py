@@ -124,6 +124,15 @@ def summarize(
     )
 
 
+def package_rows(report: SummaryReport) -> list[str]:
+    rows = [
+        f'{name}\t{pkg.fan_in_ca}\t{pkg.fan_out_ce}\t'
+        f'{pkg.instability_i}\t{pkg.abstractness_a}\t{pkg.distance_d}'
+        for name, pkg in sorted(report.component_metrics.packages.items())
+    ]
+    return ['', 'package\tCa\tCe\tI\tA\tD', *rows]
+
+
 def render_summary(report: SummaryReport) -> str:
     totals = report.totals
     violations = report.violations
@@ -141,12 +150,5 @@ def render_summary(report: SummaryReport) -> str:
         f'functions nested > {DEPTH_LIMIT}\t{violations.functions_nested_deeper_than_2.count}',
         f'files > {FILE_LOC_LIMIT} LOC\t{len(violations.files_over_500_loc)}',
         f'lines > {LINE_LIMIT} chars\t{violations.long_lines_over_120_chars}',
-        '',
-        'package\tCa\tCe\tI\tA\tD',
     ]
-    for name, pkg in sorted(report.component_metrics.packages.items()):
-        lines.append(
-            f'{name}\t{pkg.fan_in_ca}\t{pkg.fan_out_ce}\t'
-            f'{pkg.instability_i}\t{pkg.abstractness_a}\t{pkg.distance_d}'
-        )
-    return '\n'.join(lines)
+    return '\n'.join([*lines, *package_rows(report)])

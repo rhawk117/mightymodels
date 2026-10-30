@@ -121,6 +121,20 @@ def from_import_names(node: ast.ImportFrom, package_parts: list[str]) -> list[st
     return ['.'.join(filter(None, (base, name))) for name in names]
 
 
+def parsed_fields(tree: ast.Module, rel: Path) -> dict[str, object]:
+    classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+    return {
+        'classes': len(classes),
+        'abstract_classes': sum(1 for node in classes if class_is_abstract(node)),
+        'functions': tuple(
+            python_function(node, rel)
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ),
+        'imports': tuple(python_imports(tree, module_name_for(rel))),
+    }
+
+
 def analyze_python(rel: Path, text: str) -> FileMetric:
     loc, long_lines = count_loc(text)
     metric = FileMetric(
@@ -134,18 +148,7 @@ def analyze_python(rel: Path, text: str) -> FileMetric:
         tree = ast.parse(text)
     except SyntaxError:
         return metric
-    classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
-    return replace(
-        metric,
-        classes=len(classes),
-        abstract_classes=sum(1 for node in classes if class_is_abstract(node)),
-        functions=tuple(
-            python_function(node, rel)
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        ),
-        imports=tuple(python_imports(tree, module_name_for(rel))),
-    )
+    return replace(metric, **parsed_fields(tree, rel))
 
 
 def python_function(node: ast.FunctionDef | ast.AsyncFunctionDef, rel: Path) -> FunctionMetric:

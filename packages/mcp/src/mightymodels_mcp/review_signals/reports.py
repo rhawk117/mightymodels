@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 
-from .history import Analysis
+from .schemas import Analysis
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from .history import History, Report
+    from .history import History
     from .options import SignalsOptions
+    from .schemas import Report
 
 INDENT_WIDTH = 4
 TAB_WIDTH = 4
@@ -83,7 +84,22 @@ def coupling_order(pair: CouplingSignal) -> tuple[int, float, str]:
     return -pair.shared_commits, -pair.degree, pair.subject
 
 
-def change_coupling(history: History, options: SignalsOptions) -> Report[CouplingSignal]:
+def ranked_pairs(
+    shared: Counter[tuple[str, str]], revisions: Counter[str], min_shared: int
+) -> list[CouplingSignal]:
+    pairs = [
+        CouplingSignal(
+            subject=f'{left} <-> {right}',
+            shared_commits=together,
+            degree=round(together / min(revisions[left], revisions[right]), 2),
+        )
+        for (left, right), together in shared.items()
+        if together >= min_shared
+    ]
+    return sorted(pairs, key=coupling_order)
+
+
+def coupling_pairs(history: History, options: SignalsOptions) -> tuple[list[CouplingSignal], int]:
     revisions: Counter[str] = Counter()
     shared: Counter[tuple[str, str]] = Counter()
     skipped = 0
@@ -94,16 +110,11 @@ def change_coupling(history: History, options: SignalsOptions) -> Report[Couplin
             skipped += 1
             continue
         shared.update(combinations(paths, 2))
-    pairs = [
-        CouplingSignal(
-            subject=f'{left} <-> {right}',
-            shared_commits=together,
-            degree=round(together / min(revisions[left], revisions[right]), 2),
-        )
-        for (left, right), together in shared.items()
-        if together >= options.min_shared
-    ]
-    pairs.sort(key=coupling_order)
+    pairs = ranked_pairs(shared, revisions, options.min_shared)
+    return pairs, skipped
+
+
+def coupling_limitations(history: History, options: SignalsOptions, skipped: int) -> list[str]:
     limitations = history.base_limitations()
     limitations.append('degree is shared commits divided by the less-changed file')
     if skipped:
@@ -111,6 +122,12 @@ def change_coupling(history: History, options: SignalsOptions) -> Report[Couplin
             f'{skipped} commits touching more than {options.max_changeset} files '
             'were left out of pairing'
         )
+    return limitations
+
+
+def change_coupling(history: History, options: SignalsOptions) -> Report[CouplingSignal]:
+    pairs, skipped = coupling_pairs(history, options)
+    limitations = coupling_limitations(history, options, skipped)
     return history.report(Analysis.COUPLING, pairs[: options.limit], limitations)
 
 
@@ -150,22 +167,24 @@ def hotspot_order(signal: HotspotSignal) -> tuple[int, str]:
     return -signal.hotspot, signal.subject
 
 
+def hotspot_signal(path: str, churn: Churn, root: Path) -> HotspotSignal | None:
+    shape = shape_of(root.joinpath(path))
+    if shape is None:
+        return None
+    return HotspotSignal(
+        subject=path,
+        commits=churn.commits,
+        loc=shape.loc,
+        indentation=shape.indentation,
+        hotspot=churn.commits * shape.indentation,
+    )
+
+
 def code_hotspots(history: History, options: SignalsOptions) -> Report[HotspotSignal]:
-    signals: list[HotspotSignal] = []
-    for path, churn in churn_by_file(history).items():
-        shape = shape_of(history.root.joinpath(path))
-        if shape is None:
-            continue
-        signals.append(
-            HotspotSignal(
-                subject=path,
-                commits=churn.commits,
-                loc=shape.loc,
-                indentation=shape.indentation,
-                hotspot=churn.commits * shape.indentation,
-            )
-        )
-    signals.sort(key=hotspot_order)
+    measured = (
+        hotspot_signal(path, churn, history.root) for path, churn in churn_by_file(history).items()
+    )
+    signals = sorted((signal for signal in measured if signal is not None), key=hotspot_order)
     limitations = history.base_limitations()
     limitations.extend([
         (

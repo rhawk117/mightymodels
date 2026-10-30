@@ -7,17 +7,16 @@ from typing import TYPE_CHECKING, Self
 import pytest
 from mightymodels_core.git import GIT_TIMEOUT_SECONDS
 from mightymodels_core.process import CompletedRun, FailedRun
-from mightymodels_mcp.review_signals.history import (
-    Analysis,
+from mightymodels_mcp.review_signals.errors import (
     GitFailedError,
     GitMissingError,
-    GitSource,
     SignalsError,
     TargetNotUnicodeError,
     TargetOutsideError,
-    load_history,
 )
+from mightymodels_mcp.review_signals.history import GitSource, load_history
 from mightymodels_mcp.review_signals.options import SignalsOptions
+from mightymodels_mcp.review_signals.schemas import Analysis
 
 from tests.core.git.fakes import ScriptedRunner
 

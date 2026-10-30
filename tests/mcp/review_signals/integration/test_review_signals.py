@@ -6,13 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_mcp.review_signals.history import (
-    Analysis,
-    NoRepositoryError,
-    TargetOutsideError,
-    create_git_source,
-    load_history,
-)
+from mightymodels_mcp.review_signals.errors import NoRepositoryError, TargetOutsideError
+from mightymodels_mcp.review_signals.history import create_git_source, load_history
 from mightymodels_mcp.review_signals.options import SignalsOptions
 from mightymodels_mcp.review_signals.reports import (
     ChurnSignal,
@@ -22,13 +17,15 @@ from mightymodels_mcp.review_signals.reports import (
     code_churn,
     code_hotspots,
 )
+from mightymodels_mcp.review_signals.schemas import Analysis
 
 from tests.core.git.git_builders import run_git
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mightymodels_mcp.review_signals.history import History, Report
+    from mightymodels_mcp.review_signals.history import History
+    from mightymodels_mcp.review_signals.schemas import Report
 
 CAPPED = 2
 
