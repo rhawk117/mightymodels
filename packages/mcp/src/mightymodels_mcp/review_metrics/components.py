@@ -15,10 +15,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from mightymodels_mcp.review_metrics.files import JS_SUFFIXES, TS_SUFFIXES, module_name_for
-from mightymodels_mcp.review_metrics.shapes import (
-    PackageMetric,
-    PackageReport,
-)
+from mightymodels_mcp.review_metrics.views import PackageMetric, PackageReport
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

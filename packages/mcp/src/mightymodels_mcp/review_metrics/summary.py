@@ -21,6 +21,8 @@ from mightymodels_mcp.review_metrics.shapes import (
     FUNCTION_LOC_LIMIT,
     LINE_LIMIT,
     PARAM_LIMIT,
+)
+from mightymodels_mcp.review_metrics.views import (
     FileViolation,
     ModuleCycles,
     SummaryReport,

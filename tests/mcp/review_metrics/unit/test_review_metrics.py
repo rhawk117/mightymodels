@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from mightymodels_mcp.review_metrics.shapes import SummaryReport
+    from mightymodels_mcp.review_metrics.views import SummaryReport
 
 LONG = 'x = "' + 'a' * 130 + '"'
 CORE_PY = [
