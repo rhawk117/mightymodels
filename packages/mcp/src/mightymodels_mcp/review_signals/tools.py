@@ -22,7 +22,7 @@ from .reports import (
     code_hotspots,
 )
 from .schemas import ChangeCouplingRequest, CodeChurnRequest, CodeHotspotsRequest, Report
-from .use_cases import create_git_command, options_of
+from .use_cases import create_git_command
 
 if TYPE_CHECKING:
     from mightymodels_core.git import GitCommand
@@ -37,27 +37,24 @@ async def read_git(ctx: ToolContext) -> GitCommand:
 
 async def signals_code_churn(request: CodeChurnRequest, ctx: ToolContext) -> Report[ChurnSignal]:
     """Rank the files in a git history window by commits and lines changed."""
-    options = options_of(request)
-    history = await load_history(options, await read_git(ctx))
-    return await to_thread.run_sync(code_churn, history, options)
+    history = await load_history(request, await read_git(ctx))
+    return await to_thread.run_sync(code_churn, history, request)
 
 
 async def signals_change_coupling(
     request: ChangeCouplingRequest, ctx: ToolContext
 ) -> Report[CouplingSignal]:
     """Rank the file pairs that change together in a git history window."""
-    options = options_of(request)
-    history = await load_history(options, await read_git(ctx))
-    return await to_thread.run_sync(change_coupling, history, options)
+    history = await load_history(request, await read_git(ctx))
+    return await to_thread.run_sync(change_coupling, history, request)
 
 
 async def signals_code_hotspots(
     request: CodeHotspotsRequest, ctx: ToolContext
 ) -> Report[HotspotSignal]:
     """Rank the files that change often and are complex now."""
-    options = options_of(request)
-    history = await load_history(options, await read_git(ctx))
-    return await to_thread.run_sync(code_hotspots, history, options)
+    history = await load_history(request, await read_git(ctx))
+    return await to_thread.run_sync(code_hotspots, history, request)
 
 
 REVIEW_SIGNALS_TOOLS = (

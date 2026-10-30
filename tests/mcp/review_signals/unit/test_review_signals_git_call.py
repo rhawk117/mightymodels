@@ -15,8 +15,7 @@ from mightymodels_mcp.review_signals.errors import (
     TargetOutsideError,
 )
 from mightymodels_mcp.review_signals.history import load_history
-from mightymodels_mcp.review_signals.options import SignalsOptions
-from mightymodels_mcp.review_signals.schemas import Analysis
+from mightymodels_mcp.review_signals.schemas import Analysis, HistoryWindowRequest
 
 from tests.core.git.fakes import ScriptedRunner
 
@@ -56,7 +55,7 @@ class Checkout:
     def answering(self, outcome: RunOutcome) -> Self:
         return replace(self, runner=ScriptedRunner(reply=outcome))
 
-    def launch(self, options: SignalsOptions) -> Launched:
+    def launch(self, options: HistoryWindowRequest) -> Launched:
         git = GitCommand(root=self.root, executable=self.executable, processes=self.runner)
         refusal: SignalsError | None = None
         try:
@@ -118,7 +117,7 @@ class TestGitLogArgumentVector:
         target_fields: dict[str, object],
         target: list[str],
     ) -> None:
-        options = SignalsOptions.model_validate({**window_fields, **target_fields})
+        options = HistoryWindowRequest.model_validate({**window_fields, **target_fields})
 
         launched = checkout.launch(options)
 
@@ -155,12 +154,12 @@ class TestGitLogArgumentVector:
     def test_each_value_is_one_element_and_the_target_follows_the_separator(
         self, checkout: Checkout, fields: dict[str, object], values: list[str]
     ) -> None:
-        launched = checkout.launch(SignalsOptions.model_validate(fields))
+        launched = checkout.launch(HistoryWindowRequest.model_validate(fields))
 
         assert launched.vectors == [[*checkout.log, *values]]
 
     def test_git_runs_once_in_the_checkout_under_the_git_timeout(self, checkout: Checkout) -> None:
-        checkout.launch(SignalsOptions())
+        checkout.launch(HistoryWindowRequest())
 
         assert [(run.timeout, run.argv[2]) for run in checkout.runner.runs] == [
             (GIT_TIMEOUT_SECONDS, str(checkout.root))
@@ -186,7 +185,7 @@ class TestTargetThatIsNotUnicode:
         ],
     )
     def test_it_is_rejected_before_git_runs(self, linked: Checkout, target: str) -> None:
-        launched = linked.launch(SignalsOptions(target=target))
+        launched = linked.launch(HistoryWindowRequest(target=target))
 
         assert isinstance(launched.refusal, TargetNotUnicodeError)
         assert (str(launched.refusal), launched.vectors) == (self.REASON, [])
@@ -197,7 +196,7 @@ class TestRefusedTargets:
     def test_a_target_outside_the_repository_is_rejected_before_git_runs(
         self, checkout: Checkout, target: str
     ) -> None:
-        launched = checkout.launch(SignalsOptions(target=target))
+        launched = checkout.launch(HistoryWindowRequest(target=target))
 
         assert isinstance(launched.refusal, TargetOutsideError)
         assert (str(launched.refusal), launched.vectors) == (
@@ -206,7 +205,7 @@ class TestRefusedTargets:
         )
 
     def test_a_pathspec_shaped_target_is_passed_as_a_literal_path(self, checkout: Checkout) -> None:
-        launched = checkout.launch(SignalsOptions(target=':(exclude)ok.py'))
+        launched = checkout.launch(HistoryWindowRequest(target=':(exclude)ok.py'))
 
         assert launched.vectors == [
             [*checkout.log, '--max-count=500', 'HEAD', '--', ':(exclude)ok.py'],
@@ -216,7 +215,7 @@ class TestRefusedTargets:
     def test_a_target_holding_a_nul_byte_is_rejected_before_git_runs(
         self, checkout: Checkout
     ) -> None:
-        launched = checkout.launch(SignalsOptions(target='a\0b'))
+        launched = checkout.launch(HistoryWindowRequest(target='a\0b'))
 
         assert isinstance(launched.refusal, TargetOutsideError)
         assert launched.vectors == []
@@ -261,7 +260,7 @@ class TestGitFailures:
     def test_a_git_that_fails_is_rejected_with_its_reason(
         self, checkout: Checkout, outcome: RunOutcome, reason: str
     ) -> None:
-        launched = checkout.answering(outcome).launch(SignalsOptions())
+        launched = checkout.answering(outcome).launch(HistoryWindowRequest())
 
         assert isinstance(launched.refusal, GitFailedError)
         assert str(launched.refusal) == f'git log failed: {reason}'
@@ -269,7 +268,7 @@ class TestGitFailures:
     def test_a_missing_git_executable_is_rejected_before_anything_runs(
         self, checkout: Checkout
     ) -> None:
-        launched = replace(checkout, executable=None).launch(SignalsOptions())
+        launched = replace(checkout, executable=None).launch(HistoryWindowRequest())
 
         assert isinstance(launched.refusal, GitMissingError)
         assert (str(launched.refusal), launched.vectors) == ('git is not on PATH', [])

@@ -9,8 +9,8 @@ import pytest
 from mightymodels_core.git import GitCommand
 from mightymodels_core.process import SubprocessRunner
 from mightymodels_mcp.review_signals.history import load_history
-from mightymodels_mcp.review_signals.options import SignalsOptions
 from mightymodels_mcp.review_signals.reports import code_churn
+from mightymodels_mcp.review_signals.schemas import HistoryWindowRequest
 
 from tests.core.git.git_builders import run_git
 
@@ -29,7 +29,7 @@ def test_churn_lists_a_non_ascii_file_under_its_exact_name(tmp_path: Path) -> No
     tmp_path.joinpath(NAME).write_text('a\n', encoding='utf-8')
     asyncio.run(run_git(tmp_path, 'add', NAME))
     asyncio.run(run_git(tmp_path, 'commit', '-q', '-m', 'add'))
-    options = SignalsOptions()
+    options = HistoryWindowRequest()
 
     history = asyncio.run(
         load_history(
@@ -51,7 +51,7 @@ def commit_names(root: Path, names: list[bytes]) -> None:
 @pytest.mark.usefixtures('clean_git_environment')
 def test_churn_lists_a_file_name_holding_a_double_quote(tmp_path: Path) -> None:
     commit_names(tmp_path, [b'a"b.py', b'tab\tname.py'])
-    options = SignalsOptions()
+    options = HistoryWindowRequest()
 
     history = asyncio.run(
         load_history(
@@ -69,7 +69,7 @@ def test_churn_lists_a_file_name_holding_a_double_quote(tmp_path: Path) -> None:
 @pytest.mark.usefixtures('clean_git_environment')
 def test_churn_succeeds_and_notes_a_file_name_that_is_not_utf8(tmp_path: Path) -> None:
     commit_names(tmp_path, [b'bad\xff.py', b'ok.py'])
-    options = SignalsOptions()
+    options = HistoryWindowRequest()
 
     history = asyncio.run(
         load_history(
@@ -87,7 +87,7 @@ def test_churn_succeeds_and_notes_a_file_name_that_is_not_utf8(tmp_path: Path) -
 @pytest.mark.usefixtures('clean_git_environment')
 def test_a_pathspec_magic_target_scans_no_commits(tmp_path: Path) -> None:
     commit_names(tmp_path, [b'ok.py'])
-    options = SignalsOptions(target=':(exclude)ok.py')
+    options = HistoryWindowRequest(target=':(exclude)ok.py')
 
     history = asyncio.run(
         load_history(

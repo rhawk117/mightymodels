@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .history import History
-    from .options import SignalsOptions
-    from .schemas import Report
+    from .schemas import ChangeCouplingRequest, HistoryWindowRequest, Report
 
 INDENT_WIDTH = 4
 TAB_WIDTH = 4
@@ -56,7 +55,7 @@ class ChurnSignal(BaseModel):
     lines_deleted: int
 
 
-def code_churn(history: History, options: SignalsOptions) -> Report[ChurnSignal]:
+def code_churn(history: History, options: HistoryWindowRequest) -> Report[ChurnSignal]:
     ranked = sorted(churn_by_file(history).items(), key=churn_order)
     signals = [
         ChurnSignal(
@@ -99,7 +98,9 @@ def ranked_pairs(
     return sorted(pairs, key=coupling_order)
 
 
-def coupling_pairs(history: History, options: SignalsOptions) -> tuple[list[CouplingSignal], int]:
+def coupling_pairs(
+    history: History, options: ChangeCouplingRequest
+) -> tuple[list[CouplingSignal], int]:
     revisions: Counter[str] = Counter()
     shared: Counter[tuple[str, str]] = Counter()
     skipped = 0
@@ -114,7 +115,9 @@ def coupling_pairs(history: History, options: SignalsOptions) -> tuple[list[Coup
     return pairs, skipped
 
 
-def coupling_limitations(history: History, options: SignalsOptions, skipped: int) -> list[str]:
+def coupling_limitations(
+    history: History, options: ChangeCouplingRequest, skipped: int
+) -> list[str]:
     limitations = history.base_limitations()
     limitations.append('degree is shared commits divided by the less-changed file')
     if skipped:
@@ -125,7 +128,7 @@ def coupling_limitations(history: History, options: SignalsOptions, skipped: int
     return limitations
 
 
-def change_coupling(history: History, options: SignalsOptions) -> Report[CouplingSignal]:
+def change_coupling(history: History, options: ChangeCouplingRequest) -> Report[CouplingSignal]:
     pairs, skipped = coupling_pairs(history, options)
     limitations = coupling_limitations(history, options, skipped)
     return history.report(Analysis.COUPLING, pairs[: options.limit], limitations)
@@ -185,7 +188,7 @@ def hotspot_signal(path: str, churn: Churn, root: Path) -> HotspotSignal | None:
     )
 
 
-def code_hotspots(history: History, options: SignalsOptions) -> Report[HotspotSignal]:
+def code_hotspots(history: History, options: HistoryWindowRequest) -> Report[HotspotSignal]:
     measured = (
         hotspot_signal(path, churn, history.root) for path, churn in churn_by_file(history).items()
     )

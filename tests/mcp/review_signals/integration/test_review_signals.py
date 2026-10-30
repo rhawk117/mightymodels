@@ -10,7 +10,6 @@ from mightymodels_core.git import GitCommand
 from mightymodels_core.process import SubprocessRunner
 from mightymodels_mcp.review_signals.errors import GitFailedError, TargetOutsideError
 from mightymodels_mcp.review_signals.history import load_history
-from mightymodels_mcp.review_signals.options import SignalsOptions
 from mightymodels_mcp.review_signals.reports import (
     ChurnSignal,
     CouplingSignal,
@@ -19,7 +18,13 @@ from mightymodels_mcp.review_signals.reports import (
     code_churn,
     code_hotspots,
 )
-from mightymodels_mcp.review_signals.schemas import Analysis
+from mightymodels_mcp.review_signals.schemas import (
+    Analysis,
+    ChangeCouplingRequest,
+    CodeChurnRequest,
+    CodeHotspotsRequest,
+    HistoryWindowRequest,
+)
 
 from tests.core.git.git_builders import run_git
 
@@ -48,23 +53,23 @@ class Repo:
         self.git('commit', '-q', '-m', 'change')
         return self.git('rev-parse', 'HEAD')
 
-    def load(self, options: SignalsOptions) -> History:
+    def load(self, options: HistoryWindowRequest) -> History:
         return asyncio.run(
             load_history(
                 options, GitCommand(root=self.root, executable='git', processes=SubprocessRunner())
             )
         )
 
-    def churn(self, options: SignalsOptions | None = None) -> Report[ChurnSignal]:
-        options = options or SignalsOptions()
+    def churn(self, options: CodeChurnRequest | None = None) -> Report[ChurnSignal]:
+        options = options or CodeChurnRequest()
         return code_churn(self.load(options), options)
 
-    def coupling(self, options: SignalsOptions | None = None) -> Report[CouplingSignal]:
-        options = options or SignalsOptions()
+    def coupling(self, options: ChangeCouplingRequest | None = None) -> Report[CouplingSignal]:
+        options = options or ChangeCouplingRequest()
         return change_coupling(self.load(options), options)
 
-    def hotspots(self, options: SignalsOptions | None = None) -> Report[HotspotSignal]:
-        options = options or SignalsOptions()
+    def hotspots(self, options: CodeHotspotsRequest | None = None) -> Report[HotspotSignal]:
+        options = options or CodeHotspotsRequest()
         return code_hotspots(self.load(options), options)
 
 
@@ -105,19 +110,19 @@ class TestCodeChurn:
 
     def test_target_limits_the_files_counted(self, repo: Repo) -> None:
         repo.commit({'src/queue.py': 'a\n', 'docs/readme.md': 'a\n'})
-        report = repo.churn(SignalsOptions(target='src'))
+        report = repo.churn(CodeChurnRequest(target='src'))
         assert (report.target, subjects(report)) == ('src', ['src/queue.py'])
 
     def test_baseline_ref_counts_only_later_commits(self, repo: Repo) -> None:
         base = repo.commit({'old.py': 'a\n'})
         repo.commit({'new.py': 'a\n'})
-        report = repo.churn(SignalsOptions(baseline_ref=base))
+        report = repo.churn(CodeChurnRequest(baseline_ref=base))
         assert subjects(report) == ['new.py']
 
     def test_a_capped_window_says_it_was_truncated(self, repo: Repo) -> None:
         for text in ('a\n', 'b\n', 'c\n'):
             repo.commit({'queue.py': text})
-        report = repo.churn(SignalsOptions(max_commits=CAPPED))
+        report = repo.churn(CodeChurnRequest(max_commits=CAPPED))
         assert report.history.truncated is True
         assert report.signals[0].commits == CAPPED
         assert any('--all-history' in note for note in report.limitations)
@@ -125,7 +130,7 @@ class TestCodeChurn:
     def test_all_history_lifts_the_commit_cap(self, repo: Repo) -> None:
         for text in ('a\n', 'b\n', 'c\n'):
             repo.commit({'queue.py': text})
-        report = repo.churn(SignalsOptions(max_commits=CAPPED, all_history=True))
+        report = repo.churn(CodeChurnRequest(max_commits=CAPPED, all_history=True))
         assert (report.history.max_commits, report.history.truncated) == (None, False)
 
 
@@ -143,7 +148,7 @@ class TestChangeCoupling:
     def test_bulk_commits_do_not_create_coupling(self, repo: Repo) -> None:
         for text in ('a\n', 'b\n', 'c\n'):
             repo.commit({'queue.py': text, 'retry.py': text, 'other.py': text})
-        report = repo.coupling(SignalsOptions(max_changeset=2))
+        report = repo.coupling(ChangeCouplingRequest(max_changeset=2))
         assert report.signals == []
         assert any('3 commits touching more than 2' in note for note in report.limitations)
 
@@ -171,13 +176,13 @@ class TestRefusals:
     def test_a_target_outside_the_repository_is_refused(self, repo: Repo) -> None:
         repo.commit({'queue.py': 'a\n'})
         with pytest.raises(TargetOutsideError, match='outside the repository'):
-            repo.load(SignalsOptions(target='../..'))
+            repo.load(HistoryWindowRequest(target='../..'))
 
     def test_outside_a_repository_is_refused(self, tmp_path: Path) -> None:
         lone = Repo(root=tmp_path.joinpath('lone'))
         lone.root.mkdir()
         with pytest.raises(GitFailedError, match='git log failed'):
-            lone.load(SignalsOptions())
+            lone.load(HistoryWindowRequest())
 
 
 @pytest.mark.usefixtures('clean_git_environment')

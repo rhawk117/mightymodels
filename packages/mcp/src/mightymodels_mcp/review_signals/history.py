@@ -25,8 +25,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.git import GitCommand
 
-    from .options import SignalsOptions
-    from .schemas import Analysis
+    from .schemas import Analysis, HistoryWindowRequest
 
 NUMSTAT_FIELDS = 3
 OCTAL_DIGITS = 3
@@ -128,7 +127,7 @@ def checked_target(root: Path, target: str | None) -> str:
     return path
 
 
-def window_from(options: SignalsOptions) -> Window:
+def window_from(options: HistoryWindowRequest) -> Window:
     limit = None if options.all_history else options.max_commits
     return Window(since=options.since, baseline_ref=options.baseline_ref, max_commits=limit)
 
@@ -208,7 +207,7 @@ class Located:
     target: str
 
 
-def locate_target(root: Path, options: SignalsOptions) -> Located:
+def locate_target(root: Path, options: HistoryWindowRequest) -> Located:
     return Located(root=root, target=checked_target(root, options.target))
 
 
@@ -217,7 +216,7 @@ def history_from_output(located: Located, window: Window, stdout: str) -> Histor
     return History(root=located.root, target=located.target, window=window, commits=commits)
 
 
-async def load_history(options: SignalsOptions, command: GitCommand) -> History:
+async def load_history(options: HistoryWindowRequest, command: GitCommand) -> History:
     if command.executable is None:
         raise GitMissingError
 

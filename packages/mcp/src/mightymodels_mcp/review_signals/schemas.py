@@ -1,28 +1,28 @@
 """The review_signals requests and results: the history window, each analysis cut and the report.
 
-Every field reuses the constrained types of `SignalsOptions`, so a date or a revision that could
-pass for a git option is refused when the request is built. Each request holds only the fields
-its report reads.
+The date and the revision are held to a plain-value pattern and every count has to be at least
+one, so a value that could pass for a git option is refused when the request is built. Each
+request holds the history window plus only the fields its report reads.
 """
 
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from mightymodels_mcp.server.requests import RequestModel
 
-from .options import (
-    DEFAULT_LIMIT,
-    DEFAULT_MAX_CHANGESET,
-    DEFAULT_MAX_COMMITS,
-    DEFAULT_MIN_SHARED,
-    BaselineRef,
-    Count,
-    Since,
-)
+DEFAULT_MAX_COMMITS = 500
+DEFAULT_LIMIT = 25
+DEFAULT_MIN_SHARED = 3
+DEFAULT_MAX_CHANGESET = 50
+
+type Since = Annotated[str, StringConstraints(pattern=r'^[0-9A-Za-z][0-9A-Za-z .:+-]*$')]
+type BaselineRef = Annotated[str, StringConstraints(pattern=r'^[0-9A-Za-z][0-9A-Za-z._/-]*$')]
+type Count = Annotated[int, Field(ge=1)]
 
 
-class CodeChurnRequest(RequestModel):
+class HistoryWindowRequest(RequestModel):
     target: str | None = None
     since: Since | None = None
     baseline_ref: BaselineRef | None = None
@@ -31,11 +31,15 @@ class CodeChurnRequest(RequestModel):
     limit: Count = DEFAULT_LIMIT
 
 
-class CodeHotspotsRequest(CodeChurnRequest):
+class CodeChurnRequest(HistoryWindowRequest):
     pass
 
 
-class ChangeCouplingRequest(CodeChurnRequest):
+class CodeHotspotsRequest(HistoryWindowRequest):
+    pass
+
+
+class ChangeCouplingRequest(HistoryWindowRequest):
     min_shared: Count = DEFAULT_MIN_SHARED
     max_changeset: Count = DEFAULT_MAX_CHANGESET
 

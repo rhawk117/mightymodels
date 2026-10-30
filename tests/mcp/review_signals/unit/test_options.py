@@ -1,7 +1,7 @@
-"""The value checks of the review signals options model."""
+"""The value checks of the review signals request models."""
 
 import pytest
-from mightymodels_mcp.review_signals.options import SignalsOptions
+from mightymodels_mcp.review_signals.schemas import ChangeCouplingRequest
 from pydantic import ValidationError
 
 
@@ -17,7 +17,7 @@ class TestRefusedValues:
     )
     def test_a_value_that_is_not_plain_is_refused(self, fields: dict[str, str]) -> None:
         with pytest.raises(ValidationError, match='should match pattern'):
-            SignalsOptions.model_validate(fields)
+            ChangeCouplingRequest.model_validate(fields)
 
     @pytest.mark.parametrize(
         'fields',
@@ -30,7 +30,7 @@ class TestRefusedValues:
     )
     def test_a_count_below_one_is_refused(self, fields: dict[str, int]) -> None:
         with pytest.raises(ValidationError, match='greater than or equal to 1'):
-            SignalsOptions.model_validate(fields)
+            ChangeCouplingRequest.model_validate(fields)
 
 
 class TestAcceptedValues:
@@ -44,12 +44,12 @@ class TestAcceptedValues:
         ],
     )
     def test_a_plain_value_is_accepted(self, fields: dict[str, str]) -> None:
-        dumped = SignalsOptions.model_validate(fields).model_dump()
+        dumped = ChangeCouplingRequest.model_validate(fields).model_dump()
 
         assert {name: dumped[name] for name in fields} == fields
 
     def test_the_defaults_match_the_command_line(self) -> None:
-        options = SignalsOptions()
+        options = ChangeCouplingRequest()
 
         assert (options.max_commits, options.limit, options.min_shared, options.max_changeset) == (
             500,
