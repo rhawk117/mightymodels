@@ -6,7 +6,8 @@ whole report and `render_summary` prints its headline numbers and one row per pa
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from operator import attrgetter
+from typing import TYPE_CHECKING
 
 from mightymodels_mcp.review_metrics.components import package_metrics, tarjan_sccs
 from mightymodels_mcp.review_metrics.shapes import (
@@ -34,22 +35,6 @@ if TYPE_CHECKING:
     )
 
 
-def function_loc(function: FunctionMetric) -> int:
-    return function.loc
-
-
-def function_params(function: FunctionMetric) -> int:
-    return function.params
-
-
-def function_bool_params(function: FunctionMetric) -> int:
-    return function.bool_params
-
-
-def function_depth(function: FunctionMetric) -> int:
-    return function.max_depth
-
-
 def file_loc(metric: FileMetric) -> int:
     return metric.loc
 
@@ -67,26 +52,22 @@ def violation(function: FunctionMetric) -> Violation:
     )
 
 
-@runtime_checkable
-class Measure(Protocol):
-    def __call__(self, function: FunctionMetric) -> int: ...
-
-
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Rule:
-    measure: Measure
+    field: str
     limit: int
 
 
-LOC_RULE = Rule(measure=function_loc, limit=FUNCTION_LOC_LIMIT)
-PARAMS_RULE = Rule(measure=function_params, limit=PARAM_LIMIT)
-BOOL_PARAMS_RULE = Rule(measure=function_bool_params, limit=0)
-DEPTH_RULE = Rule(measure=function_depth, limit=DEPTH_LIMIT)
+LOC_RULE = Rule(field='loc', limit=FUNCTION_LOC_LIMIT)
+PARAMS_RULE = Rule(field='params', limit=PARAM_LIMIT)
+BOOL_PARAMS_RULE = Rule(field='bool_params', limit=0)
+DEPTH_RULE = Rule(field='max_depth', limit=DEPTH_LIMIT)
 
 
 def violation_group(functions: list[FunctionMetric], rule: Rule, cap: int) -> ViolationGroup:
-    hits = [function for function in functions if rule.measure(function) > rule.limit]
-    ranked = sorted(hits, key=rule.measure, reverse=True)[:cap]
+    measure = attrgetter(rule.field)
+    hits = [function for function in functions if measure(function) > rule.limit]
+    ranked = sorted(hits, key=measure, reverse=True)[:cap]
     return ViolationGroup(count=len(hits), worst=[violation(function) for function in ranked])
 
 

@@ -10,9 +10,11 @@ from mightymodels_mcp.review_metrics.files import count_loc, is_test_path
 from mightymodels_mcp.review_metrics.shapes import FileMetric, FunctionMetric
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
-MIN_CAPTURE_GROUPS = 2
+    from mightymodels_mcp.review_metrics.shapes import Language
+
 MIN_CAPTURE_GROUPS = 2
 OPENING_BRACKETS = '([{<'
 CLOSING_BRACKETS = ')]}>'
@@ -39,8 +41,7 @@ TS_CLASS_RE = re.compile(
 )
 
 
-def js_function_end(lines: list[str], start: int) -> int:
-    end = min(start + 1, len(lines) - 1)
+def js_function_closings(lines: list[str], start: int) -> Iterator[int]:
     depth = 0
     opened = False
     for idx in range(start, len(lines)):
@@ -50,9 +51,11 @@ def js_function_end(lines: list[str], start: int) -> int:
         closed = opened and depth <= 0
         terminated = not opened and line.rstrip().endswith((';', ',')) and idx > start
         if closed or terminated:
-            end = idx
-            break
-    return end
+            yield idx
+
+
+def js_function_end(lines: list[str], start: int) -> int:
+    return next(js_function_closings(lines, start), min(start + 1, len(lines) - 1))
 
 
 def bracket_step(char: str) -> int:
@@ -83,7 +86,7 @@ def typescript_classes(text: str) -> int:
     )
 
 
-def analyze_js(rel: Path, text: str, language: str) -> FileMetric:
+def analyze_js(rel: Path, text: str, language: Language) -> FileMetric:
     loc, long_lines = count_loc(text)
     typed = language == 'typescript'
     lines = text.splitlines()

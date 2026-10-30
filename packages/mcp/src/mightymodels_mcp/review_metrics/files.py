@@ -11,6 +11,8 @@ from mightymodels_mcp.review_metrics.shapes import LINE_LIMIT
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from mightymodels_mcp.review_metrics.shapes import Language
+
 IGNORED_DIRS = frozenset({
     '.git',
     '.hg',
@@ -42,7 +44,7 @@ TS_SUFFIXES = frozenset({'.ts', '.tsx', '.mts', '.cts'})
 TEST_DIR_NAMES = frozenset({'test', 'tests', '__tests__', 'spec', 'specs'})
 
 
-def language_of(path: Path) -> str | None:
+def language_of(path: Path) -> Language | None:
     if path.suffix in PY_SUFFIXES:
         return 'python'
     if path.suffix in JS_SUFFIXES:

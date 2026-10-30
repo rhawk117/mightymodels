@@ -6,6 +6,7 @@ order of its JSON object.
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -16,6 +17,7 @@ FILE_LOC_LIMIT = 500
 DEPTH_LIMIT = 2
 
 type Graph = dict[str, set[str]]
+type Language = Literal['python', 'javascript', 'typescript']
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -33,7 +35,7 @@ class FunctionMetric:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class FileMetric:
     path: str
-    language: str
+    language: Language
     loc: int
     long_lines: int
     classes: int = 0
