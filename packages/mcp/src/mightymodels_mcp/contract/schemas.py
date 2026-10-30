@@ -6,6 +6,7 @@ once the user approved the list in the form.
 """
 
 from mightymodels_core.contract.records import ApprovedCommand
+from pydantic import Field
 
 from mightymodels_mcp.server.requests import NameText, RequestModel, SlugField
 
@@ -13,16 +14,25 @@ DEFAULT_TIMEOUT = 300
 
 
 class CommandRequest(RequestModel):
-    id: NameText
-    argv: tuple[str, ...]
-    expect_exit: int = 0
-    timeout: int = DEFAULT_TIMEOUT
-    approved_by: NameText = ''
+    id: NameText = Field(
+        description='The command key, such as T1.AC-1, that a receipt is kept under.'
+    )
+    argv: tuple[str, ...] = Field(
+        description='The command and its arguments, one entry per argument; no shell is used.'
+    )
+    expect_exit: int = Field(default=0, description='The exit code that counts as a pass.')
+    timeout: int = Field(
+        default=DEFAULT_TIMEOUT,
+        description='Seconds the command may run before it counts as a failure.',
+    )
+    approved_by: NameText = Field(
+        default='', description='Who approved the command; leave it blank and the user is asked.'
+    )
 
 
 class ContractApproveRequest(RequestModel):
     slug: SlugField
-    commands: tuple[CommandRequest, ...]
+    commands: tuple[CommandRequest, ...] = Field(description='The contract commands to approve.')
 
 
 class ContractRequest(RequestModel):

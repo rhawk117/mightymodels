@@ -29,31 +29,49 @@ def validate_task_id(raw: str) -> TaskId:
     raise ValueError(message) from parsed
 
 
-type TaskIdField = Annotated[TaskId, AfterValidator(validate_task_id)]
+type TaskIdField = Annotated[
+    TaskId,
+    AfterValidator(validate_task_id),
+    Field(description='The task id: T, C or R and a number, such as T3 or R1.'),
+]
 
 
 class TaskStartRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
-    by: Worker
-    owned: Annotated[tuple[ProseText, ...], Field(min_length=1)]
-    acceptance: Annotated[tuple[NameText, ...], Field(min_length=1)]
-    mode: ArchitectMode | None = None
-    too_large_approved_by: Literal['user'] | None = None
+    by: Worker = Field(description='The worker the task is started for.')
+    owned: tuple[ProseText, ...] = Field(
+        min_length=1, description='The files the worker may edit, one path per entry.'
+    )
+    acceptance: tuple[NameText, ...] = Field(
+        min_length=1, description='The acceptance criteria the task must meet, one per entry.'
+    )
+    mode: ArchitectMode | None = Field(
+        default=None, description='The architect mode; pass it only when the worker is architect.'
+    )
+    too_large_approved_by: Literal['user'] | None = Field(
+        default=None,
+        description='Pass user only after the user approved starting a task above the size bounds.',
+    )
 
 
 class TaskVerifyRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
-    commit: RevisionField
-    assertions: dict[ProseText, ProseText] = Field(default_factory=dict)
+    commit: RevisionField = Field(description='The commit the worker reports for the task.')
+    assertions: dict[ProseText, ProseText] = Field(
+        default_factory=dict,
+        description='Evidence for criteria no contract command checks, as criterion to evidence.',
+    )
 
 
 class TaskMarkRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
-    to: Literal['failed', 'blocked', 'superseded']
-    reason: ProseText
+    to: Literal['failed', 'blocked', 'superseded'] = Field(
+        description='The state to mark the task as.'
+    )
+    reason: ProseText = Field(description='Why the task is marked, kept in its history.')
 
 
 class TaskRequest(RequestModel):
@@ -63,7 +81,7 @@ class TaskRequest(RequestModel):
 class FailedFixRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
-    hypothesis: ProseText
+    hypothesis: ProseText = Field(description='The cause the failed fix assumed, in one sentence.')
 
 
 def create_start_request(request: TaskStartRequest, head: str | None) -> StartRequest:

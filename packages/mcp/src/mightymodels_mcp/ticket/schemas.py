@@ -15,7 +15,7 @@ from mightymodels_core.primitives.value_types import SLUG_LIMIT
 from mightymodels_core.ticket_closing.records import ClosingLines
 from mightymodels_core.tickets import BranchChoice, TicketAnswers
 from mightymodels_core.vocabulary.tickets import TicketScope
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from mightymodels_mcp.server.requests import (
     NAME_LIMIT,
@@ -44,27 +44,53 @@ class TicketRequest(RequestModel):
 
 class TicketWriteRequest(RequestModel):
     slug: SlugField
-    summary: ProseText
-    context: tuple[ProseText, ...]
-    scope: TicketScope | None = None
-    compaction: bool | None = None
-    branch: RevisionField | None = None
-    issue: int | None = None
-    jira: NameText | None = None
-    reference_urls: tuple[ProseText, ...] = ()
-    investigations: tuple[LinkedInvestigation, ...] = ()
+    summary: ProseText = Field(description='What the ticket is for, in a few sentences.')
+    context: tuple[ProseText, ...] = Field(
+        description='The facts a worker needs about the ticket, one entry per fact.'
+    )
+    scope: TicketScope | None = Field(
+        default=None,
+        description='How big the ticket is; omit it and the user is asked.',
+    )
+    compaction: bool | None = Field(
+        default=None,
+        description='Whether to plan first and compact; omit it and the user is asked.',
+    )
+    branch: RevisionField | None = Field(
+        default=None,
+        description='The name of a new git branch for the ticket; omit it and the user is asked.',
+    )
+    issue: int | None = Field(
+        default=None, description='The GitHub issue number the ticket tracks.'
+    )
+    jira: NameText | None = Field(default=None, description='The Jira key the ticket tracks.')
+    reference_urls: tuple[ProseText, ...] = Field(
+        default=(), description='URLs worth keeping with the ticket, such as docs or related work.'
+    )
+    investigations: tuple[LinkedInvestigation, ...] = Field(
+        default=(), description='Slugs of the investigations this ticket draws on.'
+    )
 
 
 class TicketContextRequest(RequestModel):
     slug: SlugField
-    context: tuple[ProseText, ...]
+    context: tuple[ProseText, ...] = Field(
+        description='The new context entries that replace the ticket context, one per fact.'
+    )
 
 
 class CloseTicketRequest(RequestModel):
     slug: SlugField
-    shipped: ProseText = ''
-    pr: ProseText | None = None
-    gotchas: tuple[ProseText, ...] = ()
+    shipped: ProseText = Field(
+        default='', description='One line on what the ticket delivered; closing needs it.'
+    )
+    pr: ProseText | None = Field(
+        default=None, description='The pull request URL or number, if the work has one.'
+    )
+    gotchas: tuple[ProseText, ...] = Field(
+        default=(),
+        description='Surprises a later reader of the archive should know, one per entry.',
+    )
 
 
 class WriteChoices(BaseModel):
