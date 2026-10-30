@@ -11,7 +11,7 @@ from typing import Annotated, Literal, Self
 
 from mightymodels_core.primitives import RunId, parse_run_id
 from mightymodels_core.vocabulary.reviews import Decision, Depth, Emphasis, Persona, Result, Scope
-from pydantic import AfterValidator, model_validator
+from pydantic import AfterValidator, Field, model_validator
 
 from mightymodels_mcp.server.requests import (
     NameText,
@@ -33,17 +33,39 @@ def validate_run_id(raw: str) -> RunId:
     raise ValueError(message) from parsed
 
 
-type RunIdField = Annotated[RunId, AfterValidator(validate_run_id)]
+type RunIdField = Annotated[
+    RunId,
+    AfterValidator(validate_run_id),
+    Field(description='The review run id, as review_start printed it.'),
+]
 
 
 class ReviewStartRequest(RequestModel):
-    scope: Scope | None = None
-    depth: Depth | None = None
-    emphasis: Emphasis | None = None
-    slug: SlugField | None = None
-    base: RevisionField | None = None
-    weights: dict[Persona, float] | None = None
-    persona: Persona | None = None
+    scope: Scope | None = Field(
+        default=None, description='What the review reads; omit it and the user is asked.'
+    )
+    depth: Depth | None = Field(
+        default=None,
+        description='How many reviewers read the scope; omit it and the user is asked.',
+    )
+    emphasis: Emphasis | None = Field(
+        default=None,
+        description='Which reviewer weighs most, or custom; omit it and the user is asked.',
+    )
+    slug: SlugField | None = Field(
+        default=None, description='The ticket the review belongs to; the ticket scope requires it.'
+    )
+    base: RevisionField | None = Field(
+        default=None,
+        description='The revision a branch or ticket scope is reviewed against; they require it.',
+    )
+    weights: dict[Persona, float] | None = Field(
+        default=None,
+        description='Each persona to its weight when emphasis is custom; they must sum to one.',
+    )
+    persona: Persona | None = Field(
+        default=None, description='The one reviewer to run when the depth is quick.'
+    )
 
 
 class ReviewOverrideRequest(RequestModel):
@@ -52,7 +74,7 @@ class ReviewOverrideRequest(RequestModel):
 
 class ReviewAddRequest(RequestModel):
     run_id: RunIdField
-    persona: Persona
+    persona: Persona = Field(description='The reviewer whose report is read and recorded.')
 
 
 class ReviewGateRequest(RequestModel):
@@ -61,7 +83,10 @@ class ReviewGateRequest(RequestModel):
 
 class ReviewReportRequest(RequestModel):
     run_id: RunIdField
-    shape: ReportShape = 'full'
+    shape: ReportShape = Field(
+        default='full',
+        description='Full renders the whole report; comment renders a review comment.',
+    )
 
 
 class ReviewListRequest(RequestModel):
@@ -69,14 +94,21 @@ class ReviewListRequest(RequestModel):
 
 
 class Disposition(RequestModel):
-    decision: Decision
-    reason: ProseText = ''
+    decision: Decision = Field(description='What is done with the finding.')
+    reason: ProseText = Field(
+        default='', description='Why the finding is decided this way; some decisions require it.'
+    )
 
 
 class ReviewDisposeRequest(RequestModel):
     run_id: RunIdField
-    decisions: dict[NameText, Disposition] | None = None
-    by: NameText = ''
+    decisions: dict[NameText, Disposition] | None = Field(
+        default=None,
+        description='Each finding id to its disposition; omit it and the user is asked.',
+    )
+    by: NameText = Field(
+        default='', description='Who approved the decisions; required when decisions are given.'
+    )
 
     @model_validator(mode='after')
     def require_approver_with_decisions(self) -> Self:
@@ -89,7 +121,11 @@ class ReviewDisposeRequest(RequestModel):
 
 class ReviewResolveRequest(RequestModel):
     run_id: RunIdField
-    finding: NameText
-    result: Result
-    commit: NameText | None = None
-    reason: ProseText | None = None
+    finding: NameText = Field(description='The id of the finding being resolved.')
+    result: Result = Field(description='How the finding was resolved.')
+    commit: NameText | None = Field(
+        default=None, description='The commit that resolved the finding, as a plain revision.'
+    )
+    reason: ProseText | None = Field(
+        default=None, description='Why the finding is resolved this way, where the result needs it.'
+    )

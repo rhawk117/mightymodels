@@ -22,12 +22,29 @@ type Count = Annotated[int, Field(ge=1)]
 
 
 class HistoryWindowRequest(RequestModel):
-    target: str | None = None
-    since: Since | None = None
-    baseline_ref: BaselineRef | None = None
-    max_commits: Count = DEFAULT_MAX_COMMITS
-    all_history: bool = False
-    limit: Count = DEFAULT_LIMIT
+    target: str | None = Field(
+        default=None,
+        description='A path inside the repository to measure; omit it to measure all of it.',
+    )
+    since: Since | None = Field(
+        default=None,
+        description='Only commits after this date; max_commits and baseline_ref still apply.',
+    )
+    baseline_ref: BaselineRef | None = Field(
+        default=None,
+        description='Only commits after this revision up to HEAD; omit it to read back from HEAD.',
+    )
+    max_commits: Count = Field(
+        default=DEFAULT_MAX_COMMITS,
+        description='The most commits read; all_history lifts this cap.',
+    )
+    all_history: bool = Field(
+        default=False,
+        description='Read every commit in the window instead of stopping at max_commits.',
+    )
+    limit: Count = Field(
+        default=DEFAULT_LIMIT, description='The most signals listed in the report.'
+    )
 
 
 class CodeChurnRequest(HistoryWindowRequest):
@@ -39,5 +56,11 @@ class CodeHotspotsRequest(HistoryWindowRequest):
 
 
 class ChangeCouplingRequest(HistoryWindowRequest):
-    min_shared: Count = DEFAULT_MIN_SHARED
-    max_changeset: Count = DEFAULT_MAX_CHANGESET
+    min_shared: Count = Field(
+        default=DEFAULT_MIN_SHARED,
+        description='The fewest commits two files must share to be reported as coupled.',
+    )
+    max_changeset: Count = Field(
+        default=DEFAULT_MAX_CHANGESET,
+        description='Commits touching more files than this are skipped as bulk changes.',
+    )

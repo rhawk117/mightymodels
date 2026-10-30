@@ -30,10 +30,40 @@ def published_properties() -> list[tuple[str, str, dict[str, Any]]]:
     ]
 
 
+def is_described(prop: object) -> bool:
+    return isinstance(prop, dict) and bool(str(prop.get('description', '')).strip())
+
+
+def undescribed_properties(node: object, path: str) -> list[str]:
+    if isinstance(node, list):
+        children = [(f'{path}[{index}]', item) for index, item in enumerate(node)]
+        return [gap for child, item in children for gap in undescribed_properties(item, child)]
+    if not isinstance(node, dict):
+        return []
+    properties = node.get('properties')
+    own = (
+        [f'{path}.{name}' for name, prop in properties.items() if not is_described(prop)]
+        if isinstance(properties, dict)
+        else []
+    )
+    nested = [
+        gap for key, value in node.items() for gap in undescribed_properties(value, f'{path}.{key}')
+    ]
+    return own + nested
+
+
 class TestPublishedSchemas:
     @pytest.mark.parametrize(('tool', 'name', 'prop'), published_properties())
     def test_property_states_its_type(self, tool: str, name: str, prop: dict[str, Any]) -> None:
         assert states_type(prop), f'{tool}.{name}'
+
+    def test_every_property_states_a_description(self) -> None:
+        missing = [
+            gap
+            for tool in create_catalog().list_tools()
+            for gap in undescribed_properties(tool.parameters, tool.name)
+        ]
+        assert missing == []
 
     def test_no_published_schema_holds_a_ref_or_defs(self) -> None:
         for tool in create_catalog().list_tools():

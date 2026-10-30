@@ -20,22 +20,29 @@ type CiteText = Annotated[
 
 
 class LedgerEntry(RequestModel):
-    kind: EntryKind
-    text: ProseText
-    source: EntrySource
-    cite: CiteText | None = None
-    supersedes: tuple[int, ...] = ()
+    kind: EntryKind = Field(description='What sort of entry this is.')
+    text: ProseText = Field(description='The entry itself, stated in one claim.')
+    source: EntrySource = Field(description='Where the entry came from.')
+    cite: CiteText | None = Field(
+        default=None,
+        description='The file:line or URL the entry rests on; some sources require it.',
+    )
+    supersedes: tuple[int, ...] = Field(
+        default=(), description='The sequence numbers of earlier entries this one retires.'
+    )
 
 
 class InvestigationStartRequest(RequestModel):
-    target: ProseText
-    kind: TargetKind | None = None
+    target: ProseText = Field(description='What is being investigated, in a sentence.')
+    kind: TargetKind | None = Field(
+        default=None, description='What kind of target it is; omit it and the user is asked.'
+    )
 
 
 class InvestigationAddRequest(RequestModel):
     investigation_id: SlugField
-    round: int
-    entries: tuple[LedgerEntry, ...]
+    round: int = Field(description='The investigation round these entries belong to.')
+    entries: tuple[LedgerEntry, ...] = Field(description='The entries to append to the ledger.')
 
 
 class InvestigationRenderRequest(RequestModel):
@@ -44,8 +51,14 @@ class InvestigationRenderRequest(RequestModel):
 
 class InvestigationKnownsRequest(RequestModel):
     investigation_id: SlugField
-    kinds: Annotated[tuple[EntryKind, ...], Field(min_length=1)] = SECTION_KINDS
-    limit: Annotated[int, Field(ge=1)] = KNOWNS_LIMIT
+    kinds: tuple[EntryKind, ...] = Field(
+        default=SECTION_KINDS,
+        min_length=1,
+        description='The entry kinds to list; omit it to list every section kind.',
+    )
+    limit: int = Field(
+        default=KNOWNS_LIMIT, ge=1, description='The most live entries listed for each kind.'
+    )
 
 
 class InvestigationListRequest(RequestModel):

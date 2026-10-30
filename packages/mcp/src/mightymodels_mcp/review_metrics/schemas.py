@@ -19,5 +19,11 @@ type Count = Annotated[int, Field(ge=1)]
 
 class ReviewMetricsRequest(RequestModel):
     run_id: RunIdField
-    package_depth: Depth = DEFAULT_PACKAGE_DEPTH
-    max_listed: Count = DEFAULT_MAX_LISTED
+    package_depth: Depth = Field(
+        default=DEFAULT_PACKAGE_DEPTH,
+        description='How many leading path parts name a package in the summary.',
+    )
+    max_listed: Count = Field(
+        default=DEFAULT_MAX_LISTED,
+        description='The most entries listed in each part of the summary.',
+    )
