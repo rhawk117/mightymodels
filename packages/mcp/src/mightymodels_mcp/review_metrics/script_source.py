@@ -135,6 +135,6 @@ def js_function(lines: list[str], idx: int, rel: Path) -> FunctionMetric | None:
         loc=end - idx + 1,
         params=params,
         bool_params=bool_params,
-        max_depth=-1,
+        max_depth=None,
         approximate=True,
     )

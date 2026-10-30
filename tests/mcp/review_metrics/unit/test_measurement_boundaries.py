@@ -10,16 +10,29 @@ from mightymodels_mcp.review_metrics.domain import FileMetric, FunctionMetric
 from mightymodels_mcp.review_metrics.files import is_test_path
 from mightymodels_mcp.review_metrics.python_source import analyze_python
 from mightymodels_mcp.review_metrics.script_source import js_param_stats
-from mightymodels_mcp.review_metrics.summary import LOC_RULE, PARAMS_RULE, violation_group
+from mightymodels_mcp.review_metrics.summary import (
+    DEPTH_RULE,
+    LOC_RULE,
+    PARAMS_RULE,
+    violation_group,
+)
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_mcp.review_metrics.summary import Rule
 
 
-def function_metric(name: str, *, loc: int = 1, params: int = 0) -> FunctionMetric:
+def function_metric(
+    name: str, *, loc: int = 1, params: int = 0, max_depth: int | None = 0
+) -> FunctionMetric:
     return FunctionMetric(
-        file='m.py', name=name, line=1, loc=loc, params=params, bool_params=0, max_depth=0
+        file='m.py',
+        name=name,
+        line=1,
+        loc=loc,
+        params=params,
+        bool_params=0,
+        max_depth=max_depth,
     )
 
 
@@ -274,6 +287,17 @@ def violation_group_cases() -> pytest.MarkDecorator:
             cap=5,
             count=1,
             worst=('four',),
+        ),
+        GroupCase(
+            name='unmeasured-depth-is-left-out',
+            rule=DEPTH_RULE,
+            functions=(
+                function_metric('deep', max_depth=3),
+                function_metric('unmeasured', max_depth=None),
+            ),
+            cap=5,
+            count=1,
+            worst=('deep',),
         ),
         GroupCase(name='no-functions', rule=LOC_RULE, functions=(), cap=5, count=0, worst=()),
     ]

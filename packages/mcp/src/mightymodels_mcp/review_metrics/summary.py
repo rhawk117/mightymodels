@@ -7,7 +7,7 @@ whole report and `render_summary` prints its headline numbers and one row per pa
 
 from dataclasses import dataclass
 from operator import attrgetter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from .components import (
     ambiguous_aliases,
@@ -15,7 +15,6 @@ from .components import (
     tarjan_sccs,
 )
 from .domain import (
-    DEFAULT_SUMMARY_OPTIONS,
     DEPTH_LIMIT,
     FILE_LOC_LIMIT,
     FUNCTION_LOC_LIMIT,
@@ -58,9 +57,12 @@ def violation(function: FunctionMetric) -> Violation:
     )
 
 
+type RuleField = Literal['loc', 'params', 'bool_params', 'max_depth']
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Rule:
-    field: str
+    field: RuleField
     limit: int
 
 
@@ -72,7 +74,11 @@ DEPTH_RULE = Rule(field='max_depth', limit=DEPTH_LIMIT)
 
 def violation_group(functions: list[FunctionMetric], rule: Rule, cap: int) -> ViolationGroup:
     measure = attrgetter(rule.field)
-    hits = [function for function in functions if measure(function) > rule.limit]
+    hits = [
+        function
+        for function in functions
+        if (value := measure(function)) is not None and value > rule.limit
+    ]
     ranked = sorted(hits, key=measure, reverse=True)[:cap]
     return ViolationGroup(count=len(hits), worst=[violation(function) for function in ranked])
 
@@ -121,7 +127,7 @@ def granularity_note(graph: Graph, depth: int) -> str:
 def summarize(
     metrics: list[FileMetric],
     graph: Graph,
-    options: SummaryOptions = DEFAULT_SUMMARY_OPTIONS,
+    options: SummaryOptions,
 ) -> SummaryReport:
     module_cycles = tarjan_sccs(graph)
     return SummaryReport(

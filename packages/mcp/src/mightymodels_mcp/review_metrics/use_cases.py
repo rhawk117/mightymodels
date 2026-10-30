@@ -7,13 +7,13 @@ tool runs it in a worker thread after leaving the unit.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.primitives import StateError
 from mightymodels_core.units_of_work import ReviewWork
 
 from mightymodels_mcp.server.state import create_work
 
 from .components import build_module_graph
 from .domain import SummaryOptions
+from .errors import MetricsWriteError
 from .sources import collect_metrics
 from .summary import render_summary, summarize
 
@@ -28,13 +28,6 @@ if TYPE_CHECKING:
 
 METRICS_FILE = 'uncle-bob-metrics.json'
 JSON_INDENT = 2
-
-
-class MetricsWriteError(StateError):
-    def __init__(self, *, relative: str, reason: str) -> None:
-        self.relative = relative
-        self.reason = reason
-        super().__init__(f'could not write {relative}/{METRICS_FILE}: {reason}')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -75,6 +68,6 @@ def write_metrics(target: MetricsTarget) -> str:
         )
     except OSError as error:
         raise MetricsWriteError(
-            relative=target.relative, reason=error.strerror or str(error)
+            path=f'{target.relative}/{METRICS_FILE}', reason=error.strerror or str(error)
         ) from error
     return f'wrote {target.relative}/{METRICS_FILE}\n{render_summary(report)}\n'

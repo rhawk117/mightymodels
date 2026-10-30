@@ -33,7 +33,7 @@ class Violation(BaseModel):
     loc: int
     params: int
     bool_params: int
-    max_depth: int
+    max_depth: int | None
     approximate: bool
 
 

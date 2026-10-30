@@ -11,11 +11,13 @@ from pydantic import Field
 from mightymodels_mcp.review.schemas import RunIdField
 from mightymodels_mcp.server.requests import RequestModel
 
-DEFAULT_PACKAGE_DEPTH = 1
-DEFAULT_MAX_LISTED = 50
+from .domain import DEFAULT_MAX_LISTED, DEFAULT_PACKAGE_DEPTH
+
+type Depth = Annotated[int, Field(ge=1)]
+type Count = Annotated[int, Field(ge=1)]
 
 
 class ReviewMetricsRequest(RequestModel):
     run_id: RunIdField
-    package_depth: Annotated[int, Field(ge=1)] = DEFAULT_PACKAGE_DEPTH
-    max_listed: Annotated[int, Field(ge=1)] = DEFAULT_MAX_LISTED
+    package_depth: Depth = DEFAULT_PACKAGE_DEPTH
+    max_listed: Count = DEFAULT_MAX_LISTED

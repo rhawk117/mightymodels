@@ -1,7 +1,7 @@
 """What the `ast` module measures in a Python file, so its numbers are exact."""
 
 import ast
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from .domain import FileMetric, FunctionMetric
@@ -124,18 +124,26 @@ def from_import_names(node: ast.ImportFrom, package_parts: list[str]) -> list[st
     return ['.'.join(filter(None, (base, name))) for name in names]
 
 
-def parsed_fields(tree: ast.Module, rel: Path) -> dict[str, object]:
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ParsedFields:
+    classes: int
+    abstract_classes: int
+    functions: tuple[FunctionMetric, ...]
+    imports: tuple[str, ...]
+
+
+def parsed_fields(tree: ast.Module, rel: Path) -> ParsedFields:
     classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
-    return {
-        'classes': len(classes),
-        'abstract_classes': sum(1 for node in classes if class_is_abstract(node)),
-        'functions': tuple(
+    return ParsedFields(
+        classes=len(classes),
+        abstract_classes=sum(1 for node in classes if class_is_abstract(node)),
+        functions=tuple(
             python_function(node, rel)
             for node in ast.walk(tree)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         ),
-        'imports': tuple(python_imports(tree, list(rel.parent.parts))),
-    }
+        imports=tuple(python_imports(tree, list(rel.parent.parts))),
+    )
 
 
 def analyze_python(rel: Path, text: str) -> FileMetric:
@@ -148,9 +156,16 @@ def analyze_python(rel: Path, text: str) -> FileMetric:
         is_test=is_test_path(rel),
     )
     try:
-        return replace(metric, **parsed_fields(ast.parse(text), rel))
+        parsed = parsed_fields(ast.parse(text), rel)
     except SyntaxError, RecursionError:
         return replace(metric, parsed=False)
+    return replace(
+        metric,
+        classes=parsed.classes,
+        abstract_classes=parsed.abstract_classes,
+        functions=parsed.functions,
+        imports=parsed.imports,
+    )
 
 
 def python_function(node: ast.FunctionDef | ast.AsyncFunctionDef, rel: Path) -> FunctionMetric:

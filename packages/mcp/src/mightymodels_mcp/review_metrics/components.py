@@ -30,7 +30,7 @@ LAYOUT_DIRS = ('src', 'lib', 'app')
 SRC_DIR = 'src'
 
 
-def package_of(module: str, depth: int = 1) -> str:
+def package_of(module: str, depth: int) -> str:
     parts = module.split('.')
     while len(parts) > 1 and parts[0] in LAYOUT_DIRS:
         parts = parts[1:]
@@ -180,7 +180,7 @@ def package_graph(edges: set[tuple[str, str]]) -> Graph:
     return graph
 
 
-def package_metrics(graph: Graph, metrics: list[FileMetric], depth: int = 1) -> PackageReport:
+def package_metrics(graph: Graph, metrics: list[FileMetric], depth: int) -> PackageReport:
     edges = package_edges(graph, depth)
     packages = {
         name: package_metric(name, members, edges)

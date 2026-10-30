@@ -12,6 +12,8 @@ FUNCTION_LOC_LIMIT = 20
 PARAM_LIMIT = 3
 FILE_LOC_LIMIT = 500
 DEPTH_LIMIT = 2
+DEFAULT_PACKAGE_DEPTH = 1
+DEFAULT_MAX_LISTED = 50
 
 type Graph = dict[str, set[str]]
 type Language = Literal['python', 'javascript', 'typescript']
@@ -25,7 +27,7 @@ class FunctionMetric:
     loc: int
     params: int
     bool_params: int
-    max_depth: int
+    max_depth: int | None
     approximate: bool = False
 
 
@@ -45,8 +47,5 @@ class FileMetric:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class SummaryOptions:
-    cap: int = 50
-    depth: int = 1
-
-
-DEFAULT_SUMMARY_OPTIONS = SummaryOptions()
+    cap: int = DEFAULT_MAX_LISTED
+    depth: int = DEFAULT_PACKAGE_DEPTH
