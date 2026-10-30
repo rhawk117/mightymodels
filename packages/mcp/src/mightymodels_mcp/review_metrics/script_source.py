@@ -38,6 +38,7 @@ TS_ABSTRACT_RE = re.compile(
     r'^\s*(?:export\s+)?(?:declare\s+)?(?:abstract\s+class|interface)\s+[\w$]+',
     re.MULTILINE,
 )
+TS_INTERFACE_RE = re.compile(r'^\s*(?:export\s+)?interface\s+[\w$]+', re.MULTILINE)
 TS_CLASS_RE = re.compile(
     r'^\s*(?:export\s+)?(?:declare\s+)?(?:abstract\s+)?class\s+[\w$]+', re.MULTILINE
 )
@@ -89,9 +90,7 @@ def js_param_stats(raw: str) -> tuple[int, int]:
 
 
 def typescript_classes(text: str) -> int:
-    return len(TS_CLASS_RE.findall(text)) + len(
-        re.findall(r'^\s*(?:export\s+)?interface\s+[\w$]+', text, re.MULTILINE)
-    )
+    return len(TS_CLASS_RE.findall(text)) + len(TS_INTERFACE_RE.findall(text))
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

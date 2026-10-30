@@ -261,7 +261,7 @@ class TestGitFailures:
 
 class TestAnalysisNames:
     def test_every_analysis_has_a_name(self) -> None:
-        assert [analysis.value for analysis in Analysis] == [
+        assert list(Analysis.__value__.__args__) == [
             'code-churn',
             'change-coupling',
             'code-hotspots',

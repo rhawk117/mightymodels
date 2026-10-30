@@ -170,7 +170,7 @@ def analyze_python(rel: Path, text: str) -> FileMetric:
 
 def python_function(node: ast.FunctionDef | ast.AsyncFunctionDef, rel: Path) -> FunctionMetric:
     params, bool_params = python_param_stats(node)
-    end = getattr(node, 'end_lineno', node.lineno)
+    end = node.end_lineno or node.lineno
     return FunctionMetric(
         file=str(rel),
         name=node.name,

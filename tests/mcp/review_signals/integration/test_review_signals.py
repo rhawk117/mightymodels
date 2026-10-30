@@ -10,7 +10,6 @@ from mightymodels_mcp.review_signals.schemas import (
     HistoryWindowRequest,
 )
 from mightymodels_mcp.review_signals.views import (
-    Analysis,
     ChurnSignal,
     CouplingSignal,
     HotspotSignal,
@@ -43,7 +42,7 @@ class TestCodeChurn:
         repo.commit({'src/queue.py': 'a\n', 'src/client.py': 'a\nb\nc\n'})
         repo.commit({'src/queue.py': 'a\nb\n'})
         report = repo.churn()
-        assert report.analysis == Analysis.CHURN
+        assert report.analysis == 'code-churn'
         assert report.signals[0] == ChurnSignal(
             subject='src/queue.py', commits=2, lines_added=2, lines_deleted=0
         )

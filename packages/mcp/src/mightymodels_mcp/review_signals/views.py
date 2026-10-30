@@ -1,14 +1,10 @@
 """The review_signals results: the analysis names, each signal and the report that carries them."""
 
-from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-
-class Analysis(StrEnum):
-    CHURN = 'code-churn'
-    COUPLING = 'change-coupling'
-    HOTSPOTS = 'code-hotspots'
+type Analysis = Literal['code-churn', 'change-coupling', 'code-hotspots']
 
 
 class ScannedHistory(BaseModel):

@@ -30,7 +30,8 @@ if TYPE_CHECKING:
 
 NUMSTAT_FIELDS = 3
 OCTAL_DIGITS = 3
-RECORD = '\x1e'
+RECORD_BYTE = '1e'
+RECORD = chr(int(RECORD_BYTE, 16))
 QUOTE = '"'
 QUOTED_ESCAPE = re.compile(rb'\\([0-7]{3}|.)', re.DOTALL)
 SIMPLE_ESCAPES: dict[bytes, bytes] = {
@@ -140,7 +141,7 @@ def log_argv(target: str, window: Window) -> list[str]:
         '--no-merges',
         '--no-renames',
         '--numstat',
-        '--format=%x1e%H',
+        f'--format=%x{RECORD_BYTE}%H',
     ]
     if window.max_commits is not None:
         argv.append(f'--max-count={window.max_commits}')

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import TYPE_CHECKING
 
-from .views import Analysis, ChurnSignal, CouplingSignal, HotspotSignal
+from .views import ChurnSignal, CouplingSignal, HotspotSignal
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -58,7 +58,7 @@ def code_churn(history: History, options: HistoryWindowRequest) -> Report[ChurnS
     ]
     limitations = history.base_limitations()
     limitations.append('binary files count commits but no lines')
-    return history.report(Analysis.CHURN, signals, limitations)
+    return history.report('code-churn', signals, limitations)
 
 
 def coupling_order(pair: CouplingSignal) -> tuple[int, float, str]:
@@ -113,7 +113,7 @@ def coupling_limitations(
 def change_coupling(history: History, options: ChangeCouplingRequest) -> Report[CouplingSignal]:
     pairs, skipped = coupling_pairs(history, options)
     limitations = coupling_limitations(history, options, skipped)
-    return history.report(Analysis.COUPLING, pairs[: options.limit], limitations)
+    return history.report('change-coupling', pairs[: options.limit], limitations)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -171,6 +171,9 @@ def code_hotspots(history: History, options: HistoryWindowRequest) -> Report[Hot
             'hotspot is commits times indentation complexity (indent levels summed '
             'over non-blank lines), measured on the working tree'
         ),
-        'binary files, files over 2 MB and unreadable files are skipped',
+        (
+            f'binary files, files over {MAX_FILE_BYTES // 1_000_000} MB '
+            'and unreadable files are skipped'
+        ),
     ])
-    return history.report(Analysis.HOTSPOTS, signals[: options.limit], limitations)
+    return history.report('code-hotspots', signals[: options.limit], limitations)
