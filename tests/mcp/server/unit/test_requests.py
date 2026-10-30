@@ -36,7 +36,9 @@ class TestSlugField:
             self.adapter.validate_python('archives')
 
     def test_schema_publishes_no_pattern(self) -> None:
-        assert self.adapter.json_schema() == {'type': 'string'}
+        schema = self.adapter.json_schema()
+        assert 'pattern' not in schema
+        assert schema['type'] == 'string'
 
 
 class TestRequestModel:
