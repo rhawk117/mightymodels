@@ -101,7 +101,7 @@ class History:
         if self.truncated:
             notes.append(
                 f'history stopped at {self.window.max_commits} commits; '
-                'widen with --max-commits or --all-history'
+                'widen with max_commits or all_history'
             )
         if self.dropped_names:
             notes.append(

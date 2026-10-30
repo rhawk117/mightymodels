@@ -1,4 +1,4 @@
-"""The report: what breaks a limit, the totals, and the summary a reader sees on standard output.
+"""The report: what breaks a limit, the totals, and the summary a reader sees.
 
 A rule pairs one measure of a function with the limit it is held to. Each group counts every
 function over its limit and lists the worst of them, at most `cap`. `summarize` assembles the
@@ -110,8 +110,8 @@ def totals_of(metrics: list[FileMetric]) -> Totals:
     )
 
 
-def granularity_note(graph: Graph) -> str:
-    note = 'fan-in/fan-out counted at module level, rolled up to top-level packages'
+def granularity_note(graph: Graph, depth: int) -> str:
+    note = f'fan-in/fan-out counted at module level, rolled up to packages {depth} path parts deep'
     dropped = ambiguous_aliases(list(graph))
     if not dropped:
         return note
@@ -125,8 +125,8 @@ def summarize(
 ) -> SummaryReport:
     module_cycles = tarjan_sccs(graph)
     return SummaryReport(
-        tool='uncle-bob metrics.py',
-        granularity_note=granularity_note(graph),
+        tool='review_metrics',
+        granularity_note=granularity_note(graph, options.depth),
         totals=totals_of(metrics),
         component_metrics=package_metrics(graph, metrics, options.depth),
         module_cycles_adp=ModuleCycles(

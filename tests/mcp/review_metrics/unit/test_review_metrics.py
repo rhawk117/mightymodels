@@ -120,7 +120,7 @@ class TestSampleTreeReport:
     ) -> None:
         report = report_of(depth)
 
-        assert report.tool == 'uncle-bob metrics.py'
+        assert report.tool == 'review_metrics'
         assert (report.totals.files, report.totals.source_files, report.totals.test_files) == (
             9,
             7,

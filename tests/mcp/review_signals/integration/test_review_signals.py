@@ -123,7 +123,7 @@ class TestCodeChurn:
         report = repo.churn(CodeChurnRequest(max_commits=CAPPED))
         assert report.history.truncated is True
         assert report.signals[0].commits == CAPPED
-        assert any('--all-history' in note for note in report.limitations)
+        assert any('all_history' in note for note in report.limitations)
 
     def test_all_history_lifts_the_commit_cap(self, repo: Repo) -> None:
         for text in ('a\n', 'b\n', 'c\n'):

@@ -170,7 +170,7 @@ class TestGitLogArgumentVector:
 class TestTargetThatIsNotUnicode:
     NAME = 'caf\udce9'
     LINK = 'link'
-    REASON = "--target resolves to 'caf\\udce9', which is not valid Unicode"
+    REASON = "target resolves to 'caf\\udce9', which is not valid Unicode"
 
     @pytest.fixture
     def linked(self, checkout: Checkout) -> Checkout:
@@ -201,7 +201,7 @@ class TestRefusedTargets:
 
         assert isinstance(launched.refusal, TargetOutsideError)
         assert (str(launched.refusal), launched.vectors) == (
-            f'--target {target!r} is outside the repository',
+            f'target {target!r} is outside the repository',
             [],
         )
 

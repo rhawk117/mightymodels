@@ -9,12 +9,12 @@ class SignalsError(StateError):
 
 class TargetOutsideError(SignalsError):
     def __init__(self, *, target: str) -> None:
-        super().__init__(f'--target {target!r} is outside the repository')
+        super().__init__(f'target {target!r} is outside the repository')
 
 
 class TargetNotUnicodeError(SignalsError):
     def __init__(self, *, path: str) -> None:
-        super().__init__(f'--target resolves to {path!r}, which is not valid Unicode')
+        super().__init__(f'target resolves to {path!r}, which is not valid Unicode')
 
 
 class GitMissingError(SignalsError):

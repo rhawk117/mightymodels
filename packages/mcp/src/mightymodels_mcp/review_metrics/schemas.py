@@ -1,6 +1,6 @@
 """The review_metrics request: the run to measure for and how the summary is cut.
 
-The defaults are the old command line's: a package is the first path part and fifty entries are
+A package is the first path part by default and fifty entries are
 listed. The measured path and the report's location are derived, so the request names neither.
 """
 
