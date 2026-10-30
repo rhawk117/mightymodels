@@ -1,3 +1,4 @@
+import json
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -32,6 +33,15 @@ async def harness(server_harness: ServerHarness) -> ReviewHarness:
 def write_source(repository: Path) -> None:
     repository.joinpath('pkg').mkdir()
     repository.joinpath('pkg', 'mod.py').write_text('def one():\n    return 1\n', encoding='utf-8')
+
+
+def write_two_violations(repository: Path) -> None:
+    for package in ('alpha', 'beta'):
+        directory = repository.joinpath('pkg', package)
+        directory.mkdir(parents=True)
+        directory.joinpath('mod.py').write_text(
+            'def many(a, b, c, d):\n    return a, b, c, d\n', encoding='utf-8'
+        )
 
 
 class Ticker:
@@ -102,19 +112,27 @@ class TestReviewMetrics:
         assert written.read_text(encoding='utf-8').startswith('{\n')
         assert f'wrote {started.directory}/{METRICS_FILE}' in view['text']
 
-    async def test_options_cut_the_summary(self, harness: ReviewHarness) -> None:
-        write_source(harness.server.repository)
+    async def test_options_cut_the_listed_violations_and_set_the_package_depth(
+        self, harness: ReviewHarness
+    ) -> None:
+        write_two_violations(harness.server.repository)
         started = await harness.start()
         arguments = {'run_id': started.run_id, 'package_depth': 2, 'max_listed': 1}
 
         view_of(await harness.call('review_metrics', arguments))
 
-        assert harness.server.repository.joinpath(started.directory, METRICS_FILE).is_file()
+        written = harness.server.repository.joinpath(started.directory, METRICS_FILE)
+        report = json.loads(written.read_text(encoding='utf-8'))
+        params = report['violations']['functions_over_3_params']
+        assert params['count'] == 2
+        assert len(params['worst']) == 1
+        assert set(report['component_metrics']['packages']) == {'pkg.alpha', 'pkg.beta'}
 
-    async def test_zero_max_listed_is_refused(self, harness: ReviewHarness) -> None:
+    @pytest.mark.parametrize('option', ['max_listed', 'package_depth'])
+    async def test_zero_option_is_refused(self, harness: ReviewHarness, option: str) -> None:
         started = await harness.start()
 
-        result = await harness.call('review_metrics', {'run_id': started.run_id, 'max_listed': 0})
+        result = await harness.call('review_metrics', {'run_id': started.run_id, option: 0})
 
         assert result.is_error
 

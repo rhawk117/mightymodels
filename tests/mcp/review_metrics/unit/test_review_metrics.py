@@ -97,6 +97,24 @@ SAMPLE: dict[str, list[str]] = {
 
 
 class TestSampleTreeReport:
+    SUMMARY_LINES_AT_DEPTH_1 = (
+        'files\t9 (2 test)',
+        'source LOC\t68\ttest LOC\t5\tratio\t0.074',
+        'module cycles (ADP)\t2',
+        'package cycles (ADP)\t0',
+        'functions > 20 LOC\t1',
+        'functions > 3 params\t2',
+        'functions with bool params\t4',
+        'functions nested > 2\t1',
+        'files > 500 LOC\t0',
+        'lines > 120 chars\t1',
+        '',
+        'package\tCa\tCe\tI\tA\tD',
+        'billing\t1\t0\t0.0\t0.5\t0.5',
+        'tools\t0\t1\t1.0\tNone\tNone',
+        'web\t0\t0\tNone\t0.667\tNone',
+    )
+
     @pytest.fixture
     def sample(self, tmp_path: Path) -> Path:
         root = tmp_path.joinpath('sample')
@@ -155,5 +173,4 @@ class TestSampleTreeReport:
     ) -> None:
         text = render_summary(report_of(1))
 
-        assert 'package' in text.lower()
-        assert text.count('\n') > 1
+        assert tuple(text.splitlines()) == self.SUMMARY_LINES_AT_DEPTH_1
