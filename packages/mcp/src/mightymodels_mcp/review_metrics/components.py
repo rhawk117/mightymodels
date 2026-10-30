@@ -9,7 +9,7 @@ carries its fan-in (Ca), fan-out (Ce), instability I = Ce/(Ca+Ce), abstractness 
 from the main sequence D = |A + I - 1|.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -102,26 +102,41 @@ def depth_first_walk(graph: Graph) -> DepthFirstWalk:
     return DepthFirstWalk(discovered=MappingProxyType(discovered), left=tuple(left))
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class LowlinkTable:
+    discovered: Mapping[str, int]
+    settled: dict[str, int] = field(default_factory=dict)
+
+    def lowlink_of(self, node: str, children: list[str]) -> int:
+        reached = [
+            self.settled[child]
+            if self.discovered[child] > self.discovered[node]
+            else self.discovered[child]
+            for child in children
+        ]
+        return min([self.discovered[node], *reached])
+
+
+def pop_component(node: str, stack: list[str], discovered: Mapping[str, int]) -> list[str]:
+    component = [node]
+    while stack and discovered[stack[-1]] > discovered[node]:
+        component.append(stack.pop())
+    return component
+
+
 def tarjan_sccs(graph: Graph) -> list[list[str]]:
     walk = depth_first_walk(graph)
-    discovered = walk.discovered
-    lowlinks: dict[str, int] = {}
+    table = LowlinkTable(discovered=walk.discovered)
     stack: list[str] = []
     closed: set[str] = set()
     sccs: list[list[str]] = []
     for node in walk.left:
-        reached = [
-            lowlinks[child] if discovered[child] > discovered[node] else discovered[child]
-            for child in graph.get(node, ())
-            if child not in closed
-        ]
-        lowlinks[node] = min([discovered[node], *reached])
-        if lowlinks[node] < discovered[node]:
+        open_children = [child for child in graph.get(node, ()) if child not in closed]
+        table.settled[node] = table.lowlink_of(node, open_children)
+        if table.settled[node] < walk.discovered[node]:
             stack.append(node)
             continue
-        component = [node]
-        while stack and discovered[stack[-1]] > discovered[node]:
-            component.append(stack.pop())
+        component = pop_component(node, stack, walk.discovered)
         closed.update(component)
         sccs.append(sorted(component))
     return [scc for scc in sccs if len(scc) > 1]

@@ -64,18 +64,23 @@ def is_test_path(rel: Path) -> bool:
     return any(marker in rel.name.lower() for marker in ('.spec.', '.test.'))
 
 
+def is_pruned_dir(name: str) -> bool:
+    return name in IGNORED_DIRS or name.startswith('.')
+
+
 def iter_source_files(root: Path) -> list[Path]:
     found: list[Path] = []
-    for path in sorted(root.rglob('*')):
-        if not path.is_file() or language_of(path) is None:
-            continue
-        rel_parts = path.relative_to(root).parts
-        if any(part in IGNORED_DIRS or part.startswith('.') for part in rel_parts[:-1]):
-            continue
-        if path.name.endswith(('.min.js', '.bundle.js', '.d.ts')):
-            continue
-        found.append(path)
-    return found
+    for directory, dirnames, filenames in root.walk():
+        dirnames[:] = [name for name in dirnames if not is_pruned_dir(name)]
+        candidates = (directory.joinpath(name) for name in filenames)
+        found.extend(
+            path
+            for path in candidates
+            if language_of(path) is not None
+            and not path.name.endswith(('.min.js', '.bundle.js', '.d.ts'))
+            and path.is_file()
+        )
+    return sorted(found)
 
 
 def count_loc(text: str) -> tuple[int, int]:
