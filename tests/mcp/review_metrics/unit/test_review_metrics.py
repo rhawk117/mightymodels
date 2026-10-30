@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
     from mightymodels_mcp.review_metrics.shapes import SummaryReport
 
-pytestmark = pytest.mark.unit
 LONG = 'x = "' + 'a' * 130 + '"'
 CORE_PY = [
     'from abc import ABC, abstractmethod',
@@ -97,60 +96,64 @@ SAMPLE: dict[str, list[str]] = {
 }
 
 
-@pytest.fixture
-def sample(tmp_path: Path) -> Path:
-    root = tmp_path.joinpath('sample')
-    for name, lines in SAMPLE.items():
-        path = root.joinpath(name)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    return root
+class TestSampleTreeReport:
+    @pytest.fixture
+    def sample(self, tmp_path: Path) -> Path:
+        root = tmp_path.joinpath('sample')
+        for name, lines in SAMPLE.items():
+            path = root.joinpath(name)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        return root
 
+    @pytest.fixture
+    def report_of(self, sample: Path) -> Callable[[int], SummaryReport]:
+        def build(depth: int) -> SummaryReport:
+            metrics = collect_metrics(sample)
+            return summarize(metrics, build_module_graph(metrics), SummaryOptions(depth=depth))
 
-@pytest.fixture
-def report_of(sample: Path) -> Callable[[int], SummaryReport]:
-    def build(depth: int) -> SummaryReport:
-        metrics = collect_metrics(sample)
-        return summarize(metrics, build_module_graph(metrics), SummaryOptions(depth=depth))
+        return build
 
-    return build
+    @pytest.mark.parametrize('depth', [1, 2])
+    def test_the_report_counts_the_sample_tree(
+        self, report_of: Callable[[int], SummaryReport], depth: int
+    ) -> None:
+        report = report_of(depth)
 
+        assert report.tool == 'uncle-bob metrics.py'
+        assert (report.totals.files, report.totals.source_files, report.totals.test_files) == (
+            9,
+            7,
+            2,
+        )
+        assert set(report.totals.loc_by_language) == {'python', 'typescript', 'javascript'}
 
-@pytest.mark.parametrize('depth', [1, 2])
-def test_the_report_counts_the_sample_tree(
-    report_of: Callable[[int], SummaryReport], depth: int
-) -> None:
-    report = report_of(depth)
+    def test_the_report_lists_what_breaks_a_limit(
+        self, report_of: Callable[[int], SummaryReport]
+    ) -> None:
+        violations = report_of(1).violations
 
-    assert report.tool == 'uncle-bob metrics.py'
-    assert (report.totals.files, report.totals.source_files, report.totals.test_files) == (9, 7, 2)
-    assert set(report.totals.loc_by_language) == {'python', 'typescript', 'javascript'}
+        assert [v.name for v in violations.functions_over_3_params.worst] == ['busy', 'draw']
+        assert [v.name for v in violations.functions_over_20_loc.worst] == ['busy']
+        assert violations.functions_with_bool_params.count == 4
+        assert violations.functions_nested_deeper_than_2.count == 1
+        assert violations.long_lines_over_120_chars == 1
 
+    def test_the_package_depth_changes_the_packages_listed(
+        self,
+        report_of: Callable[[int], SummaryReport],
+    ) -> None:
+        shallow = report_of(1).component_metrics.packages
+        deep = report_of(2).component_metrics.packages
 
-def test_the_report_lists_what_breaks_a_limit(report_of: Callable[[int], SummaryReport]) -> None:
-    violations = report_of(1).violations
+        assert set(shallow) == {'tools', 'billing', 'web'}
+        assert set(deep) != set(shallow)
 
-    assert [v.name for v in violations.functions_over_3_params.worst] == ['busy', 'draw']
-    assert [v.name for v in violations.functions_over_20_loc.worst] == ['busy']
-    assert violations.functions_with_bool_params.count == 4
-    assert violations.functions_nested_deeper_than_2.count == 1
-    assert violations.long_lines_over_120_chars == 1
+    def test_the_summary_text_names_the_report_headline(
+        self,
+        report_of: Callable[[int], SummaryReport],
+    ) -> None:
+        text = render_summary(report_of(1))
 
-
-def test_the_package_depth_changes_the_packages_listed(
-    report_of: Callable[[int], SummaryReport],
-) -> None:
-    shallow = report_of(1).component_metrics.packages
-    deep = report_of(2).component_metrics.packages
-
-    assert set(shallow) == {'tools', 'billing', 'web'}
-    assert set(deep) != set(shallow)
-
-
-def test_the_summary_text_names_the_report_headline(
-    report_of: Callable[[int], SummaryReport],
-) -> None:
-    text = render_summary(report_of(1))
-
-    assert 'package' in text.lower()
-    assert text.count('\n') > 1
+        assert 'package' in text.lower()
+        assert text.count('\n') > 1

@@ -256,9 +256,10 @@ class TestGitFailures:
         assert (str(launched.refusal), launched.vectors) == ('git is not on PATH', [])
 
 
-def test_every_analysis_has_a_name() -> None:
-    assert [analysis.value for analysis in Analysis] == [
-        'code-churn',
-        'change-coupling',
-        'code-hotspots',
-    ]
+class TestAnalysisNames:
+    def test_every_analysis_has_a_name(self) -> None:
+        assert [analysis.value for analysis in Analysis] == [
+            'code-churn',
+            'change-coupling',
+            'code-hotspots',
+        ]

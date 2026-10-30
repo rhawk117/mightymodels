@@ -9,9 +9,6 @@ if TYPE_CHECKING:
     from mightymodels_mcp.review_metrics.shapes import Graph
 
 
-pytestmark = pytest.mark.unit
-
-
 class TestTarjanSccs:
     @pytest.mark.parametrize(
         ('graph', 'cycles'),
