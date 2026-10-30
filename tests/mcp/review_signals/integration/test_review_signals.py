@@ -1,20 +1,12 @@
 """Behavioral tests for the review signals domain against a real git repository."""
 
-import asyncio
-import os
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.git import GitCommand
-from mightymodels_core.process import SubprocessRunner
 from mightymodels_mcp.review_signals.errors import GitFailedError, TargetOutsideError
-from mightymodels_mcp.review_signals.history import load_history
-from mightymodels_mcp.review_signals.reports import change_coupling, code_churn, code_hotspots
 from mightymodels_mcp.review_signals.schemas import (
     ChangeCouplingRequest,
     CodeChurnRequest,
-    CodeHotspotsRequest,
     HistoryWindowRequest,
 )
 from mightymodels_mcp.review_signals.views import (
@@ -24,57 +16,14 @@ from mightymodels_mcp.review_signals.views import (
     HotspotSignal,
 )
 
-from tests.core.git.git_builders import run_git
+from tests.mcp.review_signals.git_harness import Repo
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mightymodels_mcp.review_signals.history import History
     from mightymodels_mcp.review_signals.views import Report
 
 CAPPED = 2
-
-
-@dataclass(frozen=True, slots=True)
-class Repo:
-    root: Path
-
-    def git(self, *args: str) -> str:
-        return asyncio.run(run_git(self.root, *args))
-
-    def commit(self, files: dict[str, str]) -> str:
-        for name, text in files.items():
-            path = self.root.joinpath(name)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding='utf-8')
-            self.git('add', name)
-        self.git('commit', '-q', '-m', 'change')
-        return self.git('rev-parse', 'HEAD')
-
-    def load(self, options: HistoryWindowRequest) -> History:
-        return asyncio.run(
-            load_history(
-                options, GitCommand(root=self.root, executable='git', processes=SubprocessRunner())
-            )
-        )
-
-    def churn(self, options: CodeChurnRequest | None = None) -> Report[ChurnSignal]:
-        options = options or CodeChurnRequest()
-        return code_churn(self.load(options), options)
-
-    def coupling(self, options: ChangeCouplingRequest | None = None) -> Report[CouplingSignal]:
-        options = options or ChangeCouplingRequest()
-        return change_coupling(self.load(options), options)
-
-    def hotspots(self, options: CodeHotspotsRequest | None = None) -> Report[HotspotSignal]:
-        options = options or CodeHotspotsRequest()
-        return code_hotspots(self.load(options), options)
-
-
-@pytest.fixture
-def clean_git_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in [name for name in os.environ if name.startswith('GIT_')]:
-        monkeypatch.delenv(name)
 
 
 @pytest.fixture
@@ -168,6 +117,19 @@ class TestCodeHotspots:
         repo.git('commit', '-q', '-m', 'drop')
         assert repo.hotspots().signals == []
 
+    def test_hotspots_skip_an_unreadable_file(self, repo: Repo) -> None:
+        repo.commit({'open.py': 'if x:\n    y\n', 'locked.py': 'if x:\n    y\n'})
+        repo.root.joinpath('locked.py').chmod(0)
+        try:
+            report = repo.hotspots()
+        finally:
+            repo.root.joinpath('locked.py').chmod(0o644)
+
+        assert [signal.subject for signal in report.signals] == ['open.py']
+        assert (
+            'binary files, files over 2 MB and unreadable files are skipped' in report.limitations
+        )
+
 
 @pytest.mark.usefixtures('clean_git_environment')
 class TestRefusals:
@@ -181,16 +143,3 @@ class TestRefusals:
         lone.root.mkdir()
         with pytest.raises(GitFailedError, match='git log failed'):
             lone.load(HistoryWindowRequest())
-
-
-@pytest.mark.usefixtures('clean_git_environment')
-def test_hotspots_skip_an_unreadable_file(repo: Repo) -> None:
-    repo.commit({'open.py': 'if x:\n    y\n', 'locked.py': 'if x:\n    y\n'})
-    repo.root.joinpath('locked.py').chmod(0)
-    try:
-        report = repo.hotspots()
-    finally:
-        repo.root.joinpath('locked.py').chmod(0o644)
-
-    assert [signal.subject for signal in report.signals] == ['open.py']
-    assert 'binary files, files over 2 MB and unreadable files are skipped' in report.limitations

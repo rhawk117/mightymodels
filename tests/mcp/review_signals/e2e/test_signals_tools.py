@@ -12,7 +12,7 @@ from mightymodels_mcp.review_signals.reports import code_hotspots
 from mightymodels_mcp.server.app import create_server
 
 from tests.core.git.git_builders import run_git
-from tests.mcp.server.server_harness import view_of
+from tests.mcp.server.server_harness import Ticker, view_of
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -30,7 +30,6 @@ FILE_COUNT = 30
 COUPLED_FILES = 8
 COUPLED_COMMITS = 3
 SLOW_SECONDS = 0.4
-TICK_SECONDS = 0.02
 MIN_TICKS = 5
 
 
@@ -46,36 +45,6 @@ async def commit(server: ServerHarness, names: list[str]) -> None:
         path.write_text(f'def {path.stem}():\n    return 1\n', encoding='utf-8')
         await run_git(server.repository, 'add', name)
     await run_git(server.repository, 'commit', '-q', '-m', 'change')
-
-
-@pytest.fixture
-def ticker() -> Ticker:
-    return Ticker()
-
-
-@pytest.fixture
-async def history(server_harness: ServerHarness) -> ServerHarness:
-    for index in range(FILE_COUNT):
-        await commit(server_harness, [f'file_{index:02}.py'])
-
-    coupled = [f'coupled_{index}.py' for index in range(COUPLED_FILES)]
-    for round_number in range(COUPLED_COMMITS):
-        for name in coupled:
-            path = server_harness.repository.joinpath(name)
-            path.write_text(f'VALUE = {round_number}\n', encoding='utf-8')
-        await run_git(server_harness.repository, 'add', '.')
-        await run_git(server_harness.repository, 'commit', '-q', '-m', 'together')
-    return server_harness
-
-
-class Ticker:
-    def __init__(self) -> None:
-        self.ticks = 0
-
-    async def run(self, done: anyio.Event) -> None:
-        while not done.is_set():
-            await anyio.sleep(TICK_SECONDS)
-            self.ticks += 1
 
 
 @dataclass(slots=True, kw_only=True)
@@ -124,12 +93,34 @@ def slow_stand_in_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('target', [report.param, parsing.param])
 
 
+def signal_tool_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('name', TOOLS)
+
+
 def signals_of(result: CallToolResult) -> list[dict[str, Any]]:
     return view_of(result)['signals']
 
 
 class TestSignalsTools:
-    @pytest.mark.parametrize('name', TOOLS)
+    @pytest.fixture
+    async def history(self, server_harness: ServerHarness) -> ServerHarness:
+        for index in range(FILE_COUNT):
+            await commit(server_harness, [f'file_{index:02}.py'])
+
+        coupled = [f'coupled_{index}.py' for index in range(COUPLED_FILES)]
+        for round_number in range(COUPLED_COMMITS):
+            for name in coupled:
+                path = server_harness.repository.joinpath(name)
+                path.write_text(f'VALUE = {round_number}\n', encoding='utf-8')
+            await run_git(server_harness.repository, 'add', '.')
+            await run_git(server_harness.repository, 'commit', '-q', '-m', 'together')
+        return server_harness
+
+    @pytest.fixture
+    def ticker(self) -> Ticker:
+        return Ticker()
+
+    @signal_tool_cases()
     async def test_default_result_is_structured_and_small(
         self, history: ServerHarness, name: str
     ) -> None:
@@ -139,13 +130,13 @@ class TestSignalsTools:
         assert len(json.dumps(view_of(result))) < RESULT_LIMIT
         assert len(signals) == DEFAULT_LIMIT
 
-    @pytest.mark.parametrize('name', TOOLS)
+    @signal_tool_cases()
     async def test_limit_caps_the_signals(self, history: ServerHarness, name: str) -> None:
         result = await call(history, name, {'limit': CAPPED})
 
         assert len(signals_of(result)) == CAPPED
 
-    @pytest.mark.parametrize('name', TOOLS)
+    @signal_tool_cases()
     async def test_target_starting_with_a_dash_reaches_git_after_the_separator(
         self, history: ServerHarness, name: str
     ) -> None:
@@ -154,7 +145,7 @@ class TestSignalsTools:
         assert signals_of(result) == []
         assert not history.repository.joinpath('pwned').exists()
 
-    @pytest.mark.parametrize('name', TOOLS)
+    @signal_tool_cases()
     async def test_baseline_ref_starting_with_a_dash_is_refused(
         self, history: ServerHarness, name: str
     ) -> None:
@@ -163,7 +154,7 @@ class TestSignalsTools:
         assert result.is_error
         assert not history.repository.joinpath('pwned').exists()
 
-    @pytest.mark.parametrize('name', TOOLS)
+    @signal_tool_cases()
     async def test_target_outside_the_repository_is_a_tool_error(
         self, history: ServerHarness, name: str
     ) -> None:
@@ -172,7 +163,7 @@ class TestSignalsTools:
         assert result.is_error
         assert 'outside the repository' in str(result.content)
 
-    @pytest.mark.parametrize('name', TOOLS)
+    @signal_tool_cases()
     async def test_zero_limit_is_refused(self, history: ServerHarness, name: str) -> None:
         result = await call(history, name, {'limit': 0})
 

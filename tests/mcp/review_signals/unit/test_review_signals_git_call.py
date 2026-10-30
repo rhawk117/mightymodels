@@ -1,88 +1,44 @@
 """The git launch of the review signals domain, against a runner that records what it is asked."""
 
-import asyncio
-from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Self
+from dataclasses import replace
+from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.git import GIT_TIMEOUT_SECONDS, GitCommand
+from mightymodels_core.git import GIT_TIMEOUT_SECONDS
 from mightymodels_core.process import CompletedRun, FailedRun
 from mightymodels_mcp.review_signals.errors import (
     GitFailedError,
     GitMissingError,
-    SignalsError,
     TargetNotUnicodeError,
     TargetOutsideError,
 )
-from mightymodels_mcp.review_signals.history import load_history
 from mightymodels_mcp.review_signals.schemas import HistoryWindowRequest
 from mightymodels_mcp.review_signals.views import Analysis
 
 from tests.core.git.fakes import ScriptedRunner
+from tests.mcp.review_signals.git_harness import GIT, NO_COMMITS, Checkout
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.process import RunOutcome
 
-GIT = '/opt/git/bin/git'
-LOG_OPTIONS = [
-    '--literal-pathspecs',
-    'log',
-    '--no-merges',
-    '--no-renames',
-    '--numstat',
-    '--format=%x1e%H',
-]
-NO_COMMITS = CompletedRun(exit=0, stdout='', stderr='')
+NON_UTF8_NAME = 'caf\udce9'
+LINK_NAME = 'link'
 
 
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Launched:
-    vectors: list[list[str]]
-    refusal: SignalsError | None
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Checkout:
-    root: Path
-    executable: str | None
-    runner: ScriptedRunner
-
-    @property
-    def log(self) -> list[str]:
-        return [GIT, '-C', str(self.root), *LOG_OPTIONS]
-
-    def answering(self, outcome: RunOutcome) -> Self:
-        return replace(self, runner=ScriptedRunner(reply=outcome))
-
-    def launch(self, options: HistoryWindowRequest) -> Launched:
-        git = GitCommand(root=self.root, executable=self.executable, processes=self.runner)
-        refusal: SignalsError | None = None
-        try:
-            asyncio.run(load_history(options, git))
-        except SignalsError as error:
-            refusal = error
-        vectors = [list(run.argv) for run in self.runner.runs]
-        return Launched(vectors=vectors, refusal=refusal)
-
-
-@pytest.fixture
-def checkout(tmp_path: Path) -> Checkout:
-    root = tmp_path.joinpath('checkout')
-    root.joinpath('.git').mkdir(parents=True)
-    return Checkout(root=root, executable=GIT, runner=ScriptedRunner(reply=NO_COMMITS))
-
-
-class TestGitLogArgumentVector:
-    @pytest.mark.parametrize(
+def target_scope_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         ('target_fields', 'target'),
         [
             pytest.param({}, [], id='whole-repository'),
             pytest.param({'target': 'src'}, ['src'], id='target'),
         ],
     )
-    @pytest.mark.parametrize(
+
+
+def window_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         ('window_fields', 'window'),
         [
             pytest.param({}, ['--max-count=500', 'HEAD'], id='default-window'),
@@ -110,24 +66,10 @@ class TestGitLogArgumentVector:
             ),
         ],
     )
-    def test_git_is_passed_the_vector_built_for_the_window(
-        self,
-        checkout: Checkout,
-        window_fields: dict[str, object],
-        window: list[str],
-        target_fields: dict[str, object],
-        target: list[str],
-    ) -> None:
-        options = HistoryWindowRequest.model_validate({**window_fields, **target_fields})
 
-        launched = checkout.launch(options)
 
-        assert (launched.refusal, launched.vectors) == (
-            None,
-            [[*checkout.log, *window, '--', *target]],
-        )
-
-    @pytest.mark.parametrize(
+def argument_value_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         ('fields', 'values'),
         [
             pytest.param(
@@ -152,78 +94,24 @@ class TestGitLogArgumentVector:
             ),
         ],
     )
-    def test_each_value_is_one_element_and_the_target_follows_the_separator(
-        self, checkout: Checkout, fields: dict[str, object], values: list[str]
-    ) -> None:
-        launched = checkout.launch(HistoryWindowRequest.model_validate(fields))
-
-        assert launched.vectors == [[*checkout.log, *values]]
-
-    def test_git_runs_once_in_the_checkout_under_the_git_timeout(self, checkout: Checkout) -> None:
-        checkout.launch(HistoryWindowRequest())
-
-        assert [(run.timeout, run.argv[2]) for run in checkout.runner.runs] == [
-            (GIT_TIMEOUT_SECONDS, str(checkout.root))
-        ]
 
 
-class TestTargetThatIsNotUnicode:
-    NAME = 'caf\udce9'
-    LINK = 'link'
-    REASON = "target resolves to 'caf\\udce9', which is not valid Unicode"
-
-    @pytest.fixture
-    def linked(self, checkout: Checkout) -> Checkout:
-        checkout.root.joinpath(self.NAME).mkdir()
-        checkout.root.joinpath(self.LINK).symlink_to(self.NAME, target_is_directory=True)
-        return checkout
-
-    @pytest.mark.parametrize(
+def non_unicode_target_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         'target',
         [
-            pytest.param(NAME, id='lone-surrogate'),
-            pytest.param(LINK, id='symlink-to-a-name-that-is-not-utf8'),
+            pytest.param(NON_UTF8_NAME, id='lone-surrogate'),
+            pytest.param(LINK_NAME, id='symlink-to-a-name-that-is-not-utf8'),
         ],
     )
-    def test_it_is_rejected_before_git_runs(self, linked: Checkout, target: str) -> None:
-        launched = linked.launch(HistoryWindowRequest(target=target))
-
-        assert isinstance(launched.refusal, TargetNotUnicodeError)
-        assert (str(launched.refusal), launched.vectors) == (self.REASON, [])
 
 
-class TestRefusedTargets:
-    @pytest.mark.parametrize('target', ['../..', '/etc'])
-    def test_a_target_outside_the_repository_is_rejected_before_git_runs(
-        self, checkout: Checkout, target: str
-    ) -> None:
-        launched = checkout.launch(HistoryWindowRequest(target=target))
-
-        assert isinstance(launched.refusal, TargetOutsideError)
-        assert (str(launched.refusal), launched.vectors) == (
-            f'target {target!r} is outside the repository',
-            [],
-        )
-
-    def test_a_pathspec_shaped_target_is_passed_as_a_literal_path(self, checkout: Checkout) -> None:
-        launched = checkout.launch(HistoryWindowRequest(target=':(exclude)ok.py'))
-
-        assert launched.vectors == [
-            [*checkout.log, '--max-count=500', 'HEAD', '--', ':(exclude)ok.py'],
-        ]
-        assert checkout.log[3] == '--literal-pathspecs'
-
-    def test_a_target_holding_a_nul_byte_is_rejected_before_git_runs(
-        self, checkout: Checkout
-    ) -> None:
-        launched = checkout.launch(HistoryWindowRequest(target='a\0b'))
-
-        assert isinstance(launched.refusal, TargetOutsideError)
-        assert launched.vectors == []
+def outside_target_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('target', ['../..', '/etc'])
 
 
-class TestGitFailures:
-    @pytest.mark.parametrize(
+def git_failure_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         ('outcome', 'reason'),
         [
             pytest.param(
@@ -258,6 +146,102 @@ class TestGitFailures:
             ),
         ],
     )
+
+
+@pytest.fixture
+def checkout(tmp_path: Path) -> Checkout:
+    root = tmp_path.joinpath('checkout')
+    root.joinpath('.git').mkdir(parents=True)
+    return Checkout(root=root, executable=GIT, runner=ScriptedRunner(reply=NO_COMMITS))
+
+
+class TestGitLogArgumentVector:
+    @target_scope_cases()
+    @window_cases()
+    def test_git_is_passed_the_vector_built_for_the_window(
+        self,
+        checkout: Checkout,
+        window_fields: dict[str, object],
+        window: list[str],
+        target_fields: dict[str, object],
+        target: list[str],
+    ) -> None:
+        options = HistoryWindowRequest.model_validate({**window_fields, **target_fields})
+
+        launched = checkout.launch(options)
+
+        assert (launched.refusal, launched.vectors) == (
+            None,
+            [[*checkout.log, *window, '--', *target]],
+        )
+
+    @argument_value_cases()
+    def test_each_value_is_one_element_and_the_target_follows_the_separator(
+        self, checkout: Checkout, fields: dict[str, object], values: list[str]
+    ) -> None:
+        launched = checkout.launch(HistoryWindowRequest.model_validate(fields))
+
+        assert launched.vectors == [[*checkout.log, *values]]
+
+    def test_git_runs_once_in_the_checkout_under_the_git_timeout(self, checkout: Checkout) -> None:
+        checkout.launch(HistoryWindowRequest())
+
+        assert [(run.timeout, run.argv[2]) for run in checkout.runner.runs] == [
+            (GIT_TIMEOUT_SECONDS, str(checkout.root))
+        ]
+
+
+class TestTargetThatIsNotUnicode:
+    NAME = NON_UTF8_NAME
+    LINK = LINK_NAME
+    REASON = "target resolves to 'caf\\udce9', which is not valid Unicode"
+
+    @pytest.fixture
+    def linked(self, checkout: Checkout) -> Checkout:
+        checkout.root.joinpath(self.NAME).mkdir()
+        checkout.root.joinpath(self.LINK).symlink_to(self.NAME, target_is_directory=True)
+        return checkout
+
+    @non_unicode_target_cases()
+    def test_it_is_rejected_before_git_runs(self, linked: Checkout, target: str) -> None:
+        launched = linked.launch(HistoryWindowRequest(target=target))
+
+        assert isinstance(launched.refusal, TargetNotUnicodeError)
+        assert (str(launched.refusal), launched.vectors) == (self.REASON, [])
+
+
+class TestRefusedTargets:
+    @outside_target_cases()
+    def test_a_target_outside_the_repository_is_rejected_before_git_runs(
+        self, checkout: Checkout, target: str
+    ) -> None:
+        launched = checkout.launch(HistoryWindowRequest(target=target))
+
+        assert isinstance(launched.refusal, TargetOutsideError)
+        assert (str(launched.refusal), launched.vectors) == (
+            f'target {target!r} is outside the repository',
+            [],
+        )
+
+    def test_a_pathspec_shaped_target_is_passed_as_a_literal_path(self, checkout: Checkout) -> None:
+        launched = checkout.launch(HistoryWindowRequest(target=':(exclude)ok.py'))
+
+        assert launched.vectors == [
+            [*checkout.log, '--max-count=500', 'HEAD', '--', ':(exclude)ok.py'],
+        ]
+        assert checkout.log[3] == '--literal-pathspecs'
+
+    def test_a_target_holding_a_nul_byte_is_rejected_before_git_runs(
+        self, checkout: Checkout
+    ) -> None:
+        launched = checkout.launch(HistoryWindowRequest(target='a\0b'))
+
+        assert isinstance(launched.refusal, TargetOutsideError)
+        assert launched.vectors == []
+
+
+class TestGitFailures:
+    @git_failure_cases()
     def test_a_git_that_fails_is_rejected_with_its_reason(
         self, checkout: Checkout, outcome: RunOutcome, reason: str
     ) -> None:

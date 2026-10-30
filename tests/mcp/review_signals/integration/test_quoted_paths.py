@@ -23,23 +23,6 @@ def clean_git_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name)
 
 
-@pytest.mark.usefixtures('clean_git_environment')
-def test_churn_lists_a_non_ascii_file_under_its_exact_name(tmp_path: Path) -> None:
-    asyncio.run(run_git(tmp_path, 'init', '-q'))
-    tmp_path.joinpath(NAME).write_text('a\n', encoding='utf-8')
-    asyncio.run(run_git(tmp_path, 'add', NAME))
-    asyncio.run(run_git(tmp_path, 'commit', '-q', '-m', 'add'))
-    options = HistoryWindowRequest()
-
-    history = asyncio.run(
-        load_history(
-            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
-        )
-    )
-
-    assert [signal.subject for signal in code_churn(history, options).signals] == [NAME]
-
-
 def commit_names(root: Path, names: list[bytes]) -> None:
     asyncio.run(run_git(root, 'init', '-q'))
     for name in names:
@@ -49,50 +32,62 @@ def commit_names(root: Path, names: list[bytes]) -> None:
 
 
 @pytest.mark.usefixtures('clean_git_environment')
-def test_churn_lists_a_file_name_holding_a_double_quote(tmp_path: Path) -> None:
-    commit_names(tmp_path, [b'a"b.py', b'tab\tname.py'])
-    options = HistoryWindowRequest()
+class TestQuotedPaths:
+    def test_churn_lists_a_non_ascii_file_under_its_exact_name(self, tmp_path: Path) -> None:
+        asyncio.run(run_git(tmp_path, 'init', '-q'))
+        tmp_path.joinpath(NAME).write_text('a\n', encoding='utf-8')
+        asyncio.run(run_git(tmp_path, 'add', NAME))
+        asyncio.run(run_git(tmp_path, 'commit', '-q', '-m', 'add'))
+        options = HistoryWindowRequest()
 
-    history = asyncio.run(
-        load_history(
-            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+        history = asyncio.run(
+            load_history(
+                options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+            )
         )
-    )
 
-    assert [signal.subject for signal in code_churn(history, options).signals] == [
-        'a"b.py',
-        'tab\tname.py',
-    ]
+        assert [signal.subject for signal in code_churn(history, options).signals] == [NAME]
 
+    def test_churn_lists_a_file_name_holding_a_double_quote(self, tmp_path: Path) -> None:
+        commit_names(tmp_path, [b'a"b.py', b'tab\tname.py'])
+        options = HistoryWindowRequest()
 
-@pytest.mark.skipif(sys.platform == 'darwin', reason='APFS rejects non-UTF-8 names')
-@pytest.mark.usefixtures('clean_git_environment')
-def test_churn_succeeds_and_notes_a_file_name_that_is_not_utf8(tmp_path: Path) -> None:
-    commit_names(tmp_path, [b'bad\xff.py', b'ok.py'])
-    options = HistoryWindowRequest()
-
-    history = asyncio.run(
-        load_history(
-            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+        history = asyncio.run(
+            load_history(
+                options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+            )
         )
-    )
-    report = code_churn(history, options)
 
-    assert [signal.subject for signal in report.signals] == ['ok.py']
-    assert any(
-        '1 changed paths whose names are not valid UTF-8' in note for note in report.limitations
-    )
+        assert [signal.subject for signal in code_churn(history, options).signals] == [
+            'a"b.py',
+            'tab\tname.py',
+        ]
 
+    @pytest.mark.skipif(sys.platform == 'darwin', reason='APFS rejects non-UTF-8 names')
+    def test_churn_succeeds_and_notes_a_file_name_that_is_not_utf8(self, tmp_path: Path) -> None:
+        commit_names(tmp_path, [b'bad\xff.py', b'ok.py'])
+        options = HistoryWindowRequest()
 
-@pytest.mark.usefixtures('clean_git_environment')
-def test_a_pathspec_magic_target_scans_no_commits(tmp_path: Path) -> None:
-    commit_names(tmp_path, [b'ok.py'])
-    options = HistoryWindowRequest(target=':(exclude)ok.py')
-
-    history = asyncio.run(
-        load_history(
-            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+        history = asyncio.run(
+            load_history(
+                options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+            )
         )
-    )
+        report = code_churn(history, options)
 
-    assert history.commits == []
+        assert [signal.subject for signal in report.signals] == ['ok.py']
+        assert any(
+            '1 changed paths whose names are not valid UTF-8' in note for note in report.limitations
+        )
+
+    def test_a_pathspec_magic_target_scans_no_commits(self, tmp_path: Path) -> None:
+        commit_names(tmp_path, [b'ok.py'])
+        options = HistoryWindowRequest(target=':(exclude)ok.py')
+
+        history = asyncio.run(
+            load_history(
+                options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+            )
+        )
+
+        assert history.commits == []
