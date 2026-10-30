@@ -10,6 +10,7 @@ from mcp.types import ToolAnnotations
 from mightymodels_core.edge import DataDirectoryMissingError
 from mightymodels_mcp.server.call_log import CALL_LOGGER_NAME
 from mightymodels_mcp.server.icons import load_icon
+from mightymodels_mcp.server.published_schema import inline_refs
 from mightymodels_mcp.server.registration import (
     DuplicateToolNameError,
     IncompleteToolAnnotationsError,
@@ -162,7 +163,7 @@ class TestToolCatalog:
 
     def test_registered_tool_publishes_the_request_schema(self, catalog: ToolCatalog) -> None:
         tool = catalog.register(create_note_definition()).tools['echo_note']
-        assert tool.parameters == NoteRequest.model_json_schema(by_alias=True)
+        assert tool.parameters == inline_refs(NoteRequest.model_json_schema(by_alias=True))
 
     @incomplete_definition_cases()
     def test_incomplete_definition_is_refused(
@@ -222,7 +223,7 @@ class TestResolvingTool:
         assert marker.fn.__wrapped__ is NOTE_RESOLVER.fn
         assert wants_union
         assert len(tool.resolver_plans) == 1
-        assert tool.parameters == NoteRequest.model_json_schema(by_alias=True)
+        assert tool.parameters == inline_refs(NoteRequest.model_json_schema(by_alias=True))
 
     @incomplete_definition_cases()
     def test_incomplete_resolving_definition_is_refused(
