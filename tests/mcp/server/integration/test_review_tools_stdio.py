@@ -1,47 +1,33 @@
 import json
-import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from mcp.client.client import Client
-from mcp.client.stdio import StdioServerParameters
 from mightymodels_core.edge import DATABASE_NAME
 from mightymodels_mcp.review_metrics.use_cases import METRICS_FILE
-from pydantic import BaseModel, Field
 
 from tests.core.git.git_builders import run_git
+from tests.mcp.server.integration.launch_builder import (
+    CHECKOUT,
+    SERVER_NAME,
+    create_launch_parameters,
+    load_declared_servers,
+)
 from tests.mcp.server.server_harness import view_of
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    from mcp.client.stdio import StdioServerParameters
+
     from tests.mcp.server.server_harness import ServerHarness
-
-CHECKOUT = Path(__file__).resolve().parents[4]
-PLUGIN_ROOT_VARIABLE = '${CLAUDE_PLUGIN_ROOT}'
-ENVIRONMENT_VARIABLE = 'UV_PROJECT_ENVIRONMENT'
-CACHE_VARIABLE = 'UV_CACHE_DIR'
-SERVER_NAME = 'workflow_state'
-
-
-class DeclaredServer(BaseModel):
-    command: str
-    args: list[str]
-    env: dict[str, str]
-
-
-class PluginMcpConfig(BaseModel):
-    servers: dict[str, DeclaredServer] = Field(alias='mcpServers')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Launched:
     parameters: StdioServerParameters
     server: ServerHarness
-
-
-def expand(value: str) -> str:
-    return value.replace(PLUGIN_ROOT_VARIABLE, str(CHECKOUT))
 
 
 class TestReviewToolsOverStdio:
@@ -62,25 +48,10 @@ class TestReviewToolsOverStdio:
             await run_git(server_harness.repository, 'add', '.')
             await run_git(server_harness.repository, 'commit', '-q', '-m', 'together')
 
-        declared = PluginMcpConfig.model_validate_json(
-            CHECKOUT.joinpath('mcp-servers', 'workflow_state.json').read_text()
-        ).servers[SERVER_NAME]
-        inherited = {
-            name: os.environ[name]
-            for name in ('PATH', 'HOME', CACHE_VARIABLE)
-            if name in os.environ
-        }
-        environ = {
-            **inherited,
-            **{name: expand(value) for name, value in declared.env.items()},
-            **server_harness.environ,
-            ENVIRONMENT_VARIABLE: str(tmp_path.joinpath('venv')),
-        }
-        parameters = StdioServerParameters(
-            command=declared.command,
-            args=[expand(argument) for argument in declared.args],
-            env=environ,
-            cwd=server_harness.repository,
+        parameters = create_launch_parameters(
+            declared=load_declared_servers()[SERVER_NAME],
+            server_harness=server_harness,
+            environment_directory=tmp_path.joinpath('venv'),
         )
         return Launched(parameters=parameters, server=server_harness)
 
