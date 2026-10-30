@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_mcp.review_signals.errors import NoRepositoryError, TargetOutsideError
-from mightymodels_mcp.review_signals.history import create_git_source, load_history
+from mightymodels_core.git import GitCommand
+from mightymodels_core.process import SubprocessRunner
+from mightymodels_mcp.review_signals.errors import GitFailedError, TargetOutsideError
+from mightymodels_mcp.review_signals.history import load_history
 from mightymodels_mcp.review_signals.options import SignalsOptions
 from mightymodels_mcp.review_signals.reports import (
     ChurnSignal,
@@ -47,7 +49,11 @@ class Repo:
         return self.git('rev-parse', 'HEAD')
 
     def load(self, options: SignalsOptions) -> History:
-        return asyncio.run(load_history(options, create_git_source(self.root)))
+        return asyncio.run(
+            load_history(
+                options, GitCommand(root=self.root, executable='git', processes=SubprocessRunner())
+            )
+        )
 
     def churn(self, options: SignalsOptions | None = None) -> Report[ChurnSignal]:
         options = options or SignalsOptions()
@@ -170,7 +176,7 @@ class TestRefusals:
     def test_outside_a_repository_is_refused(self, tmp_path: Path) -> None:
         lone = Repo(root=tmp_path.joinpath('lone'))
         lone.root.mkdir()
-        with pytest.raises(NoRepositoryError, match='not inside a git repository'):
+        with pytest.raises(GitFailedError, match='git log failed'):
             lone.load(SignalsOptions())
 
 

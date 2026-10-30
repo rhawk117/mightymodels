@@ -6,7 +6,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from mightymodels_mcp.review_signals.history import create_git_source, load_history
+from mightymodels_core.git import GitCommand
+from mightymodels_core.process import SubprocessRunner
+from mightymodels_mcp.review_signals.history import load_history
 from mightymodels_mcp.review_signals.options import SignalsOptions
 from mightymodels_mcp.review_signals.reports import code_churn
 
@@ -29,7 +31,11 @@ def test_churn_lists_a_non_ascii_file_under_its_exact_name(tmp_path: Path) -> No
     asyncio.run(run_git(tmp_path, 'commit', '-q', '-m', 'add'))
     options = SignalsOptions()
 
-    history = asyncio.run(load_history(options, create_git_source(tmp_path)))
+    history = asyncio.run(
+        load_history(
+            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+        )
+    )
 
     assert [signal.subject for signal in code_churn(history, options).signals] == [NAME]
 
@@ -47,7 +53,11 @@ def test_churn_lists_a_file_name_holding_a_double_quote(tmp_path: Path) -> None:
     commit_names(tmp_path, [b'a"b.py', b'tab\tname.py'])
     options = SignalsOptions()
 
-    history = asyncio.run(load_history(options, create_git_source(tmp_path)))
+    history = asyncio.run(
+        load_history(
+            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+        )
+    )
 
     assert [signal.subject for signal in code_churn(history, options).signals] == [
         'a"b.py',
@@ -61,7 +71,11 @@ def test_churn_succeeds_and_notes_a_file_name_that_is_not_utf8(tmp_path: Path) -
     commit_names(tmp_path, [b'bad\xff.py', b'ok.py'])
     options = SignalsOptions()
 
-    history = asyncio.run(load_history(options, create_git_source(tmp_path)))
+    history = asyncio.run(
+        load_history(
+            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+        )
+    )
     report = code_churn(history, options)
 
     assert [signal.subject for signal in report.signals] == ['ok.py']
@@ -75,6 +89,10 @@ def test_a_pathspec_magic_target_scans_no_commits(tmp_path: Path) -> None:
     commit_names(tmp_path, [b'ok.py'])
     options = SignalsOptions(target=':(exclude)ok.py')
 
-    history = asyncio.run(load_history(options, create_git_source(tmp_path)))
+    history = asyncio.run(
+        load_history(
+            options, GitCommand(root=tmp_path, executable='git', processes=SubprocessRunner())
+        )
+    )
 
     assert history.commits == []

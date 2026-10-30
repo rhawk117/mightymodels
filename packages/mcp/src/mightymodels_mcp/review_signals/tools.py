@@ -1,7 +1,8 @@
 """The review signals tools: git history measurements, returned inline as structured results.
 
-The state is opened only to read the checkout's root. Git runs through the async process runner,
-and the report computation runs in a worker thread, so the event loop stays free.
+The state is opened only to build the git command for the checkout's root. Git runs through the
+async process runner, and the report computation runs in a worker thread, so the event loop
+stays free.
 """
 
 from typing import TYPE_CHECKING
@@ -11,7 +12,7 @@ from anyio import to_thread
 from mightymodels_mcp.server.annotations import READS
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
-from .history import create_git_source, load_history
+from .history import load_history
 from .reports import (
     ChurnSignal,
     CouplingSignal,
@@ -21,23 +22,23 @@ from .reports import (
     code_hotspots,
 )
 from .schemas import ChangeCouplingRequest, CodeChurnRequest, CodeHotspotsRequest, Report
-from .use_cases import options_of, root_of
+from .use_cases import create_git_command, options_of
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from mightymodels_core.git import GitCommand
 
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
 
 
-async def read_root(ctx: ToolContext) -> Path:
+async def read_git(ctx: ToolContext) -> GitCommand:
     async with open_tool_state(ctx) as state:
-        return root_of(state)
+        return create_git_command(state)
 
 
 async def signals_code_churn(request: CodeChurnRequest, ctx: ToolContext) -> Report[ChurnSignal]:
     """Rank the files in a git history window by commits and lines changed."""
     options = options_of(request)
-    history = await load_history(options, create_git_source(await read_root(ctx)))
+    history = await load_history(options, await read_git(ctx))
     return await to_thread.run_sync(code_churn, history, options)
 
 
@@ -46,7 +47,7 @@ async def signals_change_coupling(
 ) -> Report[CouplingSignal]:
     """Rank the file pairs that change together in a git history window."""
     options = options_of(request)
-    history = await load_history(options, create_git_source(await read_root(ctx)))
+    history = await load_history(options, await read_git(ctx))
     return await to_thread.run_sync(change_coupling, history, options)
 
 
@@ -55,7 +56,7 @@ async def signals_code_hotspots(
 ) -> Report[HotspotSignal]:
     """Rank the files that change often and are complex now."""
     options = options_of(request)
-    history = await load_history(options, create_git_source(await read_root(ctx)))
+    history = await load_history(options, await read_git(ctx))
     return await to_thread.run_sync(code_hotspots, history, options)
 
 

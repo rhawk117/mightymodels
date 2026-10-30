@@ -7,18 +7,14 @@ or does not answer, and a git that exits non-zero each surface as a `SignalsErro
 """
 
 import re
-import shutil
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from anyio import to_thread
-from mightymodels_core.git import GIT_TIMEOUT_SECONDS
-from mightymodels_core.process import FailedRun, get_process_runner
 
 from .errors import (
     GitFailedError,
     GitMissingError,
-    NoRepositoryError,
     TargetNotUnicodeError,
     TargetOutsideError,
 )
@@ -27,7 +23,7 @@ from .schemas import Report, ScannedHistory
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mightymodels_core.process import ProcessRunner
+    from mightymodels_core.git import GitCommand
 
     from .options import SignalsOptions
     from .schemas import Analysis
@@ -46,18 +42,6 @@ SIMPLE_ESCAPES: dict[bytes, bytes] = {
     b't': b'\t',
     b'v': b'\v',
 }
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class GitSource:
-    root: Path
-    executable: str | None
-    processes: ProcessRunner
-    timeout: float = GIT_TIMEOUT_SECONDS
-
-
-def create_git_source(root: Path) -> GitSource:
-    return GitSource(root=root, executable=shutil.which('git'), processes=get_process_runner())
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -126,16 +110,6 @@ class History:
         return notes
 
 
-def repository_root(start: Path) -> Path:
-    candidates = (start, *start.parents)
-    root = next(
-        (candidate for candidate in candidates if candidate.joinpath('.git').exists()), None
-    )
-    if root is None:
-        raise NoRepositoryError(cwd=start)
-    return root
-
-
 def checked_target(root: Path, target: str | None) -> str:
     if target is None or target == '':
         return ''
@@ -159,9 +133,8 @@ def window_from(options: SignalsOptions) -> Window:
     return Window(since=options.since, baseline_ref=options.baseline_ref, max_commits=limit)
 
 
-def log_argv(git: str, target: str, window: Window) -> list[str]:
+def log_argv(target: str, window: Window) -> list[str]:
     argv = [
-        git,
         '--literal-pathspecs',
         'log',
         '--no-merges',
@@ -233,17 +206,10 @@ def without_deleted_files(root: Path, commit: Commit) -> Commit:
 class Located:
     root: Path
     target: str
-    executable: str
 
 
-def locate_target(git: GitSource, options: SignalsOptions) -> Located:
-    root = repository_root(git.root)
-    if git.executable is None:
-        raise GitMissingError
-
-    return Located(
-        root=root, target=checked_target(root, options.target), executable=git.executable
-    )
+def locate_target(root: Path, options: SignalsOptions) -> Located:
+    return Located(root=root, target=checked_target(root, options.target))
 
 
 def history_from_output(located: Located, window: Window, stdout: str) -> History:
@@ -251,15 +217,14 @@ def history_from_output(located: Located, window: Window, stdout: str) -> Histor
     return History(root=located.root, target=located.target, window=window, commits=commits)
 
 
-async def load_history(options: SignalsOptions, git: GitSource) -> History:
-    located = await to_thread.run_sync(locate_target, git, options)
+async def load_history(options: SignalsOptions, command: GitCommand) -> History:
+    if command.executable is None:
+        raise GitMissingError
+
+    located = await to_thread.run_sync(locate_target, command.root, options)
     window = window_from(options)
-    argv = log_argv(located.executable, located.target, window)
-    run = await git.processes.run(argv, timeout=git.timeout, cwd=located.root)
-    if isinstance(run, FailedRun):
-        raise GitFailedError(detail=run.detail)
+    answer = await command.answer(*log_argv(located.target, window))
+    if answer.failure is not None or answer.exit != 0:
+        raise GitFailedError(detail=answer.stderr.strip())
 
-    if run.exit != 0:
-        raise GitFailedError(detail=run.stderr.strip())
-
-    return await to_thread.run_sync(history_from_output, located, window, run.stdout)
+    return await to_thread.run_sync(history_from_output, located, window, answer.stdout)

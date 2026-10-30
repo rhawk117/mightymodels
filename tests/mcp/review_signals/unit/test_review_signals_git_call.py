@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Self
 
 import pytest
-from mightymodels_core.git import GIT_TIMEOUT_SECONDS
+from mightymodels_core.git import GIT_TIMEOUT_SECONDS, GitCommand
 from mightymodels_core.process import CompletedRun, FailedRun
 from mightymodels_mcp.review_signals.errors import (
     GitFailedError,
@@ -14,7 +14,7 @@ from mightymodels_mcp.review_signals.errors import (
     TargetNotUnicodeError,
     TargetOutsideError,
 )
-from mightymodels_mcp.review_signals.history import GitSource, load_history
+from mightymodels_mcp.review_signals.history import load_history
 from mightymodels_mcp.review_signals.options import SignalsOptions
 from mightymodels_mcp.review_signals.schemas import Analysis
 
@@ -26,8 +26,7 @@ if TYPE_CHECKING:
     from mightymodels_core.process import RunOutcome
 
 GIT = '/opt/git/bin/git'
-LOG = [
-    GIT,
+LOG_OPTIONS = [
     '--literal-pathspecs',
     'log',
     '--no-merges',
@@ -50,11 +49,15 @@ class Checkout:
     executable: str | None
     runner: ScriptedRunner
 
+    @property
+    def log(self) -> list[str]:
+        return [GIT, '-C', str(self.root), *LOG_OPTIONS]
+
     def answering(self, outcome: RunOutcome) -> Self:
         return replace(self, runner=ScriptedRunner(reply=outcome))
 
     def launch(self, options: SignalsOptions) -> Launched:
-        git = GitSource(root=self.root, executable=self.executable, processes=self.runner)
+        git = GitCommand(root=self.root, executable=self.executable, processes=self.runner)
         refusal: SignalsError | None = None
         try:
             asyncio.run(load_history(options, git))
@@ -119,7 +122,10 @@ class TestGitLogArgumentVector:
 
         launched = checkout.launch(options)
 
-        assert (launched.refusal, launched.vectors) == (None, [[*LOG, *window, '--', *target]])
+        assert (launched.refusal, launched.vectors) == (
+            None,
+            [[*checkout.log, *window, '--', *target]],
+        )
 
     @pytest.mark.parametrize(
         ('fields', 'values'),
@@ -151,15 +157,13 @@ class TestGitLogArgumentVector:
     ) -> None:
         launched = checkout.launch(SignalsOptions.model_validate(fields))
 
-        assert launched.vectors == [[*LOG, *values]]
+        assert launched.vectors == [[*checkout.log, *values]]
 
-    def test_git_runs_once_at_the_repository_root_under_the_git_timeout(
-        self, checkout: Checkout
-    ) -> None:
+    def test_git_runs_once_in_the_checkout_under_the_git_timeout(self, checkout: Checkout) -> None:
         checkout.launch(SignalsOptions())
 
-        assert [(run.timeout, run.cwd) for run in checkout.runner.runs] == [
-            (GIT_TIMEOUT_SECONDS, checkout.root)
+        assert [(run.timeout, run.argv[2]) for run in checkout.runner.runs] == [
+            (GIT_TIMEOUT_SECONDS, str(checkout.root))
         ]
 
 
@@ -205,9 +209,9 @@ class TestRefusedTargets:
         launched = checkout.launch(SignalsOptions(target=':(exclude)ok.py'))
 
         assert launched.vectors == [
-            [*LOG, '--max-count=500', 'HEAD', '--', ':(exclude)ok.py'],
+            [*checkout.log, '--max-count=500', 'HEAD', '--', ':(exclude)ok.py'],
         ]
-        assert LOG[1] == '--literal-pathspecs'
+        assert checkout.log[3] == '--literal-pathspecs'
 
     def test_a_target_holding_a_nul_byte_is_rejected_before_git_runs(
         self, checkout: Checkout

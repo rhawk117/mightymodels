@@ -1,20 +1,10 @@
 """The refusals of the review signals domain, each a `SignalsError`."""
 
-from typing import TYPE_CHECKING
-
 from mightymodels_core.primitives import StateError
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class SignalsError(StateError):
     pass
-
-
-class NoRepositoryError(SignalsError):
-    def __init__(self, *, cwd: Path) -> None:
-        super().__init__(f'{cwd} is not inside a git repository')
 
 
 class TargetOutsideError(SignalsError):
