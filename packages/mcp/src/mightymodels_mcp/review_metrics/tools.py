@@ -21,7 +21,10 @@ if TYPE_CHECKING:
 
 
 async def review_metrics(request: ReviewMetricsRequest, ctx: ToolContext) -> ReviewView:
-    """Measure the repository and write uncle-bob-metrics.json to a review run's directory."""
+    """Measure the repository and write uncle-bob-metrics.json to a review run's directory. Use
+    before the uncle-bob review for fan-in, fan-out, cycles and sizes. For git history, use
+    signals_*.
+    """
     async with open_tool_state(ctx) as state:
         workspace = workspace_at(state.checkout.toplevel)
         target = locate_metrics(create_metrics_work(state), workspace, request)

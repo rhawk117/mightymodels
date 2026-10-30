@@ -117,7 +117,9 @@ def create_start_request(request: ReviewStartRequest, form: dict[str, Any]) -> S
 async def review_start(
     request: ReviewStartRequest, ctx: ToolContext, *, answers: ChoiceOutcome
 ) -> ReviewView:
-    """Start a review run; asks the scope, depth and emphasis the call omits."""
+    """Start a review run; asks the scope, depth and emphasis the call omits. Use when the user
+    wants a branch or codebase reviewed, before dispatching any reviewer.
+    """
     form = answers_of(answers)
     if form is None:
         return ReviewView(text=describe_unanswered(request))
@@ -132,13 +134,18 @@ async def review_start(
 
 
 async def review_override(request: ReviewOverrideRequest, ctx: ToolContext) -> ReviewView:
-    """Switch a run's heavier reviewer to the override model."""
+    """Switch a run's heavier reviewer to the override model. Use when the user wants a deeper read
+    than the default model gave. Allowed once per run.
+    """
     async with open_tool_state(ctx) as state:
         return override_review(create_review_work(state), request.run_id)
 
 
 async def review_add(request: ReviewAddRequest, ctx: ToolContext) -> ReviewView:
-    """Read a reviewer's report from the run's directory and record its findings."""
+    """Read a reviewer's report from the run's directory and record its findings. Use after a
+    reviewer writes its report. Findings that changed lose their decisions and outcomes, so decide
+    them again.
+    """
     async with open_tool_state(ctx) as state:
         workspace = workspace_at(state.checkout.toplevel)
         work = create_review_work(state)
@@ -147,19 +154,25 @@ async def review_add(request: ReviewAddRequest, ctx: ToolContext) -> ReviewView:
 
 
 async def review_gate(request: ReviewGateRequest, ctx: ToolContext) -> ReviewView:
-    """List a run's findings in gate order with each one's decision; changes nothing."""
+    """List a run's findings in gate order with each one's decision; changes nothing. Use to see
+    what is still undecided. To get text for a PR comment, use review_report.
+    """
     async with open_tool_state(ctx) as state:
         return gate_review(create_review_work(state), request.run_id)
 
 
 async def review_report(request: ReviewReportRequest, ctx: ToolContext) -> ReviewView:
-    """Render a run's report, in full or as a review comment; changes nothing."""
+    """Render a run's report, in full or as a review comment; changes nothing. Use when the review
+    is decided and the text is going into a PR. To check what is undecided, use review_gate.
+    """
     async with open_tool_state(ctx) as state:
         return report_review(create_review_work(state), request.run_id, request.shape)
 
 
 async def review_list(_request: ReviewListRequest, ctx: ToolContext) -> ReviewView:
-    """List the latest review runs with their findings and verdicts; changes nothing."""
+    """List the latest review runs with their findings and verdicts; changes nothing. Use to find a
+    run id or see which runs are open.
+    """
     async with open_tool_state(ctx) as state:
         return list_reviews(create_review_work(state))
 

@@ -192,7 +192,9 @@ def create_dispositions(run_id: RunId, decided: DecidedBy) -> DispositionsToReco
 async def review_dispose(
     request: ReviewDisposeRequest, ctx: ToolContext, *, chosen: AcceptedElicitation[DisposeChoice]
 ) -> ReviewView:
-    """Decide a run's findings; asks a page of them to fix, then why for each one left unchecked."""
+    """Decide what to do with a run's findings; asks which to fix, then why for each left unchecked.
+    Use after review_gate shows undecided findings. Overwrites a prior decision.
+    """
     choice = chosen.data
     if choice.unanswered is not None:
         text = needs_input_text((unanswered_question(choice.unanswered),))
@@ -204,7 +206,9 @@ async def review_dispose(
 
 
 async def review_resolve(request: ReviewResolveRequest, ctx: ToolContext) -> ReviewView:
-    """Record how a finding chosen for fix turned out: fixed at a commit, failed or blocked."""
+    """Record how a finding chosen for fix turned out: fixed at a commit, failed or blocked. Use
+    after a fix is attempted. To decide a finding first, use review_dispose.
+    """
     resolve = ResolveRequest(
         finding_key=request.finding,
         result=request.result,

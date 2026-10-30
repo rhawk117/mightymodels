@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 import pytest
@@ -5,6 +6,7 @@ from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.published_schema import RecursiveDefinitionError, inline_refs
 
 TYPE_KEYS = ('type', 'enum', 'const')
+USE_SENTENCE = re.compile(r'\bUse\s')
 
 
 def states_type(node: dict[str, Any]) -> bool:
@@ -109,3 +111,19 @@ class TestInlineRefs:
         }
         with pytest.raises(RecursiveDefinitionError):
             inline_refs(schema)
+
+
+class TestToolDescriptions:
+    def test_every_description_says_when_to_use_the_tool(self) -> None:
+        missing = [
+            tool.name
+            for tool in create_catalog().list_tools()
+            if not USE_SENTENCE.search(tool.description or '')
+        ]
+        assert missing == []
+
+    def test_every_description_fits_the_context_budget(self) -> None:
+        long = [
+            tool.name for tool in create_catalog().list_tools() if len(tool.description or '') > 300
+        ]
+        assert long == []

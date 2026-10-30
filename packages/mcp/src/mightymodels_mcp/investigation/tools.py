@@ -86,7 +86,9 @@ def incoming_entry(entry: LedgerEntry) -> IncomingEntry:
 async def investigation_start(
     request: InvestigationStartRequest, ctx: ToolContext, *, answers: ChoiceOutcome
 ) -> InvestigationView:
-    """Start an investigation; asks the target's kind when the call omits it."""
+    """Start an investigation; asks the target's kind when the call omits it. Use when beginning a
+    new question. Every call starts a new investigation under a free key.
+    """
     form = answers_of(answers)
     if form is None:
         return InvestigationView(text=needs_input_text(kind_round(request).questions))
@@ -99,7 +101,9 @@ async def investigation_start(
 async def investigation_add(
     request: InvestigationAddRequest, ctx: ToolContext
 ) -> InvestigationView:
-    """Add one round of entries to an investigation's ledger."""
+    """Add one round of entries to an investigation's ledger. Use after each round of reading or
+    testing to record what was learned.
+    """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         entries = [incoming_entry(entry) for entry in request.entries]
@@ -111,7 +115,9 @@ async def investigation_add(
 async def investigation_render(
     request: InvestigationRenderRequest, ctx: ToolContext
 ) -> InvestigationView:
-    """Render an investigation's ledger; changes nothing."""
+    """Render an investigation's ledger; changes nothing. Use to read the whole record. For only the
+    established facts, use investigation_knowns.
+    """
     async with open_tool_state(ctx) as state:
         return render_investigation(create_investigation_work(state), request.investigation_id)
 
@@ -119,7 +125,9 @@ async def investigation_render(
 async def investigation_knowns(
     request: InvestigationKnownsRequest, ctx: ToolContext
 ) -> InvestigationView:
-    """Show the knowns table with each row current or a lead at HEAD; changes nothing."""
+    """Show the knowns table with each row current or a lead at HEAD; changes nothing. Use before
+    relying on an earlier finding. For the whole ledger, use investigation_render.
+    """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         selection = KnownsSelection(kinds=request.kinds, limit=request.limit)
@@ -130,7 +138,9 @@ async def investigation_knowns(
 async def investigation_list(
     _request: InvestigationListRequest, ctx: ToolContext
 ) -> InvestigationView:
-    """List the latest investigations with their rounds; changes nothing."""
+    """List the latest investigations with their rounds; changes nothing. Use to find an
+    investigation id or resume earlier work.
+    """
     async with open_tool_state(ctx) as state:
         return list_investigations(create_investigation_work(state))
 
