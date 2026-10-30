@@ -5,6 +5,9 @@ from typing import TYPE_CHECKING
 
 import anyio
 import pytest
+from mcp import Client
+from mcp.types import ToolAnnotations
+from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.review_metrics.use_cases import METRICS_FILE
 
 from tests.mcp.review.review_harness import create_review_harness
@@ -19,6 +22,9 @@ if TYPE_CHECKING:
     from tests.mcp.review.review_harness import ReviewHarness
     from tests.mcp.server.server_harness import ServerHarness
 
+REFRESHES = ToolAnnotations(
+    read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False
+)
 UNKNOWN_RUN = '20200101-000000'
 SLOW_SECONDS = 0.4
 MIN_TICKS = 5
@@ -68,6 +74,28 @@ def zero_option_cases() -> pytest.MarkDecorator:
 
 
 class TestReviewMetrics:
+    async def test_tool_is_listed_with_idempotent_hints(
+        self, server_harness: ServerHarness
+    ) -> None:
+        server = server_harness.create_server(create_catalog())
+        async with Client(server) as client:
+            listed = {tool.name: tool for tool in (await client.list_tools()).tools}
+
+        assert listed['review_metrics'].annotations == REFRESHES
+
+    async def test_same_call_twice_rewrites_the_same_report(self, harness: ReviewHarness) -> None:
+        write_source(harness.server.repository)
+        started = await harness.start()
+        arguments = {'run_id': started.run_id}
+        view_of(await harness.call('review_metrics', arguments))
+        written = harness.server.repository.joinpath(started.directory, METRICS_FILE)
+        first = written.read_text(encoding='utf-8')
+
+        second = await harness.call('review_metrics', arguments)
+
+        assert not second.is_error
+        assert written.read_text(encoding='utf-8') == first
+
     async def test_request_without_run_id_is_refused(self, harness: ReviewHarness) -> None:
         result = await harness.call('review_metrics', {})
 

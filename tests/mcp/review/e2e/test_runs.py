@@ -32,6 +32,9 @@ WRITES = ToolAnnotations(
 READS = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
+MARKS = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=False
+)
 UNKNOWN_RUN = '20200101-000000'
 EMPHASIS_FORM = (
     f'{NEEDS_INPUT}\nWhat should the review emphasize?\n'
@@ -43,7 +46,7 @@ def listed_tool_cases() -> pytest.MarkDecorator:
     tools: list[ParameterSet] = [
         pytest.param('review_start', 'Start a review', WRITES, id='start'),
         pytest.param('review_override', "Override a review's models", WRITES, id='override'),
-        pytest.param('review_add', "Add a reviewer's report", WRITES, id='add'),
+        pytest.param('review_add', "Add a reviewer's report", MARKS, id='add'),
         pytest.param('review_gate', 'Gate a review', READS, id='gate'),
         pytest.param('review_report', 'Report a review', READS, id='report'),
         pytest.param('review_list', 'List the reviews', READS, id='list'),

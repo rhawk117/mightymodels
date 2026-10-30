@@ -10,7 +10,7 @@ from anyio import to_thread
 from mightymodels_core.workspace import workspace_at
 
 from mightymodels_mcp.review.views import ReviewView
-from mightymodels_mcp.server.annotations import WRITES
+from mightymodels_mcp.server.annotations import REFRESHES
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .schemas import ReviewMetricsRequest
@@ -34,7 +34,7 @@ REVIEW_METRICS_TOOLS = (
     ToolSpec(
         name='review_metrics',
         title='Measure the code for a review',
-        annotations=WRITES,
+        annotations=REFRESHES,
         icon='review',
         request_model=ReviewMetricsRequest,
         result_model=ReviewView,

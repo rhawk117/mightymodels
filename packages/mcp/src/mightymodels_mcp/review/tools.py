@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from mightymodels_mcp.forms.choices import Choice, ChoiceQuestion, ChoiceRound, answers_of
 from mightymodels_mcp.forms.needs_input import needs_input_text
-from mightymodels_mcp.server.annotations import READS, WRITES
+from mightymodels_mcp.server.annotations import READS, REOPENS, WRITES
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .schemas import (
@@ -187,7 +187,7 @@ REVIEW_TOOLS = (
     ToolSpec(
         name='review_add',
         title="Add a reviewer's report",
-        annotations=WRITES,
+        annotations=REOPENS,
         icon='review',
         request_model=ReviewAddRequest,
         result_model=ReviewView,

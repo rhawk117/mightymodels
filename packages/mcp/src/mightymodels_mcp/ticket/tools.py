@@ -23,7 +23,7 @@ from mightymodels_mcp.forms.choices import (
     answers_of,
 )
 from mightymodels_mcp.forms.needs_input import needs_input_text
-from mightymodels_mcp.server.annotations import CLOSES, READS, WRITES
+from mightymodels_mcp.server.annotations import CLOSES, READS, REFRESHES, REPLACES, WRITES
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .close_facts import CloseAttempt, gather_close_facts
@@ -192,7 +192,7 @@ TICKET_TOOLS = (
     ToolSpec(
         name='ticket_validate',
         title='Validate a ticket',
-        annotations=WRITES,
+        annotations=REFRESHES,
         icon='ticket',
         request_model=TicketRequest,
         result_model=TicketView,
@@ -210,7 +210,7 @@ TICKET_TOOLS = (
     ToolSpec(
         name='ticket_update_context',
         title="Update a ticket's context",
-        annotations=WRITES,
+        annotations=REPLACES,
         icon='ticket',
         request_model=TicketContextRequest,
         result_model=TicketView,

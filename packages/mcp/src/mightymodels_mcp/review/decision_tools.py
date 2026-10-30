@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from mightymodels_mcp.forms.choices import Choice, ChoiceOutcome, ChoiceQuestion
 from mightymodels_mcp.forms.dispose import REASON_CHOICES, ReasonsForm, create_dispose_pages
 from mightymodels_mcp.forms.needs_input import needs_input_text
-from mightymodels_mcp.server.annotations import WRITES
+from mightymodels_mcp.server.annotations import REPLACES
 from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 from mightymodels_mcp.server.requests import USER_APPROVER
@@ -219,7 +219,7 @@ DECISION_TOOLS = (
     ToolSpec(
         name='review_dispose',
         title="Decide a review's findings",
-        annotations=WRITES,
+        annotations=REPLACES,
         icon='review',
         request_model=ReviewDisposeRequest,
         result_model=ReviewView,
@@ -229,7 +229,7 @@ DECISION_TOOLS = (
     ToolSpec(
         name='review_resolve',
         title='Resolve a review finding',
-        annotations=WRITES,
+        annotations=REPLACES,
         icon='review',
         request_model=ReviewResolveRequest,
         result_model=ReviewView,

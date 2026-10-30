@@ -11,9 +11,9 @@ One row per registered tool, 36 in all. The old action of `snapshot` is `none`, 
 | Old tool | Old action | New tool | Input fields | Title | Read-only | Destructive | Idempotent | Open world |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ticket` | `write` | `ticket_write` | `slug`, `summary`, `context`, `scope`, `compaction`, `branch`, `issue`, `jira`, `reference_urls`, `investigations` | Write a ticket | false | false | false | false |
-| `ticket` | `validate` | `ticket_validate` | `slug` | Validate a ticket | false | false | false | false |
+| `ticket` | `validate` | `ticket_validate` | `slug` | Validate a ticket | false | false | true | false |
 | `ticket` | `show` | `ticket_show` | `slug` | Show a ticket | true | false | true | false |
-| `ticket` | `update-context` | `ticket_update_context` | `slug`, `context` | Update a ticket's context | false | false | false | false |
+| `ticket` | `update-context` | `ticket_update_context` | `slug`, `context` | Update a ticket's context | false | true | true | false |
 | `close` | `check` | `close_check` | `slug` | Check a ticket for live work | true | false | true | false |
 | `close` | `close` | `close_ticket` | `slug`, `shipped`, `pr`, `gotchas` | Close a ticket | false | true | false | false |
 | `task` | `start` | `task_start` | `slug`, `task_id`, `by`, `owned`, `acceptance`, `mode`, `too_large_approved_by` | Start a task | false | false | false | false |
@@ -26,13 +26,13 @@ One row per registered tool, 36 in all. The old action of `snapshot` is `none`, 
 | `contract` | `status` | `contract_status` | `slug` | Show the contract status | true | false | true | false |
 | `review` | `start` | `review_start` | `scope`, `depth`, `emphasis`, `slug`, `base`, `weights`, `persona` | Start a review | false | false | false | false |
 | `review` | `override` | `review_override` | `run_id` | Override a review's models | false | false | false | false |
-| `review` | `add` | `review_add` | `run_id`, `persona` | Add a reviewer's report | false | false | false | false |
+| `review` | `add` | `review_add` | `run_id`, `persona` | Add a reviewer's report | false | true | false | false |
 | `review` | `gate` | `review_gate` | `run_id` | Gate a review | true | false | true | false |
 | `review` | `report` | `review_report` | `run_id`, `shape` | Report a review | true | false | true | false |
 | `review` | `list` | `review_list` | none | List the reviews | true | false | true | false |
-| `review` | `dispose` | `review_dispose` | `run_id`, `decisions`, `by` | Decide a review's findings | false | false | false | false |
-| `review` | `resolve` | `review_resolve` | `run_id`, `finding`, `result`, `commit`, `reason` | Resolve a review finding | false | false | false | false |
-| `mightymodels review-metrics` | `none` | `review_metrics` | `run_id`, `package_depth`, `max_listed` | Measure the code for a review | false | false | false | false |
+| `review` | `dispose` | `review_dispose` | `run_id`, `decisions`, `by` | Decide a review's findings | false | true | true | false |
+| `review` | `resolve` | `review_resolve` | `run_id`, `finding`, `result`, `commit`, `reason` | Resolve a review finding | false | true | true | false |
+| `mightymodels review-metrics` | `none` | `review_metrics` | `run_id`, `package_depth`, `max_listed` | Measure the code for a review | false | false | true | false |
 | `mightymodels review-signals` | `code-churn` | `signals_code_churn` | `target`, `since`, `baseline_ref`, `max_commits`, `all_history`, `limit` | Measure code churn | true | false | true | false |
 | `mightymodels review-signals` | `change-coupling` | `signals_change_coupling` | `target`, `since`, `baseline_ref`, `max_commits`, `all_history`, `limit`, `min_shared`, `max_changeset` | Measure change coupling | true | false | true | false |
 | `mightymodels review-signals` | `code-hotspots` | `signals_code_hotspots` | `target`, `since`, `baseline_ref`, `max_commits`, `all_history`, `limit` | Measure code hotspots | true | false | true | false |

@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from tests.mcp.server.server_harness import ServerHarness
     from tests.mcp.ticket.ticket_harness import FormAction
 
-WRITES = ToolAnnotations(
-    read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False
+REPLACES = ToolAnnotations(
+    read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=False
 )
 UNKNOWN_RUN = '20200101-000000'
 FIRST_PAGE = tuple(f'finding_{position}' for position in range(1, 11))
@@ -65,10 +65,10 @@ class Refusal:
 
 def listed_tool_cases() -> pytest.MarkDecorator:
     tools: list[ParameterSet] = [
-        pytest.param('review_dispose', "Decide a review's findings", id='dispose'),
-        pytest.param('review_resolve', 'Resolve a review finding', id='resolve'),
+        pytest.param('review_dispose', "Decide a review's findings", REPLACES, id='dispose'),
+        pytest.param('review_resolve', 'Resolve a review finding', REPLACES, id='resolve'),
     ]
-    return pytest.mark.parametrize(('name', 'title'), tools)
+    return pytest.mark.parametrize(('name', 'title', 'annotations'), tools)
 
 
 def dispose_unanswered_round_cases() -> pytest.MarkDecorator:
@@ -158,13 +158,17 @@ async def refusal_text(harness: ReviewHarness, started: StartedRun, refusal: Ref
 class TestListedTools:
     @listed_tool_cases()
     async def test_tool_carries_title_hints_and_review_icon(
-        self, server_harness: ServerHarness, name: str, title: str
+        self,
+        server_harness: ServerHarness,
+        name: str,
+        title: str,
+        annotations: ToolAnnotations,
     ) -> None:
         server = server_harness.create_server(create_catalog())
         async with Client(server) as client:
             listed = {tool.name: tool for tool in (await client.list_tools()).tools}
 
-        assert (listed[name].title, listed[name].annotations) == (title, WRITES)
+        assert (listed[name].title, listed[name].annotations) == (title, annotations)
         assert listed[name].icons == [load_icon('review')]
 
 
@@ -248,6 +252,19 @@ class TestReviewDispose:
         assert view['text'] == '0 dispositions recorded\n'
         assert answerer.asked == []
 
+    async def test_same_decisions_twice_record_the_same_values(
+        self, harness: ReviewHarness, eleven: StartedRun
+    ) -> None:
+        decisions = {'F1': {'decision': 'fix'}, 'F2': {'decision': 'dismiss', 'reason': 'noise'}}
+        arguments = {'run_id': eleven.run_id, 'decisions': decisions, 'by': 'owner'}
+        view_of(await harness.call('review_dispose', arguments))
+        first = await gate_decisions(harness, eleven)
+
+        second = await harness.call('review_dispose', arguments)
+
+        assert not second.is_error
+        assert await gate_decisions(harness, eleven) == first
+
     @dispose_refusal_cases()
     async def test_refused_with_core_message(
         self, harness: ReviewHarness, eleven: StartedRun, refusal: Refusal
@@ -270,6 +287,22 @@ class TestReviewResolve:
 
         assert view['text'] == 'F1 fixed\n'
         assert harness.git_calls == []
+
+    async def test_same_resolution_twice_records_the_same_outcome(
+        self, harness: ReviewHarness, chosen: StartedRun
+    ) -> None:
+        arguments = {
+            'run_id': chosen.run_id,
+            'finding': 'F1',
+            'result': 'fixed',
+            'commit': 'abc1234',
+        }
+        first = view_of(await harness.call('review_resolve', arguments))
+
+        second = await harness.call('review_resolve', arguments)
+
+        assert not second.is_error
+        assert view_of(second)['text'] == first['text'] == 'F1 fixed\n'
 
     @resolve_refusal_cases()
     async def test_refused_with_core_message(
