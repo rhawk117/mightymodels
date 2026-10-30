@@ -41,6 +41,10 @@ REFRESHES = ToolAnnotations(
 )
 
 
+def without_stamp(section: dict[str, object]) -> dict[str, object]:
+    return {key: value for key, value in section.items() if key != 'validated_at'}
+
+
 def unanswered_action_cases() -> pytest.MarkDecorator:
     actions: list[ParameterSet] = [
         pytest.param('decline', id='decline'),
@@ -204,7 +208,9 @@ class TestStagedTicket:
 
         second = view_of(await staged.call('ticket_update_context', arguments))
 
-        assert second['staged']['section'] == first['staged']['section']
+        assert without_stamp(second['staged']['section']) == without_stamp(
+            first['staged']['section']
+        )
         assert second['text'] == first['text']
 
     async def test_update_context_restages_with_the_new_lines(self, staged: TicketHarness) -> None:
