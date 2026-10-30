@@ -8,8 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mightymodels_mcp.review_metrics.files import iter_source_files, language_of
-from mightymodels_mcp.review_metrics.python_source import analyze_python
-from mightymodels_mcp.review_metrics.script_source import analyze_js
+from mightymodels_mcp.review_metrics.languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -33,9 +32,7 @@ def analyze_source(path: Path, root: Path) -> FileMetric | None:
     if text is None or language is None:
         return None
     rel = path.relative_to(root)
-    if language == 'python':
-        return analyze_python(rel, text)
-    return analyze_js(rel, text, language)
+    return SOURCE_LANGUAGES[language].analyze(rel, text)
 
 
 def collect_metrics(root: Path) -> list[FileMetric]:

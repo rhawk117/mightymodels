@@ -14,7 +14,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.files import JS_SUFFIXES, TS_SUFFIXES, module_name_for
+from mightymodels_mcp.review_metrics.files import module_name_for
+from mightymodels_mcp.review_metrics.languages import SOURCE_LANGUAGES
 from mightymodels_mcp.review_metrics.views import PackageMetric, PackageReport
 
 if TYPE_CHECKING:
@@ -73,40 +74,8 @@ def build_module_graph(metrics: list[FileMetric]) -> Graph:
     return graph
 
 
-def resolve_python_internal(imp: str, lookup: dict[str, str]) -> str | None:
-    candidate = imp
-    while candidate and candidate not in lookup:
-        candidate = candidate.rpartition('.')[0]
-    return lookup[candidate] if candidate else None
-
-
-def normalized_parts(parts: tuple[str, ...]) -> list[str]:
-    normalized: list[str] = []
-    for part in parts:
-        if part == '..':
-            normalized = normalized[:-1]
-            continue
-        if part not in {'.', ''}:
-            normalized.append(part)
-    return normalized
-
-
-def resolve_javascript_internal(imp: str, metric: FileMetric, lookup: dict[str, str]) -> str | None:
-    if not imp.startswith('.'):
-        return None
-    joined = Path(metric.path).parent.joinpath(imp)
-    if joined.suffix in JS_SUFFIXES | TS_SUFFIXES:
-        joined = joined.with_suffix('')
-    parts = normalized_parts(joined.parts)
-    if parts and parts[-1] == 'index':
-        parts = parts[:-1]
-    return lookup.get('.'.join(parts))
-
-
 def resolve_internal(imp: str, metric: FileMetric, lookup: dict[str, str]) -> str | None:
-    if metric.language == 'python':
-        return resolve_python_internal(imp, lookup)
-    return resolve_javascript_internal(imp, metric, lookup)
+    return SOURCE_LANGUAGES[metric.language].resolve_import(imp, metric, lookup)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

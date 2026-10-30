@@ -4,6 +4,7 @@ The imports are reliable, the function numbers are approximate and each one says
 """
 
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from mightymodels_mcp.review_metrics.domain import FileMetric, FunctionMetric
@@ -93,18 +94,23 @@ def typescript_classes(text: str) -> int:
     )
 
 
-def analyze_js(rel: Path, text: str, language: Language) -> FileMetric:
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ScriptDialect:
+    name: Language
+    typed: bool
+
+
+def analyze_js(rel: Path, text: str, dialect: ScriptDialect) -> FileMetric:
     loc, long_lines = count_loc(text)
-    typed = language == 'typescript'
     lines = text.splitlines()
     found = (js_function(lines, idx, rel) for idx in range(len(lines)))
     return FileMetric(
         path=str(rel),
-        language=language,
+        language=dialect.name,
         loc=loc,
         long_lines=long_lines,
-        classes=typescript_classes(text) if typed else 0,
-        abstract_classes=len(TS_ABSTRACT_RE.findall(text)) if typed else 0,
+        classes=typescript_classes(text) if dialect.typed else 0,
+        abstract_classes=len(TS_ABSTRACT_RE.findall(text)) if dialect.typed else 0,
         is_test=is_test_path(rel),
         functions=tuple(function for function in found if function is not None),
         imports=tuple(JS_IMPORT_RE.findall(text)),
