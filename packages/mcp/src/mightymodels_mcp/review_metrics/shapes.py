@@ -43,6 +43,7 @@ class FileMetric:
     is_test: bool = False
     functions: tuple[FunctionMetric, ...] = ()
     imports: tuple[str, ...] = ()
+    parsed: bool = True
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -122,6 +123,7 @@ class Totals(BaseModel):
     source_loc: int
     test_loc: int
     test_to_source_ratio: float | None
+    unparsed_files: int
     functions_measured: int
     loc_by_language: dict[str, int]
 

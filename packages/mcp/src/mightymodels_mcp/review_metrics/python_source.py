@@ -4,28 +4,32 @@ import ast
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.files import count_loc, is_test_path, module_name_for
+from mightymodels_mcp.review_metrics.files import count_loc, is_test_path
 from mightymodels_mcp.review_metrics.shapes import FileMetric, FunctionMetric
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
+def is_bool_param(arg: ast.arg, default: ast.expr | None) -> bool:
+    annotation = arg.annotation
+    if isinstance(annotation, ast.Name) and annotation.id == 'bool':
+        return True
+    return isinstance(default, ast.Constant) and isinstance(default.value, bool)
+
+
 def python_param_stats(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[int, int]:
     args = node.args
-    params = [*args.posonlyargs, *args.args, *args.kwonlyargs]
-    named = [a for a in params if a.arg not in ('self', 'cls')]
-    bool_count = 0
-    defaults = [*args.defaults, *args.kw_defaults]
-    for default in defaults:
-        if isinstance(default, ast.Constant) and isinstance(default.value, bool):
-            bool_count += 1
-    for arg in named:
-        annotation = getattr(arg, 'annotation', None)
-        if isinstance(annotation, ast.Name) and annotation.id == 'bool':
-            bool_count += 1
+    positional = [*args.posonlyargs, *args.args]
+    padding: list[ast.expr | None] = [None] * (len(positional) - len(args.defaults))
+    pairs = [
+        *zip(positional, [*padding, *args.defaults], strict=True),
+        *zip(args.kwonlyargs, args.kw_defaults, strict=True),
+    ]
+    named = [(arg, default) for arg, default in pairs if arg.arg not in ('self', 'cls')]
+    bool_count = sum(1 for arg, default in named if is_bool_param(arg, default))
     extra = (1 if args.vararg else 0) + (1 if args.kwarg else 0)
-    return len(named) + extra, min(bool_count, len(named))
+    return len(named) + extra, bool_count
 
 
 SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
@@ -101,8 +105,7 @@ def import_names(node: ast.AST, package_parts: list[str]) -> list[str]:
     return []
 
 
-def python_imports(tree: ast.Module, module: str) -> list[str]:
-    package_parts = module.split('.')[:-1]
+def python_imports(tree: ast.Module, package_parts: list[str]) -> list[str]:
     return [name for node in ast.walk(tree) for name in import_names(node, package_parts)]
 
 
@@ -131,7 +134,7 @@ def parsed_fields(tree: ast.Module, rel: Path) -> dict[str, object]:
             for node in ast.walk(tree)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         ),
-        'imports': tuple(python_imports(tree, module_name_for(rel))),
+        'imports': tuple(python_imports(tree, list(rel.parent.parts))),
     }
 
 
@@ -145,10 +148,9 @@ def analyze_python(rel: Path, text: str) -> FileMetric:
         is_test=is_test_path(rel),
     )
     try:
-        tree = ast.parse(text)
-    except SyntaxError:
-        return metric
-    return replace(metric, **parsed_fields(tree, rel))
+        return replace(metric, **parsed_fields(ast.parse(text), rel))
+    except SyntaxError, RecursionError:
+        return replace(metric, parsed=False)
 
 
 def python_function(node: ast.FunctionDef | ast.AsyncFunctionDef, rel: Path) -> FunctionMetric:

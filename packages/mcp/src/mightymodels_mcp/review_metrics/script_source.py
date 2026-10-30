@@ -23,6 +23,7 @@ JS_IMPORT_RE = re.compile(
     r"""(?:import\s+(?:[\w*{},\s$]+\s+from\s+)?|export\s+[\w*{},\s$]+\s+from\s+|"""
     r"""require\(\s*|import\(\s*)['"]([^'"]+)['"]"""
 )
+JS_BOOL_RE = re.compile(r'(?:=\s*(?:true|false)\b|:\s*boolean\b)')
 JS_FUNC_RES = (
     re.compile(
         r'^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([\w$]+)?\s*\(([^)]*)\)'
@@ -66,18 +67,24 @@ def bracket_step(char: str) -> int:
     return 0
 
 
-def js_param_stats(raw: str) -> tuple[int, int]:
-    raw = raw.strip()
-    if not raw:
-        return 0, 0
+def split_top_level(raw: str) -> list[str]:
+    parts: list[str] = []
     depth = 0
-    count = 1
-    for char in raw:
+    start = 0
+    for index, char in enumerate(raw):
         depth += bracket_step(char)
         if char == ',' and depth == 0:
-            count += 1
-    bools = len(re.findall(r'(?:=\s*(?:true|false)\b|:\s*boolean\b)', raw))
-    return count, min(bools, count)
+            parts.append(raw[start:index])
+            start = index + 1
+    return [*parts, raw[start:]]
+
+
+def js_param_stats(raw: str) -> tuple[int, int]:
+    if not raw.strip():
+        return 0, 0
+    params = split_top_level(raw)
+    bools = sum(1 for param in params if JS_BOOL_RE.search(param))
+    return len(params), bools
 
 
 def typescript_classes(text: str) -> int:

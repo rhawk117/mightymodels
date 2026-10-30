@@ -39,13 +39,30 @@ def package_of(module: str, depth: int = 1) -> str:
     return '.'.join(parts[: max(depth, 1)]) if len(parts) > 1 else parts[0]
 
 
+def src_aliases(name: str) -> list[str]:
+    parts = name.split('.')
+    return [
+        '.'.join(parts[index + 1 :]) for index, part in enumerate(parts[:-1]) if part == SRC_DIR
+    ]
+
+
+def alias_claims(names: list[str]) -> dict[str, set[str]]:
+    claims: dict[str, set[str]] = {}
+    for name in names:
+        for alias in src_aliases(name):
+            claims.setdefault(alias, set()).add(name)
+    return {alias: owners for alias, owners in claims.items() if alias not in names}
+
+
+def ambiguous_aliases(names: list[str]) -> list[str]:
+    return sorted(alias for alias, owners in alias_claims(names).items() if len(owners) > 1)
+
+
 def module_lookup(names: list[str]) -> dict[str, str]:
     lookup = {name: name for name in names}
-    for name in names:
-        parts = name.split('.')
-        for index, part in enumerate(parts[:-1]):
-            if part == SRC_DIR:
-                lookup.setdefault('.'.join(parts[index + 1 :]), name)
+    for alias, owners in alias_claims(names).items():
+        if len(owners) == 1:
+            lookup[alias] = next(iter(owners))
     return lookup
 
 

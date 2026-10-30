@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from operator import attrgetter
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.components import package_metrics, tarjan_sccs
+from mightymodels_mcp.review_metrics.components import (
+    ambiguous_aliases,
+    package_metrics,
+    tarjan_sccs,
+)
 from mightymodels_mcp.review_metrics.shapes import (
     DEFAULT_SUMMARY_OPTIONS,
     DEPTH_LIMIT,
@@ -98,9 +102,18 @@ def totals_of(metrics: list[FileMetric]) -> Totals:
         source_loc=src_loc,
         test_loc=test_loc,
         test_to_source_ratio=round(test_loc / src_loc, 3) if src_loc else None,
+        unparsed_files=sum(1 for m in metrics if not m.parsed),
         functions_measured=sum(len(m.functions) for m in metrics),
         loc_by_language=langs,
     )
+
+
+def granularity_note(graph: Graph) -> str:
+    note = 'fan-in/fan-out counted at module level, rolled up to top-level packages'
+    dropped = ambiguous_aliases(list(graph))
+    if not dropped:
+        return note
+    return f'{note}; src aliases claimed by more than one module were dropped: {", ".join(dropped)}'
 
 
 def summarize(
@@ -111,9 +124,7 @@ def summarize(
     module_cycles = tarjan_sccs(graph)
     return SummaryReport(
         tool='uncle-bob metrics.py',
-        granularity_note=(
-            'fan-in/fan-out counted at module level, rolled up to top-level packages'
-        ),
+        granularity_note=granularity_note(graph),
         totals=totals_of(metrics),
         component_metrics=package_metrics(graph, metrics, options.depth),
         module_cycles_adp=ModuleCycles(

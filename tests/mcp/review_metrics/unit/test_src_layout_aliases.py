@@ -2,7 +2,11 @@
 
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.components import build_module_graph, module_lookup
+from mightymodels_mcp.review_metrics.components import (
+    ambiguous_aliases,
+    build_module_graph,
+    module_lookup,
+)
 from mightymodels_mcp.review_metrics.shapes import SummaryOptions
 from mightymodels_mcp.review_metrics.sources import collect_metrics
 from mightymodels_mcp.review_metrics.summary import summarize
@@ -22,6 +26,16 @@ def test_a_module_is_aliased_by_the_path_after_any_src_component() -> None:
 
     assert lookup['a_pkg.mod'] == 'packages.a.src.a_pkg.mod'
     assert lookup['top.mod'] == 'src.top.mod'
+
+
+def test_an_alias_claimed_by_two_modules_is_dropped_and_reported() -> None:
+    names = ['packages.a.src.shared.mod', 'packages.b.src.shared.mod', 'src.top.mod']
+
+    lookup = module_lookup(names)
+
+    assert 'shared.mod' not in lookup
+    assert lookup['top.mod'] == 'src.top.mod'
+    assert ambiguous_aliases(names) == ['shared.mod']
 
 
 def test_an_import_across_nested_src_packages_counts_as_fan_out(tmp_path: Path) -> None:

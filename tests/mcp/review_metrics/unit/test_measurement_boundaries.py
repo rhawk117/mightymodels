@@ -42,7 +42,9 @@ def analyze_python_cases() -> pytest.MarkDecorator:
         name='syntax-error',
         rel='billing/broken.py',
         text='def broken(:\n    pass\n',
-        expected=FileMetric(path='billing/broken.py', language='python', loc=2, long_lines=0),
+        expected=FileMetric(
+            path='billing/broken.py', language='python', loc=2, long_lines=0, parsed=False
+        ),
     )
     async_function = PythonFile(
         name='async-function',
@@ -78,6 +80,48 @@ def analyze_python_cases() -> pytest.MarkDecorator:
             imports=('billing.core', 'billing.util.helper'),
         ),
     )
+    init_relative = PythonFile(
+        name='relative-imports-in-package-init',
+        rel='pkg/sub/__init__.py',
+        text='from .x import y\nfrom ..z import w\n',
+        expected=FileMetric(
+            path='pkg/sub/__init__.py',
+            language='python',
+            loc=2,
+            long_lines=0,
+            imports=('pkg.sub.x.y', 'pkg.z.w'),
+        ),
+    )
+    deep_expression = PythonFile(
+        name='deep-expression',
+        rel='billing/deep.py',
+        text='x = ' + '(' * 300 + '1' + ')' * 300 + '\n',
+        expected=FileMetric(
+            path='billing/deep.py', language='python', loc=1, long_lines=1, parsed=False
+        ),
+    )
+    bool_pairing = PythonFile(
+        name='bool-annotation-and-default-count-once',
+        rel='billing/flags.py',
+        text='def f(a: bool = False, b: int = 1):\n    return a\n',
+        expected=FileMetric(
+            path='billing/flags.py',
+            language='python',
+            loc=2,
+            long_lines=0,
+            functions=(
+                FunctionMetric(
+                    file='billing/flags.py',
+                    name='f',
+                    line=1,
+                    loc=2,
+                    params=2,
+                    bool_params=1,
+                    max_depth=0,
+                ),
+            ),
+        ),
+    )
     test_file = PythonFile(
         name='test-path-is-flagged',
         rel='tests/test_core.py',
@@ -87,7 +131,16 @@ def analyze_python_cases() -> pytest.MarkDecorator:
         ),
     )
     return pytest.mark.parametrize(
-        'source', [syntax_error.param, async_function.param, relative_import.param, test_file.param]
+        'source',
+        [
+            syntax_error.param,
+            async_function.param,
+            relative_import.param,
+            init_relative.param,
+            deep_expression.param,
+            bool_pairing.param,
+            test_file.param,
+        ],
     )
 
 
@@ -104,6 +157,8 @@ def js_param_stats_cases() -> pytest.MarkDecorator:
             pytest.param('fill: boolean, scale = 1', (2, 1), id='typed-boolean'),
             pytest.param('a = true, b = false, c = 0', (3, 2), id='boolean-defaults'),
             pytest.param('flag: boolean = true', (1, 1), id='boolean-counted-once-at-most'),
+            pytest.param('flag: boolean = true, b', (2, 1), id='boolean-typed-and-defaulted'),
+            pytest.param('a: boolean = true, b = 1', (2, 1), id='boolean-then-number'),
             pytest.param(
                 '{ retries = 3, verbose = false } = {}', (1, 1), id='destructured-with-boolean'
             ),
