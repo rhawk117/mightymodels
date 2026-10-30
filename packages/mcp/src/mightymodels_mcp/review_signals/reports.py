@@ -144,9 +144,14 @@ def indent_level(line: str) -> int:
 
 
 def shape_of(path: Path) -> Shape | None:
-    if not path.is_file() or path.stat().st_size > MAX_FILE_BYTES:
+    try:
+        if not path.is_file() or path.stat().st_size > MAX_FILE_BYTES:
+            return None
+
+        raw = path.read_bytes()
+    except OSError:
         return None
-    raw = path.read_bytes()
+
     if b'\0' in raw[:BINARY_SNIFF]:
         return None
     lines = [line for line in raw.decode('utf-8', 'replace').splitlines() if line.strip()]
@@ -191,6 +196,6 @@ def code_hotspots(history: History, options: SignalsOptions) -> Report[HotspotSi
             'hotspot is commits times indentation complexity (indent levels summed '
             'over non-blank lines), measured on the working tree'
         ),
-        'binary files and files over 2 MB are skipped',
+        'binary files, files over 2 MB and unreadable files are skipped',
     ])
     return history.report(Analysis.HOTSPOTS, signals[: options.limit], limitations)

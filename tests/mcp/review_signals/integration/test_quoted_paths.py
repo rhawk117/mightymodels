@@ -1,8 +1,9 @@
-"""A non-ASCII file name reaches the churn report unquoted."""
+"""Odd file names and pathspec-shaped targets reach the churn report as they are."""
 
 import asyncio
 import os
-from typing import TYPE_CHECKING
+import sys
+from pathlib import Path
 
 import pytest
 from mightymodels_mcp.review_signals.history import create_git_source, load_history
@@ -10,9 +11,6 @@ from mightymodels_mcp.review_signals.options import SignalsOptions
 from mightymodels_mcp.review_signals.reports import code_churn
 
 from tests.core.git.git_builders import run_git
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 NAME = 'café.py'
 
@@ -34,3 +32,49 @@ def test_churn_lists_a_non_ascii_file_under_its_exact_name(tmp_path: Path) -> No
     history = asyncio.run(load_history(options, create_git_source(tmp_path)))
 
     assert [signal.subject for signal in code_churn(history, options).signals] == [NAME]
+
+
+def commit_names(root: Path, names: list[bytes]) -> None:
+    asyncio.run(run_git(root, 'init', '-q'))
+    for name in names:
+        Path(os.fsdecode(os.fsencode(root) + b'/' + name)).write_bytes(b'a\n')
+    asyncio.run(run_git(root, 'add', '-A'))
+    asyncio.run(run_git(root, 'commit', '-q', '-m', 'add'))
+
+
+@pytest.mark.usefixtures('clean_git_environment')
+def test_churn_lists_a_file_name_holding_a_double_quote(tmp_path: Path) -> None:
+    commit_names(tmp_path, [b'a"b.py', b'tab\tname.py'])
+    options = SignalsOptions()
+
+    history = asyncio.run(load_history(options, create_git_source(tmp_path)))
+
+    assert [signal.subject for signal in code_churn(history, options).signals] == [
+        'a"b.py',
+        'tab\tname.py',
+    ]
+
+
+@pytest.mark.skipif(sys.platform == 'darwin', reason='APFS rejects non-UTF-8 names')
+@pytest.mark.usefixtures('clean_git_environment')
+def test_churn_succeeds_and_notes_a_file_name_that_is_not_utf8(tmp_path: Path) -> None:
+    commit_names(tmp_path, [b'bad\xff.py', b'ok.py'])
+    options = SignalsOptions()
+
+    history = asyncio.run(load_history(options, create_git_source(tmp_path)))
+    report = code_churn(history, options)
+
+    assert [signal.subject for signal in report.signals] == ['ok.py']
+    assert any(
+        '1 changed paths whose names are not valid UTF-8' in note for note in report.limitations
+    )
+
+
+@pytest.mark.usefixtures('clean_git_environment')
+def test_a_pathspec_magic_target_scans_no_commits(tmp_path: Path) -> None:
+    commit_names(tmp_path, [b'ok.py'])
+    options = SignalsOptions(target=':(exclude)ok.py')
+
+    history = asyncio.run(load_history(options, create_git_source(tmp_path)))
+
+    assert history.commits == []

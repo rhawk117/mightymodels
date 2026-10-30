@@ -6,6 +6,7 @@ through the process runner under the git timeout. A target that is refused, a gi
 or does not answer, and a git that exits non-zero each surface as a `SignalsError`.
 """
 
+import re
 import shutil
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
@@ -32,7 +33,19 @@ if TYPE_CHECKING:
     from .schemas import Analysis
 
 NUMSTAT_FIELDS = 3
+OCTAL_DIGITS = 3
 RECORD = '\x1e'
+QUOTE = '"'
+QUOTED_ESCAPE = re.compile(rb'\\([0-7]{3}|.)', re.DOTALL)
+SIMPLE_ESCAPES: dict[bytes, bytes] = {
+    b'a': b'\a',
+    b'b': b'\b',
+    b'f': b'\f',
+    b'n': b'\n',
+    b'r': b'\r',
+    b't': b'\t',
+    b'v': b'\v',
+}
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -58,6 +71,7 @@ class Window:
 class Commit:
     sha: str
     changes: dict[str, tuple[int, int]]
+    dropped: int = 0
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -66,6 +80,10 @@ class History:
     target: str
     window: Window
     commits: list[Commit]
+
+    @property
+    def dropped_names(self) -> int:
+        return sum(commit.dropped for commit in self.commits)
 
     @property
     def truncated(self) -> bool:
@@ -101,6 +119,10 @@ class History:
                 f'history stopped at {self.window.max_commits} commits; '
                 'widen with --max-commits or --all-history'
             )
+        if self.dropped_names:
+            notes.append(
+                f'{self.dropped_names} changed paths whose names are not valid UTF-8 were left out'
+            )
         return notes
 
 
@@ -117,7 +139,11 @@ def repository_root(start: Path) -> Path:
 def checked_target(root: Path, target: str | None) -> str:
     if target is None or target == '':
         return ''
-    resolved = root.joinpath(target).resolve()
+    try:
+        resolved = root.joinpath(target).resolve()
+    except ValueError as error:
+        raise TargetOutsideError(target=target) from error
+
     if not resolved.is_relative_to(root.resolve()):
         raise TargetOutsideError(target=target)
     path = resolved.relative_to(root.resolve()).as_posix()
@@ -136,8 +162,7 @@ def window_from(options: SignalsOptions) -> Window:
 def log_argv(git: str, target: str, window: Window) -> list[str]:
     argv = [
         git,
-        '-c',
-        'core.quotePath=false',
+        '--literal-pathspecs',
         'log',
         '--no-merges',
         '--no-renames',
@@ -159,16 +184,37 @@ def count(text: str) -> int:
     return int(text) if text.isdigit() else 0
 
 
+def unescape(match: re.Match[bytes]) -> bytes:
+    code = bytes(match.group(1))
+    if len(code) == OCTAL_DIGITS:
+        return bytes([int(code, 8) & 0xFF])
+
+    return SIMPLE_ESCAPES.get(code, code)
+
+
+def unquote(path: str) -> str | None:
+    if not (path.startswith(QUOTE) and path.endswith(QUOTE)):
+        return path
+
+    raw = QUOTED_ESCAPE.sub(unescape, path[1:-1].encode())
+    try:
+        return raw.decode()
+    except UnicodeDecodeError:
+        return None
+
+
 def parse_commit(block: str) -> Commit | None:
     lines = block.strip().splitlines()
     if not lines:
         return None
+
     rows = (line.split('\t') for line in lines[1:])
+    fields = [row for row in rows if len(row) == NUMSTAT_FIELDS]
+    named = [(added, deleted, unquote(path)) for added, deleted, path in fields]
     changes = {
-        path: (count(added), count(deleted))
-        for added, deleted, path in (row for row in rows if len(row) == NUMSTAT_FIELDS)
+        path: (count(added), count(deleted)) for added, deleted, path in named if path is not None
     }
-    return Commit(sha=lines[0].strip(), changes=changes)
+    return Commit(sha=lines[0].strip(), changes=changes, dropped=len(fields) - len(changes))
 
 
 def parse_log(output: str) -> list[Commit]:

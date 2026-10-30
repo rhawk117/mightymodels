@@ -172,3 +172,16 @@ class TestRefusals:
         lone.root.mkdir()
         with pytest.raises(NoRepositoryError, match='not inside a git repository'):
             lone.load(SignalsOptions())
+
+
+@pytest.mark.usefixtures('clean_git_environment')
+def test_hotspots_skip_an_unreadable_file(repo: Repo) -> None:
+    repo.commit({'open.py': 'if x:\n    y\n', 'locked.py': 'if x:\n    y\n'})
+    repo.root.joinpath('locked.py').chmod(0)
+    try:
+        report = repo.hotspots()
+    finally:
+        repo.root.joinpath('locked.py').chmod(0o644)
+
+    assert [signal.subject for signal in report.signals] == ['open.py']
+    assert 'binary files, files over 2 MB and unreadable files are skipped' in report.limitations

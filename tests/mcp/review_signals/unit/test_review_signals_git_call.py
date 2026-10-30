@@ -28,8 +28,7 @@ if TYPE_CHECKING:
 GIT = '/opt/git/bin/git'
 LOG = [
     GIT,
-    '-c',
-    'core.quotePath=false',
+    '--literal-pathspecs',
     'log',
     '--no-merges',
     '--no-renames',
@@ -201,6 +200,22 @@ class TestRefusedTargets:
             f'--target {target!r} is outside the repository',
             [],
         )
+
+    def test_a_pathspec_shaped_target_is_passed_as_a_literal_path(self, checkout: Checkout) -> None:
+        launched = checkout.launch(SignalsOptions(target=':(exclude)ok.py'))
+
+        assert launched.vectors == [
+            [*LOG, '--max-count=500', 'HEAD', '--', ':(exclude)ok.py'],
+        ]
+        assert LOG[1] == '--literal-pathspecs'
+
+    def test_a_target_holding_a_nul_byte_is_rejected_before_git_runs(
+        self, checkout: Checkout
+    ) -> None:
+        launched = checkout.launch(SignalsOptions(target='a\0b'))
+
+        assert isinstance(launched.refusal, TargetOutsideError)
+        assert launched.vectors == []
 
 
 class TestGitFailures:
