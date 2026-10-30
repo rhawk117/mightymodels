@@ -9,12 +9,12 @@ from dataclasses import dataclass
 from operator import attrgetter
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.components import (
+from .components import (
     ambiguous_aliases,
     package_metrics,
     tarjan_sccs,
 )
-from mightymodels_mcp.review_metrics.domain import (
+from .domain import (
     DEFAULT_SUMMARY_OPTIONS,
     DEPTH_LIMIT,
     FILE_LOC_LIMIT,
@@ -22,7 +22,7 @@ from mightymodels_mcp.review_metrics.domain import (
     LINE_LIMIT,
     PARAM_LIMIT,
 )
-from mightymodels_mcp.review_metrics.views import (
+from .views import (
     FileViolation,
     ModuleCycles,
     SummaryReport,
@@ -33,7 +33,7 @@ from mightymodels_mcp.review_metrics.views import (
 )
 
 if TYPE_CHECKING:
-    from mightymodels_mcp.review_metrics.domain import (
+    from .domain import (
         FileMetric,
         FunctionMetric,
         Graph,

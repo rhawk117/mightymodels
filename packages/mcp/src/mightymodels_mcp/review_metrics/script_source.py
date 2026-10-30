@@ -7,14 +7,14 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.domain import FileMetric, FunctionMetric
-from mightymodels_mcp.review_metrics.files import count_loc, is_test_path
+from .domain import FileMetric, FunctionMetric
+from .files import count_loc, is_test_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from mightymodels_mcp.review_metrics.domain import Language
+    from .domain import Language
 
 MIN_CAPTURE_GROUPS = 2
 OPENING_BRACKETS = '([{<'

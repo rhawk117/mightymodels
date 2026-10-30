@@ -6,12 +6,12 @@ vendored directories, minified and bundled scripts and type declaration files.
 
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.domain import LINE_LIMIT
+from .domain import LINE_LIMIT
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mightymodels_mcp.review_metrics.domain import Language
+    from .domain import Language
 
 IGNORED_DIRS = frozenset({
     '.git',

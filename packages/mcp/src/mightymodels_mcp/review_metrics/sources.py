@@ -7,13 +7,13 @@ patterns: the imports are reliable, the function numbers are approximate and eac
 import logging
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.files import iter_source_files, language_of
-from mightymodels_mcp.review_metrics.languages import SOURCE_LANGUAGES
+from .files import iter_source_files, language_of
+from .languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mightymodels_mcp.review_metrics.domain import FileMetric
+    from .domain import FileMetric
 
 LOGGER = logging.getLogger(__name__)
 

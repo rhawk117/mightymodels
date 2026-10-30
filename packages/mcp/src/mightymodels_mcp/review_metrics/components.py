@@ -14,14 +14,14 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from mightymodels_mcp.review_metrics.files import module_name_for
-from mightymodels_mcp.review_metrics.languages import SOURCE_LANGUAGES
-from mightymodels_mcp.review_metrics.views import PackageMetric, PackageReport
+from .files import module_name_for
+from .languages import SOURCE_LANGUAGES
+from .views import PackageMetric, PackageReport
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from mightymodels_mcp.review_metrics.domain import (
+    from .domain import (
         FileMetric,
         Graph,
     )

@@ -5,14 +5,14 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 
-from mightymodels_mcp.review_metrics.files import JS_SUFFIXES, TS_SUFFIXES
-from mightymodels_mcp.review_metrics.python_source import analyze_python
-from mightymodels_mcp.review_metrics.script_source import ScriptDialect, analyze_js
+from .files import JS_SUFFIXES, TS_SUFFIXES
+from .python_source import analyze_python
+from .script_source import ScriptDialect, analyze_js
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from mightymodels_mcp.review_metrics.domain import FileMetric, Language
+    from .domain import FileMetric, Language
 
 
 def resolve_python_internal(imp: str, lookup: dict[str, str]) -> str | None:
