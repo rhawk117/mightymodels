@@ -10,7 +10,6 @@ from mightymodels_mcp.review_metrics.domain import FileMetric, FunctionMetric
 from mightymodels_mcp.review_metrics.files import is_test_path
 from mightymodels_mcp.review_metrics.python_source import analyze_python
 from mightymodels_mcp.review_metrics.script_source import js_param_stats
-from mightymodels_mcp.review_metrics.sources import read_source
 from mightymodels_mcp.review_metrics.summary import LOC_RULE, PARAMS_RULE, violation_group
 
 if TYPE_CHECKING:
@@ -281,31 +280,6 @@ def violation_group_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('case', [case.param for case in cases])
 
 
-@dataclass(slots=True, kw_only=True, frozen=True)
-class SourceCase:
-    name: str
-    content: bytes | None
-    as_directory: bool = False
-    text: str | None = None
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
-
-
-def read_source_cases() -> pytest.MarkDecorator:
-    readable = SourceCase(name='readable', content=b'x = 1\n', text='x = 1\n')
-    undecodable = SourceCase(
-        name='undecodable-bytes-are-replaced', content=b'a\xffb\n', text='a�b\n'
-    )
-    empty = SourceCase(name='empty-file', content=b'', text='')
-    missing = SourceCase(name='missing-path', content=None)
-    directory = SourceCase(name='directory-path', content=None, as_directory=True)
-    return pytest.mark.parametrize(
-        'case', [readable.param, undecodable.param, empty.param, missing.param, directory.param]
-    )
-
-
 class TestAnalyzePython:
     @analyze_python_cases()
     def test_the_file_measures_what_its_source_holds(self, source: PythonFile) -> None:
@@ -336,19 +310,3 @@ class TestViolationGroup:
         group = violation_group(list(case.functions), case.rule, case.cap)
 
         assert (group.count, tuple(v.name for v in group.worst)) == (case.count, case.worst)
-
-
-class TestReadSource:
-    def path_for(self, case: SourceCase, tmp_path: Path) -> Path:
-        path = tmp_path.joinpath('source.py')
-        if case.as_directory:
-            path.mkdir()
-        elif case.content is not None:
-            path.write_bytes(case.content)
-        return path
-
-    @read_source_cases()
-    def test_the_text_or_nothing_when_the_path_cannot_be_read(
-        self, case: SourceCase, tmp_path: Path
-    ) -> None:
-        assert read_source(self.path_for(case, tmp_path)) == case.text

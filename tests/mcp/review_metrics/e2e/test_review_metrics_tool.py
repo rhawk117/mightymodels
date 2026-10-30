@@ -8,7 +8,7 @@ import pytest
 from mightymodels_mcp.review_metrics.use_cases import METRICS_FILE
 
 from tests.mcp.review.review_harness import create_review_harness
-from tests.mcp.server.server_harness import view_of
+from tests.mcp.server.server_harness import Ticker, view_of
 from tests.mcp.ticket.ticket_harness import SLUG
 
 if TYPE_CHECKING:
@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 UNKNOWN_RUN = '20200101-000000'
 SLOW_SECONDS = 0.4
-TICK_SECONDS = 0.02
 MIN_TICKS = 5
 
 
@@ -44,16 +43,6 @@ def write_two_violations(repository: Path) -> None:
         )
 
 
-class Ticker:
-    def __init__(self) -> None:
-        self.ticks = 0
-
-    async def run(self, done: anyio.Event) -> None:
-        while not done.is_set():
-            await anyio.sleep(TICK_SECONDS)
-            self.ticks += 1
-
-
 @dataclass(slots=True, kw_only=True)
 class SlowMeasure:
     ticker: Ticker
@@ -72,6 +61,10 @@ class SlowMeasure:
         time.sleep(SLOW_SECONDS)
         self.ticks_after = self.ticker.ticks
         return []
+
+
+def zero_option_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('option', ['max_listed', 'package_depth'])
 
 
 class TestReviewMetrics:
@@ -128,7 +121,7 @@ class TestReviewMetrics:
         assert len(params['worst']) == 1
         assert set(report['component_metrics']['packages']) == {'pkg.alpha', 'pkg.beta'}
 
-    @pytest.mark.parametrize('option', ['max_listed', 'package_depth'])
+    @zero_option_cases()
     async def test_zero_option_is_refused(self, harness: ReviewHarness, option: str) -> None:
         started = await harness.start()
 

@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from mcp.types import CallToolResult
     from mightymodels_mcp.server.registration import ToolCatalog
 
+TICK_SECONDS = 0.02
+
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ServerHarness:
@@ -46,3 +48,13 @@ def view_of(result: CallToolResult) -> dict[str, Any]:
     assert not result.is_error, result.content
     assert result.structured_content
     return result.structured_content
+
+
+class Ticker:
+    def __init__(self) -> None:
+        self.ticks = 0
+
+    async def run(self, done: anyio.Event) -> None:
+        while not done.is_set():
+            await anyio.sleep(TICK_SECONDS)
+            self.ticks += 1

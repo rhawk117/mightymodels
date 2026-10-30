@@ -9,8 +9,8 @@ if TYPE_CHECKING:
     from mightymodels_mcp.review_metrics.domain import Graph
 
 
-class TestTarjanSccs:
-    @pytest.mark.parametrize(
+def tarjan_sccs_cycle_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
         ('graph', 'cycles'),
         [
             pytest.param({'a': set(), 'b': set(), 'c': set()}, [], id='no-edges'),
@@ -32,6 +32,10 @@ class TestTarjanSccs:
             ),
         ],
     )
+
+
+class TestTarjanSccs:
+    @tarjan_sccs_cycle_cases()
     def test_the_cycles_and_their_order_are_those_the_script_reported(
         self, graph: Graph, cycles: list[list[str]]
     ) -> None:

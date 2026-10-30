@@ -96,6 +96,10 @@ SAMPLE: dict[str, list[str]] = {
 }
 
 
+def report_depth_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('depth', [1, 2])
+
+
 class TestSampleTreeReport:
     SUMMARY_LINES_AT_DEPTH_1 = (
         'files\t9 (2 test)',
@@ -132,7 +136,7 @@ class TestSampleTreeReport:
 
         return build
 
-    @pytest.mark.parametrize('depth', [1, 2])
+    @report_depth_cases()
     def test_the_report_counts_the_sample_tree(
         self, report_of: Callable[[int], SummaryReport], depth: int
     ) -> None:
