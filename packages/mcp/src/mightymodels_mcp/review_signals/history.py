@@ -181,7 +181,16 @@ def window_from(options: SignalsOptions) -> Window:
 
 
 def log_argv(git: str, target: str, window: Window) -> list[str]:
-    argv = [git, 'log', '--no-merges', '--no-renames', '--numstat', '--format=%x1e%H']
+    argv = [
+        git,
+        '-c',
+        'core.quotePath=false',
+        'log',
+        '--no-merges',
+        '--no-renames',
+        '--numstat',
+        '--format=%x1e%H',
+    ]
     if window.max_commits is not None:
         argv.append(f'--max-count={window.max_commits}')
     if window.since is not None:

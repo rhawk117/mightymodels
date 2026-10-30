@@ -27,7 +27,16 @@ if TYPE_CHECKING:
     from mightymodels_core.process import RunOutcome
 
 GIT = '/opt/git/bin/git'
-LOG = [GIT, 'log', '--no-merges', '--no-renames', '--numstat', '--format=%x1e%H']
+LOG = [
+    GIT,
+    '-c',
+    'core.quotePath=false',
+    'log',
+    '--no-merges',
+    '--no-renames',
+    '--numstat',
+    '--format=%x1e%H',
+]
 NO_COMMITS = CompletedRun(exit=0, stdout='', stderr='')
 
 

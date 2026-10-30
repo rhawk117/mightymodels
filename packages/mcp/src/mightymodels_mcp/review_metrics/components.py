@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     )
 
 LAYOUT_DIRS = ('src', 'lib', 'app')
-SRC_PREFIX = 'src.'
+SRC_DIR = 'src'
 
 
 def package_of(module: str, depth: int = 1) -> str:
@@ -42,8 +42,10 @@ def package_of(module: str, depth: int = 1) -> str:
 def module_lookup(names: list[str]) -> dict[str, str]:
     lookup = {name: name for name in names}
     for name in names:
-        if name.startswith(SRC_PREFIX):
-            lookup.setdefault(name.removeprefix(SRC_PREFIX), name)
+        parts = name.split('.')
+        for index, part in enumerate(parts[:-1]):
+            if part == SRC_DIR:
+                lookup.setdefault('.'.join(parts[index + 1 :]), name)
     return lookup
 
 
