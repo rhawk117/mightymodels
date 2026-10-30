@@ -6,7 +6,7 @@ The old server key was `state`, so its tools were named `mcp__plugin_mightymodel
 
 ## Tool map
 
-One row per registered tool, 33 in all. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
+One row per registered tool, 36 in all. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
 
 | Old tool | Old action | New tool | Input fields | Title | Read-only | Destructive | Idempotent | Open world |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

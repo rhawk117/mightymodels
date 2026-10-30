@@ -1,4 +1,4 @@
-"""The contract records, repository seam, sqlite store, policy, service and run use case."""
+"""The contract records, their repository seam, the sqlite store, the policy and the service."""
 
 from .errors import (
     ChangedCommandError,
@@ -22,7 +22,6 @@ from .policy import (
 )
 from .records import Approval, ApprovedCommand, Receipt, RecordedCommand
 from .repository import ContractRepository
-from .runs import ContractRunner, RunRequest, RunResult
 from .services import ApprovalResult, CommandStatus, ContractService, ContractStatus
 from .sqlite_contract import SqliteContractRepository
 
@@ -36,7 +35,6 @@ __all__ = [
     'CommandStatus',
     'ContractOptions',
     'ContractRepository',
-    'ContractRunner',
     'ContractService',
     'ContractStatus',
     'DuplicateCommandError',
@@ -50,8 +48,6 @@ __all__ = [
     'ReceiptAssessment',
     'ReceiptState',
     'RecordedCommand',
-    'RunRequest',
-    'RunResult',
     'SqliteContractRepository',
     'UnapprovedCommandError',
     'UnknownCommandError',

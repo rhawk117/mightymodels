@@ -1,4 +1,4 @@
-"""The contract repository and the process runner, kept in memory."""
+"""The contract repository kept in memory."""
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -10,16 +10,11 @@ from mightymodels_core.contract.records import (
     owning_task,
     unapproved_command_error,
 )
-from mightymodels_core.process import CompletedRun
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
 
     from mightymodels_core.contract.records import Approval, ApprovedCommand, Receipt
-    from mightymodels_core.process import RunOutcome
-
-    from tests.core.git.fakes import CommitHistory
 
 type CommandAddress = tuple[int, str]
 
@@ -101,29 +96,3 @@ class FakeContractRepository:
         self.ledger.receipts.extend(
             PlacedReceipt(ticket_id=ticket_id, receipt=receipt) for receipt in receipts
         )
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class RecordedRun:
-    argv: object
-    timeout: float
-    cwd: Path | None
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class FakeProcessRunner:
-    reply: RunOutcome = field(default_factory=lambda: CompletedRun(exit=0, stdout='', stderr=''))
-    moves_head: CommitHistory | None = None
-    runs: list[RecordedRun] = field(default_factory=list)
-
-    async def run(
-        self,
-        argv: Sequence[str],
-        *,
-        timeout: float,  # noqa: ASYNC109  the ProcessRunner Protocol fixes this signature; the fake records the timeout, never enforces it
-        cwd: Path | None = None,
-    ) -> RunOutcome:
-        self.runs.append(RecordedRun(argv=argv, timeout=timeout, cwd=cwd))
-        if self.moves_head is not None:
-            self.moves_head.commit('moved.py')
-        return self.reply
