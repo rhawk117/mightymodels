@@ -15,7 +15,8 @@ from mightymodels_mcp.review_signals.errors import (
     TargetOutsideError,
 )
 from mightymodels_mcp.review_signals.history import load_history
-from mightymodels_mcp.review_signals.schemas import Analysis, HistoryWindowRequest
+from mightymodels_mcp.review_signals.schemas import HistoryWindowRequest
+from mightymodels_mcp.review_signals.views import Analysis
 
 from tests.core.git.fakes import ScriptedRunner
 

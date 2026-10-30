@@ -10,20 +10,18 @@ from mightymodels_core.git import GitCommand
 from mightymodels_core.process import SubprocessRunner
 from mightymodels_mcp.review_signals.errors import GitFailedError, TargetOutsideError
 from mightymodels_mcp.review_signals.history import load_history
-from mightymodels_mcp.review_signals.reports import (
-    ChurnSignal,
-    CouplingSignal,
-    HotspotSignal,
-    change_coupling,
-    code_churn,
-    code_hotspots,
-)
+from mightymodels_mcp.review_signals.reports import change_coupling, code_churn, code_hotspots
 from mightymodels_mcp.review_signals.schemas import (
-    Analysis,
     ChangeCouplingRequest,
     CodeChurnRequest,
     CodeHotspotsRequest,
     HistoryWindowRequest,
+)
+from mightymodels_mcp.review_signals.views import (
+    Analysis,
+    ChurnSignal,
+    CouplingSignal,
+    HotspotSignal,
 )
 
 from tests.core.git.git_builders import run_git
@@ -32,7 +30,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_mcp.review_signals.history import History
-    from mightymodels_mcp.review_signals.schemas import Report
+    from mightymodels_mcp.review_signals.views import Report
 
 CAPPED = 2
 

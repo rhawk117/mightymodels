@@ -5,15 +5,14 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict
-
-from .schemas import Analysis
+from .views import Analysis, ChurnSignal, CouplingSignal, HotspotSignal
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from .history import History
-    from .schemas import ChangeCouplingRequest, HistoryWindowRequest, Report
+    from .schemas import ChangeCouplingRequest, HistoryWindowRequest
+    from .views import Report
 
 INDENT_WIDTH = 4
 TAB_WIDTH = 4
@@ -46,15 +45,6 @@ def churn_order(item: tuple[str, Churn]) -> tuple[int, int, str]:
     return -churn.commits, -(churn.added + churn.deleted), path
 
 
-class ChurnSignal(BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
-
-    subject: str
-    commits: int
-    lines_added: int
-    lines_deleted: int
-
-
 def code_churn(history: History, options: HistoryWindowRequest) -> Report[ChurnSignal]:
     ranked = sorted(churn_by_file(history).items(), key=churn_order)
     signals = [
@@ -69,14 +59,6 @@ def code_churn(history: History, options: HistoryWindowRequest) -> Report[ChurnS
     limitations = history.base_limitations()
     limitations.append('binary files count commits but no lines')
     return history.report(Analysis.CHURN, signals, limitations)
-
-
-class CouplingSignal(BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
-
-    subject: str
-    shared_commits: int
-    degree: float
 
 
 def coupling_order(pair: CouplingSignal) -> tuple[int, float, str]:
@@ -159,16 +141,6 @@ def shape_of(path: Path) -> Shape | None:
         return None
     lines = [line for line in raw.decode('utf-8', 'replace').splitlines() if line.strip()]
     return Shape(loc=len(lines), indentation=sum(map(indent_level, lines)))
-
-
-class HotspotSignal(BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
-
-    subject: str
-    commits: int
-    loc: int
-    indentation: int
-    hotspot: int
 
 
 def hotspot_order(signal: HotspotSignal) -> tuple[int, str]:

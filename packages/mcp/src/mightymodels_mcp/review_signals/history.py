@@ -18,14 +18,15 @@ from .errors import (
     TargetNotUnicodeError,
     TargetOutsideError,
 )
-from .schemas import Report, ScannedHistory
+from .views import Report, ScannedHistory
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.git import GitCommand
 
-    from .schemas import Analysis, HistoryWindowRequest
+    from .schemas import HistoryWindowRequest
+    from .views import Analysis
 
 NUMSTAT_FIELDS = 3
 OCTAL_DIGITS = 3

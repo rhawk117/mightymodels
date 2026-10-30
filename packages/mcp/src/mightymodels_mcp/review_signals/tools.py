@@ -13,16 +13,10 @@ from mightymodels_mcp.server.annotations import READS
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .history import load_history
-from .reports import (
-    ChurnSignal,
-    CouplingSignal,
-    HotspotSignal,
-    change_coupling,
-    code_churn,
-    code_hotspots,
-)
-from .schemas import ChangeCouplingRequest, CodeChurnRequest, CodeHotspotsRequest, Report
+from .reports import change_coupling, code_churn, code_hotspots
+from .schemas import ChangeCouplingRequest, CodeChurnRequest, CodeHotspotsRequest
 from .use_cases import create_git_command
+from .views import ChurnSignal, CouplingSignal, HotspotSignal, Report
 
 if TYPE_CHECKING:
     from mightymodels_core.git import GitCommand

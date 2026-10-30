@@ -5,10 +5,9 @@ one, so a value that could pass for a git option is refused when the request is 
 request holds the history window plus only the fields its report reads.
 """
 
-from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import Field, StringConstraints
 
 from mightymodels_mcp.server.requests import RequestModel
 
@@ -42,29 +41,3 @@ class CodeHotspotsRequest(HistoryWindowRequest):
 class ChangeCouplingRequest(HistoryWindowRequest):
     min_shared: Count = DEFAULT_MIN_SHARED
     max_changeset: Count = DEFAULT_MAX_CHANGESET
-
-
-class Analysis(StrEnum):
-    CHURN = 'code-churn'
-    COUPLING = 'change-coupling'
-    HOTSPOTS = 'code-hotspots'
-
-
-class ScannedHistory(BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
-
-    since: str | None
-    baseline_ref: str | None
-    max_commits: int | None
-    commits_scanned: int
-    truncated: bool
-
-
-class Report[Signal](BaseModel):
-    model_config = ConfigDict(extra='forbid', frozen=True)
-
-    analysis: Analysis
-    target: str
-    history: ScannedHistory
-    signals: list[Signal]
-    limitations: list[str]
