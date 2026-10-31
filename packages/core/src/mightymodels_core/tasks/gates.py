@@ -152,7 +152,7 @@ class VerificationGate:
 
 def get_plan_task_problem(record: TaskRecord) -> str | None:
     if record.status == 'pending':
-        return f'{record.key} has contract commands but was never started'
+        return f'{record.key} was never started'
 
     if record.status in CLOSED:
         return None

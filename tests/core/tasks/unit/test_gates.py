@@ -137,7 +137,7 @@ def readiness_cases() -> pytest.MarkDecorator:
         ),
         pytest.param(
             [create_record('T1', 'pending')],
-            ['T1 has contract commands but was never started'],
+            ['T1 was never started'],
             id='plan-task-pending',
         ),
         pytest.param(
