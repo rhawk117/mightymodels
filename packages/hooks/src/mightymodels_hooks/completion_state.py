@@ -1,16 +1,15 @@
 """What the completion gate reads: the tasks the stopping worker started and the facts they need.
 
 The ticket is the one unclosed ticket whose branch is checked out. A plan task is read as its
-brief's text, which is `None` when the brief is missing. A residual is read as the task record,
-its own contract commands, the latest receipts and what git says of its base and of HEAD. An
-`R` task is a residual; a `C` task and any other id is not read. A repository the database has
-not recorded, a missing ticket directory and no ticket on the branch read as nothing started.
+brief's text, which is `None` when the brief is missing. A residual is read as the task record and
+what git says of its base and of HEAD. An `R` task is a residual; a `C` task and any other id is
+not read. A repository the database has not recorded, a missing ticket directory and no ticket on
+the branch read as nothing started.
 """
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.edge import open_state
 from mightymodels_core.tasks import SqliteTaskRepository
 from mightymodels_core.tasks.gates import GitFacts, is_plan_task
@@ -20,9 +19,8 @@ from mightymodels_core.workspace import workspace_of
 from mightymodels_hooks.branch_state import branch_ticket
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
-    from mightymodels_core.contract import Receipt, RecordedCommand
     from mightymodels_core.git import Git
     from mightymodels_core.primitives import Slug, TaskId
     from mightymodels_core.tasks import TaskRecord
@@ -45,8 +43,6 @@ class PlanTask:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ResidualFacts:
     task: TaskRecord
-    commands: Sequence[RecordedCommand]
-    receipts: Mapping[str, Receipt]
     base_commit: str | None
     git: GitFacts
 
@@ -63,8 +59,6 @@ class StartedRows:
     slug: Slug
     plan_ids: Sequence[TaskId]
     residuals: Sequence[TaskRecord]
-    commands: Sequence[RecordedCommand]
-    receipts: Mapping[str, Receipt]
 
 
 def started_rows(entry: Entry, branch: str | None, worker: Worker) -> StartedRows | None:
@@ -75,15 +69,12 @@ def started_rows(entry: Entry, branch: str | None, worker: Worker) -> StartedRow
     slug = ticket.slug
     ticket_id = ticket.id
     tasks = SqliteTaskRepository(unit=entry.unit)
-    contracts = SqliteContractRepository(unit=entry.unit)
     started = tasks.in_progress_started_by(ticket_id, worker)
     residuals = (tasks.task(ticket_id, key) for key in started if key.startswith(RESIDUAL_PREFIX))
     return StartedRows(
         slug=slug,
         plan_ids=[key for key in started if is_plan_task(key)],
         residuals=[record for record in residuals if record is not None],
-        commands=contracts.commands(ticket_id),
-        receipts=contracts.latest_receipts(ticket_id),
     )
 
 
@@ -113,13 +104,11 @@ async def git_facts_of(git: Git, task: TaskRecord, head: str | None) -> tuple[st
     )
 
 
-async def residual_facts_of(git: Git, rows: StartedRows, residual: TaskRecord) -> ResidualFacts:
+async def residual_facts_of(git: Git, residual: TaskRecord) -> ResidualFacts:
     head = await git.resolve_head()
     base_commit, facts = await git_facts_of(git, residual, head)
     return ResidualFacts(
         task=residual,
-        commands=[command for command in rows.commands if command.task_key == residual.key],
-        receipts=rows.receipts,
         base_commit=base_commit,
         git=facts,
     )
@@ -143,8 +132,7 @@ class CompletionState:
                 slug=rows.slug,
                 plan_tasks=[plan_task_of(workspace, rows.slug, key) for key in rows.plan_ids],
                 residuals=[
-                    await residual_facts_of(state.git, rows, residual)
-                    for residual in rows.residuals
+                    await residual_facts_of(state.git, residual) for residual in rows.residuals
                 ],
             )
 

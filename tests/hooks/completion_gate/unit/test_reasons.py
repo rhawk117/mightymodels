@@ -77,7 +77,7 @@ class TestUnfinishedReason:
         reason = unfinished_reason(unfinished)
         assert reason is not None
         assert f'R1 is in progress and {lack}' in reason
-        assert f'mightymodels verify run --slug {SLUG} --id' in reason
+        assert 'verify run' not in reason
         assert 'brief' not in reason
 
     def test_a_residual_that_follows_its_base_inside_its_files_is_not_held(self) -> None:

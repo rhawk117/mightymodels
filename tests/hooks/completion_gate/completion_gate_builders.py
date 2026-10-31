@@ -170,9 +170,7 @@ def residual_facts(
         changed_files=changed,
         named_commit=None,
     )
-    return ResidualFacts(
-        task=task, commands=[], receipts={}, base_commit=BASE if resolves else None, git=facts
-    )
+    return ResidualFacts(task=task, base_commit=BASE if resolves else None, git=facts)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

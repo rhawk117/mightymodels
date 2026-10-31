@@ -21,8 +21,6 @@ if TYPE_CHECKING:
 
 type Staging = Callable[[ResidualScene], Awaitable[None]]
 
-NO_RECEIPT = 'R1.AC-1 has no receipt at the current HEAD'
-
 
 async def nothing_committed(scene: ResidualScene) -> None:
     await scene.start()
@@ -74,9 +72,6 @@ def held_cases() -> pytest.MarkDecorator:
         ('staging', 'lack'),
         [
             pytest.param(nothing_committed, 'no commit follows its base', id='no-commit'),
-            pytest.param(fixed_without_a_receipt, NO_RECEIPT, id='no-receipt'),
-            pytest.param(proven_before_the_fix, NO_RECEIPT, id='receipt-at-an-older-commit'),
-            pytest.param(fixed_and_failing, 'R1.AC-1 fail at HEAD', id='failed-receipt'),
             pytest.param(
                 fixed_outside_the_owned_set,
                 f'changed outside the owned set: {OUTSIDE}',
@@ -92,6 +87,9 @@ def let_through_cases() -> pytest.MarkDecorator:
         [
             pytest.param(fixed_and_proven, id='committed-proven-and-inside-the-owned-set'),
             pytest.param(fixed_with_no_contract_command, id='no-contract-command'),
+            pytest.param(fixed_without_a_receipt, id='no-receipt'),
+            pytest.param(proven_before_the_fix, id='receipt-at-an-older-commit'),
+            pytest.param(fixed_and_failing, id='failed-receipt'),
             pytest.param(check_fix_with_nothing_committed, id='check-fix'),
         ],
     )
@@ -122,7 +120,7 @@ class TestCompletionGateOnAResidual:
         reply = await scene.harness.stop()
         assert reply.decision == 'block'
         assert f'R1 is in progress and {lack}' in reply.reason
-        assert 'mightymodels verify run --slug port-it --id' in reply.reason
+        assert 'verify run' not in reply.reason
         assert 'brief' not in reply.reason
 
     @let_through_cases()
@@ -159,4 +157,4 @@ class TestCompletionGateOnAResidual:
         assert 'T1 is in progress and its brief' in reply.reason
         assert 'R1 is in progress and no commit follows its base' in reply.reason
         assert 'Append the `## DONE` half' in reply.reason
-        assert 'mightymodels verify run --slug port-it --id' in reply.reason
+        assert 'verify run' not in reply.reason
