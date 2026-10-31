@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText
-    from mightymodels_core.vocabulary.contract import Outcome, Phase
+    from mightymodels_core.vocabulary.contract import ApprovalSource, Outcome, Phase
 
 COMMANDS = ReadLimit(rows=1000, kept='contract commands')
 
@@ -35,6 +35,7 @@ class ApprovedCommand:
     expect_exit: int
     timeout: int
     approved_by: str
+    approval_source: ApprovalSource = 'fallback'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

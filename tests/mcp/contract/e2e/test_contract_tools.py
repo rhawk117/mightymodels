@@ -1,3 +1,5 @@
+import sqlite3
+from contextlib import closing
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
@@ -5,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import pytest
 from mcp import Client
 from mcp.types import ElicitRequestFormParams, ElicitResult, ToolAnnotations
+from mightymodels_core.edge import DATABASE_NAME
 from mightymodels_mcp.forms.needs_input import NEEDS_INPUT
 from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.app import create_server
@@ -85,6 +88,14 @@ def create_approve(*commands: Mapping[str, Any]) -> dict[str, Any]:
     return {'slug': SLUG, 'commands': [dict(command) for command in commands]}
 
 
+def approval_sources_of(server_harness: ServerHarness) -> list[tuple[str, str]]:
+    with closing(sqlite3.connect(server_harness.data_directory / DATABASE_NAME)) as connection:
+        rows = connection.execute(
+            'SELECT command_key, approval_source FROM contract_commands ORDER BY command_key'
+        ).fetchall()
+    return [(key, source) for key, source in rows]
+
+
 def unanswered_action_cases() -> pytest.MarkDecorator:
     actions: list[ParameterSet] = [
         pytest.param('decline', id='decline'),
@@ -130,7 +141,7 @@ class TestListedTools:
 
 class TestContractApprove:
     async def test_form_lists_every_command_and_approving_records_them(
-        self, harness: ContractHarness
+        self, harness: ContractHarness, server_harness: ServerHarness
     ) -> None:
         answerer = FormAnswerer()
 
@@ -141,8 +152,11 @@ class TestContractApprove:
         assert (view['text'], view['passing']) == ('contract: 2 commands (2 new)\n', True)
         assert (answerer.messages, answerer.fields) == ([FORM_MESSAGE], [frozenset({'approval'})])
         assert await harness.status_rows() == ['I1 never-run', 'I2 never-run']
+        assert approval_sources_of(server_harness) == [('I1', 'form'), ('I2', 'form')]
 
-    async def test_named_approvers_ask_nothing(self, harness: ContractHarness) -> None:
+    async def test_named_approvers_ask_nothing(
+        self, harness: ContractHarness, server_harness: ServerHarness
+    ) -> None:
         answerer = FormAnswerer()
         named = [{**command, 'approved_by': 'lead'} for command in (CHECK, LINT)]
 
@@ -150,6 +164,7 @@ class TestContractApprove:
 
         assert view['text'] == 'contract: 2 commands (2 new)\n'
         assert answerer.messages == []
+        assert approval_sources_of(server_harness) == [('I1', 'fallback'), ('I2', 'fallback')]
 
     async def test_declining_the_choice_records_nothing(self, harness: ContractHarness) -> None:
         answerer = FormAnswerer(answer='decline')

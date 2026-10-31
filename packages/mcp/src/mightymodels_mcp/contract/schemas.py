@@ -5,10 +5,15 @@ request only holds the shapes. An approver the call leaves blank is filled with 
 once the user approved the list in the form.
 """
 
+from typing import TYPE_CHECKING
+
 from mightymodels_core.contract.records import ApprovedCommand
 from pydantic import Field
 
 from mightymodels_mcp.server.requests import NameText, RequestModel, SlugField
+
+if TYPE_CHECKING:
+    from mightymodels_core.vocabulary.contract import ApprovalSource
 
 DEFAULT_TIMEOUT = 300
 
@@ -43,7 +48,9 @@ def leaves_approver_blank(request: ContractApproveRequest) -> bool:
     return any(not command.approved_by.strip() for command in request.commands)
 
 
-def create_approved_command(command: CommandRequest, fallback_approver: str) -> ApprovedCommand:
+def create_approved_command(
+    command: CommandRequest, fallback_approver: str, source: ApprovalSource
+) -> ApprovedCommand:
     named = bool(command.approved_by.strip())
     return ApprovedCommand(
         key=command.id,
@@ -51,12 +58,14 @@ def create_approved_command(command: CommandRequest, fallback_approver: str) -> 
         expect_exit=command.expect_exit,
         timeout=command.timeout,
         approved_by=command.approved_by if named else fallback_approver,
+        approval_source=source,
     )
 
 
 def create_approved_commands(
     request: ContractApproveRequest, fallback_approver: str
 ) -> tuple[ApprovedCommand, ...]:
+    source: ApprovalSource = 'form' if leaves_approver_blank(request) else 'fallback'
     return tuple(
-        create_approved_command(command, fallback_approver) for command in request.commands
+        create_approved_command(command, fallback_approver, source) for command in request.commands
     )

@@ -85,3 +85,22 @@ class TestCreateApprovedCommands:
         (approved,) = approved_commands_of(create_commands({'approved_by': 'lead'}), USER_APPROVER)
 
         assert approved.approved_by == 'lead'
+
+    def test_a_blank_approver_marks_every_command_as_form(self) -> None:
+        commands = approved_commands_of(create_commands({}, {'id': 'I2'}), USER_APPROVER)
+
+        assert [command.approval_source for command in commands] == ['form', 'form']
+
+    def test_every_approver_named_marks_every_command_as_fallback(self) -> None:
+        request = create_commands({'approved_by': 'lead'}, {'id': 'I2', 'approved_by': 'lead'})
+
+        commands = approved_commands_of(request, USER_APPROVER)
+
+        assert [command.approval_source for command in commands] == ['fallback', 'fallback']
+
+    def test_a_mixed_list_is_all_form(self) -> None:
+        request = create_commands({'approved_by': 'lead'}, {'id': 'I2'})
+
+        commands = approved_commands_of(request, USER_APPROVER)
+
+        assert [command.approval_source for command in commands] == ['form', 'form']

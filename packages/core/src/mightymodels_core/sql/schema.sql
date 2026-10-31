@@ -150,12 +150,14 @@ CREATE TABLE contract_commands (
   expect_exit INTEGER NOT NULL DEFAULT 0,
   timeout INTEGER NOT NULL DEFAULT 300,
   approved_by TEXT NOT NULL,
+  approval_source TEXT NOT NULL DEFAULT 'fallback',
   approved_at INTEGER NOT NULL DEFAULT (unixepoch()),
   head TEXT,
   CONSTRAINT fk_contract_commands_ticket FOREIGN KEY (ticket_id)
     REFERENCES tickets (id) ON DELETE CASCADE,
   CONSTRAINT uq_contract_commands_key UNIQUE (ticket_id, command_key),
-  CONSTRAINT ck_contract_commands_argv CHECK (json_valid(argv))
+  CONSTRAINT ck_contract_commands_argv CHECK (json_valid(argv)),
+  CONSTRAINT ck_contract_commands_approval_source CHECK (approval_source IN ('form', 'fallback'))
 ) STRICT;
 
 CREATE TABLE receipts (

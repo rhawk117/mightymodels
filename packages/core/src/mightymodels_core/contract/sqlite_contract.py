@@ -64,6 +64,7 @@ def approve_params_of(
         expect_exit=command.expect_exit,
         timeout=command.timeout,
         approved_by=command.approved_by,
+        approval_source=command.approval_source,
         approved_at=approval.at,
         head=approval.head,
     )

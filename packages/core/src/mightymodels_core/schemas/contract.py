@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
-from mightymodels_core.vocabulary.contract import Outcome, Phase
+from mightymodels_core.vocabulary.contract import ApprovalSource, Outcome, Phase
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
@@ -19,6 +19,7 @@ class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):
     expect_exit: int
     timeout: int
     approved_by: str
+    approval_source: ApprovalSource
     approved_at: datetime
     head: str | None
 
@@ -49,6 +50,7 @@ class ContractCommandRow(Struct, frozen=True, kw_only=True):
     expect_exit: int
     timeout: int
     approved_by: str
+    approval_source: ApprovalSource
     approved_at: datetime
     head: str | None
 

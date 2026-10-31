@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
-from mightymodels_core.database import DuplicateRowError, MissingParentError
+from mightymodels_core.database import DatabaseError, DuplicateRowError, MissingParentError
 from mightymodels_core.schemas.contract import (
     APPROVE_CONTRACT_COMMAND,
     CONTRACT_COMMANDS_OF_TICKET,
@@ -15,13 +15,13 @@ from mightymodels_core.schemas.contract import (
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
-    from mightymodels_core.schemas.contract import Outcome
+    from mightymodels_core.schemas.contract import ApprovalSource, Outcome
 
 APPROVED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 RAN_AT = datetime(2026, 1, 2, 4, 0, 0, tzinfo=UTC)
 
 
-def command(ticket_id: int, key: str) -> ApproveContractCommandParams:
+def command(ticket_id: int, key: str, source: str = 'form') -> ApproveContractCommandParams:
     return ApproveContractCommandParams(
         ticket_id=ticket_id,
         command_key=key,
@@ -29,6 +29,7 @@ def command(ticket_id: int, key: str) -> ApproveContractCommandParams:
         expect_exit=0,
         timeout=300,
         approved_by='owner',
+        approval_source=cast('ApprovalSource', source),
         approved_at=APPROVED_AT,
         head=None,
     )
@@ -69,8 +70,30 @@ class TestCommands:
         assert commands[0].expect_exit == 0
         assert commands[0].timeout == 300
         assert commands[0].approved_by == 'owner'
+        assert commands[0].approval_source == 'form'
         assert commands[0].approved_at == APPROVED_AT
         assert commands[0].head is None
+
+    def test_a_fallback_approval_reads_back_as_fallback(
+        self, database: Database, ticket_id: int
+    ) -> None:
+        with database.write() as unit:
+            unit.run_many(APPROVE_CONTRACT_COMMAND, [command(ticket_id, 'I1', 'fallback')])
+
+        with database.read() as unit:
+            (row,) = unit.all(
+                CONTRACT_COMMANDS_OF_TICKET, ContractCommandsParams(ticket_id=ticket_id, limit=10)
+            )
+
+        assert row.approval_source == 'fallback'
+
+    def test_an_unknown_approval_source_is_refused(
+        self, database: Database, ticket_id: int
+    ) -> None:
+        unknown = command(ticket_id, 'I1', 'claimed')
+
+        with pytest.raises(DatabaseError), database.write() as unit:
+            unit.run_many(APPROVE_CONTRACT_COMMAND, [unknown])
 
     def test_a_command_key_is_unique_within_a_ticket(
         self, database: Database, ticket_id: int
