@@ -32,8 +32,8 @@ class InvalidCommandKeyError(StateError):
         self.command_key = command_key
         self.limit = limit
         super().__init__(
-            f'{command_key!r} is not a command id: letters, digits, dots, dashes and underscores '
-            f'only, at most {limit} characters'
+            f'{command_key!r} is not a command id: an id is I or L followed by digits, '
+            f'at most {limit} characters'
         )
 
 

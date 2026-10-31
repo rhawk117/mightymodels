@@ -32,7 +32,7 @@ type CommandShapeIssue = (
     InvalidCommandKeyError | InvalidArgvError | InvalidTimeoutError | MissingApprovalError
 )
 
-COMMAND_KEY_PATTERN = re.compile(r'[A-Za-z0-9._-]+')
+COMMAND_KEY_PATTERN = re.compile(r'[IL][0-9]+')
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

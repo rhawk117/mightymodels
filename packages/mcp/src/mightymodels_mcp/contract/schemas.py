@@ -15,7 +15,7 @@ DEFAULT_TIMEOUT = 300
 
 class CommandRequest(RequestModel):
     id: NameText = Field(
-        description='The command key, such as T1.AC-1, that a receipt is kept under.'
+        description='The command key, such as I1 or L1, that a receipt is kept under.'
     )
     argv: tuple[str, ...] = Field(
         description='The command and its arguments, one entry per argument; no shell is used.'

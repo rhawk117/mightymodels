@@ -78,7 +78,7 @@ def recorded(key: str, argv: tuple[str, ...] = ('make', 'test')) -> RecordedComm
 def command_shape_cases() -> pytest.MarkDecorator:
     scenarios = [
         ShapeScenario(name='valid'),
-        ShapeScenario(name='key-at-limit', key='a' * OPTIONS.key_limit),
+        ShapeScenario(name='key-at-limit', key='I' + '1' * (OPTIONS.key_limit - 1)),
         ShapeScenario(
             name='key-over-limit',
             key='a' * (OPTIONS.key_limit + 1),
