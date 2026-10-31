@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from mightymodels_core.tasks import VerifyRequest
     from mightymodels_core.tasks.records import TaskRecord
 
-    from .schemas import FailedFixRequest, TaskMarkRequest, TaskStartRequest
+    from .schemas import FailedFixRequest, TaskDeclareRequest, TaskMarkRequest, TaskStartRequest
     from .views import TaskView
 
 
@@ -42,6 +42,14 @@ def start_task(work: TaskWork, request: TaskStartRequest, head: str | None) -> T
         attempts = unit.task_reads.show(request.slug).attempts
 
     return render_started(record, attempts, StartOrigin(worker=request.by, head=head))
+
+
+def declare_tasks(work: TaskWork, request: TaskDeclareRequest) -> TaskView:
+    with work.write() as unit:
+        records = unit.tasks.declare(request.slug, request.task_ids)
+        attempts = unit.task_reads.show(request.slug).attempts
+
+    return render_listing(records, attempts)
 
 
 def prepare_verification(work: TaskWork, slug: Slug, task_id: TaskId) -> TaskRecord:

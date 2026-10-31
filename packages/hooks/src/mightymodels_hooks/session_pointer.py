@@ -84,6 +84,7 @@ def create_pointer_fields() -> PointerFields:
             'ticket_update_context': 'slug',
             'close_check': 'slug',
             'close_ticket': 'slug',
+            'task_declare': 'slug',
             'task_start': 'slug',
             'task_verify': 'slug',
             'task_mark': 'slug',

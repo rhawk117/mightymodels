@@ -6,7 +6,7 @@ The old server key was `state`, so its tools were named `mcp__plugin_mightymodel
 
 ## Tool map
 
-One row per registered tool, 36 in all. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
+One row per registered tool, 37 in all, `task_declare` among them, which is new and has no old call. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
 
 | Old tool | Old action | New tool | Input fields | Title | Read-only | Destructive | Idempotent | Open world |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -17,6 +17,7 @@ One row per registered tool, 36 in all. The old action of `snapshot` is `none`, 
 | `close` | `check` | `close_check` | `slug` | Check a ticket for live work | true | false | true | false |
 | `close` | `close` | `close_ticket` | `slug`, `shipped`, `pr`, `gotchas` | Close a ticket | false | true | false | false |
 | `task` | `start` | `task_start` | `slug`, `task_id`, `by`, `owned`, `acceptance`, `mode`, `too_large_approved_by` | Start a task | false | false | false | false |
+| `none` | `none` | `task_declare` | `slug`, `task_ids` | Declare the plan tasks | false | false | true | false |
 | `task` | `verify` | `task_verify` | `slug`, `task_id`, `commit`, `assertions` | Verify a task | false | false | false | false |
 | `task` | `mark` | `task_mark` | `slug`, `task_id`, `to`, `reason` | Mark a task | false | true | false | false |
 | `task` | `show` | `task_show` | `slug` | Show the tasks | true | false | true | false |

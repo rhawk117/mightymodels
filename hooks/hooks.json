@@ -77,7 +77,7 @@
         ]
       },
       {
-        "matcher": "^mcp__plugin_mightymodels_workflow_state__(ticket_write|ticket_validate|ticket_show|ticket_update_context|close_check|close_ticket|task_start|task_verify|task_mark|task_show|task_ready|failed_fix_record|contract_approve|contract_status|review_start|snapshot_take|crashout_add|investigation_add|investigation_render|investigation_knowns)$",
+        "matcher": "^mcp__plugin_mightymodels_workflow_state__(ticket_write|ticket_validate|ticket_show|ticket_update_context|close_check|close_ticket|task_declare|task_start|task_verify|task_mark|task_show|task_ready|failed_fix_record|contract_approve|contract_status|review_start|snapshot_take|crashout_add|investigation_add|investigation_render|investigation_knowns)$",
         "hooks": [
           {
             "type": "command",

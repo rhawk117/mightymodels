@@ -55,6 +55,13 @@ class TaskStartRequest(RequestModel):
     )
 
 
+class TaskDeclareRequest(RequestModel):
+    slug: SlugField
+    task_ids: tuple[TaskIdField, ...] = Field(
+        min_length=1, description='The plan task ids to record as pending, such as T1 and T2.'
+    )
+
+
 class TaskVerifyRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
