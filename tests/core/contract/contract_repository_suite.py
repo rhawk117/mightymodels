@@ -1,5 +1,6 @@
 """The contract repository contract, written once for every tier to subclass."""
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -9,7 +10,7 @@ from mightymodels_core.contract import (
     RecordedCommand,
     UnapprovedCommandError,
 )
-from mightymodels_core.contract.records import COMMANDS
+from mightymodels_core.contract.records import COMMANDS, Retirement
 from mightymodels_core.primitives import WriteLimitError
 
 from tests.core.contract.contract_builders import APPROVAL, create_command, create_receipt
@@ -135,6 +136,51 @@ class ContractRepositoryContract:
                 approved.contract.record(approved.ticket_id, batch)
 
             assert approved.contract.latest_receipts(approved.ticket_id) == {}
+
+    class TestRetire:
+        retirement = Retirement(
+            by='owner',
+            why='the command no longer applies',
+            approval_source='form',
+            at=datetime(2026, 2, 3, 4, 5, 6, tzinfo=UTC),
+        )
+
+        @pytest.fixture
+        def approved(self, harness: ContractHarness) -> ContractHarness:
+            commands = [create_command('I1'), create_command('I3')]
+            harness.contract.approve(harness.ticket_id, commands, APPROVAL)
+            harness.contract.approve(harness.other_ticket_id, [create_command('I1')], APPROVAL)
+            return harness
+
+        def test_fresh_command_has_no_retirement(self, approved: ContractHarness) -> None:
+            commands = approved.contract.commands(approved.ticket_id)
+
+            assert [command.retirement for command in commands] == [None, None]
+
+        def test_retired_command_reads_back_with_its_retirement(
+            self, approved: ContractHarness
+        ) -> None:
+            approved.contract.retire(approved.ticket_id, 'I1', self.retirement)
+
+            by_key = {c.key: c for c in approved.contract.commands(approved.ticket_id)}
+            assert by_key['I1'].retirement == self.retirement
+            assert by_key['I3'].retirement is None
+
+        def test_retired_command_keeps_its_latest_receipt(self, approved: ContractHarness) -> None:
+            receipt = create_receipt('I1')
+            approved.contract.record(approved.ticket_id, [receipt])
+
+            approved.contract.retire(approved.ticket_id, 'I1', self.retirement)
+
+            assert approved.contract.latest_receipts(approved.ticket_id) == {'I1': receipt}
+
+        def test_retiring_leaves_another_tickets_command_alone(
+            self, approved: ContractHarness
+        ) -> None:
+            approved.contract.retire(approved.ticket_id, 'I1', self.retirement)
+
+            (other,) = approved.contract.commands(approved.other_ticket_id)
+            assert other.retirement is None
 
     class TestCommandCap:
         held_commands = COMMANDS.rows

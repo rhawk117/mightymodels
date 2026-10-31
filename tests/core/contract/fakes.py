@@ -1,6 +1,6 @@
 """The contract repository kept in memory."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import (
@@ -13,7 +13,12 @@ from mightymodels_core.contract.records import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from mightymodels_core.contract.records import Approval, ApprovedCommand, Receipt
+    from mightymodels_core.contract.records import (
+        Approval,
+        ApprovedCommand,
+        Receipt,
+        Retirement,
+    )
 
 type CommandAddress = tuple[int, str]
 
@@ -85,6 +90,11 @@ class FakeContractRepository:
             self.ledger.approved[ticket_id, command.key] = PlacedCommand(
                 command=recorded, approved_by=command.approved_by, approval=approval
             )
+
+    def retire(self, ticket_id: int, key: str, retirement: Retirement) -> None:
+        placed = self.ledger.approved[ticket_id, key]
+        retired = replace(placed.command, retirement=retirement)
+        self.ledger.approved[ticket_id, key] = replace(placed, command=retired)
 
     def record(self, ticket_id: int, receipts: Sequence[Receipt]) -> None:
         approved_keys = self.ledger.keys_of(ticket_id)

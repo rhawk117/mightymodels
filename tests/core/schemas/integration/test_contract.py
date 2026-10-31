@@ -8,9 +8,11 @@ from mightymodels_core.schemas.contract import (
     CONTRACT_COMMANDS_OF_TICKET,
     LATEST_RECEIPTS,
     RECORD_RECEIPT,
+    RETIRE_CONTRACT_COMMAND,
     ApproveContractCommandParams,
     ContractCommandsParams,
     RecordReceiptParams,
+    RetireContractCommandParams,
 )
 
 if TYPE_CHECKING:
@@ -18,6 +20,7 @@ if TYPE_CHECKING:
     from mightymodels_core.schemas.contract import ApprovalSource, Outcome
 
 APPROVED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+RETIRED_AT = datetime(2026, 1, 3, 3, 4, 5, tzinfo=UTC)
 RAN_AT = datetime(2026, 1, 2, 4, 0, 0, tzinfo=UTC)
 
 
@@ -32,6 +35,17 @@ def command(ticket_id: int, key: str, source: str = 'form') -> ApproveContractCo
         approval_source=cast('ApprovalSource', source),
         approved_at=APPROVED_AT,
         head=None,
+    )
+
+
+def retirement(ticket_id: int, key: str, source: str = 'form') -> RetireContractCommandParams:
+    return RetireContractCommandParams(
+        ticket_id=ticket_id,
+        command_key=key,
+        retired_by='owner',
+        retired_why='no longer applies',
+        retired_approval_source=cast('ApprovalSource', source),
+        retired_at=RETIRED_AT,
     )
 
 
@@ -107,6 +121,49 @@ class TestCommands:
     def test_a_command_needs_a_ticket(self, database: Database) -> None:
         with pytest.raises(MissingParentError), database.write() as unit:
             unit.run_many(APPROVE_CONTRACT_COMMAND, [command(999, 'I1')])
+
+
+class TestRetirement:
+    def test_a_retirement_is_read_back_on_its_own_row(
+        self, database: Database, ticket_id: int
+    ) -> None:
+        with database.write() as unit:
+            unit.run_many(APPROVE_CONTRACT_COMMAND, [command(ticket_id, 'I1')])
+            retired = unit.run(RETIRE_CONTRACT_COMMAND, retirement(ticket_id, 'I1'))
+
+        with database.read() as unit:
+            (row,) = unit.all(
+                CONTRACT_COMMANDS_OF_TICKET, ContractCommandsParams(ticket_id=ticket_id, limit=10)
+            )
+
+        assert retired == 1
+        assert row.retired_by == 'owner'
+        assert row.retired_why == 'no longer applies'
+        assert row.retired_approval_source == 'form'
+        assert row.retired_at == RETIRED_AT
+
+    def test_an_unretired_command_reads_back_without_retirement(
+        self, database: Database, ticket_id: int
+    ) -> None:
+        with database.write() as unit:
+            unit.run_many(APPROVE_CONTRACT_COMMAND, [command(ticket_id, 'I1')])
+
+        with database.read() as unit:
+            (row,) = unit.all(
+                CONTRACT_COMMANDS_OF_TICKET, ContractCommandsParams(ticket_id=ticket_id, limit=10)
+            )
+
+        assert row.retired_at is None
+        assert row.retired_by is None
+
+    def test_an_unknown_retirement_source_is_refused(
+        self, database: Database, ticket_id: int
+    ) -> None:
+        with database.write() as unit:
+            unit.run_many(APPROVE_CONTRACT_COMMAND, [command(ticket_id, 'I1')])
+
+        with pytest.raises(DatabaseError), database.write() as unit:
+            unit.run(RETIRE_CONTRACT_COMMAND, retirement(ticket_id, 'I1', 'claimed'))
 
 
 class TestReceipts:

@@ -24,6 +24,15 @@ class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):
     head: str | None
 
 
+class RetireContractCommandParams(Struct, frozen=True, kw_only=True):
+    ticket_id: int
+    command_key: str
+    retired_by: str
+    retired_why: str
+    retired_approval_source: ApprovalSource
+    retired_at: datetime
+
+
 class ContractCommandsParams(Struct, frozen=True, kw_only=True, gc=False):
     ticket_id: int
     limit: int
@@ -53,6 +62,10 @@ class ContractCommandRow(Struct, frozen=True, kw_only=True):
     approval_source: ApprovalSource
     approved_at: datetime
     head: str | None
+    retired_by: str | None
+    retired_why: str | None
+    retired_approval_source: ApprovalSource | None
+    retired_at: datetime | None
 
 
 class ReceiptRow(Struct, frozen=True, kw_only=True):
@@ -75,11 +88,15 @@ APPROVE_CONTRACT_COMMAND = Command(
 CONTRACT_COMMANDS_OF_TICKET = Query(
     name='contract_commands_of_ticket', params=ContractCommandsParams, row=ContractCommandRow
 )
+RETIRE_CONTRACT_COMMAND = Command(
+    name='retire_contract_command', params=RetireContractCommandParams
+)
 RECORD_RECEIPT = Command(name='record_receipt', params=RecordReceiptParams)
 LATEST_RECEIPTS = Query(name='latest_receipts', params=ContractCommandsParams, row=ReceiptRow)
 
 DECLARATIONS: tuple[Declaration, ...] = (
     APPROVE_CONTRACT_COMMAND,
+    RETIRE_CONTRACT_COMMAND,
     CONTRACT_COMMANDS_OF_TICKET,
     RECORD_RECEIPT,
     LATEST_RECEIPTS,

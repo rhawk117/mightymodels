@@ -39,11 +39,20 @@ class ApprovedCommand:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class Retirement:
+    by: str
+    why: str
+    approval_source: ApprovalSource
+    at: datetime
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class RecordedCommand:
     key: str
     argv: tuple[str, ...]
     expect_exit: int
     timeout: int
+    retirement: Retirement | None = None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

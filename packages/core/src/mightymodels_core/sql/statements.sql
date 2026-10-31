@@ -290,6 +290,14 @@ VALUES (
   :approved_at, :head
 );
 
+-- name: retire_contract_command
+UPDATE contract_commands
+SET retired_by = :retired_by,
+    retired_why = :retired_why,
+    retired_approval_source = :retired_approval_source,
+    retired_at = :retired_at
+WHERE ticket_id = :ticket_id AND command_key = :command_key;
+
 -- name: contract_commands_of_ticket
 SELECT json_object(
   'id', id,
@@ -300,7 +308,11 @@ SELECT json_object(
   'approved_by', approved_by,
   'approval_source', approval_source,
   'approved_at', approved_at,
-  'head', head
+  'head', head,
+  'retired_by', retired_by,
+  'retired_why', retired_why,
+  'retired_approval_source', retired_approval_source,
+  'retired_at', retired_at
 )
 FROM contract_commands
 WHERE ticket_id = :ticket_id
