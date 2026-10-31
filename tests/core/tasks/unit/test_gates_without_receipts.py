@@ -1,6 +1,6 @@
 """Task verification proves criteria by citation alone, never by receipts or contract commands."""
 
-from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from mightymodels_core.tasks import Brief, Evidence, TaskRecord, VerificationGate
 
@@ -10,7 +10,11 @@ from tests.core.tasks.service_builders import (
     FIRST_TASK,
     OWNED_FILE,
     create_git_facts,
+    verify_as_asked,
 )
+
+if TYPE_CHECKING:
+    from tests.core.tasks.service_builders import ServiceHarness
 
 BRIEF = f'## ASKED\n  - AC-1: first\n  - AC-2: second\n## DONE\ncommit: {DONE_COMMIT}\n'
 CITED = {'AC-1': f'{OWNED_FILE}:1', 'AC-2': f'{OWNED_FILE}:2'}
@@ -40,9 +44,9 @@ class TestGatesWithoutReceipts:
             'no cited assertion proves this task',
         ]
 
-    def test_evidence_carries_no_commands_or_receipts(self) -> None:
-        evidence = create_gate(CITED).evidence
+    def test_a_live_contract_command_with_no_receipt_still_verifies(
+        self, contracted_harness: ServiceHarness
+    ) -> None:
+        record = verify_as_asked(contracted_harness, frozenset({OWNED_FILE}))
 
-        assert not hasattr(evidence, 'commands')
-        assert not hasattr(evidence, 'receipts')
-        assert replace(evidence, assertions={}).assertions == {}
+        assert (record.status, record.reasons) == ('verified', ())
