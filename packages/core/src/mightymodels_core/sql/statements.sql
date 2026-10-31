@@ -316,7 +316,7 @@ SELECT json_object(
 )
 FROM contract_commands
 WHERE ticket_id = :ticket_id
-ORDER BY command_key
+ORDER BY id
 LIMIT :limit;
 
 -- name: record_receipt

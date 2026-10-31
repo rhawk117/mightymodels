@@ -148,7 +148,7 @@ class PickPolicy:
     @property
     def picked_keys(self) -> list[str]:
         if self.asked is None:
-            return sorted(self.held_by_key)
+            return list(self.held_by_key)
 
         return list(self.asked)
 

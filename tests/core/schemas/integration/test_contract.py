@@ -66,7 +66,7 @@ def receipt(command_id: int, outcome: Outcome, stdout_tail: str) -> RecordReceip
 
 
 class TestCommands:
-    def test_a_batch_of_commands_is_approved_and_read_back_in_key_order(
+    def test_a_batch_of_commands_is_approved_and_read_back_in_approval_order(
         self, database: Database, ticket_id: int
     ) -> None:
         batch = [command(ticket_id, 'I2'), command(ticket_id, 'I1')]
@@ -79,7 +79,7 @@ class TestCommands:
             )
 
         assert approved == 2
-        assert [row.command_key for row in commands] == ['I1', 'I2']
+        assert [row.command_key for row in commands] == ['I2', 'I1']
         assert commands[0].argv == ['uv', 'run', 'pytest', '-q']
         assert commands[0].expect_exit == 0
         assert commands[0].timeout == 300

@@ -57,7 +57,7 @@ class FakeContractRepository:
         ]
         if (error := COMMANDS.error(held, owner=f'ticket {ticket_id}')) is not None:
             raise error
-        return sorted(held, key=lambda command: command.key)
+        return held
 
     def latest_receipts(self, ticket_id: int) -> dict[str, Receipt]:
         latest = {

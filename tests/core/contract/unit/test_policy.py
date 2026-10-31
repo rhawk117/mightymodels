@@ -266,11 +266,18 @@ class TestPickPolicy:
         assert isinstance(problem, UnknownCommandError)
         assert problem.unknown == ('I10', 'I8')
 
-    def test_no_ids_picks_every_command_in_key_order(self) -> None:
+    def test_no_ids_picks_every_command_in_approval_order(self) -> None:
         policy = PickPolicy(slug=SLUG, held=self.held, asked=None)
 
         assert policy.get_pick_problem() is None
-        assert [command.key for command in policy.picked_commands] == [FIRST_KEY, SECOND_KEY]
+        assert [command.key for command in policy.picked_commands] == [SECOND_KEY, FIRST_KEY]
+
+    def test_no_ids_picks_i2_before_i10(self) -> None:
+        held = (recorded('I2'), recorded('I10'), recorded('I1'))
+
+        policy = PickPolicy(slug=SLUG, held=held, asked=None)
+
+        assert [command.key for command in policy.picked_commands] == ['I2', 'I10', 'I1']
 
     def test_asked_ids_pick_in_the_order_asked(self) -> None:
         policy = PickPolicy(slug=SLUG, held=self.held, asked=[SECOND_KEY, FIRST_KEY])

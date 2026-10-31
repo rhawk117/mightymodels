@@ -34,25 +34,34 @@ class ContractRepositoryContract:
         def test_no_commands_are_held_before_an_approval(self, harness: ContractHarness) -> None:
             assert harness.contract.commands(harness.ticket_id) == []
 
-        def test_approved_commands_are_read_back_ordered_by_key(
+        def test_approved_commands_are_read_back_in_approval_order(
             self, approved: ContractHarness
         ) -> None:
             expected = [
-                RecordedCommand(
-                    key='I1',
-                    argv=('make', 'lint'),
-                    expect_exit=0,
-                    timeout=300,
-                ),
                 RecordedCommand(
                     key='I3',
                     argv=('make', 'test'),
                     expect_exit=0,
                     timeout=300,
                 ),
+                RecordedCommand(
+                    key='I1',
+                    argv=('make', 'lint'),
+                    expect_exit=0,
+                    timeout=300,
+                ),
             ]
 
             assert approved.contract.commands(approved.ticket_id) == expected
+
+        def test_i2_approved_before_i10_is_read_back_before_it(
+            self, harness: ContractHarness
+        ) -> None:
+            for key in ('I2', 'I10', 'I1'):
+                harness.contract.approve(harness.ticket_id, [create_command(key)], APPROVAL)
+
+            keys = [command.key for command in harness.contract.commands(harness.ticket_id)]
+            assert keys == ['I2', 'I10', 'I1']
 
         def test_commands_of_another_ticket_are_not_read(self, approved: ContractHarness) -> None:
             assert approved.contract.commands(approved.other_ticket_id) == []
@@ -73,7 +82,7 @@ class ContractRepositoryContract:
                 approved.contract.approve(approved.ticket_id, batch, APPROVAL)
 
             keys = [command.key for command in approved.contract.commands(approved.ticket_id)]
-            assert keys == ['I1', 'I3']
+            assert keys == ['I3', 'I1']
 
         def test_key_twice_in_one_batch_is_refused(self, harness: ContractHarness) -> None:
             batch = [create_command('I1'), create_command('I1')]
