@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.policy import live_commands
-from mightymodels_core.tasks.gates import get_readiness_problems, get_receipt_problems
+from mightymodels_core.tasks.gates import get_landing_problems, get_readiness_problems
 
 if TYPE_CHECKING:
     from mightymodels_core.contract.repository import ContractRepository
@@ -46,7 +46,7 @@ class TaskReadService:
         receipts = self.contracts.latest_receipts(ticket_id)
         problems = [
             *get_readiness_problems(records),
-            *get_receipt_problems(
+            *get_landing_problems(
                 live_commands(self.contracts.commands(ticket_id)), receipts, head
             ),
         ]

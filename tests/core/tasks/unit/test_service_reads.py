@@ -50,7 +50,7 @@ class TestReady:
     ) -> None:
         readiness = service_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
 
-        assert readiness.problems == ['no plan task has been started']
+        assert readiness.problems[0] == 'no plan task has been started'
 
     def test_ready_is_clear_when_every_plan_task_is_proven_at_head(
         self, verified_harness: ServiceHarness

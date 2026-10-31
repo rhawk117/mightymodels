@@ -11,18 +11,17 @@ as the error, so the caller can tell none from unreadable.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from mightymodels_core.contract import SqliteContractRepository, live_commands
+from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository, TaskReadService
-from mightymodels_core.tasks.gates import STUCK, get_receipt_problem
+from mightymodels_core.tasks.gates import STUCK
 from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError
 
 from mightymodels_hooks.hook_context import STATE_UNREADABLE
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
-    from mightymodels_core.contract import Receipt, RecordedCommand
     from mightymodels_core.edge import OpenState
     from mightymodels_core.primitives import TaskId
     from mightymodels_core.tasks import TaskRecord
@@ -150,21 +149,6 @@ def tickets_on_branch(entry: Entry, branch: str | None) -> BranchTickets:
     )
 
 
-def not_proven_in_landing(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
-) -> list[str]:
-    passed_at_head = (
-        receipts[command.key]
-        for command in commands
-        if get_receipt_problem(command.key, receipts.get(command.key), head) is None
-    )
-    return [
-        f'{receipt.key} passed at HEAD in the {receipt.phase} phase, not the landing phase'
-        for receipt in passed_at_head
-        if receipt.phase != 'landing'
-    ]
-
-
 def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Landing:
     found = branch_ticket(entry, branch)
     ticket = found.ticket
@@ -178,10 +162,7 @@ def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Lan
         tickets=tickets, tasks=reads.tasks, attempts=reads.attempts, contracts=contracts
     )
     readiness = service.ready(ticket.slug, head)
-    commands = live_commands(contracts.commands(reads.ticket_id))
-    receipts = contracts.latest_receipts(reads.ticket_id)
-    unproven = (*readiness.problems, *not_proven_in_landing(commands, receipts, head))
-    return Landing(unclosed=found.unclosed, unproven=unproven)
+    return Landing(unclosed=found.unclosed, unproven=tuple(readiness.problems))
 
 
 @runtime_checkable

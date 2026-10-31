@@ -55,15 +55,6 @@ class TestWithATicket:
             True,
         )
 
-    async def test_push_is_denied_when_the_receipt_is_not_a_landing_one(
-        self, harness: MainThreadHarness
-    ) -> None:
-        head = await commit_file(harness.checkout, 'a.txt')
-        await harness.dispatch.seed((VERIFIED,))
-        await harness.prove(head, 'task')
-        verdict = await harness.verdict(bash_payload(PUSH))
-        assert (verdict.decision, 'not the landing phase' in verdict.detail) == ('deny', True)
-
     async def test_push_of_a_proven_landing_is_not_judged(self, harness: MainThreadHarness) -> None:
         head = await commit_file(harness.checkout, 'a.txt')
         await harness.dispatch.seed((VERIFIED,))
@@ -90,3 +81,38 @@ class TestWithATicket:
         harness.dispatch.data_directory.write_text('not a directory')
         verdict = await harness.verdict(bash_payload(PUSH))
         assert verdict.decision == 'deny'
+
+
+@pytest.mark.usefixtures('ticket_directory')
+class TestLandingRule:
+    @pytest.fixture
+    def ticket_directory(self, harness: MainThreadHarness) -> None:
+        harness.dispatch.make_ticket_directory()
+
+    async def test_push_of_a_pass_at_head_in_the_task_phase_is_not_judged(
+        self, harness: MainThreadHarness
+    ) -> None:
+        head = await commit_file(harness.checkout, 'a.txt')
+        await harness.dispatch.seed((VERIFIED,))
+        await harness.prove(head, 'task')
+        verdict = await harness.verdict(bash_payload(PUSH))
+        assert verdict.decision is None
+
+    async def test_push_is_denied_when_the_contract_has_only_an_integration_command(
+        self, harness: MainThreadHarness
+    ) -> None:
+        head = await commit_file(harness.checkout, 'a.txt')
+        await harness.dispatch.seed((VERIFIED,))
+        await harness.prove(head, 'landing', key='I1')
+        verdict = await harness.verdict(bash_payload(PUSH))
+        assert (verdict.decision, 'no live L* command' in verdict.detail) == ('deny', True)
+
+    async def test_push_ignores_a_retired_command_without_a_receipt(
+        self, harness: MainThreadHarness
+    ) -> None:
+        head = await commit_file(harness.checkout, 'a.txt')
+        await harness.dispatch.seed((VERIFIED,))
+        await harness.prove(head, 'landing')
+        await harness.add_retired_command('L2', head)
+        verdict = await harness.verdict(bash_payload(PUSH))
+        assert verdict.decision is None

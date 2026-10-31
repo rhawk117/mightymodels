@@ -6,7 +6,13 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import msgspec
-from mightymodels_core.contract import Approval, ApprovedCommand, Receipt, SqliteContractRepository
+from mightymodels_core.contract import (
+    Approval,
+    ApprovedCommand,
+    Receipt,
+    Retirement,
+    SqliteContractRepository,
+)
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, open_state
 from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.tickets import SqliteTicketRepository
@@ -35,7 +41,7 @@ PUSH = 'git push origin main'
 OUTSIDE_PATH = 'src/app.py'
 OTHER_SLUG = Slug('other-it')
 WORKER = 'mightymodels:workers:engineer'
-COMMAND_KEY = 'I1'
+COMMAND_KEY = 'L1'
 MOMENT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
 
@@ -102,26 +108,46 @@ class MainThreadHarness:
                 tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
                 tickets.stage(slug, section, ())
 
-    async def prove(self, head: str, phase: Phase) -> None:
+    async def prove(self, head: str, phase: Phase, key: str = COMMAND_KEY) -> None:
         async with open_state(self.dispatch.data_directory, self.checkout) as state:
             with write_entry(state.database, state.checkout.repository_key()) as entry:
                 tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
                 ticket_id = tickets.staged_ticket(SLUG).id
                 contracts = SqliteContractRepository(unit=entry.unit)
                 command = ApprovedCommand(
-                    key=COMMAND_KEY,
+                    key=key,
                     argv=('make', 'test'),
                     expect_exit=0,
                     timeout=300,
                     approved_by='planner',
                 )
                 contracts.approve(ticket_id, [command], Approval(at=MOMENT, head=head))
-                contracts.record(ticket_id, [passing_receipt(head, phase)])
+                contracts.record(ticket_id, [passing_receipt(head, phase, key)])
+
+    async def add_retired_command(self, key: str, head: str) -> None:
+        async with open_state(self.dispatch.data_directory, self.checkout) as state:
+            with write_entry(state.database, state.checkout.repository_key()) as entry:
+                tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)
+                ticket_id = tickets.staged_ticket(SLUG).id
+                contracts = SqliteContractRepository(unit=entry.unit)
+                command = ApprovedCommand(
+                    key=key,
+                    argv=('make', 'test'),
+                    expect_exit=0,
+                    timeout=300,
+                    approved_by='planner',
+                )
+                contracts.approve(ticket_id, [command], Approval(at=MOMENT, head=head))
+                contracts.retire(
+                    ticket_id,
+                    key,
+                    Retirement(by='planner', why='dropped', approval_source='fallback', at=MOMENT),
+                )
 
 
-def passing_receipt(head: str, phase: Phase) -> Receipt:
+def passing_receipt(head: str, phase: Phase, key: str = COMMAND_KEY) -> Receipt:
     return Receipt(
-        key=COMMAND_KEY,
+        key=key,
         argv=('make', 'test'),
         outcome='pass',
         exit=0,

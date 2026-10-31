@@ -26,7 +26,7 @@ SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 BASE_COMMIT = 'base001'
 DONE_COMMIT = 'abc1234'
 OWNED_FILE = 'src/a.py'
-COMMAND_KEY = f'{FIRST_TASK}.AC-1'
+COMMAND_KEY = 'L1'
 BRIEF_TEXT = f'## ASKED\nacceptance:\n  - AC-1: it works\n## DONE\ncommit: {DONE_COMMIT}\n'
 
 

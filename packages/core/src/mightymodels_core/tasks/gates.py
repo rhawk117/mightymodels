@@ -28,6 +28,8 @@ DONE_COMMIT = re.compile(r'^\s*commit:\s*([0-9a-fA-F]{7,64})\s*$', re.MULTILINE)
 STUCK: frozenset[TaskStatus] = frozenset({'failed', 'blocked'})
 CLOSED: frozenset[TaskStatus] = frozenset({'verified', 'superseded'})
 PLAN_TASK_PREFIX = 'T'
+LANDING_COMMAND_PREFIX = 'L'
+NO_LANDING_COMMAND = 'the contract has no live L* command; approve one with contract_approve'
 
 
 def is_plan_task(task_key: TaskId) -> bool:
@@ -83,6 +85,16 @@ def get_receipt_problems(
         get_receipt_problem(command.key, receipts.get(command.key), head) for command in commands
     )
     return [problem for problem in problems if problem is not None]
+
+
+def get_landing_problems(
+    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
+) -> list[str]:
+    problems = get_receipt_problems(commands, receipts, head)
+    if any(command.key.startswith(LANDING_COMMAND_PREFIX) for command in commands):
+        return problems
+
+    return [NO_LANDING_COMMAND, *problems]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
