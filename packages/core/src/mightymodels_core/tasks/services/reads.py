@@ -42,15 +42,9 @@ class TaskReadService:
     def ready(self, slug: Slug, head: str | None) -> Readiness:
         ticket_id = self.tickets.staged_ticket(slug).id
         records = self.tasks.tasks(ticket_id)
-        superseded = {record.key for record in records if record.status == 'superseded'}
-        live = [
-            command
-            for command in self.contracts.commands(ticket_id)
-            if command.task_key not in superseded
-        ]
         receipts = self.contracts.latest_receipts(ticket_id)
         problems = [
             *get_readiness_problems(records),
-            *get_receipt_problems(live, receipts, head),
+            *get_receipt_problems(self.contracts.commands(ticket_id), receipts, head),
         ]
         return Readiness(records=records, problems=problems)

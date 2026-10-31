@@ -165,15 +165,6 @@ def not_proven_in_landing(
     ]
 
 
-def live_commands(
-    contracts: SqliteContractRepository, ticket_id: int, records: Sequence[TaskRecord]
-) -> list[RecordedCommand]:
-    superseded = {record.key for record in records if record.status == 'superseded'}
-    return [
-        command for command in contracts.commands(ticket_id) if command.task_key not in superseded
-    ]
-
-
 def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Landing:
     found = branch_ticket(entry, branch)
     ticket = found.ticket
@@ -187,9 +178,9 @@ def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Lan
         tickets=tickets, tasks=reads.tasks, attempts=reads.attempts, contracts=contracts
     )
     readiness = service.ready(ticket.slug, head)
-    live = live_commands(contracts, reads.ticket_id, readiness.records)
+    commands = contracts.commands(reads.ticket_id)
     receipts = contracts.latest_receipts(reads.ticket_id)
-    unproven = (*readiness.problems, *not_proven_in_landing(live, receipts, head))
+    unproven = (*readiness.problems, *not_proven_in_landing(commands, receipts, head))
     return Landing(unclosed=found.unclosed, unproven=unproven)
 
 

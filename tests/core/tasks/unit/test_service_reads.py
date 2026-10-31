@@ -71,7 +71,7 @@ class TestReady:
 
         assert readiness.problems == [f'{COMMAND_KEY} has no receipt at the current HEAD']
 
-    def test_ready_skips_the_commands_of_a_superseded_task(
+    def test_ready_still_names_the_commands_of_a_superseded_task(
         self, contracted_harness: ServiceHarness
     ) -> None:
         contracted_harness.service.mark(
@@ -80,7 +80,7 @@ class TestReady:
 
         readiness = contracted_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
 
-        assert not any(COMMAND_KEY in problem for problem in readiness.problems)
+        assert any(COMMAND_KEY in problem for problem in readiness.problems)
 
     def test_ready_refuses_a_ticket_that_was_never_staged(
         self, service_harness: ServiceHarness
