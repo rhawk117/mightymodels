@@ -77,3 +77,17 @@ class UnknownCommandError(StateError):
     def __init__(self, *, unknown: Sequence[str]) -> None:
         self.unknown = tuple(unknown)
         super().__init__(f'not in the contract: {list(unknown)}; approve them with contract first')
+
+
+class RetiredCommandError(StateError):
+    def __init__(self, *, command_key: str) -> None:
+        self.command_key = command_key
+        super().__init__(
+            f'{command_key} is retired and cannot be approved again; approve a new id instead'
+        )
+
+
+class AlreadyRetiredError(StateError):
+    def __init__(self, *, command_key: str) -> None:
+        self.command_key = command_key
+        super().__init__(f'{command_key} is already retired')

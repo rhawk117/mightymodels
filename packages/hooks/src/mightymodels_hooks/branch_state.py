@@ -11,7 +11,7 @@ as the error, so the caller can tell none from unreadable.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from mightymodels_core.contract import SqliteContractRepository
+from mightymodels_core.contract import SqliteContractRepository, live_commands
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository, TaskReadService
 from mightymodels_core.tasks.gates import STUCK, get_receipt_problem
 from mightymodels_core.tickets import SqliteTicketRepository
@@ -178,7 +178,7 @@ def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Lan
         tickets=tickets, tasks=reads.tasks, attempts=reads.attempts, contracts=contracts
     )
     readiness = service.ready(ticket.slug, head)
-    commands = contracts.commands(reads.ticket_id)
+    commands = live_commands(contracts.commands(reads.ticket_id))
     receipts = contracts.latest_receipts(reads.ticket_id)
     unproven = (*readiness.problems, *not_proven_in_landing(commands, receipts, head))
     return Landing(unclosed=found.unclosed, unproven=unproven)

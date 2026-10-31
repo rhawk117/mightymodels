@@ -13,8 +13,10 @@ from mightymodels_core.contract.policy import (
     ContractOptions,
     PickPolicy,
     ReceiptAssessment,
+    RetirePolicy,
+    live_commands,
 )
-from mightymodels_core.contract.records import Approval
+from mightymodels_core.contract.records import Approval, Retirement
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -23,6 +25,7 @@ if TYPE_CHECKING:
     from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Clock, Slug
     from mightymodels_core.tickets.repository import TicketRepository
+    from mightymodels_core.vocabulary.contract import ApprovalSource
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -41,10 +44,19 @@ class CommandStatus:
 class ContractStatus:
     head: str | None
     commands: list[CommandStatus]
+    retired: list[RecordedCommand] = field(default_factory=list)
 
     @property
     def is_passing(self) -> bool:
         return all(status.assessment.is_passing for status in self.commands)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RetireRequest:
+    key: str
+    by: str
+    why: str
+    approval_source: ApprovalSource
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -70,23 +82,40 @@ class ContractService:
     def status(self, slug: Slug, head: str | None) -> ContractStatus:
         ticket_id = self.tickets.staged_ticket(slug).id
         receipts = self.contracts.latest_receipts(ticket_id)
+        held = self.contracts.commands(ticket_id)
         statuses = [
             CommandStatus(
                 command=command,
                 assessment=ReceiptAssessment(receipt=receipts.get(command.key), head=head),
             )
-            for command in self.contracts.commands(ticket_id)
+            for command in live_commands(held)
         ]
-        return ContractStatus(head=head, commands=statuses)
+        retired = [command for command in held if command.retirement is not None]
+        return ContractStatus(head=head, commands=statuses, retired=retired)
 
     def pick(self, slug: Slug, asked: Sequence[str] | None) -> list[RecordedCommand]:
         ticket_id = self.tickets.staged_ticket(slug).id
         held = self.contracts.commands(ticket_id)
-        policy = PickPolicy(slug=slug, held=held, asked=asked)
+        policy = PickPolicy(slug=slug, held=live_commands(held), asked=asked)
         if problem := policy.get_pick_problem():
             raise problem
 
         return policy.picked_commands
+
+    def retire(self, slug: Slug, request: RetireRequest) -> None:
+        ticket_id = self.tickets.staged_ticket(slug).id
+        held = self.contracts.commands(ticket_id)
+        policy = RetirePolicy(key=request.key, held=held)
+        if problem := policy.get_retire_problem():
+            raise problem
+
+        retirement = Retirement(
+            by=request.by,
+            why=request.why,
+            approval_source=request.approval_source,
+            at=self.clock.now(),
+        )
+        self.contracts.retire(ticket_id, request.key, retirement)
 
     def record(self, slug: Slug, receipts: Sequence[Receipt]) -> None:
         ticket_id = self.tickets.staged_ticket(slug).id

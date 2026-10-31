@@ -1,6 +1,7 @@
 """The contract records, their repository seam, the sqlite store, the policy and the service."""
 
 from .errors import (
+    AlreadyRetiredError,
     ChangedCommandError,
     DuplicateCommandError,
     InvalidArgvError,
@@ -8,6 +9,7 @@ from .errors import (
     InvalidTimeoutError,
     MissingApprovalError,
     NoContractError,
+    RetiredCommandError,
     UnapprovedCommandError,
     UnknownCommandError,
 )
@@ -18,14 +20,23 @@ from .policy import (
     PickPolicy,
     ReceiptAssessment,
     ReceiptState,
+    RetirePolicy,
     is_argv,
+    live_commands,
 )
-from .records import Approval, ApprovedCommand, Receipt, RecordedCommand
+from .records import Approval, ApprovedCommand, Receipt, RecordedCommand, Retirement
 from .repository import ContractRepository
-from .services import ApprovalResult, CommandStatus, ContractService, ContractStatus
+from .services import (
+    ApprovalResult,
+    CommandStatus,
+    ContractService,
+    ContractStatus,
+    RetireRequest,
+)
 from .sqlite_contract import SqliteContractRepository
 
 __all__ = [
+    'AlreadyRetiredError',
     'Approval',
     'ApprovalPolicy',
     'ApprovalResult',
@@ -48,8 +59,13 @@ __all__ = [
     'ReceiptAssessment',
     'ReceiptState',
     'RecordedCommand',
+    'RetirePolicy',
+    'RetireRequest',
+    'RetiredCommandError',
+    'Retirement',
     'SqliteContractRepository',
     'UnapprovedCommandError',
     'UnknownCommandError',
     'is_argv',
+    'live_commands',
 ]
