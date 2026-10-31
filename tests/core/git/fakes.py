@@ -144,6 +144,7 @@ class RecordedRun:
     argv: tuple[str, ...]
     timeout: float
     cwd: Path | None
+    env: Mapping[str, str] | None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -157,7 +158,8 @@ class ScriptedRunner:
         *,
         timeout: float,  # noqa: ASYNC109  the ProcessRunner Protocol fixes this signature; the fake records the timeout, never enforces it
         cwd: Path | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> RunOutcome:
-        recorded = RecordedRun(argv=tuple(argv), timeout=timeout, cwd=cwd)
+        recorded = RecordedRun(argv=tuple(argv), timeout=timeout, cwd=cwd, env=env)
         self.runs.append(recorded)
         return self.reply
