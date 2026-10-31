@@ -49,7 +49,7 @@ class ContractRepositoryContract:
     class TestApprove:
         @pytest.fixture
         def approved(self, harness: ContractHarness) -> ContractHarness:
-            commands = [create_command('T2.AC-1'), create_command('T1.AC-1', argv=('make', 'lint'))]
+            commands = [create_command('I3'), create_command('I1', argv=('make', 'lint'))]
             harness.contract.approve(harness.ticket_id, commands, APPROVAL)
             return harness
 
@@ -61,15 +61,15 @@ class ContractRepositoryContract:
         ) -> None:
             expected = [
                 RecordedCommand(
-                    key='T1.AC-1',
-                    task_key=TaskId('T1'),
+                    key='I1',
+                    task_key=None,
                     argv=('make', 'lint'),
                     expect_exit=0,
                     timeout=300,
                 ),
                 RecordedCommand(
-                    key='T2.AC-1',
-                    task_key=TaskId('T2'),
+                    key='I3',
+                    task_key=None,
                     argv=('make', 'test'),
                     expect_exit=0,
                     timeout=300,
@@ -91,27 +91,25 @@ class ContractRepositoryContract:
             assert approved.contract.commands(approved.other_ticket_id) == []
 
         def test_another_ticket_may_approve_the_same_key(self, approved: ContractHarness) -> None:
-            approved.contract.approve(
-                approved.other_ticket_id, [create_command('T1.AC-1')], APPROVAL
-            )
+            approved.contract.approve(approved.other_ticket_id, [create_command('I1')], APPROVAL)
 
             assert len(approved.contract.commands(approved.other_ticket_id)) == 1
 
         def test_key_the_ticket_holds_is_refused(self, approved: ContractHarness) -> None:
             with pytest.raises(DuplicateCommandError):
-                approved.contract.approve(approved.ticket_id, [create_command('T1.AC-1')], APPROVAL)
+                approved.contract.approve(approved.ticket_id, [create_command('I1')], APPROVAL)
 
         def test_refused_batch_stores_none_of_it(self, approved: ContractHarness) -> None:
-            batch = [create_command('T3.AC-1'), create_command('T1.AC-1')]
+            batch = [create_command('I5'), create_command('I1')]
 
             with pytest.raises(DuplicateCommandError):
                 approved.contract.approve(approved.ticket_id, batch, APPROVAL)
 
             keys = [command.key for command in approved.contract.commands(approved.ticket_id)]
-            assert keys == ['T1.AC-1', 'T2.AC-1']
+            assert keys == ['I1', 'I3']
 
         def test_key_twice_in_one_batch_is_refused(self, harness: ContractHarness) -> None:
-            batch = [create_command('T1.AC-1'), create_command('T1.AC-1')]
+            batch = [create_command('I1'), create_command('I1')]
 
             with pytest.raises(DuplicateCommandError):
                 harness.contract.approve(harness.ticket_id, batch, APPROVAL)
@@ -121,7 +119,7 @@ class ContractRepositoryContract:
     class TestRecord:
         @pytest.fixture
         def approved(self, harness: ContractHarness) -> ContractHarness:
-            commands = [create_command('T1.AC-1'), create_command('T2.AC-1')]
+            commands = [create_command('I1'), create_command('I3')]
             harness.contract.approve(harness.ticket_id, commands, APPROVAL)
             return harness
 
@@ -129,47 +127,43 @@ class ContractRepositoryContract:
             assert approved.contract.latest_receipts(approved.ticket_id) == {}
 
         def test_receipt_is_read_back_as_recorded(self, approved: ContractHarness) -> None:
-            receipt = create_receipt('T1.AC-1')
+            receipt = create_receipt('I1')
 
             approved.contract.record(approved.ticket_id, [receipt])
 
-            assert approved.contract.latest_receipts(approved.ticket_id) == {'T1.AC-1': receipt}
+            assert approved.contract.latest_receipts(approved.ticket_id) == {'I1': receipt}
 
         def test_latest_receipt_of_each_command_is_read(self, approved: ContractHarness) -> None:
-            failed = create_receipt('T1.AC-1', 'fail', day=3)
-            passed = create_receipt('T1.AC-1', 'pass', day=4)
-            other = create_receipt('T2.AC-1', 'timeout', day=3)
+            failed = create_receipt('I1', 'fail', day=3)
+            passed = create_receipt('I1', 'pass', day=4)
+            other = create_receipt('I3', 'timeout', day=3)
 
             approved.contract.record(approved.ticket_id, [failed, other])
             approved.contract.record(approved.ticket_id, [passed])
 
             latest = approved.contract.latest_receipts(approved.ticket_id)
-            assert latest == {'T1.AC-1': passed, 'T2.AC-1': other}
+            assert latest == {'I1': passed, 'I3': other}
 
         def test_receipts_of_another_ticket_are_not_read(self, approved: ContractHarness) -> None:
-            approved.contract.approve(
-                approved.other_ticket_id, [create_command('T1.AC-1')], APPROVAL
-            )
-            approved.contract.record(approved.other_ticket_id, [create_receipt('T1.AC-1')])
+            approved.contract.approve(approved.other_ticket_id, [create_command('I1')], APPROVAL)
+            approved.contract.record(approved.other_ticket_id, [create_receipt('I1')])
 
             assert approved.contract.latest_receipts(approved.ticket_id) == {}
 
         def test_receipt_for_an_unapproved_key_is_refused(self, approved: ContractHarness) -> None:
             with pytest.raises(UnapprovedCommandError):
-                approved.contract.record(approved.ticket_id, [create_receipt('T9.AC-1')])
+                approved.contract.record(approved.ticket_id, [create_receipt('I9')])
 
         def test_receipt_for_a_key_only_another_ticket_approved_is_refused(
             self, approved: ContractHarness
         ) -> None:
-            approved.contract.approve(
-                approved.other_ticket_id, [create_command('T9.AC-1')], APPROVAL
-            )
+            approved.contract.approve(approved.other_ticket_id, [create_command('I9')], APPROVAL)
 
             with pytest.raises(UnapprovedCommandError):
-                approved.contract.record(approved.ticket_id, [create_receipt('T9.AC-1')])
+                approved.contract.record(approved.ticket_id, [create_receipt('I9')])
 
         def test_refused_batch_stores_none_of_it(self, approved: ContractHarness) -> None:
-            batch = [create_receipt('T1.AC-1'), create_receipt('T9.AC-1')]
+            batch = [create_receipt('I1'), create_receipt('I9')]
 
             with pytest.raises(UnapprovedCommandError):
                 approved.contract.record(approved.ticket_id, batch)
