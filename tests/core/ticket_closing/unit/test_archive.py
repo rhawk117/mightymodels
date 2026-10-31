@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import Receipt, RecordedCommand
 from mightymodels_core.investigations import InvestigationRecord, Ledger, LedgerRecord
-from mightymodels_core.primitives import Slug, TaskId, redact
+from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.ticket_closing import (
     ArchivedCommand,
     ArchivedDecision,
@@ -24,9 +24,7 @@ if TYPE_CHECKING:
 
 FIRST = Slug('first-probe')
 SECOND = Slug('second-probe')
-COMMAND = RecordedCommand(
-    key='I1', task_key=TaskId('T1'), argv=('true',), expect_exit=0, timeout=10
-)
+COMMAND = RecordedCommand(key='I1', argv=('true',), expect_exit=0, timeout=10)
 
 
 def create_entry(seq: int, text: str, *, kind: EntryKind = 'decision') -> LedgerRecord:

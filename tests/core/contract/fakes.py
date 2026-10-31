@@ -7,7 +7,6 @@ from mightymodels_core.contract.records import (
     COMMANDS,
     RecordedCommand,
     duplicate_command_error,
-    owning_task,
     unapproved_command_error,
 )
 
@@ -79,7 +78,6 @@ class FakeContractRepository:
         for command in commands:
             recorded = RecordedCommand(
                 key=command.key,
-                task_key=owning_task(command.key),
                 argv=command.argv,
                 expect_exit=command.expect_exit,
                 timeout=command.timeout,

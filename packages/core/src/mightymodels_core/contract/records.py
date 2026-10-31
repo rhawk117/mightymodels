@@ -49,7 +49,6 @@ class ApprovedCommand:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RecordedCommand:
     key: str
-    task_key: TaskId | None
     argv: tuple[str, ...]
     expect_exit: int
     timeout: int

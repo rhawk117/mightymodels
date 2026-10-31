@@ -33,7 +33,6 @@ if TYPE_CHECKING:
 def command_of(row: ContractCommandRow) -> RecordedCommand:
     return RecordedCommand(
         key=row.command_key,
-        task_key=owning_task(row.command_key),
         argv=tuple(row.argv),
         expect_exit=row.expect_exit,
         timeout=row.timeout,

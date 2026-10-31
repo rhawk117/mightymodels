@@ -23,7 +23,7 @@ from mightymodels_core.contract import (
     UnknownCommandError,
     is_argv,
 )
-from mightymodels_core.primitives import Slug, TaskId
+from mightymodels_core.primitives import Slug
 
 from tests.core.contract.contract_builders import (
     FIRST_KEY,
@@ -72,7 +72,7 @@ class AssessmentScenario:
 
 
 def recorded(key: str, argv: tuple[str, ...] = ('make', 'test')) -> RecordedCommand:
-    return RecordedCommand(key=key, task_key=TaskId('T1'), argv=argv, expect_exit=0, timeout=300)
+    return RecordedCommand(key=key, argv=argv, expect_exit=0, timeout=300)
 
 
 def command_shape_cases() -> pytest.MarkDecorator:

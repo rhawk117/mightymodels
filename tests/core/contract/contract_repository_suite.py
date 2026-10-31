@@ -1,6 +1,5 @@
 """The contract repository contract, written once for every tier to subclass."""
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
@@ -11,34 +10,12 @@ from mightymodels_core.contract import (
     UnapprovedCommandError,
 )
 from mightymodels_core.contract.records import COMMANDS
-from mightymodels_core.primitives import TaskId, WriteLimitError
+from mightymodels_core.primitives import WriteLimitError
 
 from tests.core.contract.contract_builders import APPROVAL, create_command, create_receipt
 
 if TYPE_CHECKING:
-    from _pytest.mark import ParameterSet
-
     from tests.core.contract.contract_builders import ContractHarness
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class OwnerCase:
-    key: str
-    task_key: TaskId | None
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.key)
-
-
-def command_owner_cases() -> pytest.MarkDecorator:
-    cases = [
-        OwnerCase(key='T7.AC-1', task_key=TaskId('T7')),
-        OwnerCase(key='C2.ci', task_key=TaskId('C2')),
-        OwnerCase(key='lint', task_key=None),
-        OwnerCase(key='not a task.AC-1', task_key=None),
-    ]
-    return pytest.mark.parametrize('case', [case.param for case in cases])
 
 
 class ContractRepositoryContract:
@@ -62,14 +39,12 @@ class ContractRepositoryContract:
             expected = [
                 RecordedCommand(
                     key='I1',
-                    task_key=None,
                     argv=('make', 'lint'),
                     expect_exit=0,
                     timeout=300,
                 ),
                 RecordedCommand(
                     key='I3',
-                    task_key=None,
                     argv=('make', 'test'),
                     expect_exit=0,
                     timeout=300,
@@ -77,15 +52,6 @@ class ContractRepositoryContract:
             ]
 
             assert approved.contract.commands(approved.ticket_id) == expected
-
-        @command_owner_cases()
-        def test_owning_task_comes_from_the_key(
-            self, harness: ContractHarness, case: OwnerCase
-        ) -> None:
-            harness.contract.approve(harness.ticket_id, [create_command(case.key)], APPROVAL)
-
-            (command,) = harness.contract.commands(harness.ticket_id)
-            assert command.task_key == case.task_key
 
         def test_commands_of_another_ticket_are_not_read(self, approved: ContractHarness) -> None:
             assert approved.contract.commands(approved.other_ticket_id) == []
