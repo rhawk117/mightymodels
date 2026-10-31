@@ -6,7 +6,7 @@ The old server key was `state`, so its tools were named `mcp__plugin_mightymodel
 
 ## Tool map
 
-One row per registered tool, 37 in all, `task_declare` among them, which is new and has no old call. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
+One row per registered tool, 38 in all, `task_declare` and `contract_retire` among them, which are new and have no old call. The old action of `snapshot` is `none`, because that tool took no action. The input fields are the request schema's properties in schema order. The four hints are the tool's annotations. The test `tests/mcp/server/unit/test_mapping_doc.py` holds this table to the registered catalog.
 
 | Old tool | Old action | New tool | Input fields | Title | Read-only | Destructive | Idempotent | Open world |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -25,6 +25,7 @@ One row per registered tool, 37 in all, `task_declare` among them, which is new 
 | `failed_fix` | `record` | `failed_fix_record` | `slug`, `task_id`, `hypothesis` | Record a failed fix | false | false | false | false |
 | `contract` | `approve` | `contract_approve` | `slug`, `commands` | Approve the contract commands | false | false | false | false |
 | `contract` | `status` | `contract_status` | `slug` | Show the contract status | true | false | true | false |
+| `none` | `none` | `contract_retire` | `slug`, `id`, `why`, `approved_by` | Retire a contract command | false | false | false | false |
 | `review` | `start` | `review_start` | `scope`, `depth`, `emphasis`, `slug`, `base`, `weights`, `persona` | Start a review | false | false | false | false |
 | `review` | `override` | `review_override` | `run_id` | Override a review's models | false | false | false | false |
 | `review` | `add` | `review_add` | `run_id`, `persona` | Add a reviewer's report | false | true | false | false |

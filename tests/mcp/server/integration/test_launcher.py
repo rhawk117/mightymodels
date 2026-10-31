@@ -55,7 +55,7 @@ class TestLauncher:
             listed = await client.list_tools()
 
         names = [tool.name for tool in listed.tools]
-        assert len(names) == 37
+        assert len(names) == 38
         assert sorted(names) == sorted(create_catalog().tools)
 
 

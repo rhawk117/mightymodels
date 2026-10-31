@@ -58,7 +58,7 @@ def register(name: str) -> RegisteredTool:
 
 class TestMappingDoc:
     document = Path(__file__).resolve().parents[4] / 'docs' / 'workflow-state-tools.md'
-    row_count = 37
+    row_count = 38
 
     @pytest.fixture
     def rows(self) -> list[DocRow]:
@@ -77,7 +77,7 @@ class TestMappingDoc:
         assert sorted(row.new_tool for row in rows) == sorted(registered)
 
     def test_old_pairs_are_unique(self, rows: list[DocRow]) -> None:
-        pairs = [(row.old_tool, row.old_action) for row in rows]
+        pairs = [(row.old_tool, row.old_action) for row in rows if row.old_tool != 'none']
         assert len(set(pairs)) == len(pairs)
 
     def test_each_row_matches_its_registered_tool(

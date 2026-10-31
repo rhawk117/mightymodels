@@ -7,8 +7,13 @@ from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from mightymodels_core.contract.policy import ReceiptAssessment
-    from mightymodels_core.contract.records import RecordedCommand
-    from mightymodels_core.contract.services import ApprovalResult, CommandStatus, ContractStatus
+    from mightymodels_core.contract.records import RecordedCommand, Retirement
+    from mightymodels_core.contract.services import (
+        ApprovalResult,
+        CommandStatus,
+        ContractStatus,
+        RetireRequest,
+    )
 
 
 class CommandView(BaseModel):
@@ -19,12 +24,22 @@ class CommandView(BaseModel):
     state: str
 
 
+class RetiredView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    by: str
+    why: str
+    approval_source: str
+
+
 class ContractView(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     text: str
     passing: bool
     commands: tuple[CommandView, ...] = ()
+    retired: tuple[RetiredView, ...] = ()
 
 
 def render_state(command: RecordedCommand, assessment: ReceiptAssessment) -> str:
@@ -50,6 +65,20 @@ def render_approved(result: ApprovalResult) -> ContractView:
     return ContractView(text=text, passing=True)
 
 
+def render_retired(request: RetireRequest) -> ContractView:
+    text = f'retired {request.key} ({request.approval_source}, by {request.by}): {request.why}\n'
+    return ContractView(text=text, passing=True)
+
+
+def create_retired_view(key: str, retirement: Retirement) -> RetiredView:
+    return RetiredView(
+        id=key,
+        by=retirement.by,
+        why=retirement.why,
+        approval_source=retirement.approval_source,
+    )
+
+
 def render_declined(choice: str) -> ContractView:
     text = f'not approved: the user chose to {choice}; revise the commands, then call again\n'
     return ContractView(text=text, passing=False)
@@ -57,7 +86,19 @@ def render_declined(choice: str) -> ContractView:
 
 def render_status(status: ContractStatus) -> ContractView:
     views = tuple(map(create_command_view, status.commands))
-    rows = ''.join(f'{view.id} {view.state}\n' for view in views) or 'no matching commands\n'
+    retired = tuple(
+        create_retired_view(command.key, command.retirement)
+        for command in status.retired
+        if command.retirement
+    )
+    live = ''.join(f'{view.id} {view.state}\n' for view in views)
+    gone = ''.join(
+        f'{view.id} retired by {view.by} ({view.approval_source}): {view.why}\n' for view in retired
+    )
+    rows = live + gone or 'no matching commands\n'
     return ContractView(
-        text=f'HEAD {short_head(status.head)}\n{rows}', passing=status.is_passing, commands=views
+        text=f'HEAD {short_head(status.head)}\n{rows}',
+        passing=status.is_passing,
+        commands=views,
+        retired=retired,
     )

@@ -69,8 +69,8 @@ class TestHooksJson:
 
         assert all(router.find_handler(name) is not None for name in named)
 
-    def test_the_pointer_matcher_names_twenty_one_tools(self) -> None:
-        assert len(POINTER_TOOLS) == 21
+    def test_the_pointer_matcher_names_twenty_two_tools(self) -> None:
+        assert len(POINTER_TOOLS) == 22
 
     @fixed_wrapper_cases()
     def test_fixed_wrappers_take_no_subcommand(

@@ -24,12 +24,15 @@ from mightymodels_mcp.server.state import create_work
 from .schemas import (
     ContractApproveRequest,
     ContractRequest,
+    ContractRetireRequest,
     create_approved_commands,
+    create_retire_request,
     leaves_approver_blank,
 )
 from .use_cases import (
     ContractApproval,
     approve_contract,
+    retire_contract,
     show_contract_status,
 )
 from .views import ContractView, render_declined
@@ -43,6 +46,10 @@ APPROVAL_ARGUMENT = 'approval'
 APPROVE = 'approve'
 DECLINE = 'decline'
 PASS_APPROVER = f'approved_by "{USER_APPROVER}" on each command, once the user approved'
+
+
+RETIRE_MESSAGE = 'Retire this verification command?'
+PASS_RETIRE_APPROVER = f'approved_by "{USER_APPROVER}", once the user approved'
 
 
 RoundAsk = Elicit[BaseModel] | BaseModel
@@ -66,11 +73,31 @@ def create_approval_round(request: ContractApproveRequest) -> ChoiceRound:
     return ChoiceRound(message=APPROVE_MESSAGE, questions=asked)
 
 
+def create_retire_question(request: ContractRetireRequest) -> ChoiceQuestion:
+    return ChoiceQuestion(
+        argument=APPROVAL_ARGUMENT,
+        title=f'{RETIRE_MESSAGE}\n{request.id}: {request.why}',
+        description='Approve retiring the command, or decline to keep it.',
+        choices=(Choice(value=APPROVE, title='Approve'), Choice(value=DECLINE, title='Decline')),
+    )
+
+
+def ask_retirement(request: ContractRetireRequest) -> RoundAsk:
+    asked = () if request.approved_by.strip() else (create_retire_question(request),)
+    return ChoiceRound(message=RETIRE_MESSAGE, questions=asked).ask()
+
+
+def describe_unanswered_retirement(request: ContractRetireRequest) -> str:
+    question = replace(create_retire_question(request), prompt=PASS_RETIRE_APPROVER)
+    return needs_input_text([question])
+
+
 def ask_approval(request: ContractApproveRequest) -> RoundAsk:
     return create_approval_round(request).ask()
 
 
 APPROVAL_RESOLVER = Resolve(ask_approval)
+RETIREMENT_RESOLVER = Resolve(ask_retirement)
 
 
 def describe_unanswered(request: ContractApproveRequest) -> str:
@@ -97,6 +124,27 @@ async def contract_approve(
         head = await state.git.resolve_head()
         approval = ContractApproval(slug=request.slug, commands=commands, head=head)
         return approve_contract(create_work(state, TaskWork), approval)
+
+
+async def contract_retire(
+    request: ContractRetireRequest, ctx: ToolContext, *, answers: ChoiceOutcome
+) -> ContractView:
+    """Retire a contract command that no longer applies. Use when a command is obsolete; to replace
+    one, approve a new id with contract_approve, then retire the old one. Asks the user when the
+    approver is blank.
+    """
+    named = bool(request.approved_by.strip())
+    form = answers_of(answers)
+    if form is None and not named:
+        return ContractView(text=describe_unanswered_retirement(request), passing=False)
+
+    if form is not None and form.get(APPROVAL_ARGUMENT) == DECLINE:
+        return render_declined(DECLINE)
+
+    async with open_tool_state(ctx) as state:
+        return retire_contract(
+            create_work(state, TaskWork), request.slug, create_retire_request(request)
+        )
 
 
 async def contract_status(request: ContractRequest, ctx: ToolContext) -> ContractView:
@@ -127,6 +175,16 @@ CONTRACT_TOOLS = (
         request_model=ContractRequest,
         result_model=ContractView,
         handler=contract_status,
+    ),
+    ToolSpec(
+        name='contract_retire',
+        title='Retire a contract command',
+        annotations=WRITES,
+        icon='contract',
+        request_model=ContractRetireRequest,
+        result_model=ContractView,
+        handler=contract_retire,
+        resolvers={'answers': RETIREMENT_RESOLVER},
     ),
 )
 

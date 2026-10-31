@@ -8,9 +8,16 @@ once the user approved the list in the form.
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import ApprovedCommand
+from mightymodels_core.contract.services import RetireRequest
 from pydantic import Field
 
-from mightymodels_mcp.server.requests import NameText, RequestModel, SlugField
+from mightymodels_mcp.server.requests import (
+    USER_APPROVER,
+    NameText,
+    ProseText,
+    RequestModel,
+    SlugField,
+)
 
 if TYPE_CHECKING:
     from mightymodels_core.vocabulary.contract import ApprovalSource
@@ -44,6 +51,15 @@ class ContractRequest(RequestModel):
     slug: SlugField
 
 
+class ContractRetireRequest(RequestModel):
+    slug: SlugField
+    id: NameText = Field(description='The command key to retire, such as I1 or L1.')
+    why: ProseText = Field(description='Why the command no longer applies.')
+    approved_by: NameText = Field(
+        default='', description='Who approved the retirement; leave it blank and the user is asked.'
+    )
+
+
 def leaves_approver_blank(request: ContractApproveRequest) -> bool:
     return any(not command.approved_by.strip() for command in request.commands)
 
@@ -68,4 +84,15 @@ def create_approved_commands(
     source: ApprovalSource = 'form' if leaves_approver_blank(request) else 'fallback'
     return tuple(
         create_approved_command(command, fallback_approver, source) for command in request.commands
+    )
+
+
+def create_retire_request(request: ContractRetireRequest) -> RetireRequest:
+    named = bool(request.approved_by.strip())
+    source: ApprovalSource = 'fallback' if named else 'form'
+    return RetireRequest(
+        key=request.id,
+        by=request.approved_by if named else USER_APPROVER,
+        why=request.why,
+        approval_source=source,
     )
