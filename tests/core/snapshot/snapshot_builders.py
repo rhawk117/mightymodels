@@ -139,6 +139,7 @@ def seed_ticket(
             acceptance_count=2,
             head=HEAD,
         )
+        unit.tasks.declare(slug, [TaskId('T1')])
         unit.tasks.start(slug, start)
         unit.tasks.mark(slug, MarkRequest(task_key=TaskId('T1'), to='blocked', reason='a wall'))
     return slug
@@ -204,6 +205,7 @@ def seed_crowded_tasks(
     ]
     with work.write() as unit:
         unit.contracts.record(seeded, receipts)
+        unit.tasks.declare(seeded, [TaskId('T2')])
         unit.tasks.start(seeded, start)
         unit.tasks.mark(seeded, MarkRequest(task_key=TaskId('T2'), to='blocked', reason='a wall'))
     return seeded

@@ -15,6 +15,7 @@ from mightymodels_core.tasks.errors import (
     NotPlanTaskError,
     TaskMovedError,
     TransitionError,
+    UndeclaredPlanTaskError,
     UnknownTaskError,
 )
 from mightymodels_core.tasks.gates import (
@@ -136,6 +137,10 @@ class TaskService:
     def start(self, slug: Slug, request: StartRequest) -> TaskRecord:
         ticket = open_ticket_of(self.tickets, slug)
         ticket_id = ticket.id
+        task_key = request.task_key
+        if is_plan_task(task_key) and self.tasks.task(ticket_id, task_key) is None:
+            raise UndeclaredPlanTaskError(task_key=task_key)
+
         policy = self.start_policy_for(ticket_id, request)
         if problem := policy.get_start_problem():
             raise problem

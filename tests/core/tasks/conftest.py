@@ -24,6 +24,7 @@ from .repository_builders import SQL, TICKET_SLUGS, create_ticket_section
 from .service_builders import (
     BASE_COMMIT,
     COMMAND_KEY,
+    FIRST_TASK,
     OWNED_FILE,
     SERVICE_MOMENT,
     SERVICE_SLUG,
@@ -103,9 +104,15 @@ def service_harness() -> ServiceHarness:
 
 
 @pytest.fixture
-def started_harness(service_harness: ServiceHarness) -> ServiceHarness:
-    service_harness.service.start(SERVICE_SLUG, create_start_request())
+def declared_harness(service_harness: ServiceHarness) -> ServiceHarness:
+    service_harness.service.declare(SERVICE_SLUG, [FIRST_TASK])
     return service_harness
+
+
+@pytest.fixture
+def started_harness(declared_harness: ServiceHarness) -> ServiceHarness:
+    declared_harness.service.start(SERVICE_SLUG, create_start_request())
+    return declared_harness
 
 
 @pytest.fixture

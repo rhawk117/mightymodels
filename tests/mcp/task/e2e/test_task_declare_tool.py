@@ -36,6 +36,7 @@ class TestTaskDeclare:
 
     async def test_leaves_an_existing_task_unchanged(self, staged: TaskHarness) -> None:
         await staged.commit('first')
+        view_of(await staged.call('task_declare', {'slug': SLUG, 'task_ids': ['T1']}))
         start = {'slug': SLUG, 'task_id': 'T1', 'by': 'engineer', 'owned': [OWNED]}
         view_of(await staged.call('task_start', {**start, 'acceptance': ['AC-1']}))
 

@@ -50,7 +50,8 @@ async def task_declare(request: TaskDeclareRequest, ctx: ToolContext) -> TaskVie
 async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
     """Start a task for a worker on the files it owns. Use just before dispatching that worker, so
     its owned files and acceptance criteria are on record. Refused if the task is too large
-    unless the user approved it.
+    unless the user approved it. A plan task never declared is refused; declare it with
+    task_declare first.
     """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()

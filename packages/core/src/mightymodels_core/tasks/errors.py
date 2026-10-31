@@ -18,6 +18,14 @@ class UnknownTaskError(StateError):
         super().__init__(f'ticket {ticket_id} holds no task {task_key}; start the task first')
 
 
+class UndeclaredPlanTaskError(StateError):
+    def __init__(self, *, task_key: TaskId) -> None:
+        self.task_key = task_key
+        super().__init__(
+            f'{task_key} was never declared; declare the plan tasks with task_declare first'
+        )
+
+
 class TransitionError(StateError):
     def __init__(self, *, task_key: TaskId, current: TaskStatus, target: TaskStatus) -> None:
         self.task_key = task_key

@@ -189,6 +189,7 @@ class TestTaskMark:
 class TestTaskReady:
     async def test_unverified_plan_task_is_not_ready(self, staged: TaskHarness) -> None:
         await staged.commit('first')
+        view_of(await staged.call('task_declare', {'slug': SLUG, 'task_ids': ['T1']}))
         view_of(await staged.call('task_start', {**START, 'task_id': 'T1'}))
 
         view = view_of(await staged.call('task_ready', {'slug': SLUG}))
