@@ -22,6 +22,7 @@ class PreToolUsePayload(
     tool_name: str | None = None
     tool_input: dict[str, object] | None = None
     agent_type: str | None = None
+    agent_id: str | None = None
 
 
 class PostToolUsePayload(

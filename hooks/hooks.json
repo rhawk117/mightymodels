@@ -23,7 +23,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|Bash",
+        "matcher": "Edit|Write|Bash|mcp__plugin_mightymodels_workflow_state__contract_run",
         "hooks": [
           {
             "type": "command",
