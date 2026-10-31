@@ -61,7 +61,6 @@ class TaskWork:
             tickets=tickets,
             tasks=task_repository,
             attempts=attempts,
-            contracts=contracts,
             clock=self.clock,
         )
         task_reads = TaskReadService(

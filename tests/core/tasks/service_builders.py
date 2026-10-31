@@ -62,7 +62,7 @@ def create_verify_request(seen: TaskRecord, *, changed_files: frozenset[str]) ->
     return VerifyRequest(
         seen=seen,
         commit=DONE_COMMIT,
-        assertions={},
+        assertions={'AC-1': f'{OWNED_FILE}:1'},
         git=create_git_facts(changed_files=changed_files),
         brief=Brief(text=BRIEF_TEXT),
     )

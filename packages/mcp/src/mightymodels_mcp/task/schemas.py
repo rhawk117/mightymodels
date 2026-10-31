@@ -61,7 +61,7 @@ class TaskVerifyRequest(RequestModel):
     commit: RevisionField = Field(description='The commit the worker reports for the task.')
     assertions: dict[ProseText, ProseText] = Field(
         default_factory=dict,
-        description='Evidence for criteria no contract command checks, as criterion to evidence.',
+        description='A citation for each acceptance criterion, as criterion to evidence.',
     )
 
 

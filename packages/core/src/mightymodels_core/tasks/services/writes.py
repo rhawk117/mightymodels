@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from datetime import datetime
 
-    from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
     from mightymodels_core.tasks.gates import Brief, GitFacts
     from mightymodels_core.tasks.records import TaskRecord
@@ -126,7 +125,6 @@ class TaskService:
     tickets: TicketRepository
     tasks: TaskRepository
     attempts: AttemptRepository
-    contracts: ContractRepository
     clock: Clock
     options: TaskOptions = field(default_factory=TaskOptions)
 
@@ -174,25 +172,18 @@ class TaskService:
 
         self.check_verifiable(current)
         gate = VerificationGate(
-            task=current, evidence=self.evidence_for(ticket_id, current, request), git=request.git
+            task=current, evidence=self.evidence_for(current, request), git=request.git
         )
         transition = verification_transition(gate, self.clock.now())
         self.tickets.mark_in_progress(ticket)
         self.tasks.record_verification(ticket_id, transition, request.commit)
         return self.task_held(ticket_id, task_key)
 
-    def evidence_for(self, ticket_id: int, task: TaskRecord, request: VerifyRequest) -> Evidence:
-        own = [
-            command
-            for command in self.contracts.commands(ticket_id)
-            if command.task_key == task.key
-        ]
+    def evidence_for(self, task: TaskRecord, request: VerifyRequest) -> Evidence:
         return Evidence(
             commit=request.commit,
             brief=request.brief if is_plan_task(task.key) else None,
             assertions=request.assertions,
-            commands=own,
-            receipts=self.contracts.latest_receipts(ticket_id),
         )
 
     def mark(self, slug: Slug, request: MarkRequest) -> TaskRecord:

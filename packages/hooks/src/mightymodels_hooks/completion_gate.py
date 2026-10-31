@@ -9,8 +9,7 @@ each task and what its brief lacks.
 
 A residual (an `R` id) has no brief and is held on the rest of what verifies a task: a commit
 follows its base and the commits since its base touched only the files it owns. The reason names
-each residual and which of the two it lacks. A
-fix for a failing CI check (a `C` id) is not held.
+each residual and which of the two it lacks. A fix for a failing CI check (a `C` id) is not held.
 
 The gate keeps no marker of its own. Claude Code sets `stop_hook_active` on the stop that follows a
 block, and the gate lets that one through, so a subagent that cannot finish is never trapped.
@@ -82,8 +81,6 @@ def residual_problems(facts: ResidualFacts) -> list[str]:
         commit=head,
         brief=Brief(text=None),
         assertions={},
-        commands=(),
-        receipts={},
     )
     gate = VerificationGate(task=facts.task, evidence=evidence, git=facts.git)
     if problems := gate.commit_problems():

@@ -1,10 +1,10 @@
 """The two gates of the task domain: what keeps a task from verified and a ticket from ready.
 
 A task is proven only when the reported commit is the current HEAD and descends from the task's
-base, every contract command for it passed at that HEAD, its DONE brief names the commit, every
-other acceptance criterion carries a citation, and the commit touched only the files the task
-owns. A ticket is ready only when a plan task has been started, every plan task is closed and no
-fix is stuck.
+base, its DONE brief names the commit, every acceptance criterion carries a citation, and the
+commit touched only the files the task owns. Contract commands and receipts play no part. A
+ticket is ready only when a plan task has been started, every plan task is closed and no fix is
+stuck.
 
 The caller passes the git facts and the brief text in as values; the gates call no git, read no
 file and return their problems as the lines the caller shows, an empty list being a pass.
@@ -40,11 +40,6 @@ def done_commit(brief_text: str) -> str | None:
     return str(named[1]) if separator and named else None
 
 
-def criterion_of_command(key: str) -> str | None:
-    _, separator, criterion = key.partition('.')
-    return criterion if separator else None
-
-
 def criteria_in_brief(brief_text: str) -> list[str]:
     asked = brief_text.split(DONE_HEADING, 1)[0]
     return [found[1] for found in ASKED_CRITERION.finditer(asked)]
@@ -69,8 +64,6 @@ class Evidence:
     commit: str
     brief: Brief | None
     assertions: Mapping[str, str]
-    commands: Sequence[RecordedCommand]
-    receipts: Mapping[str, Receipt]
 
 
 def get_receipt_problem(command_key: str, receipt: Receipt | None, head: str | None) -> str | None:
@@ -105,9 +98,7 @@ class VerificationGate:
 
     @property
     def proven_criteria(self) -> set[str]:
-        criteria = (criterion_of_command(command.key) for command in self.evidence.commands)
-        by_command = {criterion for criterion in criteria if criterion is not None}
-        return by_command | set(self.evidence.assertions)
+        return set(self.evidence.assertions)
 
     def commit_problems(self) -> list[str]:
         if self.evidence.commit != self.git.head:
@@ -120,9 +111,6 @@ class VerificationGate:
             return ['the task base is not an ancestor of the reported commit']
 
         return []
-
-    def receipt_problems(self) -> list[str]:
-        return get_receipt_problems(self.evidence.commands, self.evidence.receipts, self.git.head)
 
     def brief_problems(self) -> list[str]:
         if self.evidence.brief is None:
@@ -140,12 +128,10 @@ class VerificationGate:
         asked = criteria_in_brief(self.brief_text or '')
         proven = self.proven_criteria
         problems = [
-            f'{criterion} has neither a contract command nor a citation'
-            for criterion in asked
-            if criterion not in proven
+            f'{criterion} has no citation' for criterion in asked if criterion not in proven
         ]
         if not proven:
-            problems.append('no contract command and no cited assertion proves this task')
+            problems.append('no cited assertion proves this task')
 
         return problems
 
@@ -158,7 +144,6 @@ class VerificationGate:
             return problems
 
         return [
-            *self.receipt_problems(),
             *self.brief_problems(),
             *self.criteria_problems(),
             *self.ownership_problems(),

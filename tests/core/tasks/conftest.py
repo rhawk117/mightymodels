@@ -87,9 +87,7 @@ def service_harness() -> ServiceHarness:
     clock = create_fake_clock(SERVICE_MOMENT)
     task_repository = FakeTaskRepository(ledger=task_ledger)
     attempts = FakeAttemptRepository(ledger=task_ledger)
-    service = TaskService(
-        tickets=tickets, tasks=task_repository, attempts=attempts, contracts=contracts, clock=clock
-    )
+    service = TaskService(tickets=tickets, tasks=task_repository, attempts=attempts, clock=clock)
     reads = TaskReadService(
         tickets=tickets, tasks=task_repository, attempts=attempts, contracts=contracts
     )
@@ -129,13 +127,4 @@ def proven_harness(contracted_harness: ServiceHarness) -> ServiceHarness:
 @pytest.fixture
 def verified_harness(proven_harness: ServiceHarness) -> ServiceHarness:
     verify_as_asked(proven_harness, frozenset({OWNED_FILE}))
-    return proven_harness
-
-
-@pytest.fixture
-def foreign_command_harness(proven_harness: ServiceHarness) -> ServiceHarness:
-    approval = Approval(at=SERVICE_MOMENT, head=BASE_COMMIT)
-    proven_harness.contracts.approve(
-        proven_harness.ticket_id, [create_command('T2.AC-1')], approval
-    )
     return proven_harness
