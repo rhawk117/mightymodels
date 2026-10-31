@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):
     ticket_id: int
     command_key: str
-    task_key: str | None
     argv: list[str]
     expect_exit: int
     timeout: int
@@ -46,7 +45,6 @@ class RecordReceiptParams(Struct, frozen=True, kw_only=True):
 class ContractCommandRow(Struct, frozen=True, kw_only=True):
     id: int
     command_key: str
-    task_key: str | None
     argv: list[str]
     expect_exit: int
     timeout: int

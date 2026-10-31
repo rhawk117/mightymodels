@@ -282,10 +282,10 @@ LIMIT :limit;
 
 -- name: approve_contract_command
 INSERT INTO contract_commands (
-  ticket_id, command_key, task_key, argv, expect_exit, timeout, approved_by, approved_at, head
+  ticket_id, command_key, argv, expect_exit, timeout, approved_by, approved_at, head
 )
 VALUES (
-  :ticket_id, :command_key, :task_key, :argv, :expect_exit, :timeout, :approved_by, :approved_at,
+  :ticket_id, :command_key, :argv, :expect_exit, :timeout, :approved_by, :approved_at,
   :head
 );
 
@@ -293,7 +293,6 @@ VALUES (
 SELECT json_object(
   'id', id,
   'command_key', command_key,
-  'task_key', task_key,
   'argv', json(argv),
   'expect_exit', expect_exit,
   'timeout', timeout,

@@ -1,7 +1,7 @@
 """The values the contract repository hands out and takes in: frozen, never a database row.
 
 An `ApprovedCommand` is what an approval writes. A `RecordedCommand` is what `verify run`
-executes, with the task that owns it. A `Receipt` is the result of one run of a command. The
+executes. A `Receipt` is the result of one run of a command. The
 output tails of a receipt are redacted text, which only `redact` produces, so a secret cannot
 reach a receipt by the type alone.
 """
@@ -10,25 +10,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.errors import DuplicateCommandError, UnapprovedCommandError
-from mightymodels_core.primitives import InvalidTaskIdError, ReadLimit, parse_task_id
+from mightymodels_core.primitives import ReadLimit
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Sequence
     from datetime import datetime
 
-    from mightymodels_core.primitives import RedactedText, TaskId
+    from mightymodels_core.primitives import RedactedText
     from mightymodels_core.vocabulary.contract import Outcome, Phase
 
 COMMANDS = ReadLimit(rows=1000, kept='contract commands')
-
-
-def owning_task(command_key: str) -> TaskId | None:
-    task_part, separator, _ = command_key.partition('.')
-    if not separator:
-        return None
-
-    task_key = parse_task_id(task_part)
-    return None if isinstance(task_key, InvalidTaskIdError) else task_key
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

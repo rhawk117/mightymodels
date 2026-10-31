@@ -146,7 +146,6 @@ CREATE TABLE contract_commands (
   id INTEGER CONSTRAINT pk_contract_commands PRIMARY KEY,
   ticket_id INTEGER NOT NULL,
   command_key TEXT NOT NULL,
-  task_key TEXT,
   argv TEXT NOT NULL,
   expect_exit INTEGER NOT NULL DEFAULT 0,
   timeout INTEGER NOT NULL DEFAULT 300,

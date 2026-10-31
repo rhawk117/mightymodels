@@ -8,7 +8,6 @@ from mightymodels_core.contract.records import (
     Receipt,
     RecordedCommand,
     duplicate_command_error,
-    owning_task,
     unapproved_command_error,
 )
 from mightymodels_core.primitives import redact
@@ -61,7 +60,6 @@ def approve_params_of(
     return ApproveContractCommandParams(
         ticket_id=ticket_id,
         command_key=command.key,
-        task_key=owning_task(command.key),
         argv=list(command.argv),
         expect_exit=command.expect_exit,
         timeout=command.timeout,

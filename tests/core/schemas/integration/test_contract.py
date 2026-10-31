@@ -21,11 +21,10 @@ APPROVED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 RAN_AT = datetime(2026, 1, 2, 4, 0, 0, tzinfo=UTC)
 
 
-def command(ticket_id: int, key: str, task_key: str | None = None) -> ApproveContractCommandParams:
+def command(ticket_id: int, key: str) -> ApproveContractCommandParams:
     return ApproveContractCommandParams(
         ticket_id=ticket_id,
         command_key=key,
-        task_key=task_key,
         argv=['uv', 'run', 'pytest', '-q'],
         expect_exit=0,
         timeout=300,
@@ -55,7 +54,7 @@ class TestCommands:
     def test_a_batch_of_commands_is_approved_and_read_back_in_key_order(
         self, database: Database, ticket_id: int
     ) -> None:
-        batch = [command(ticket_id, 'T1.AC-2', 'T1'), command(ticket_id, 'I1')]
+        batch = [command(ticket_id, 'I2'), command(ticket_id, 'I1')]
         with database.write() as unit:
             approved = unit.run_many(APPROVE_CONTRACT_COMMAND, batch)
 
@@ -65,9 +64,7 @@ class TestCommands:
             )
 
         assert approved == 2
-        assert [row.command_key for row in commands] == ['I1', 'T1.AC-2']
-        assert commands[1].task_key == 'T1'
-        assert commands[0].task_key is None
+        assert [row.command_key for row in commands] == ['I1', 'I2']
         assert commands[0].argv == ['uv', 'run', 'pytest', '-q']
         assert commands[0].expect_exit == 0
         assert commands[0].timeout == 300
