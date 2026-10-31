@@ -1,4 +1,4 @@
-"""The contract records, their repository seam, the sqlite store, the policy and the service."""
+"""The contract records, the repository seam, the sqlite store, the policy, service and runner."""
 
 from .errors import (
     AlreadyRetiredError,
@@ -10,6 +10,7 @@ from .errors import (
     MissingApprovalError,
     NoContractError,
     RetiredCommandError,
+    TrackedChangesError,
     UnapprovedCommandError,
     UnknownCommandError,
 )
@@ -26,6 +27,15 @@ from .policy import (
 )
 from .records import Approval, ApprovedCommand, Receipt, RecordedCommand, Retirement
 from .repository import ContractRepository
+from .runs import (
+    ContractRunner,
+    RunOptions,
+    RunProgress,
+    RunReporter,
+    RunRequest,
+    RunResult,
+    child_environment,
+)
 from .services import (
     ApprovalResult,
     CommandStatus,
@@ -46,6 +56,7 @@ __all__ = [
     'CommandStatus',
     'ContractOptions',
     'ContractRepository',
+    'ContractRunner',
     'ContractService',
     'ContractStatus',
     'DuplicateCommandError',
@@ -63,9 +74,16 @@ __all__ = [
     'RetireRequest',
     'RetiredCommandError',
     'Retirement',
+    'RunOptions',
+    'RunProgress',
+    'RunReporter',
+    'RunRequest',
+    'RunResult',
     'SqliteContractRepository',
+    'TrackedChangesError',
     'UnapprovedCommandError',
     'UnknownCommandError',
+    'child_environment',
     'is_argv',
     'live_commands',
 ]

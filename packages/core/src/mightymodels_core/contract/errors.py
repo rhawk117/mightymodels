@@ -91,3 +91,12 @@ class AlreadyRetiredError(StateError):
     def __init__(self, *, command_key: str) -> None:
         self.command_key = command_key
         super().__init__(f'{command_key} is already retired')
+
+
+class TrackedChangesError(StateError):
+    def __init__(self, *, paths: Sequence[str]) -> None:
+        self.paths = tuple(paths)
+        super().__init__(
+            f'tracked files have uncommitted changes: {list(paths)}; commit or stash them, '
+            'then rerun the contract'
+        )
