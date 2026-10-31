@@ -86,6 +86,7 @@ class FakeContractRepository:
                 argv=command.argv,
                 expect_exit=command.expect_exit,
                 timeout=command.timeout,
+                approval_source=command.approval_source,
             )
             self.ledger.approved[ticket_id, command.key] = PlacedCommand(
                 command=recorded, approved_by=command.approved_by, approval=approval

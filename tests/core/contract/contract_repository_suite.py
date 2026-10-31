@@ -1,5 +1,6 @@
 """The contract repository contract, written once for every tier to subclass."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,8 @@ from mightymodels_core.primitives import WriteLimitError
 from tests.core.contract.contract_builders import APPROVAL, create_command, create_receipt
 
 if TYPE_CHECKING:
+    from mightymodels_core.vocabulary.contract import ApprovalSource
+
     from tests.core.contract.contract_builders import ContractHarness
 
 
@@ -53,6 +56,16 @@ class ContractRepositoryContract:
             ]
 
             assert approved.contract.commands(approved.ticket_id) == expected
+
+        @pytest.mark.parametrize('source', ['form', 'fallback'])
+        def test_command_is_read_back_with_the_source_it_was_approved_with(
+            self, harness: ContractHarness, source: ApprovalSource
+        ) -> None:
+            command = replace(create_command('I1'), approval_source=source)
+            harness.contract.approve(harness.ticket_id, [command], APPROVAL)
+
+            (recorded,) = harness.contract.commands(harness.ticket_id)
+            assert recorded.approval_source == source
 
         def test_i2_approved_before_i10_is_read_back_before_it(
             self, harness: ContractHarness

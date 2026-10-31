@@ -50,6 +50,7 @@ def command_of(row: ContractCommandRow) -> RecordedCommand:
         argv=tuple(row.argv),
         expect_exit=row.expect_exit,
         timeout=row.timeout,
+        approval_source=row.approval_source,
         retirement=retirement_of(row),
     )
 

@@ -52,6 +52,7 @@ class RecordedCommand:
     argv: tuple[str, ...]
     expect_exit: int
     timeout: int
+    approval_source: ApprovalSource = 'fallback'
     retirement: Retirement | None = None
 
 
