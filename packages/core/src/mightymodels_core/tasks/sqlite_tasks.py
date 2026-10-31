@@ -7,6 +7,7 @@ from mightymodels_core.primitives import TaskId, redact
 from mightymodels_core.schemas.tasks import (
     ADD_TASK_ATTEMPT,
     ADD_TASK_TRANSITION,
+    DECLARE_TASK,
     IN_PROGRESS_TASKS_STARTED_BY,
     RECORD_TASK_VERIFICATION,
     TASK_BY_KEY,
@@ -15,6 +16,7 @@ from mightymodels_core.schemas.tasks import (
     UPSERT_TASK,
     AddTaskAttemptParams,
     AddTaskTransitionParams,
+    DeclareTaskParams,
     RecordTaskVerificationParams,
     StartedByParams,
     TaskKeyParams,
@@ -26,6 +28,9 @@ from mightymodels_core.tasks.errors import UnknownTaskError
 from mightymodels_core.tasks.records import TASKS, TaskRecord
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from datetime import datetime
+
     from mightymodels_core.database import Unit
     from mightymodels_core.schemas.tasks import TaskRow, Worker
     from mightymodels_core.tasks.records import Attempt, Transition
@@ -87,6 +92,14 @@ class SqliteTaskRepository:
         if (error := TASKS.error(rows, owner=f'ticket {ticket_id}')) is not None:
             raise error
         return [TaskId(row.task_key) for row in rows]
+
+    def declare(self, ticket_id: int, task_keys: Sequence[TaskId], at: datetime) -> None:
+        for task_key in task_keys:
+            self.unit.run(
+                DECLARE_TASK,
+                DeclareTaskParams(ticket_id=ticket_id, task_key=task_key, updated_at=at),
+            )
+        self.refuse_too_many_tasks(ticket_id)
 
     def record_start(self, ticket_id: int, transition: Transition, attempt: Attempt) -> None:
         started = TaskRecord(

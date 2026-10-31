@@ -80,6 +80,15 @@ class FixNotUnderwayError(StateError):
         )
 
 
+class NotPlanTaskError(StateError):
+    def __init__(self, *, task_key: TaskId) -> None:
+        self.task_key = task_key
+        super().__init__(
+            f'{task_key} is not a plan task; only plan task ids (T*) are declared, and other '
+            'tasks start freely'
+        )
+
+
 class TaskMovedError(StateError):
     def __init__(self, *, task_key: TaskId, changed: Sequence[str]) -> None:
         self.task_key = task_key

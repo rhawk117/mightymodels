@@ -1,7 +1,9 @@
 """The seams under the task services: the tasks of one ticket and their attempts, by ticket id.
 
-`TaskRepository` reads and writes the task rows. `record_start` upserts the task as in progress,
-keeps the base it first had, and writes the attempt and the transition with it.
+`TaskRepository` reads and writes the task rows. `declare` writes `pending` rows for the ids that
+have no row and leaves every existing row, and the transitions, as they were. `record_start`
+upserts the task as in progress, keeps the base it first had, and writes the attempt and the
+transition with it.
 `record_verification` sets the verified commit and refuses a task that was never started.
 `record_mark` moves a task that may never have started, keeping what it held. A write that leaves
 the ticket with more tasks than one read returns is refused.
@@ -14,7 +16,8 @@ the ticket with more tasks than one read returns is refused.
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from collections.abc import Collection
+    from collections.abc import Collection, Sequence
+    from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText, TaskId
     from mightymodels_core.tasks.records import (
@@ -34,6 +37,8 @@ class TaskRepository(Protocol):
     def tasks(self, ticket_id: int) -> list[TaskRecord]: ...
 
     def in_progress_started_by(self, ticket_id: int, worker: Worker) -> list[TaskId]: ...
+
+    def declare(self, ticket_id: int, task_keys: Sequence[TaskId], at: datetime) -> None: ...
 
     def record_start(self, ticket_id: int, transition: Transition, attempt: Attempt) -> None: ...
 

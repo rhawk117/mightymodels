@@ -197,6 +197,11 @@ ON CONFLICT (ticket_id, task_key) DO UPDATE SET
   updated_at = excluded.updated_at
 RETURNING json_object('id', id);
 
+-- name: declare_task
+INSERT INTO tasks (ticket_id, task_key, status, owned, updated_at)
+VALUES (:ticket_id, :task_key, 'pending', '[]', :updated_at)
+ON CONFLICT (ticket_id, task_key) DO NOTHING;
+
 -- name: record_task_verification
 UPDATE tasks SET
   status = :status,

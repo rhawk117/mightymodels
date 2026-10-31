@@ -11,7 +11,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import redact, redact_within
-from mightymodels_core.tasks.errors import TaskMovedError, TransitionError, UnknownTaskError
+from mightymodels_core.tasks.errors import (
+    NotPlanTaskError,
+    TaskMovedError,
+    TransitionError,
+    UnknownTaskError,
+)
 from mightymodels_core.tasks.gates import (
     Evidence,
     VerificationGate,
@@ -28,7 +33,7 @@ from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
 from mightymodels_core.tickets import open_ticket_of
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from datetime import datetime
 
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
@@ -145,6 +150,17 @@ class TaskService:
             ticket_id, start_transition(policy, request, self.clock.now()), attempt
         )
         return self.task_held(ticket_id, request.task_key)
+
+    def declare(self, slug: Slug, task_keys: Sequence[TaskId]) -> list[TaskRecord]:
+        ticket = open_ticket_of(self.tickets, slug)
+        ticket_id = ticket.id
+        for task_key in task_keys:
+            if not is_plan_task(task_key):
+                raise NotPlanTaskError(task_key=task_key)
+
+        self.tickets.mark_in_progress(ticket)
+        self.tasks.declare(ticket_id, sorted(set(task_keys)), self.clock.now())
+        return self.tasks.tasks(ticket_id)
 
     def prepare_verification(self, slug: Slug, task_key: TaskId) -> TaskRecord:
         ticket_id = open_ticket_of(self.tickets, slug).id
