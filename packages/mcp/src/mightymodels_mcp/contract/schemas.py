@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import ApprovedCommand
 from mightymodels_core.contract.services import RetireRequest
+from mightymodels_core.vocabulary.contract import Phase
 from pydantic import Field
 
 from mightymodels_mcp.server.requests import (
@@ -58,6 +59,16 @@ class ContractRetireRequest(RequestModel):
     approved_by: NameText = Field(
         default='', description='Who approved the retirement; leave it blank and the user is asked.'
     )
+
+
+class ContractRunRequest(RequestModel):
+    slug: SlugField
+    ids: tuple[NameText, ...] | None = Field(
+        default=None,
+        min_length=1,
+        description='The command keys to run, such as I1; leave it out to run every live command.',
+    )
+    phase: Phase = Field(description='The phase the receipts are recorded under.')
 
 
 def leaves_approver_blank(request: ContractApproveRequest) -> bool:

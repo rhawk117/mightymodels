@@ -5,12 +5,27 @@ approver blank; the user approves the list or declines it. A declined or cancell
 the needs-input text as a normal result. Both tools ask git only for HEAD. The resolver's
 annotations are read at runtime, so `RoundAsk` is a module-level plain assignment and
 `ContractApproveRequest` a runtime import.
+
+contract_run runs the approved commands without a form, because the approved contract is the
+permission. Its progress goes out as notifications whose position rises on every one, since a
+heartbeat repeats a command's position.
 """
 
-from dataclasses import replace
-from typing import TYPE_CHECKING
+import itertools
+import os
+from contextlib import suppress
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+import anyio
 from mcp.server.mcpserver.resolve import Elicit, Resolve
+from mightymodels_core.contract.runs import (
+    ContractRunner,
+    RunRequest,
+    child_environment,
+)
+from mightymodels_core.edge import create_clock
+from mightymodels_core.process import get_process_runner
 from mightymodels_core.units_of_work import TaskWork
 from pydantic import BaseModel
 
@@ -25,6 +40,7 @@ from .schemas import (
     ContractApproveRequest,
     ContractRequest,
     ContractRetireRequest,
+    ContractRunRequest,
     create_approved_commands,
     create_retire_request,
     leaves_approver_blank,
@@ -33,11 +49,16 @@ from .use_cases import (
     ContractApproval,
     approve_contract,
     retire_contract,
+    show_contract_run,
     show_contract_status,
 )
-from .views import ContractView, render_declined
+from .views import ContractRunView, ContractView, render_declined
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from mightymodels_core.contract.runs import RunProgress
+
     from mightymodels_mcp.forms.choices import ChoiceOutcome
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
 
@@ -147,6 +168,48 @@ async def contract_retire(
         )
 
 
+@runtime_checkable
+class ProgressSender(Protocol):
+    async def report_progress(
+        self, progress: float, total: float | None = None, message: str | None = None
+    ) -> None: ...
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ToolProgressReporter:
+    ctx: ProgressSender
+    ticks: Iterator[int] = field(default_factory=itertools.count)
+
+    async def report(self, progress: RunProgress) -> None:
+        status = progress.outcome or progress.state
+        place = f'{progress.position} of {progress.total}'
+        message = f'{progress.key} {status} ({place})'
+        with suppress(anyio.BrokenResourceError, anyio.ClosedResourceError):
+            await self.ctx.report_progress(next(self.ticks), message=message)
+
+
+async def contract_run(request: ContractRunRequest, ctx: ToolContext) -> ContractRunView:
+    """Run the approved contract commands of a ticket and record a receipt for each. Use when the
+    work is done and the commands must prove it. Blocks until the last command ends. Leave ids out
+    to run every live command. A failed command does not stop the run. Refused while tracked files
+    have changes.
+    """
+    async with open_tool_state(ctx) as state:
+        work = create_work(state, TaskWork)
+        runner = ContractRunner(
+            work=work,
+            processes=get_process_runner(),
+            git=state.git,
+            clock=create_clock(),
+            root=state.checkout.toplevel,
+            environment=child_environment(os.environ),
+            reporter=ToolProgressReporter(ctx=ctx),
+        )
+        run = RunRequest(slug=request.slug, asked=request.ids, phase=request.phase)
+        result = await runner.run(run)
+        return show_contract_run(work, request.slug, result)
+
+
 async def contract_status(request: ContractRequest, ctx: ToolContext) -> ContractView:
     """Show each approved command of a ticket with its latest receipt against the current HEAD. Use
     to see which verifications still need a run. For task readiness overall, use task_ready.
@@ -185,6 +248,15 @@ CONTRACT_TOOLS = (
         result_model=ContractView,
         handler=contract_retire,
         resolvers={'answers': RETIREMENT_RESOLVER},
+    ),
+    ToolSpec(
+        name='contract_run',
+        title='Run the contract commands',
+        annotations=WRITES,
+        icon='contract',
+        request_model=ContractRunRequest,
+        result_model=ContractRunView,
+        handler=contract_run,
     ),
 )
 

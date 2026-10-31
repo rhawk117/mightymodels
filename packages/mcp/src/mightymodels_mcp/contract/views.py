@@ -6,8 +6,11 @@ from mightymodels_core.primitives import short_head
 from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from mightymodels_core.contract.policy import ReceiptAssessment
-    from mightymodels_core.contract.records import RecordedCommand, Retirement
+    from mightymodels_core.contract.records import Receipt, RecordedCommand, Retirement
+    from mightymodels_core.contract.runs import RunResult
     from mightymodels_core.contract.services import (
         ApprovalResult,
         CommandStatus,
@@ -101,4 +104,54 @@ def render_status(status: ContractStatus) -> ContractView:
         passing=status.is_passing,
         commands=views,
         retired=retired,
+    )
+
+
+class RunReceiptView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    outcome: str
+    exit: int | None
+    duration_ms: int
+    head: str | None
+    stdout_tail: str
+    stderr_tail: str
+    approval_source: str
+
+
+class ContractRunView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    passing: bool
+    receipts: tuple[RunReceiptView, ...] = ()
+
+
+def create_run_receipt_view(receipt: Receipt, approval_source: str) -> RunReceiptView:
+    return RunReceiptView(
+        id=receipt.key,
+        outcome=receipt.outcome,
+        exit=receipt.exit,
+        duration_ms=receipt.duration_ms,
+        head=receipt.head,
+        stdout_tail=receipt.stdout_tail,
+        stderr_tail=receipt.stderr_tail,
+        approval_source=approval_source,
+    )
+
+
+def render_run_line(view: RunReceiptView) -> str:
+    return (
+        f'{view.id} {view.outcome} exit={view.exit} {view.duration_ms}ms ({view.approval_source})\n'
+    )
+
+
+def render_run(result: RunResult, sources: Mapping[str, str]) -> ContractRunView:
+    views = tuple(
+        create_run_receipt_view(receipt, sources.get(receipt.key, 'fallback'))
+        for receipt in result.receipts
+    )
+    return ContractRunView(
+        text=''.join(map(render_run_line, views)), passing=result.is_passing, receipts=views
     )

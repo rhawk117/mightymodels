@@ -94,6 +94,7 @@ def create_pointer_fields() -> PointerFields:
             'contract_approve': 'slug',
             'contract_status': 'slug',
             'contract_retire': 'slug',
+            'contract_run': 'slug',
             'review_start': 'slug',
             'snapshot_take': 'slug',
             'crashout_add': 'ticket',

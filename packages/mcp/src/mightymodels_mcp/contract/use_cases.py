@@ -7,17 +7,18 @@ A unit holds the database connection synchronously and must never be held across
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .views import render_approved, render_retired, render_status
+from .views import render_approved, render_retired, render_run, render_status
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.contract.records import ApprovedCommand
+    from mightymodels_core.contract.runs import RunResult
     from mightymodels_core.contract.services import RetireRequest
     from mightymodels_core.primitives import Slug
     from mightymodels_core.units_of_work import TaskWork
 
-    from .views import ContractView
+    from .views import ContractRunView, ContractView
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -46,3 +47,12 @@ def retire_contract(work: TaskWork, slug: Slug, request: RetireRequest) -> Contr
         unit.contracts.retire(slug, request)
 
     return render_retired(request)
+
+
+def show_contract_run(work: TaskWork, slug: Slug, result: RunResult) -> ContractRunView:
+    head = result.receipts[0].head if result.receipts else None
+    with work.read() as unit:
+        status = unit.contracts.status(slug, head)
+
+    sources = {item.command.key: item.command.approval_source for item in status.commands}
+    return render_run(result, sources)
