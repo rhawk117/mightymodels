@@ -259,12 +259,12 @@ class TestPickPolicy:
         assert problem.slug == SLUG
 
     def test_ids_outside_the_contract_are_unknown(self) -> None:
-        asked = [FIRST_KEY, 'T9.AC-9', 'T8.AC-8']
+        asked = [FIRST_KEY, 'I10', 'I8']
 
         problem = PickPolicy(slug=SLUG, held=self.held, asked=asked).get_pick_problem()
 
         assert isinstance(problem, UnknownCommandError)
-        assert problem.unknown == ('T9.AC-9', 'T8.AC-8')
+        assert problem.unknown == ('I10', 'I8')
 
     def test_no_ids_picks_every_command_in_key_order(self) -> None:
         policy = PickPolicy(slug=SLUG, held=self.held, asked=None)

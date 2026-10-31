@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 FIRST = Slug('first-probe')
 SECOND = Slug('second-probe')
 COMMAND = RecordedCommand(
-    key='T1.AC-1', task_key=TaskId('T1'), argv=('true',), expect_exit=0, timeout=10
+    key='I1', task_key=TaskId('T1'), argv=('true',), expect_exit=0, timeout=10
 )
 
 
@@ -67,7 +67,7 @@ def create_receipt() -> Receipt:
 class TestArchivedCommand:
     def test_a_command_with_no_receipt_is_never_run(self) -> None:
         assert archived_command(COMMAND, None) == ArchivedCommand(
-            key='T1.AC-1',
+            key='I1',
             argv=('true',),
             expect_exit=0,
             outcome='never-run',

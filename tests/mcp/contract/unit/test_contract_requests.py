@@ -10,7 +10,7 @@ from mightymodels_mcp.contract.schemas import create_approved_commands as approv
 from mightymodels_mcp.server.requests import NAME_LIMIT, USER_APPROVER
 from pydantic import ValidationError
 
-COMMAND = MappingProxyType({'id': 'T1.check', 'argv': ('uv', 'run', 'pytest')})
+COMMAND = MappingProxyType({'id': 'I1', 'argv': ('uv', 'run', 'pytest')})
 APPROVE = MappingProxyType({'slug': 'probe-ticket', 'commands': (COMMAND,)})
 
 
@@ -28,7 +28,7 @@ def invalid_approve_cases() -> pytest.MarkDecorator:
         [
             pytest.param({'slug': 'Not A Slug'}, id='slug'),
             pytest.param({'unknown': 'field'}, id='extra-field'),
-            pytest.param({'commands': ({'id': 'T1.check'},)}, id='no-argv'),
+            pytest.param({'commands': ({'id': 'I1'},)}, id='no-argv'),
             pytest.param({'commands': ({**COMMAND, 'argv': 'pytest'},)}, id='argv-string'),
             pytest.param({'commands': ({**COMMAND, 'expect_exit': 'zero'},)}, id='expect-exit'),
             pytest.param(
@@ -61,7 +61,7 @@ class TestLeavesApproverBlank:
         assert leaves_approver_blank(create_commands({'approved_by': ' '}))
 
     def test_one_blank_among_named_is_blank(self) -> None:
-        assert leaves_approver_blank(create_commands({'approved_by': 'lead'}, {'id': 'T1.lint'}))
+        assert leaves_approver_blank(create_commands({'approved_by': 'lead'}, {'id': 'I2'}))
 
     def test_every_command_named_is_not_blank(self) -> None:
         assert not leaves_approver_blank(create_commands({'approved_by': 'lead'}))
@@ -74,7 +74,7 @@ class TestCreateApprovedCommands:
         (approved,) = approved_commands_of(request, USER_APPROVER)
 
         assert (approved.key, approved.argv, approved.expect_exit, approved.timeout) == (
-            'T1.check',
+            'I1',
             ('uv', 'run', 'pytest'),
             1,
             60,

@@ -1,13 +1,13 @@
 from mightymodels_mcp.contract.schemas import ContractApproveRequest
 from mightymodels_mcp.contract.tools import create_approval_round
 
-COMMAND_TEXT = 'T1.check: uv run pytest'
+COMMAND_TEXT = 'I1: uv run pytest'
 
 
 def create_request() -> ContractApproveRequest:
     return ContractApproveRequest.model_validate({
         'slug': 'probe-ticket',
-        'commands': ({'id': 'T1.check', 'argv': ('uv', 'run', 'pytest')},),
+        'commands': ({'id': 'I1', 'argv': ('uv', 'run', 'pytest')},),
     })
 
 

@@ -73,9 +73,9 @@ class TestSnapshotRead:
 
         states = {check.key: check.state for check in record.checks}
         assert states == {
-            'T1.AC-1': 'pass',
-            'T1.AC-2': 'stale (fail at bbbbbbbbbbbb)',
-            'T2.AC-1': 'never-run',
+            'I1': 'pass',
+            'I2': 'stale (fail at bbbbbbbbbbbb)',
+            'I3': 'never-run',
         }
 
     def test_works_lists_only_the_commands_whose_latest_receipt_passed(
@@ -83,7 +83,7 @@ class TestSnapshotRead:
     ) -> None:
         record = take_snapshot(snapshot_read, seeded, repository_facts)
 
-        assert [command.key for command in record.works] == ['T1.AC-1']
+        assert [command.key for command in record.works] == ['I1']
 
     def test_do_not_retry_holds_the_blocked_move_with_its_reason(
         self, snapshot_read: SnapshotRead, seeded: Slug, repository_facts: RepositoryFacts

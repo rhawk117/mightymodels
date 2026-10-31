@@ -32,11 +32,11 @@ WRITES = ToolAnnotations(
 READS = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
-CHECK = MappingProxyType({'id': 'T1.check', 'argv': ('uv', 'run', 'pytest', '-q')})
-LINT = MappingProxyType({'id': 'T1.lint', 'argv': ('uv', 'run', 'ruff', 'check')})
+CHECK = MappingProxyType({'id': 'I1', 'argv': ('uv', 'run', 'pytest', '-q')})
+LINT = MappingProxyType({'id': 'I2', 'argv': ('uv', 'run', 'ruff', 'check')})
 STATUS = MappingProxyType({'slug': SLUG})
 FORM_MESSAGE = 'Approve these verification commands?'
-FORM_TITLE = f'{FORM_MESSAGE}\nT1.check: uv run pytest -q\nT1.lint: uv run ruff check'
+FORM_TITLE = f'{FORM_MESSAGE}\nI1: uv run pytest -q\nI2: uv run ruff check'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -140,7 +140,7 @@ class TestContractApprove:
 
         assert (view['text'], view['passing']) == ('contract: 2 commands (2 new)\n', True)
         assert (answerer.messages, answerer.fields) == ([FORM_MESSAGE], [frozenset({'approval'})])
-        assert await harness.status_rows() == ['T1.check never-run', 'T1.lint never-run']
+        assert await harness.status_rows() == ['I1 never-run', 'I2 never-run']
 
     async def test_named_approvers_ask_nothing(self, harness: ContractHarness) -> None:
         answerer = FormAnswerer()
@@ -192,7 +192,7 @@ class TestContractApprove:
         result = await approved.call('contract_approve', create_approve(changed))
 
         assert result.is_error
-        assert 'T1.check' in str(result.content)
+        assert 'I1' in str(result.content)
 
     async def test_asks_git_only_for_head(self, harness: ContractHarness) -> None:
         view_of(await harness.call('contract_approve', create_approve(CHECK, LINT)))
@@ -204,11 +204,11 @@ class TestContractStatus:
     async def test_shows_each_command_with_its_state(self, approved: ContractHarness) -> None:
         view = view_of(await approved.call('contract_status', dict(STATUS)))
 
-        assert view['text'].splitlines()[1:] == ['T1.check never-run', 'T1.lint never-run']
+        assert view['text'].splitlines()[1:] == ['I1 never-run', 'I2 never-run']
         assert view['passing'] is False
         assert [(row['id'], row['argv'], row['state']) for row in view['commands']] == [
-            ('T1.check', list(CHECK['argv']), 'never-run'),
-            ('T1.lint', list(LINT['argv']), 'never-run'),
+            ('I1', list(CHECK['argv']), 'never-run'),
+            ('I2', list(LINT['argv']), 'never-run'),
         ]
 
     async def test_header_names_the_short_head(self, approved: ContractHarness) -> None:

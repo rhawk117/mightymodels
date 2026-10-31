@@ -29,8 +29,8 @@ APPROVAL = Approval(at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC), head='abc1234'
 SERVICE_SLUG = Slug('service-subject')
 SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 HEAD = 'abc1234'
-FIRST_KEY = 'T1.AC-1'
-SECOND_KEY = 'T1.AC-2'
+FIRST_KEY = 'I1'
+SECOND_KEY = 'I2'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

@@ -121,14 +121,12 @@ def seed_ticket(
     work = TaskWork(database=database, repository_key=repository_key, clock=clock)
     with work.write() as unit:
         unit.tasks.tickets.stage(slug, create_section(FIRST_SUMMARY), (investigation,))
-        unit.contracts.approve(
-            slug, [create_command(key) for key in ('T1.AC-1', 'T1.AC-2', 'T2.AC-1')], head=HEAD
-        )
+        unit.contracts.approve(slug, [create_command(key) for key in ('I1', 'I2', 'I3')], head=HEAD)
         unit.contracts.record(
             slug,
             [
-                create_receipt('T1.AC-1', outcome='pass', head=HEAD),
-                create_receipt('T1.AC-2', outcome='fail', head=OLD_HEAD),
+                create_receipt('I1', outcome='pass', head=HEAD),
+                create_receipt('I2', outcome='fail', head=OLD_HEAD),
             ],
         )
         start = TaskStartRequest(
@@ -200,8 +198,8 @@ def seed_crowded_tasks(
         head=HEAD,
     )
     receipts = [
-        create_receipt('T1.AC-2', outcome='pass', head=HEAD),
-        create_receipt('T2.AC-1', outcome='pass', head=HEAD),
+        create_receipt('I2', outcome='pass', head=HEAD),
+        create_receipt('I3', outcome='pass', head=HEAD),
     ]
     with work.write() as unit:
         unit.contracts.record(seeded, receipts)

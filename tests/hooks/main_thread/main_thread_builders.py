@@ -35,7 +35,7 @@ PUSH = 'git push origin main'
 OUTSIDE_PATH = 'src/app.py'
 OTHER_SLUG = Slug('other-it')
 WORKER = 'mightymodels:workers:engineer'
-COMMAND_KEY = 'T1.AC-1'
+COMMAND_KEY = 'I1'
 MOMENT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
 
