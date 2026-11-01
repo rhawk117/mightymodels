@@ -12,6 +12,12 @@ if TYPE_CHECKING:
     from tests.core.tasks.service_builders import ServiceHarness
 
 
+def unrostered_task_key_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'task_key', [pytest.param('R1', id='residual'), pytest.param('C1', id='ci')]
+    )
+
+
 class TestStartRefusal:
     def test_an_undeclared_plan_task_is_refused_naming_task_declare(
         self, service_harness: ServiceHarness
@@ -26,7 +32,7 @@ class TestStartRefusal:
 
         assert (record.key, record.status) == (FIRST_TASK, 'in-progress')
 
-    @pytest.mark.parametrize('task_key', ['R1', 'C1'])
+    @unrostered_task_key_cases()
     def test_a_residual_or_ci_task_starts_without_a_declared_row(
         self, service_harness: ServiceHarness, task_key: str
     ) -> None:

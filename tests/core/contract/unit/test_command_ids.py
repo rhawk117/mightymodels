@@ -14,27 +14,32 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class IdScenario:
+    name: str
     key: str
     accepted: bool
+    marks: tuple[pytest.MarkDecorator, ...] = ()
 
     @property
     def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.key or 'empty')
+        return pytest.param(self, id=self.name, marks=self.marks)
 
 
 def command_id_cases() -> pytest.MarkDecorator:
     accepted = ['I1', 'L1', 'I10']
     refused = ['T1.AC-1', 'T1', 'R1', 'C1.ci', 'lint', 'i1', 'I', 'L', 'IL1', 'I1.AC-1', 'I-1']
-    scenarios = [IdScenario(key=key, accepted=True) for key in accepted] + [
-        IdScenario(key=key, accepted=False) for key in refused
+    scenarios = [IdScenario(name=key, key=key, accepted=True) for key in accepted] + [
+        IdScenario(name=key, key=key, accepted=False) for key in refused
     ]
     return pytest.mark.parametrize('scenario', [scenario.param for scenario in scenarios])
 
 
-@command_id_cases()
-def test_approval_accepts_only_i_and_l_ids(scenario: IdScenario) -> None:
-    policy = ApprovalPolicy(commands=[create_command(scenario.key)], held=[])
+class TestApprovalCommandIds:
+    def find_problem(self, scenario: IdScenario) -> object | None:
+        policy = ApprovalPolicy(commands=[create_command(scenario.key)], held=[])
+        return policy.get_approval_problem()
 
-    problem = policy.get_approval_problem()
+    @command_id_cases()
+    def test_approval_accepts_only_i_and_l_ids(self, scenario: IdScenario) -> None:
+        problem = self.find_problem(scenario)
 
-    assert type(problem) is (type(None) if scenario.accepted else InvalidCommandKeyError)
+        assert type(problem) is (type(None) if scenario.accepted else InvalidCommandKeyError)

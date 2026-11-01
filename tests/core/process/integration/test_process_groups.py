@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import anyio
+import pytest
 from mightymodels_core.process import (
     ChildSetting,
     CompletedRun,
@@ -16,8 +17,6 @@ from mightymodels_core.process import (
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 WAIT_SECONDS = 10
 POLL_SECONDS = 0.05
@@ -76,12 +75,20 @@ class TestSubprocessRunnerGroups:
         'time.sleep(60)\n'
     )
 
+    probe_script = 'import os; print(os.environ.get("MM_PROBE"))'
+
+    @pytest.fixture
+    def marker(self, tmp_path: Path) -> Path:
+        return tmp_path.joinpath('pids')
+
+    @pytest.fixture
+    def inherited_probe(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv('MM_PROBE', 'inherited')
+
     def spawning_argv(self, marker: Path) -> list[str]:
         return [sys.executable, '-c', self.spawning_script, str(marker)]
 
-    async def test_timeout_ends_child_and_grandchild(self, tmp_path: Path) -> None:
-        marker = tmp_path.joinpath('pids')
-
+    async def test_timeout_ends_child_and_grandchild(self, marker: Path) -> None:
         launched = await launch(self.spawning_argv(marker), ChildSetting())
         assert not isinstance(launched, FailedRun)
         pair = await wait_for_pair(marker)
@@ -93,10 +100,7 @@ class TestSubprocessRunnerGroups:
         assert await wait_until_gone(pair.child)
         assert await wait_until_gone(pair.grandchild)
 
-    async def test_cancellation_ends_both_and_is_returned_to_the_caller(
-        self, tmp_path: Path
-    ) -> None:
-        marker = tmp_path.joinpath('pids')
+    async def test_cancellation_ends_both_and_is_returned_to_the_caller(self, marker: Path) -> None:
         returned = False
 
         with anyio.CancelScope() as scope:
@@ -117,22 +121,16 @@ class TestSubprocessRunnerGroups:
         assert await wait_until_gone(pair.grandchild)
 
     async def test_given_env_reaches_the_child(self) -> None:
-        script = 'import os; print(os.environ.get("MM_PROBE"))'
-
         outcome = await self.runner.run(
-            [sys.executable, '-c', script],
+            [sys.executable, '-c', self.probe_script],
             timeout=30,
             setting=ChildSetting(env={'MM_PROBE': 'given'}),
         )
 
         assert outcome == CompletedRun(exit=0, stdout='given\n', stderr='')
 
-    async def test_omitted_env_inherits_the_parent_environment(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv('MM_PROBE', 'inherited')
-        script = 'import os; print(os.environ.get("MM_PROBE"))'
-
-        outcome = await self.runner.run([sys.executable, '-c', script], timeout=30)
+    @pytest.mark.usefixtures('inherited_probe')
+    async def test_omitted_env_inherits_the_parent_environment(self) -> None:
+        outcome = await self.runner.run([sys.executable, '-c', self.probe_script], timeout=30)
 
         assert outcome == CompletedRun(exit=0, stdout='inherited\n', stderr='')
