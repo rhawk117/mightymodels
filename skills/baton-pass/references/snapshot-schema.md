@@ -1,10 +1,10 @@
 # Snapshot schema
 
-Read before another component writes a table the `snapshot` tool reads, and when a snapshot carries warnings. The snapshot is objective state, read from the database and git; BATON.md adds only what no table holds.
+Read before another component writes a table `snapshot_take` reads, and when a snapshot carries warnings. The snapshot is objective state, read from the database and git; BATON.md adds only what no table holds.
 
 ## Output
 
-The tool writes no file. Its answer holds `record` (the JSON below), `markdown`, and the two paths `record_path` and `markdown_path`, which are `.mightymodels/SLUG/handoffs/snapshot.json` and `snapshot.md` relative to the repository root. The agent writes both whole on every run; never tracked by git. Each list holds at most `limit` entries (default 20, at most 100), the most recent kept, except `tasks` and `checks`, which list every task and every contract command. The changed paths in `repository` are cut to `limit` too; `dirty_count` is not.
+`snapshot_take` writes no file. Its answer holds `record` (the JSON below), `markdown`, and the two paths `record_path` and `markdown_path`, which are `.mightymodels/SLUG/handoffs/snapshot.json` and `snapshot.md` relative to the repository root. The agent writes both whole on every run; never tracked by git. Each list holds at most `limit` entries (default 20, at most 100), the most recent kept, except `tasks` and `checks`, which list every task and every contract command. The changed paths in `repository` are cut to `limit` too; `dirty_count` is not.
 
 | Key                           | Source                                                    | Holds                                                                                                         |
 | ----------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -27,4 +27,4 @@ The `answers` and `subagents` sections stay in the record and read empty. The da
 
 ## Writers of what it reads
 
-The snapshot reads rows other tools own. `ticket` writes `tickets`, and `task` (in progress) and `close` (closed) move its status; `task` writes the task rows; `contract` writes `contract_commands`; `mightymodels verify run` writes `receipts`; `investigation` writes `ledger_entries`; `review` writes the review rows. The row shapes are the contract, so a change to one of them updates this reader in the same change.
+The snapshot reads rows other tools own. `ticket_*` writes `tickets`, and `task_*` (in progress) and `close_ticket` (closed) move its status; `task_*` writes the task rows; `contract_approve` and `contract_retire` write `contract_commands`; `contract_run` writes `receipts`; `investigation_*` writes `ledger_entries`, and the AskUserQuestion recorder hook writes the `decision` ones from the user; `review_*` writes the review rows. The row shapes are the contract, so a change to one of them updates this reader in the same change.

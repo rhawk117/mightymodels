@@ -13,7 +13,6 @@ when_to_use: >-
   failure that survived two attempts, or a guess about user intent.
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_state__investigation
 ---
 
 # ask-an-adult
@@ -41,9 +40,14 @@ re-open a decision the user already made, or a second time on the same packet.
 ## Build the packet
 
 Fill prompting-subagents' wingman template:
-the decision in one sentence, each option with its cost, the ticket's text, every fact with its
-citation and every assumption marked as one, constraints, what was tried, and your lean. Missing
-sections are the usual reason wingman comes back at low confidence.
+the decision in one sentence, each option with its cost, the ticket's text, every fact and
+every assumption marked as one, constraints, what was tried, and your lean. Missing sections are
+the usual reason wingman comes back at low confidence.
+
+Wingman can read nothing and call nothing, so a path, a command or a link in the packet is a dead
+end for it. Carry the text itself: for each fact, the quoted lines, the command's output or the
+page's passage, with its citation beside it as provenance only. Never write "see `src/queue.py`"
+or "run the tests"; paste what the file says and what the run printed.
 
 When a ticket is active, the `<ticket>` section carries these fields of `ticket.yml`, verbatim:
 `task`, `summary`, every `context` line, `companion-docs` and `handoff-context`. Leave
@@ -55,7 +59,7 @@ disagreement, so hiding your preference buys nothing and costs the advisor a use
 
 Run the template's ten-second checklist, then send the packet to `mightymodels:triage:wingman` through the `Agent` tool, its `model` the ticket's alias. Do not
 paraphrase file contents you have not read, and do not summarize scout findings into
-conclusions: pass the citations through as they came back. While the ticket has a task that is
+conclusions: pass each finding through as it came back, with the text it cites. While the ticket has a task that is
 blocked or failed, or with the architect after either, and its `auto-escalate` is off, put the block
 to the user before you send the packet: the dispatch hook answers this dispatch with `ask` and the
 block's reasons.
@@ -82,20 +86,15 @@ Surface `<verdict>`, `<confidence>`, and `<user_questions>` to the user verbatim
 Summarizing an advisor whose whole value is its reasoning defeats the call.
 
 The user decides; this skill is the only tie-break path. When the user cannot choose and
-says so ("you pick", "either is fine"), adopt wingman's verdict and record it as the user's
-decision to defer to it, in those words. Do not escalate the same packet again.
+says so ("you pick", "either is fine"), adopt wingman's verdict, and say in chat that the user
+deferred to it. Do not escalate the same packet again.
 
 ## Record it
 
-A decision escalated once and then lost to compaction gets escalated again, so persist it
-before any work resumes. When an investigation is active, or the ticket's `investigations`
-list links one, append it through lets-investigate's ledger. Call
-`mcp__plugin_mightymodels_state__investigation` with action `add`:
-
-```json
-{"request": {"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 1}, "entries": [{"kind": "decision", "text": "<the choice> (wingman: <verdict, one line>; user: <answer>)", "source": "user"}]}}}
-```
-
-`ID` is the investigation's id and the `round` is the ledger's latest one (`investigation`
-`render` shows it). With no investigation, say in chat that the decision is not
-persisted yet; baton-pass records settled decisions when the session is handed off.
+The user's answers to wingman's questions go through `AskUserQuestion`, and the recorder hook on
+that tool writes each answer, verbatim, as a decision in the ledger or ticket the session is
+pointed at. Write nothing by hand: a second entry would record the same answer twice. If the
+user settles the choice in chat instead of the dialog, nothing records it, so put the choice to
+them again through `AskUserQuestion` before work resumes. With no investigation or ticket in
+the session, nothing is persisted; baton-pass hands the settled decisions on when the session
+ends.

@@ -18,8 +18,11 @@ when_to_use: >-
 argument-hint: "[question or claim]"
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_state__investigation
-  - mcp__plugin_mightymodels_state__similarity
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_add
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_knowns
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_list
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_start
+  - mcp__plugin_mightymodels_mighty-mcp__similarity_search
 ---
 
 # what-we-know
@@ -42,8 +45,7 @@ exists in the active ticket, or when the dispatch says so. Interactive otherwise
 from the skill that called this one.
 
 The ledger belongs to lets-investigate, and this skill reads and writes it only through the
-`investigation` tool, so the rows have one writer: call
-`mcp__plugin_mightymodels_state__investigation`. The ledger-schema reference of lets-investigate,
+`investigation_*` tools, so the rows have one writer. The ledger-schema reference of lets-investigate,
 `${CLAUDE_PLUGIN_ROOT}/skills/lets-investigate/references/ledger-schema.md`, describes the
 fields.
 
@@ -52,8 +54,8 @@ fields.
 Consolidation starts from whatever evidence exists, and re-deriving evidence that already
 carries a citation is waste.
 
-- **An investigation exists.** Action `list` shows the ids; lets-investigate usually hands
-  you one. Action `knowns` with the id prints every live entry marked `current` (written at
+- **An investigation exists.** `investigation_list` shows the ids; lets-investigate usually hands
+  you one. `investigation_knowns` with the id prints every live entry marked `current` (written at
   this HEAD) or `lead` (written at an older one). Current Knowns lift straight into the knowns
   table, Open items into uncertainties, Decisions into the table with source `user`, and
   Resources carry forward. A lead is history, not evidence: the code may have moved since it
@@ -64,12 +66,9 @@ carries a citation is waste.
   claim with a citation is a known; a claim someone made without one is an uncertainty, even
   when it came from the user, until the user confirms it at the dialog.
 - **Nothing is established yet** and the user is asking cold. Open an investigation first
-  (action `start`, `kind` one of `behavior`, `claim`, `research` or `change`, the proposed
-  change being the SWOT target) so the verdicts have somewhere to persist:
-
-  ```json
-  {"request": {"action": "start", "payload": {"request": {"target": "<target line>", "kind": "change"}}}}
-  ```
+  (`investigation_start` with the `target` line and `kind` one of `behavior`, `claim`,
+  `research` or `change`, the proposed change being the SWOT target) so the verdicts have
+  somewhere to persist.
 
   Then bootstrap with one scout wave of
   two or three narrow retrieval questions aimed at the target, then consolidate what came
@@ -103,12 +102,12 @@ would ask, state a working assumption for each, and proceed on the assumptions l
 assumptions.
 
 **Persist before analysing.** Write the session's verdicts in one batch with
-`mcp__plugin_mightymodels_state__investigation`: its `request` holds action `add`, and the
-`payload`'s own `request` is `{"round": N}` (the next round after the ledger's latest):
+`investigation_add`: `investigation_id`, `round` (the next round after the ledger's latest) and
+`entries`:
 
 ```json
-{"request": {"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 2},
- "entries": [{"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout", "supersedes": [4]}]}}}
+{"investigation_id": "ID", "round": 2,
+ "entries": [{"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout", "supersedes": [4]}]}
 ```
 
 The batch
@@ -149,7 +148,7 @@ Compile fresh citations for the current task against the current HEAD: where the
 what touches it, and what the ASKED stanza's `files-in-scope` should contain. Fresh every time,
 because the plan is deliberately citation-free; citations rot during iteration and this step
 is where they get compiled at dispatch time. When the ticket links an investigation, its
-`investigation` `knowns` rows are leads for where to look, never citations to copy: re-verify before
+`investigation_knowns` rows are leads for where to look, never citations to copy: re-verify before
 any of them reaches the report. Sprint mode writes nothing; the brief's ASKED stanza is the
 durable record of the task's citations, and a second copy in the ledger would drift.
 
@@ -176,11 +175,7 @@ plan and the ASKED stanza; adding a SWOT per task is context spent on a question
 ## Both modes
 
 Before a scout wave, search what the plugin already holds for this repository (ledger entries,
-scout reports, review findings and crashouts) through `mcp__plugin_mightymodels_state__similarity`:
-
-```json
-{"request": {"action": "search", "query": "<the target or the task's intent>"}}
-```
+scout reports, review findings and crashouts) through `similarity_search` with a `query` (the target or the task's intent) and optionally a `kind`.
 
 A row it returns says where earlier work looked. It is a lead, never a citation: re-verify it at
 HEAD before it reaches the table, or carry it as an uncertainty.

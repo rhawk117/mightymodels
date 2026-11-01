@@ -17,19 +17,22 @@ when_to_use: >-
 argument-hint: "[question, claim or error]"
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_state__investigation
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_add
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_list
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_render
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_start
 ---
 
 # lets-investigate
 
 The opening move: understand before anything gets named, ticketed, or built. The session's
 product is a ledger, restated in chat at the end of every round, that the user has agreed is
-sufficient. The ledger is persisted before every gate by the `investigation` tool, so a compaction
+sufficient. The ledger is persisted before every gate by the `investigation_*` tools, so a compaction
 or a new conversation resumes from the database instead of from memory; the chat restatement is
 the tool's own rendering, so the two cannot disagree.
 
-State goes through the plugin's MCP tool, called by full name:
-`mcp__plugin_mightymodels_state__investigation`. Read `references/ledger-schema.md` when an
+State goes through the plugin's MCP tools (`investigation_start`, `investigation_add`,
+`investigation_render`, `investigation_list`), which take flat arguments. Read `references/ledger-schema.md` when an
 entry is rejected.
 
 <important>Invoke `prompting-subagents` before the first dispatch.</important>
@@ -64,28 +67,25 @@ the user already holds cost nothing to record and a round to rediscover.
 
 Once the user confirms the target, open the ledger and record their answers as round 0:
 
-Call `mcp__plugin_mightymodels_state__investigation` with action `start` and the target, and
-leave `kind` out: the tool asks the user for the classification and records the answer. The kinds
-are `behavior`, `claim`, `research` and `change` (a proposed change to weigh, which what-we-know
-opens):
+Call `investigation_start` with the `target` line and leave `kind` out: the tool asks the user for
+the classification and records the answer. The kinds are `behavior`, `claim`, `research` and
+`change` (a proposed change to weigh, which what-we-know opens). An answer starting `needs input`
+means no one could be asked through the tool: put the question it names to the user in one
+`AskUserQuestion` dialog, then call again with `kind`.
+
+`start` returns the investigation id; every later call names it. From then on the session is
+pointed at that investigation, and the recorder hook on `AskUserQuestion` writes each answer the
+user gives in a dialog into the ledger as a `decision` entry from `user`: the framing answers
+and every gate answer. Do not write those yourself. Facts the user states are not decisions, so
+record them with `investigation_add` as round 0:
 
 ```json
-{"request": {"action": "start", "payload": {"request": {"target": "<target line>"}}}}
+{"investigation_id": "ID", "round": 0,
+ "entries": [{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]}
 ```
 
-An answer starting `needs input` means no one could be asked through the tool: put the question
-it names to the user in one `AskUserQuestion` dialog, then call again with `kind` in the request.
-
-`start` returns the investigation id; every later call names it. Then the same tool with action
-`add` records the user's answers:
-
-```json
-{"request": {"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 0},
- "entries": [{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]}}}
-```
-
-When the user is resuming an earlier investigation, action `list` shows the ids and action
-`render` restores the ledger.
+When the user is resuming an earlier investigation, `investigation_list` shows the ids and
+`investigation_render` restores the ledger.
 
 ## Each round
 
@@ -124,19 +124,15 @@ is an entry `kind`:
 **4. Persist, then restate the whole ledger.** Write the round's entries in one `add` call:
 
 ```json
-{"request": {"action": "add", "investigation_id": "ID", "payload": {"request": {"round": 1}, "entries": [
+{"investigation_id": "ID", "round": 1, "entries": [
   {"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout"},
   {"kind": "open", "text": "... rests on ...", "cite": "CHANGELOG 3.x", "source": "web-scout"},
   {"kind": "known", "text": "...", "cite": "https://...#backoff", "source": "web-scout", "supersedes": [4]},
   {"kind": "next", "text": "<exact question>", "source": "code-scout"}
-]}}}
+]}
 ```
 
-Then call `mcp__plugin_mightymodels_state__investigation` with action `render`:
-
-```json
-{"request": {"action": "render", "investigation_id": "ID"}}
-```
+Then call `investigation_render` with the `investigation_id`.
 
 An answered Open question is retired by the entry that answers it (`supersedes`, naming an
 entry from an earlier call), never edited. Paste the `render` output into chat as the
@@ -192,8 +188,9 @@ Rules that keep the ledger honest:
 
 - A Known has a citation or it is not a Known. "The retry wrapper is applied everywhere" with
   no line goes in Open.
-- A Decision carries the user's word from a gate or a framing dialog. Your own conclusion,
-  however well cited, is a Known or an Open item until the user takes it.
+- A Decision carries the user's word from a gate or a framing dialog, and the recorder hook
+  writes it when the user answers an `AskUserQuestion`; you never add one. Your own conclusion,
+  however well cited, is a Known or an Open item until the user takes it through a dialog.
 - Resources record where facts came from so open-ticket can name them in the issue and the
   next session does not re-find them. A fetched docs page goes here with the version it
   describes; a docs page for the wrong version is a Resource with a warning, not a Known.
@@ -224,7 +221,7 @@ the database keeps it for a later session.
 ## Boundaries
 
 Read-only apart from the ledger rows: no other writes, no edits, no commands beyond
-the `investigation` tool and the single read-only command a scout runs. If the investigation surfaces something needing immediate
+the `investigation_*` tools and the single read-only command a scout runs. If the investigation surfaces something needing immediate
 action (a live secret, a data-loss path in production), say so plainly and let the user act;
 the pipeline is for work, not for emergencies.
 

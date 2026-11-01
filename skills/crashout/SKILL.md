@@ -7,7 +7,9 @@ when_to_use: >-
 argument-hint: "[rant | journal]"
 disable-model-invocation: true
 allowed-tools:
-  - mcp__plugin_mightymodels_state__crashout
+  - mcp__plugin_mightymodels_mighty-mcp__crashout_add
+  - mcp__plugin_mightymodels_mighty-mcp__crashout_last
+  - mcp__plugin_mightymodels_mighty-mcp__crashout_stats
 ---
 
 # crashout
@@ -58,13 +60,7 @@ before you have read the last one.
 
 Before diagnosing, look at whether this has happened before:
 
-Call `mcp__plugin_mightymodels_state__crashout` with action `stats`:
-
-```json
-{"request": {"action": "stats"}}
-```
-
-It prints the journal's patterns: the entry count, severity and verdict counts, how often you
+Call `crashout_stats`, which takes no arguments. It prints the journal's patterns: the entry count, severity and verdict counts, how often you
 barked back, the first and last times, every failure tagged with its day, verdict and
 severity, and the standing corrective actions, each once. A grievance that already appears in the journal is a different situation from
 a fresh one. It means a corrective action you previously committed to did not
@@ -105,12 +101,13 @@ either way the journal records a lie and the pattern data rots.
 ### 6. Journal it
 
 Append the entry before you respond, while the state is raw. Call
-`mcp__plugin_mightymodels_state__crashout` with action `add`; the tool validates the entry:
+`crashout_add`; the tool validates the entry. Its arguments are flat; `ticket` and `branch` are
+optional:
 
 ```json
-{"request": {"action": "add", "entry": {"severity": "crashout", "verdict": "deserved",
-  "rant": "...verbatim...", "failures": ["..."], "root_cause": "...",
-  "corrective_action": "...", "barked_back": false, "ticket": null, "branch": "feat/x"}}}
+{"severity": "crashout", "verdict": "deserved", "rant": "...verbatim...",
+ "failures": ["..."], "root_cause": "...", "corrective_action": "...",
+ "barked_back": false, "branch": "feat/x"}
 ```
 
 The tool stamps the time it received the entry and stores it as a row of the `crashouts`
@@ -233,13 +230,7 @@ Rules of the bark:
 On `/crashout journal`, read the journal and report the pattern, not the
 diary:
 
-Call `mcp__plugin_mightymodels_state__crashout` with action `stats`:
-
-```json
-{"request": {"action": "stats"}}
-```
-
-The tool prints the deterministic facts (the entry count, severity and verdict counts, the
+Call `crashout_stats`, which takes no arguments. The tool prints the deterministic facts (the entry count, severity and verdict counts, the
 barked-back ratio, the first and last times, every failure with its day, verdict and
 severity, the standing corrective actions each once; two actions that differ only in
 whitespace count as one). Your job is the interpretation, and grouping by meaning is yours.
@@ -251,13 +242,7 @@ Present, compactly:
 - the standing corrective actions currently in force
 - the most recent entry, briefly
 
-For the most recent entry, call `mcp__plugin_mightymodels_state__crashout` with action `last`:
-
-```json
-{"request": {"action": "last"}}
-```
-
-It prints the entry one line per field, the rant and the failures indented under their names.
+For the most recent entry, call `crashout_last`, which takes no arguments. It prints the entry one line per field, the rant and the failures indented under their names.
 
 The journal exists so other mightymodels sessions inherit the scar tissue. If a
 theme recurs three or more times, say so plainly and elevate it: that is no
