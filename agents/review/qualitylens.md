@@ -29,7 +29,7 @@ Five tool calls is the budget. Small changes should need one or two analyses; sp
 
 1. Check the dispatch (no tool). Confirm it carries a target and a history window. If either is missing, return `UNKNOWN-BLOCKED` naming what is absent.
 2. Confirm the target paths exist (tool: `Read`, `Grep` or `Glob`). If a signals tool is not among your tools or fails, return `UNKNOWN-BLOCKED` with the error line.
-3. Call `signals_code_churn` for the target (tool: `signals_code_churn`).
+3. Call `signals_code_churn` for the target (tool: `signals_code_churn`), passing the caller's history window and target.
 4. Call `signals_change_coupling` only when the churn output shows several target files changing in the same commits, or the dispatch asks about hidden relationships. Hidden co-change is the only thing it adds.
 5. Call `signals_code_hotspots` only when the dispatch asks for broader context.
 6. Compose the report from the tool output and run the checks in the verification section.
