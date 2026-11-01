@@ -87,6 +87,12 @@ class RetiredCommandError(StateError):
         )
 
 
+class RetiredPickError(StateError):
+    def __init__(self, *, retired: Sequence[str]) -> None:
+        self.retired = tuple(retired)
+        super().__init__(f'retired, not run: {list(retired)}; pick live ids or leave ids out')
+
+
 class AlreadyRetiredError(StateError):
     def __init__(self, *, command_key: str) -> None:
         self.command_key = command_key

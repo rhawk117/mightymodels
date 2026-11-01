@@ -174,7 +174,7 @@ class TestContractApprove:
         )
 
         assert (view['text'], view['passing']) == (
-            'not approved: the user chose to decline; revise the commands, then call again\n',
+            'not approved: the user declined these commands; revise them, then call again\n',
             False,
         )
         assert await harness.status_rows() == ['no matching commands']

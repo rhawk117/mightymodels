@@ -117,7 +117,7 @@ class TestContractRetire:
         view = view_of(await harness.retire(FormAnswerer(answer='decline')))
 
         assert (view['text'], view['passing']) == (
-            'not approved: the user chose to decline; revise the commands, then call again\n',
+            'not retired: the user declined; the command stays live\n',
             False,
         )
         assert retirements_of(server_harness) == [('I1', None, None), ('I2', None, None)]

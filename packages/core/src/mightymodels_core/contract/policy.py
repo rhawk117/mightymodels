@@ -19,6 +19,7 @@ from mightymodels_core.contract.errors import (
     MissingApprovalError,
     NoContractError,
     RetiredCommandError,
+    RetiredPickError,
     UnknownCommandError,
 )
 
@@ -147,30 +148,47 @@ class PickPolicy:
     asked: Sequence[str] | None
 
     @property
-    def held_by_key(self) -> Mapping[str, RecordedCommand]:
-        return {command.key: command for command in self.held}
+    def live_by_key(self) -> Mapping[str, RecordedCommand]:
+        return {command.key: command for command in live_commands(self.held)}
+
+    @property
+    def retired_keys(self) -> set[str]:
+        return {command.key for command in self.held if command.retirement is not None}
 
     @property
     def picked_keys(self) -> list[str]:
         if self.asked is None:
-            return list(self.held_by_key)
+            return list(self.live_by_key)
 
         return list(self.asked)
 
     @property
+    def retired_asked(self) -> list[str]:
+        return [key for key in self.picked_keys if key in self.retired_keys]
+
+    @property
     def unknown_keys(self) -> list[str]:
-        return [key for key in self.picked_keys if key not in self.held_by_key]
+        known = self.live_by_key.keys() | self.retired_keys
+        return [key for key in self.picked_keys if key not in known]
 
     @property
     def picked_commands(self) -> list[RecordedCommand]:
-        return [self.held_by_key[key] for key in self.picked_keys]
+        return [self.live_by_key[key] for key in self.picked_keys]
 
-    def get_pick_problem(self) -> NoContractError | UnknownCommandError | None:
+    def get_pick_problem(
+        self,
+    ) -> NoContractError | RetiredPickError | UnknownCommandError | None:
         if not self.held:
             return NoContractError(slug=self.slug)
 
+        if retired := self.retired_asked:
+            return RetiredPickError(retired=retired)
+
         if unknown := self.unknown_keys:
             return UnknownCommandError(unknown=unknown)
+
+        if not self.live_by_key:
+            return NoContractError(slug=self.slug)
 
         return None
 

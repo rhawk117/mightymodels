@@ -106,7 +106,7 @@ class ContractService:
     def pick(self, slug: Slug, asked: Sequence[str] | None) -> list[RecordedCommand]:
         ticket_id = self.tickets.staged_ticket(slug).id
         held = self.contracts.commands(ticket_id)
-        policy = PickPolicy(slug=slug, held=live_commands(held), asked=asked)
+        policy = PickPolicy(slug=slug, held=held, asked=asked)
         if problem := policy.get_pick_problem():
             raise problem
 

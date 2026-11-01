@@ -2,6 +2,7 @@
 
 import string
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -20,10 +21,12 @@ from mightymodels_core.contract import (
     PickPolicy,
     ReceiptAssessment,
     RecordedCommand,
+    RetiredPickError,
     UnknownCommandError,
     is_argv,
 )
 from mightymodels_core.contract.policy import is_landing_command
+from mightymodels_core.contract.records import Retirement
 from mightymodels_core.primitives import Slug
 
 from tests.core.contract.contract_builders import (
@@ -274,6 +277,18 @@ class TestPickPolicy:
 
         assert isinstance(problem, UnknownCommandError)
         assert problem.unknown == ('I10', 'I8')
+
+    def test_a_retired_id_asked_is_refused_as_retired(self) -> None:
+        retirement = Retirement(
+            by='planner', why='dropped', approval_source='fallback', at=datetime.now(tz=UTC)
+        )
+        retired = replace(recorded(FIRST_KEY), retirement=retirement)
+        held = (retired, recorded(SECOND_KEY))
+
+        problem = PickPolicy(slug=SLUG, held=held, asked=[FIRST_KEY, 'I10']).get_pick_problem()
+
+        assert isinstance(problem, RetiredPickError)
+        assert problem.retired == (FIRST_KEY,)
 
     def test_no_ids_picks_every_command_in_approval_order(self) -> None:
         policy = PickPolicy(slug=SLUG, held=self.held, asked=None)

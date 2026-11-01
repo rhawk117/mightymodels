@@ -52,7 +52,12 @@ from .use_cases import (
     show_contract_run,
     show_contract_status,
 )
-from .views import ContractRunView, ContractView, render_declined
+from .views import (
+    ContractRunView,
+    ContractView,
+    render_approval_declined,
+    render_retirement_declined,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -80,12 +85,19 @@ def describe_commands(request: ContractApproveRequest) -> str:
     return ''.join(f'\n{command.id}: {" ".join(command.argv)}' for command in request.commands)
 
 
-def create_approval_question(request: ContractApproveRequest) -> ChoiceQuestion:
+def approve_or_decline_question(title: str, description: str) -> ChoiceQuestion:
     return ChoiceQuestion(
         argument=APPROVAL_ARGUMENT,
-        title=f'{APPROVE_MESSAGE}{describe_commands(request)}',
-        description='Approve every command listed, or decline to revise them.',
+        title=title,
+        description=description,
         choices=(Choice(value=APPROVE, title='Approve'), Choice(value=DECLINE, title='Decline')),
+    )
+
+
+def create_approval_question(request: ContractApproveRequest) -> ChoiceQuestion:
+    return approve_or_decline_question(
+        f'{APPROVE_MESSAGE}{describe_commands(request)}',
+        'Approve every command listed, or decline to revise them.',
     )
 
 
@@ -95,11 +107,9 @@ def create_approval_round(request: ContractApproveRequest) -> ChoiceRound:
 
 
 def create_retire_question(request: ContractRetireRequest) -> ChoiceQuestion:
-    return ChoiceQuestion(
-        argument=APPROVAL_ARGUMENT,
-        title=f'{RETIRE_MESSAGE}\n{request.id}: {request.why}',
-        description='Approve retiring the command, or decline to keep it.',
-        choices=(Choice(value=APPROVE, title='Approve'), Choice(value=DECLINE, title='Decline')),
+    return approve_or_decline_question(
+        f'{RETIRE_MESSAGE}\n{request.id}: {request.why}',
+        'Approve retiring the command, or decline to keep it.',
     )
 
 
@@ -138,7 +148,7 @@ async def contract_approve(
         return ContractView(text=describe_unanswered(request), passing=False)
 
     if form.get(APPROVAL_ARGUMENT) == DECLINE:
-        return render_declined(DECLINE)
+        return render_approval_declined()
 
     commands = create_approved_commands(request, USER_APPROVER)
     async with open_tool_state(ctx) as state:
@@ -160,7 +170,7 @@ async def contract_retire(
         return ContractView(text=describe_unanswered_retirement(request), passing=False)
 
     if form is not None and form.get(APPROVAL_ARGUMENT) == DECLINE:
-        return render_declined(DECLINE)
+        return render_retirement_declined()
 
     async with open_tool_state(ctx) as state:
         return retire_contract(

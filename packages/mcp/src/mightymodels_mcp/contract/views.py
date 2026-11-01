@@ -80,8 +80,13 @@ def create_retired_view(key: str, retirement: Retirement) -> RetiredView:
     )
 
 
-def render_declined(choice: str) -> ContractView:
-    text = f'not approved: the user chose to {choice}; revise the commands, then call again\n'
+def render_approval_declined() -> ContractView:
+    text = 'not approved: the user declined these commands; revise them, then call again\n'
+    return ContractView(text=text, passing=False)
+
+
+def render_retirement_declined() -> ContractView:
+    text = 'not retired: the user declined; the command stays live\n'
     return ContractView(text=text, passing=False)
 
 

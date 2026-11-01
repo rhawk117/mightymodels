@@ -9,6 +9,7 @@ from mightymodels_core.contract import (
     ChangedCommandError,
     ContractService,
     RetiredCommandError,
+    RetiredPickError,
     RetireRequest,
     SqliteContractRepository,
     UnknownCommandError,
@@ -115,8 +116,12 @@ class TestRetire:
     def test_pick_by_name_refuses_the_retired_command(self, approved: RetireHarness) -> None:
         approved.service.retire(SLUG, create_request(FIRST_KEY))
 
-        with pytest.raises(UnknownCommandError):
+        with pytest.raises(RetiredPickError) as raised:
             approved.service.pick(SLUG, [FIRST_KEY])
+
+        assert str(raised.value) == (
+            f"retired, not run: ['{FIRST_KEY}']; pick live ids or leave ids out"
+        )
 
     def test_the_row_and_its_receipts_survive(self, approved: RetireHarness) -> None:
         approved.service.record(SLUG, [create_receipt(FIRST_KEY)])
