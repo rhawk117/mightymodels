@@ -45,9 +45,9 @@ if TYPE_CHECKING:
 
 EDIT_TOOLS = frozenset({'Edit', 'Write'})
 BASH_TOOL = 'Bash'
-CONTRACT_RUN_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_run'
-CONTRACT_APPROVE_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_approve'
-CONTRACT_RETIRE_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_retire'
+CONTRACT_RUN_TOOL = 'mcp__plugin_mightymodels_mighty-mcp__contract_run'
+CONTRACT_APPROVE_TOOL = 'mcp__plugin_mightymodels_mighty-mcp__contract_approve'
+CONTRACT_RETIRE_TOOL = 'mcp__plugin_mightymodels_mighty-mcp__contract_retire'
 PRIMARY_ONLY_TOOLS = frozenset({CONTRACT_RUN_TOOL, CONTRACT_APPROVE_TOOL, CONTRACT_RETIRE_TOOL})
 CONTRACT_PRIMARY_ONLY = (
     'mightymodels: only the primary runs, approves and retires contract commands, so this '

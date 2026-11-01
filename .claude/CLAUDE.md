@@ -2,7 +2,7 @@
 
 ## Commands
 
-Every command goes through `make`. Each target delegates to uv or to `scripts/quality.sh`, which contains the format, lint and test steps.
+Every command goes through `make`. Each target delegates to uv or to a script under `scripts/`.
 
 - `make setup` installs the pre-commit git hook and syncs every workspace package and dependency group. A fresh clone has no git hook, so run it before the first commit.
 - `make sync` syncs the workspace packages and dependency groups.
@@ -13,6 +13,7 @@ Every command goes through `make`. Each target delegates to uv or to `scripts/qu
 - `make test.end-to-end` runs `pytest -q -m e2e`.
 - `make pre-commit` runs every pre-commit hook on all files, including the hygiene fixers and uv-lock.
 - `make check` runs lint, then test.
+- `make quality` runs pre-commit on all files, then `pytest -q -m "not integration"`, which matches CI's quality job.
 
 ## Stack
 
@@ -21,7 +22,7 @@ Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. 
 ## Layout
 
 - The plugin sits at the repository root, and `.claude-plugin/plugin.json` contains its manifest. The root `pyproject.toml` is both the plugin project and the uv workspace root, with members under `packages/`.
-- `packages/hooks` is a stub. The hook code that runs today is `.claude/hooks/pyhooks.py`, a PEP 723 script that `.claude/settings.json` wires to Write, Edit and Read. ty does not check it, because `ty.toml` includes only `packages` and `tests`.
+- `packages/hooks` holds the plugin's hook code (`mightymodels_hooks`), which `hooks/hooks.json` runs through the shell wrappers in `hooks/`. `.claude/hooks/pyhooks.py` is the project's own hook script, a PEP 723 script that `.claude/settings.json` wires to Write, Edit and Read. ty does not check it, because `ty.toml` includes only `packages` and `tests`.
 - `packages/mcp` also holds the `review_metrics` and `review_signals` tool domains, which carry the review commands that the removed command line used to run.
 - Read `.claude/rules/python.md` before writing Python and `.claude/rules/testing.md` before writing tests. Both load on their own when you touch a matching file.
 

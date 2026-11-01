@@ -22,10 +22,10 @@ setup: ## Setup Developer Environment
 sync: ## Sync all workspace packages and dependency groups
 	$(UV) sync --all-packages --all-groups
 
-format: ## Run the quality script's formatters
+format: ## Run the formatters
 	bash ./scripts/format.sh
 
-lint: ## Run the quality script's linters
+lint: ## Run the linters
 	bash ./scripts/lint.sh
 
 test: ## Run the unit, agents and smoke tests
@@ -34,8 +34,9 @@ test: ## Run the unit, agents and smoke tests
 test.end-to-end: ## Run the end-to-end tests
 	$(UV) run pytest -q -m e2e
 
-quality: ## Run the full quality script
-	./scripts/quality.sh
+quality: ## Run pre-commit on all files, then the tests CI runs
+	$(UV) run pre-commit run --all-files
+	$(UV) run pytest -q -m "not integration"
 
 pre-commit: ## Run pre-commit on all files
 	$(UV) run pre-commit run --all-files

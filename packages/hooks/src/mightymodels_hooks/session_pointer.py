@@ -1,4 +1,4 @@
-"""The `session-pointer` subcommand, which the PostToolUse hook runs on the workflow_state tools.
+"""The `session-pointer` subcommand, which the PostToolUse hook runs on the mighty-mcp tools.
 
 A call to a tool that names a ticket (`slug`, or `ticket` on `crashout_add`) or an investigation
 (`investigation_id`) points the calling session at it, through core's session pointer repository,

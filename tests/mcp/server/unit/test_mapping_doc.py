@@ -57,7 +57,7 @@ def register(name: str) -> RegisteredTool:
 
 
 class TestMappingDoc:
-    document = Path(__file__).resolve().parents[4] / 'docs' / 'workflow-state-tools.md'
+    document = Path(__file__).resolve().parents[4] / 'docs' / 'mighty-mcp-tools.md'
     row_count = 39
 
     @pytest.fixture

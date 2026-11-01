@@ -59,7 +59,7 @@ class TestContractRunDenial:
 
     async def test_another_mcp_tool_from_a_subagent_passes(self) -> None:
         payload = PreToolUsePayload(
-            tool_name='mcp__plugin_mightymodels_workflow_state__task_start',
+            tool_name='mcp__plugin_mightymodels_mighty-mcp__task_start',
             tool_input={},
             agent_id='agent-1',
         )
@@ -102,10 +102,10 @@ class TestHookMatcher:
             'Read',
             'Grep',
             'Editor',
-            'mcp__plugin_mightymodels_workflow_state__task_start',
+            'mcp__plugin_mightymodels_mighty-mcp__task_start',
             f'{CONTRACT_RUN_TOOL}_extra',
             CONTRACT_RUN_TOOL.removeprefix('mcp__'),
         ],
     )
     def test_it_ignores_every_other_tool(self, tool: str) -> None:
-        assert re.fullmatch(self.matcher(), tool) is None
+        assert re.search(self.matcher(), tool) is None

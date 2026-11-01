@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from mightymodels_core.session_pointers import SessionPointer
 
 SESSION_ID = 'session-1'
-SERVER_PREFIX = 'mcp__plugin_mightymodels_workflow_state__'
+SERVER_PREFIX = 'mcp__plugin_mightymodels_mighty-mcp__'
 
 
 def pointer_payload(tool: str, tool_input: object, **given: object) -> PostToolUsePayload:

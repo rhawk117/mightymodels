@@ -14,7 +14,7 @@ fi
 
 compact=$(printf '%s' "${input}" | tr -d '[:space:]')
 case ${compact} in
-  *'"tool_name":"mcp__plugin_mightymodels_workflow_state__contract_run"'*'"agent_id":'* | *'"agent_id":'*'"tool_name":"mcp__plugin_mightymodels_workflow_state__contract_run"'*)
+  *'"tool_name":"mcp__plugin_mightymodels_mighty-mcp__contract_run"'*'"agent_id":'* | *'"agent_id":'*'"tool_name":"mcp__plugin_mightymodels_mighty-mcp__contract_run"'*)
     printf '%s\n' 'mightymodels: the main-thread hook could not run, so this subagent contract_run call is refused' >&2
     exit 2
     ;;

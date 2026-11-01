@@ -52,8 +52,8 @@ class TestCreateServer:
     def server(self, dependencies: ServerDependencies) -> MCPServer[ServerDependencies]:
         return create_server(dependencies, ToolCatalog())
 
-    def test_name_is_workflow_state(self, server: MCPServer[ServerDependencies]) -> None:
-        assert server.name == 'workflow_state'
+    def test_name_is_mighty_mcp(self, server: MCPServer[ServerDependencies]) -> None:
+        assert server.name == 'mighty-mcp'
 
     def test_icon_is_the_server_icon(self, server: MCPServer[ServerDependencies]) -> None:
         assert server.icons == [load_icon('server')]

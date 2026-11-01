@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 
 POINTER_TOOLS = create_pointer_fields().tool_names
 MAIN_THREAD_MATCHER = (
-    f'Edit|Write|Bash|{CONTRACT_RUN_TOOL}|{CONTRACT_APPROVE_TOOL}|{CONTRACT_RETIRE_TOOL}'
+    f'^(Edit|Write|Bash|{CONTRACT_RUN_TOOL}|{CONTRACT_APPROVE_TOOL}|{CONTRACT_RETIRE_TOOL})$'
 )
-POINTER_MATCHER = '^mcp__plugin_mightymodels_workflow_state__(' + '|'.join(POINTER_TOOLS) + ')$'
+POINTER_MATCHER = '^mcp__plugin_mightymodels_mighty-mcp__(' + '|'.join(POINTER_TOOLS) + ')$'
 EXPECTED = [
     ('SessionStart', None, 'hook.sh', 'session-start'),
     ('PreToolUse', 'Agent', 'dispatch-hook.sh', None),

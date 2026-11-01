@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "workflow_state": {
+    "mighty-mcp": {
       "command": "uv",
       "args": ["run", "--locked", "--no-dev", "--package", "mightymodels-mcp", "mightymodels-mcp"],
       "env": {
