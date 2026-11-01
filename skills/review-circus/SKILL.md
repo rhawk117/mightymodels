@@ -145,19 +145,18 @@ the gate again and call `review_dispose` for them again before any remediation c
 
 Always, when any finding exists. Show the user the `review_gate` answer: findings
 by severity, security first, then by persona weight, with sources, location, any severity
-conflict, and the decision so far. Then take the findings one at a time, in gate order. For each
-`Fn`, call `review_dispose` with
-`finding` and no `decisions`; the tool asks the user what to do with that finding and records the answer. Two of
-the choices need a reason, which the tool asks with the choice. A severity conflict is settled
-here by the decision the user makes about it:
+conflict, and the decision so far. Then call `review_dispose` with the `run_id` and no `decisions`. The tool
+asks the user which of up to ten undecided findings to fix, then a reason for each one left
+unchecked, and records the answers. A severity conflict is settled here by the decision the user
+makes about it. Call again while the answer shows findings still undecided:
 
 ```json
-{"run_id": "20261005-103000", "by": "user", "finding": "F1"}
+{"run_id": "20261005-103000"}
 ```
 
 The answer says which findings are still undecided. An answer starting `needs input` means no one
 could be asked through the tool: put the question it names to the user in one `AskUserQuestion`
-dialog, then call again with `decisions` for that finding (several findings may go in one call):
+dialog, then call again with `decisions` (several findings may go in one call):
 
 ```json
 {"run_id": "20261005-103000", "by": "user", "decisions": {"F1": {"decision": "fix"}, "F2": {"decision": "accept-risk", "reason": "..."}}}
