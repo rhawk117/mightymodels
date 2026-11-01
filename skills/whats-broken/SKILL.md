@@ -7,6 +7,7 @@ when_to_use: >-
 argument-hint: "[failing check, test or symptom]"
 allowed-tools:
   - mcp__plugin_mightymodels_mighty-mcp__contract_approve
+  - mcp__plugin_mightymodels_mighty-mcp__contract_run
   - mcp__plugin_mightymodels_mighty-mcp__task_start
 ---
 
