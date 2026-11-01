@@ -1,6 +1,6 @@
 # mighty-mcp tools
 
-This page maps each call of the old `state` server to its tool on the new `mighty-mcp` server. The skills-and-agents port uses it to rewrite the old calls mechanically. Porting the skills and agents is not part of this change.
+This page maps each call of the old `state` server to its tool on the new `mighty-mcp` server. The skills-and-agents port used it to rewrite the old calls mechanically, and that port is done.
 
 The old server key was `state`, so its tools were named `mcp__plugin_mightymodels_state__<tool>`. Each took one argument, `{"request": {"action": ..., ...}}`, and the action chose the operation. The new server key is `mighty-mcp` (`mcp-servers/mighty-mcp.json`), so by the same naming rule each tool is named `mcp__plugin_mightymodels_mighty-mcp__<tool>`. It takes its fields as flat arguments, with no `request` wrapper and no `action`.
 
@@ -101,7 +101,7 @@ The per-file table comes from the same pattern with `rg --no-config -uu -c` over
 ## The AskUserQuestion recorder and the session pointer
 
 The recorder, a PostToolUse hook on `AskUserQuestion`, is the only Decision record for
-AskUserQuestion answers. The skills port must drop the skills' own gate-Decision writes, because
+AskUserQuestion answers. The ported skills carry no gate-Decision writes of their own, because
 a skill that also writes one records the same answer twice.
 
 The session pointer tells the recorder which ticket or investigation a session works on. A

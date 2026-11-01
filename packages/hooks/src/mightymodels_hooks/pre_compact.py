@@ -1,10 +1,11 @@
 """The `pre-compact` subcommand, which the PreCompact hook runs.
 
 A compaction drops the conversation, so before it runs the hook writes the snapshot of the one
-ticket, not closed, whose branch is checked out: the same record and Markdown the `snapshot` tool
-serves, to the ticket's `handoffs/snapshot.json` and `handoffs/snapshot.md`, for the next turn to
-resume from. It reads the state database and git and writes those two files. A detached HEAD, a
-branch no open ticket names and a branch two open tickets name leave everything as it was.
+ticket, not closed, whose branch is checked out: the same record and Markdown the
+`snapshot_take` tool serves, to the ticket's `handoffs/snapshot.json` and
+`handoffs/snapshot.md`, for the next turn to resume from. It reads the state database and git
+and writes those two files. A detached HEAD, a branch no open ticket names and a branch two open
+tickets name leave everything as it was.
 
 The hook never blocks a compaction and prints nothing on standard output. No data directory, no git
 work tree, an unreadable database or an unwritable handoffs directory is said on standard error,

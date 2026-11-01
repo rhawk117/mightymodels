@@ -54,7 +54,7 @@ NO_STARTED_TASK = 'no task is started for the intern on the ticket whose branch 
 STARTED_UNREADABLE = 'the started task could not be read ({error})'
 NO_TASK_IN_PROGRESS = (
     '{target} was refused: ticket {slug}, whose branch is checked out, has no task in progress. '
-    'Start the task with the `task` tool (action `start`, `by` naming this worker), then dispatch '
+    'Start the task with the `task_start` tool (`by` naming this worker), then dispatch '
     'again.'
 )
 TICKETS_UNREADABLE = (
@@ -71,8 +71,8 @@ BLOCK_GOES_TO_THE_OWNER_FIRST = (
     '{target} was held for the owner: ticket {slug}, whose branch is checked out, has a task a '
     'block stopped ({blocks}), and its `auto-escalate` is off. Approve this dispatch to '
     'escalate, or decline it and say what to do about the block. `auto-escalate: true` under '
-    '`handoff-context` in ticket.yml, validated with the `ticket` tool, lets an escalation '
-    'through without this question.'
+    '`handoff-context` in ticket.yml, validated with the `ticket_validate` tool, lets '
+    'an escalation through without this question.'
 )
 
 
