@@ -77,7 +77,7 @@ Some tasks do not cut: one rename across thirty files is one change. Say so in t
 and offer the task whole; the user decides, not the bound.
 
 **3. Give the pieces ids.** The next free `T` ids of the task list, in dependency order. The
-original's id is never reused, because its history stays under it. Task ids are plain T numbers (`T7`), never dotted or lettered. A criterion that is a command keeps its argv: the piece's engineer runs it in sandboxed Bash and cites the output in `task_verify`, so it needs no contract id. Each task that named the original in `depends-on` will name the piece that carries what it waited for.
+original's id is never reused, because its history stays under it. A criterion that is a command keeps its argv: the piece's engineer runs it in sandboxed Bash and cites the output in `task_verify`, so it needs no contract id. Each task that named the original in `depends-on` will name the piece that carries what it waited for.
 
 **4. Ask the user once.** Write the pieces out in full in your message, then open one
 `AskUserQuestion` dialog about them. Each piece shows its id, its intent, its acceptance and its
@@ -104,7 +104,7 @@ The dialog has one question with these options:
 
 **Split as shown.** In this order, so that a session cut off halfway still has a true record:
 
-1. Supersede the original with `task_mark`, `to` `superseded` and a `reason` naming the pieces (such as "split into T7, T8 and T9"). The tool takes this for a task `task_start` refused, which never started, as it does for one a worker returned.
+1. Supersede the original with `task_mark`, `to` `superseded` and a `reason` naming the pieces (such as "split into T7, T8 and T9").
 2. Update the task list where it lives (`plan.md`, or the issue's task list as one-shot wrote
    it). Under the original's heading leave one line, `superseded: split into T7, T8, T9`, in place
    of its acceptance and verify. Add the pieces in dependency order, and repoint each `depends-on`
@@ -116,7 +116,7 @@ The dialog has one question with these options:
 
 **Keep it as one task.** Split nothing and change nothing in the task list. A task a worker
 returned as `too-large` is still in progress, and `task_start` does not take one: mark it `blocked`
-with that reason first (`task_mark`). Then agents-assemble calls `task_start` with the call it refused and one more field, `too_large_approved_by` set to `user`, which the tool accepts only as that value.
+with that reason first (`task_mark`). Then agents-assemble calls `task_start` with the call it refused and one more field, `too_large_approved_by` set to `user`.
 
 This answer is the only thing that permits that field. It is never added because a refusal was in
 the way, and never on a different task than the one the user was shown.

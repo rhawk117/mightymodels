@@ -132,7 +132,7 @@ Push, then gitty-up re-watches.
   is `blocked`), then the owner's question unless `auto-escalate` is on, as agents-assemble step 6
   has it, and **architect** once (`task_start` with `by` `architect`, the architect
   template with the trigger and the failing tail). The architect also failing goes to
-  **whats-broken**; the task tools refuse a second architect implementation pass on its own. whats-broken's own stop rules end at the user,
+  **whats-broken**; whats-broken's own stop rules end at the user,
   with every attempt's evidence.
 
 After a compaction, `task_show` and `contract_status` (each with `slug`) and `gh pr view`
