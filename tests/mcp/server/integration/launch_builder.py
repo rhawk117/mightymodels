@@ -6,6 +6,8 @@ from mcp.client.stdio import StdioServerParameters
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from tests.mcp.server.server_harness import ServerHarness
 
 CHECKOUT = Path(__file__).resolve().parents[4]
@@ -36,7 +38,11 @@ def load_declared_servers() -> dict[str, DeclaredServer]:
 
 
 def create_launch_parameters(
-    *, declared: DeclaredServer, server_harness: ServerHarness, environment_directory: Path
+    *,
+    declared: DeclaredServer,
+    server_harness: ServerHarness,
+    environment_directory: Path,
+    extra_environ: Mapping[str, str] | None = None,
 ) -> StdioServerParameters:
     inherited = {
         name: os.environ[name] for name in ('PATH', 'HOME', CACHE_VARIABLE) if name in os.environ
@@ -45,6 +51,7 @@ def create_launch_parameters(
         **inherited,
         **{name: expand(value) for name, value in declared.env.items()},
         **server_harness.environ,
+        **(extra_environ or {}),
         ENVIRONMENT_VARIABLE: str(environment_directory),
     }
     return StdioServerParameters(

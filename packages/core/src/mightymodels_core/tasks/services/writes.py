@@ -11,7 +11,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import redact, redact_within
-from mightymodels_core.tasks.errors import TaskMovedError, TransitionError, UnknownTaskError
+from mightymodels_core.tasks.errors import (
+    NotPlanTaskError,
+    TaskMovedError,
+    TransitionError,
+    UndeclaredPlanTaskError,
+    UnknownTaskError,
+)
 from mightymodels_core.tasks.gates import (
     Evidence,
     VerificationGate,
@@ -28,10 +34,9 @@ from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
 from mightymodels_core.tickets import open_ticket_of
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
     from datetime import datetime
 
-    from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
     from mightymodels_core.tasks.gates import Brief, GitFacts
     from mightymodels_core.tasks.records import TaskRecord
@@ -126,13 +131,16 @@ class TaskService:
     tickets: TicketRepository
     tasks: TaskRepository
     attempts: AttemptRepository
-    contracts: ContractRepository
     clock: Clock
     options: TaskOptions = field(default_factory=TaskOptions)
 
     def start(self, slug: Slug, request: StartRequest) -> TaskRecord:
         ticket = open_ticket_of(self.tickets, slug)
         ticket_id = ticket.id
+        task_key = request.task_key
+        if is_plan_task(task_key) and self.tasks.task(ticket_id, task_key) is None:
+            raise UndeclaredPlanTaskError(task_key=task_key)
+
         policy = self.start_policy_for(ticket_id, request)
         if problem := policy.get_start_problem():
             raise problem
@@ -147,6 +155,17 @@ class TaskService:
             ticket_id, start_transition(policy, request, self.clock.now()), attempt
         )
         return self.task_held(ticket_id, request.task_key)
+
+    def declare(self, slug: Slug, task_keys: Sequence[TaskId]) -> list[TaskRecord]:
+        ticket = open_ticket_of(self.tickets, slug)
+        ticket_id = ticket.id
+        for task_key in task_keys:
+            if not is_plan_task(task_key):
+                raise NotPlanTaskError(task_key=task_key)
+
+        self.tickets.mark_in_progress(ticket)
+        self.tasks.declare(ticket_id, sorted(set(task_keys)), self.clock.now())
+        return self.tasks.tasks(ticket_id)
 
     def prepare_verification(self, slug: Slug, task_key: TaskId) -> TaskRecord:
         ticket_id = open_ticket_of(self.tickets, slug).id
@@ -174,25 +193,18 @@ class TaskService:
 
         self.check_verifiable(current)
         gate = VerificationGate(
-            task=current, evidence=self.evidence_for(ticket_id, current, request), git=request.git
+            task=current, evidence=self.evidence_for(current, request), git=request.git
         )
         transition = verification_transition(gate, self.clock.now())
         self.tickets.mark_in_progress(ticket)
         self.tasks.record_verification(ticket_id, transition, request.commit)
         return self.task_held(ticket_id, task_key)
 
-    def evidence_for(self, ticket_id: int, task: TaskRecord, request: VerifyRequest) -> Evidence:
-        own = [
-            command
-            for command in self.contracts.commands(ticket_id)
-            if command.task_key == task.key
-        ]
+    def evidence_for(self, task: TaskRecord, request: VerifyRequest) -> Evidence:
         return Evidence(
             commit=request.commit,
             brief=request.brief if is_plan_task(task.key) else None,
             assertions=request.assertions,
-            commands=own,
-            receipts=self.contracts.latest_receipts(ticket_id),
         )
 
     def mark(self, slug: Slug, request: MarkRequest) -> TaskRecord:

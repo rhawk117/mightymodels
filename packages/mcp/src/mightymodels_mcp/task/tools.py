@@ -9,12 +9,13 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.workspace import workspace_at
 
-from mightymodels_mcp.server.annotations import MARKS, READS, WRITES
+from mightymodels_mcp.server.annotations import MARKS, READS, REFRESHES, WRITES
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
 from .gate_facts import VerificationSources, gather_verification
 from .schemas import (
     FailedFixRequest,
+    TaskDeclareRequest,
     TaskMarkRequest,
     TaskRequest,
     TaskStartRequest,
@@ -23,6 +24,7 @@ from .schemas import (
 from .use_cases import (
     check_ready,
     create_task_work,
+    declare_tasks,
     mark_task,
     prepare_verification,
     record_failed_fix,
@@ -36,10 +38,20 @@ if TYPE_CHECKING:
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
 
 
+async def task_declare(request: TaskDeclareRequest, ctx: ToolContext) -> TaskView:
+    """Record the plan's tasks as pending. Use once the plan is approved, before the first
+    task_start. A task already recorded is left unchanged. Only plan tasks, T and a number, are
+    accepted. The next step is task_start for each task.
+    """
+    async with open_tool_state(ctx) as state:
+        return declare_tasks(create_task_work(state), request)
+
+
 async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
     """Start a task for a worker on the files it owns. Use just before dispatching that worker, so
     its owned files and acceptance criteria are on record. Refused if the task is too large
-    unless the user approved it.
+    unless the user approved it. A plan task never declared is refused; declare it with
+    task_declare first.
     """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
@@ -47,9 +59,9 @@ async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
 
 
 async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> TaskView:
-    """Verify a task against the reported commit, its contract receipts and its brief. Use when a
-    worker reports done, before the task closes. To record a failure or block instead, use
-    task_mark.
+    """Verify a task against the reported commit, its brief's citations and its owned
+    files. Use when a worker reports done, before the task closes. To record a failure or block
+    instead, use task_mark.
     """
     async with open_tool_state(ctx) as state:
         work = create_task_work(state)
@@ -96,6 +108,15 @@ async def failed_fix_record(request: FailedFixRequest, ctx: ToolContext) -> Task
 
 
 TASK_TOOLS = (
+    ToolSpec(
+        name='task_declare',
+        title='Declare the plan tasks',
+        annotations=REFRESHES,
+        icon='task',
+        request_model=TaskDeclareRequest,
+        result_model=TaskView,
+        handler=task_declare,
+    ),
     ToolSpec(
         name='task_start',
         title='Start a task',

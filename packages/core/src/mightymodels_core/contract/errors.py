@@ -32,8 +32,8 @@ class InvalidCommandKeyError(StateError):
         self.command_key = command_key
         self.limit = limit
         super().__init__(
-            f'{command_key!r} is not a command id: letters, digits, dots, dashes and underscores '
-            f'only, at most {limit} characters'
+            f'{command_key!r} is not a command id: an id is I or L followed by digits, '
+            f'at most {limit} characters'
         )
 
 
@@ -77,3 +77,32 @@ class UnknownCommandError(StateError):
     def __init__(self, *, unknown: Sequence[str]) -> None:
         self.unknown = tuple(unknown)
         super().__init__(f'not in the contract: {list(unknown)}; approve them with contract first')
+
+
+class RetiredCommandError(StateError):
+    def __init__(self, *, command_key: str) -> None:
+        self.command_key = command_key
+        super().__init__(
+            f'{command_key} is retired and cannot be approved again; approve a new id instead'
+        )
+
+
+class RetiredPickError(StateError):
+    def __init__(self, *, retired: Sequence[str]) -> None:
+        self.retired = tuple(retired)
+        super().__init__(f'retired, not run: {list(retired)}; pick live ids or leave ids out')
+
+
+class AlreadyRetiredError(StateError):
+    def __init__(self, *, command_key: str) -> None:
+        self.command_key = command_key
+        super().__init__(f'{command_key} is already retired')
+
+
+class TrackedChangesError(StateError):
+    def __init__(self, *, paths: Sequence[str]) -> None:
+        self.paths = tuple(paths)
+        super().__init__(
+            f'tracked files have uncommitted changes: {list(paths)}; commit or stash them, '
+            'then rerun the contract'
+        )

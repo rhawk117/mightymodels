@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.tasks import MarkRequest
+from mightymodels_core.tasks.gates import NO_LANDING_COMMAND
 from mightymodels_core.tickets import NotStagedError
 
 from tests.core.tasks.service_builders import (
@@ -50,7 +51,7 @@ class TestReady:
     ) -> None:
         readiness = service_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
 
-        assert readiness.problems == ['no plan task has been started']
+        assert readiness.problems == ['no plan task has been started', NO_LANDING_COMMAND]
 
     def test_ready_is_clear_when_every_plan_task_is_proven_at_head(
         self, verified_harness: ServiceHarness
@@ -71,7 +72,7 @@ class TestReady:
 
         assert readiness.problems == [f'{COMMAND_KEY} has no receipt at the current HEAD']
 
-    def test_ready_skips_the_commands_of_a_superseded_task(
+    def test_ready_still_names_the_commands_of_a_superseded_task(
         self, contracted_harness: ServiceHarness
     ) -> None:
         contracted_harness.service.mark(
@@ -80,7 +81,7 @@ class TestReady:
 
         readiness = contracted_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
 
-        assert not any(COMMAND_KEY in problem for problem in readiness.problems)
+        assert any(COMMAND_KEY in problem for problem in readiness.problems)
 
     def test_ready_refuses_a_ticket_that_was_never_staged(
         self, service_harness: ServiceHarness

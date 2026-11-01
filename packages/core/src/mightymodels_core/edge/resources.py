@@ -1,10 +1,10 @@
 """What both edges do first: find the repository, name it, and open the database for it.
 
-The server's lifespan and `verify run` start in whatever directory the session did. `open_state`
+The server's lifespan and the hooks start in whatever directory the session did. `open_state`
 takes that directory and the plugin data directory the edge read from its environment, and hands
 out, for the length of an `async with` block, the checkout at the git toplevel, the git that
 answers there and the database opened beside the data directory's other files. The block's exit
-closes the database. So the two edges of one session open the same file.
+closes the database. So the two edges of one session, the server and the hooks, open the same file.
 
 Every refusal comes before anything is created: no data directory, no git executable, no work
 tree. A database file of another schema version is refused when it is opened, before

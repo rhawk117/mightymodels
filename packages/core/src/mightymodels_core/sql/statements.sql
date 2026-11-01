@@ -197,6 +197,11 @@ ON CONFLICT (ticket_id, task_key) DO UPDATE SET
   updated_at = excluded.updated_at
 RETURNING json_object('id', id);
 
+-- name: declare_task
+INSERT INTO tasks (ticket_id, task_key, status, owned, updated_at)
+VALUES (:ticket_id, :task_key, 'pending', '[]', :updated_at)
+ON CONFLICT (ticket_id, task_key) DO NOTHING;
+
 -- name: record_task_verification
 UPDATE tasks SET
   status = :status,
@@ -277,28 +282,41 @@ LIMIT :limit;
 
 -- name: approve_contract_command
 INSERT INTO contract_commands (
-  ticket_id, command_key, task_key, argv, expect_exit, timeout, approved_by, approved_at, head
+  ticket_id, command_key, argv, expect_exit, timeout, approved_by, approval_source,
+  approved_at, head
 )
 VALUES (
-  :ticket_id, :command_key, :task_key, :argv, :expect_exit, :timeout, :approved_by, :approved_at,
-  :head
+  :ticket_id, :command_key, :argv, :expect_exit, :timeout, :approved_by, :approval_source,
+  :approved_at, :head
 );
+
+-- name: retire_contract_command
+UPDATE contract_commands
+SET retired_by = :retired_by,
+    retired_why = :retired_why,
+    retired_approval_source = :retired_approval_source,
+    retired_at = :retired_at
+WHERE ticket_id = :ticket_id AND command_key = :command_key;
 
 -- name: contract_commands_of_ticket
 SELECT json_object(
   'id', id,
   'command_key', command_key,
-  'task_key', task_key,
   'argv', json(argv),
   'expect_exit', expect_exit,
   'timeout', timeout,
   'approved_by', approved_by,
+  'approval_source', approval_source,
   'approved_at', approved_at,
-  'head', head
+  'head', head,
+  'retired_by', retired_by,
+  'retired_why', retired_why,
+  'retired_approval_source', retired_approval_source,
+  'retired_at', retired_at
 )
 FROM contract_commands
 WHERE ticket_id = :ticket_id
-ORDER BY command_key
+ORDER BY id
 LIMIT :limit;
 
 -- name: record_receipt

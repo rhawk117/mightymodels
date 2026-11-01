@@ -51,7 +51,7 @@ INSERT INTO task_attempts (task_id, worker) VALUES (:task_id, 'engineer');
 
 -- name: add_command
 INSERT INTO contract_commands (ticket_id, command_key, argv, approved_by)
-VALUES (:ticket_id, 'T1.AC-1', '["true"]', 'user')
+VALUES (:ticket_id, 'I1', '["true"]', 'user')
 RETURNING json_object('id', id);
 
 -- name: add_receipt

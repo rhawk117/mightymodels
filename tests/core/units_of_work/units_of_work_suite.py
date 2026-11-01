@@ -233,8 +233,6 @@ class UnitsOfWorkContract(UnitsOfWorkFastPaths):
                 tasks = unit.tasks
 
                 assert unit_of(tasks.tasks) is unit_of(tasks.attempts)
-                assert tasks.contracts is unit.contracts.contracts
-                assert unit_of(tasks.contracts) is unit_of(tasks.tasks)
                 assert tasks.tickets is unit.contracts.tickets
                 assert unit_of(tasks.tickets) is unit_of(tasks.tasks)
 

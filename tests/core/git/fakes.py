@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from mightymodels_core.git.errors import GitUnavailableError
 from mightymodels_core.git.records import Checkout, UntrackedFiles
 from mightymodels_core.git.revisions import revision_error
-from mightymodels_core.process import CompletedRun
+from mightymodels_core.process import ChildSetting, CompletedRun
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, Sequence
@@ -143,7 +143,7 @@ class InMemoryGit:
 class RecordedRun:
     argv: tuple[str, ...]
     timeout: float
-    cwd: Path | None
+    setting: ChildSetting
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -156,8 +156,8 @@ class ScriptedRunner:
         argv: Sequence[str],
         *,
         timeout: float,  # noqa: ASYNC109  the ProcessRunner Protocol fixes this signature; the fake records the timeout, never enforces it
-        cwd: Path | None = None,
+        setting: ChildSetting = ChildSetting(),  # noqa: B008  a frozen value, shared safely
     ) -> RunOutcome:
-        recorded = RecordedRun(argv=tuple(argv), timeout=timeout, cwd=cwd)
+        recorded = RecordedRun(argv=tuple(argv), timeout=timeout, setting=setting)
         self.runs.append(recorded)
         return self.reply

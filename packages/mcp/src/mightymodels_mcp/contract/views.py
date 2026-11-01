@@ -7,8 +7,14 @@ from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from mightymodels_core.contract.policy import ReceiptAssessment
-    from mightymodels_core.contract.records import RecordedCommand
-    from mightymodels_core.contract.services import ApprovalResult, CommandStatus, ContractStatus
+    from mightymodels_core.contract.records import Receipt, RecordedCommand, Retirement
+    from mightymodels_core.contract.runs import RunResult
+    from mightymodels_core.contract.services import (
+        ApprovalResult,
+        CommandStatus,
+        ContractStatus,
+        RetireRequest,
+    )
 
 
 class CommandView(BaseModel):
@@ -19,12 +25,22 @@ class CommandView(BaseModel):
     state: str
 
 
+class RetiredView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    by: str
+    why: str
+    approval_source: str
+
+
 class ContractView(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     text: str
     passing: bool
     commands: tuple[CommandView, ...] = ()
+    retired: tuple[RetiredView, ...] = ()
 
 
 def render_state(command: RecordedCommand, assessment: ReceiptAssessment) -> str:
@@ -50,14 +66,90 @@ def render_approved(result: ApprovalResult) -> ContractView:
     return ContractView(text=text, passing=True)
 
 
-def render_declined(choice: str) -> ContractView:
-    text = f'not approved: the user chose to {choice}; revise the commands, then call again\n'
+def render_retired(request: RetireRequest) -> ContractView:
+    text = f'retired {request.key} ({request.approval_source}, by {request.by}): {request.why}\n'
+    return ContractView(text=text, passing=True)
+
+
+def create_retired_view(key: str, retirement: Retirement) -> RetiredView:
+    return RetiredView(
+        id=key,
+        by=retirement.by,
+        why=retirement.why,
+        approval_source=retirement.approval_source,
+    )
+
+
+def render_approval_declined() -> ContractView:
+    text = 'not approved: the user declined these commands; revise them, then call again\n'
+    return ContractView(text=text, passing=False)
+
+
+def render_retirement_declined() -> ContractView:
+    text = 'not retired: the user declined; the command stays live\n'
     return ContractView(text=text, passing=False)
 
 
 def render_status(status: ContractStatus) -> ContractView:
     views = tuple(map(create_command_view, status.commands))
-    rows = ''.join(f'{view.id} {view.state}\n' for view in views) or 'no matching commands\n'
+    retired = tuple(
+        create_retired_view(command.key, command.retirement) for command in status.retired
+    )
+    live = ''.join(f'{view.id} {view.state}\n' for view in views)
+    gone = ''.join(
+        f'{view.id} retired by {view.by} ({view.approval_source}): {view.why}\n' for view in retired
+    )
+    rows = live + gone or 'no matching commands\n'
     return ContractView(
-        text=f'HEAD {short_head(status.head)}\n{rows}', passing=status.is_passing, commands=views
+        text=f'HEAD {short_head(status.head)}\n{rows}',
+        passing=status.is_passing,
+        commands=views,
+        retired=retired,
+    )
+
+
+class RunReceiptView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    outcome: str
+    exit: int | None
+    duration_ms: int
+    head: str | None
+    stdout_tail: str
+    stderr_tail: str
+    approval_source: str
+
+
+class ContractRunView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    passing: bool
+    receipts: tuple[RunReceiptView, ...] = ()
+
+
+def create_run_receipt_view(receipt: Receipt, approval_source: str) -> RunReceiptView:
+    return RunReceiptView(
+        id=receipt.key,
+        outcome=receipt.outcome,
+        exit=receipt.exit,
+        duration_ms=receipt.duration_ms,
+        head=receipt.head,
+        stdout_tail=receipt.stdout_tail,
+        stderr_tail=receipt.stderr_tail,
+        approval_source=approval_source,
+    )
+
+
+def render_run_line(view: RunReceiptView) -> str:
+    return (
+        f'{view.id} {view.outcome} exit={view.exit} {view.duration_ms}ms ({view.approval_source})\n'
+    )
+
+
+def render_run(result: RunResult) -> ContractRunView:
+    views = tuple(create_run_receipt_view(run.receipt, run.approval_source) for run in result.runs)
+    return ContractRunView(
+        text=''.join(map(render_run_line, views)), passing=result.is_passing, receipts=views
     )

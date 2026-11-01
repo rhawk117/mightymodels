@@ -1,13 +1,11 @@
 """The task gates: what keeps a task from verified and a ticket from ready."""
 
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
 from hypothesis import example, given
 from hypothesis import strategies as st
-from mightymodels_core.contract.records import Receipt, RecordedCommand
 from mightymodels_core.primitives import TaskId, redact
 from mightymodels_core.tasks import (
     Brief,
@@ -20,36 +18,14 @@ from mightymodels_core.tasks import (
     get_readiness_problems,
     is_plan_task,
 )
-from mightymodels_core.tasks.gates import criterion_of_command
 
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
-    from mightymodels_core.schemas.contract import Outcome
     from mightymodels_core.schemas.tasks import TaskStatus
 
 HEAD = 'abc1234'
 BRIEF = '## ASKED\n  - AC-1: first\n  - AC-2: second\n## DONE\ncommit: abc1234\n'
 TASK = TaskId('T7')
-
-
-def create_command(key: str) -> RecordedCommand:
-    return RecordedCommand(key=key, task_key=TASK, argv=('true',), expect_exit=0, timeout=30)
-
-
-def create_receipt(key: str, *, outcome: Outcome = 'pass', head: str | None = HEAD) -> Receipt:
-    return Receipt(
-        key=key,
-        argv=('true',),
-        outcome=outcome,
-        exit=0,
-        duration_ms=1,
-        stdout_tail=redact(''),
-        stderr_tail=redact(''),
-        digest='d',
-        head=head,
-        phase='task',
-        at=datetime(2026, 1, 2, tzinfo=UTC),
-    )
 
 
 def create_record(key: str, status: TaskStatus, reasons: tuple[str, ...] = ()) -> TaskRecord:
@@ -72,9 +48,7 @@ class GateScenario:
         default_factory=lambda: Evidence(
             commit=HEAD,
             brief=Brief(text=BRIEF),
-            assertions={'AC-2': 'src/a.py:1'},
-            commands=[create_command('T7.AC-1')],
-            receipts={'T7.AC-1': create_receipt('T7.AC-1')},
+            assertions={'AC-1': 'src/a.py:1', 'AC-2': 'src/a.py:2'},
         )
     )
     base: str | None = 'base123'
@@ -105,7 +79,6 @@ def with_evidence(name: str, problems: tuple[str, ...], **changes: object) -> Ga
 
 
 def verification_cases() -> pytest.MarkDecorator:
-    key = 'T7.AC-1'
     scenarios = [
         proven(),
         with_git(
@@ -126,21 +99,6 @@ def verification_cases() -> pytest.MarkDecorator:
             ('changed outside the owned set: src/b.py',),
             changed_files=frozenset({'src/a.py', 'src/b.py'}),
         ),
-        with_evidence(
-            'receipt-missing',
-            (f'{key} has no receipt at the current HEAD',),
-            receipts={},
-        ),
-        with_evidence(
-            'receipt-from-another-head',
-            (f'{key} has no receipt at the current HEAD',),
-            receipts={key: create_receipt(key, head='old0000')},
-        ),
-        with_evidence(
-            'receipt-failed',
-            (f'{key} fail at HEAD',),
-            receipts={key: create_receipt(key, outcome='fail')},
-        ),
         with_evidence('brief-missing', ('the task brief is missing',), brief=Brief(text=None)),
         with_git(
             'done-names-another-commit',
@@ -149,15 +107,13 @@ def verification_cases() -> pytest.MarkDecorator:
         ),
         with_evidence(
             'criterion-unproven',
-            ('AC-2 has neither a contract command nor a citation',),
-            assertions={},
+            ('AC-2 has no citation',),
+            assertions={'AC-1': 'src/a.py:1'},
         ),
         with_evidence(
             'nothing-proves-the-task',
-            ('no contract command and no cited assertion proves this task',),
+            ('no cited assertion proves this task',),
             brief=None,
-            commands=[],
-            receipts={},
             assertions={},
         ),
         with_evidence('residual-has-no-brief', (), brief=None),
@@ -181,7 +137,7 @@ def readiness_cases() -> pytest.MarkDecorator:
         ),
         pytest.param(
             [create_record('T1', 'pending')],
-            ['T1 has contract commands but was never started'],
+            ['T1 was never started'],
             id='plan-task-pending',
         ),
         pytest.param(
@@ -213,14 +169,6 @@ class TestVerificationGate:
     def test_verification_problems(self, scenario: GateScenario) -> None:
         assert scenario.gate.get_verification_problems() == list(scenario.problems)
 
-    def test_proven_criteria_ignore_a_dotless_command_key(self) -> None:
-        dotless = replace(
-            proven().evidence, commands=[create_command('T7.AC-1'), create_command('nodot')]
-        )
-        scenario = GateScenario(name='dotless-command-key', evidence=dotless)
-
-        assert scenario.gate.proven_criteria == {'AC-1', 'AC-2'}
-
 
 def done_commit_cases() -> pytest.MarkDecorator:
     cases = [
@@ -236,19 +184,6 @@ class TestDoneCommit:
     @done_commit_cases()
     def test_done_commit(self, brief_text: str, named: str | None) -> None:
         assert done_commit(brief_text) == named
-
-
-class TestCriterionOfCommand:
-    heads = st.text(alphabet=st.characters(exclude_characters='.'))
-    tails = st.text()
-
-    @given(head=heads, tail=tails)
-    def test_criterion_is_the_text_after_the_first_dot(self, head: str, tail: str) -> None:
-        assert criterion_of_command(f'{head}.{tail}') == tail
-
-    @given(key=heads)
-    def test_dotless_key_has_no_criterion(self, key: str) -> None:
-        assert criterion_of_command(key) is None
 
 
 class TestPlanTask:

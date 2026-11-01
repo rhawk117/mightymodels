@@ -1,11 +1,16 @@
-"""The `main-thread-hook` subcommand, which the plugin's PreToolUse hook on `Edit`, `Write` and
-`Bash` runs.
+"""The `main-thread-hook` subcommand, which the plugin's PreToolUse hook on `Edit`, `Write`,
+`Bash`, `contract_run`, `contract_approve` and `contract_retire` runs.
 
 While the checked-out branch has one unclosed ticket the main thread hands repository edits to a
 worker and pushes only a proven landing. The caller rule is the dispatch hook's: a caller whose
 `agent_type` begins `mightymodels:` is a plugin worker and gets no decision here, and every other
 caller is judged as the main thread. Input that is not a JSON object never reaches this module;
 the command exits 2 on it, and hooks/main-thread-hook.sh turns that into a block for a push.
+
+A call to `contract_run`, `contract_approve` or `contract_retire` (`PRIMARY_ONLY_TOOLS`) is denied
+whenever the payload carries an `agent_id`, because only the primary runs, approves and retires
+contract commands. That check comes before the plugin-worker rule, so a `mightymodels:` subagent
+is denied too.
 
 An `Edit` or `Write` whose `file_path` is in a ticket directory gets no decision and reads no
 state. Any other one is answered `ask` while the branch has one unclosed ticket, so the user
@@ -40,6 +45,15 @@ if TYPE_CHECKING:
 
 EDIT_TOOLS = frozenset({'Edit', 'Write'})
 BASH_TOOL = 'Bash'
+CONTRACT_RUN_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_run'
+CONTRACT_APPROVE_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_approve'
+CONTRACT_RETIRE_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_retire'
+PRIMARY_ONLY_TOOLS = frozenset({CONTRACT_RUN_TOOL, CONTRACT_APPROVE_TOOL, CONTRACT_RETIRE_TOOL})
+CONTRACT_PRIMARY_ONLY = (
+    'mightymodels: only the primary runs, approves and retires contract commands, so this '
+    '`{tool}` call from a subagent was refused. Report back what you changed and verified, and '
+    'the primary will act on the contract.'
+)
 EDIT_OUTSIDE = (
     'mightymodels: ticket {slug} is unclosed on the checked-out branch, and this {tool} of {path} '
     'is outside the ticket directories under `.mightymodels/`. The main thread hands a repository '
@@ -57,8 +71,9 @@ EDIT_SEVERAL_TICKETS = (
 PUSH_HELD = (
     '`git push` was refused: ticket {slug}, whose branch is checked out, is not ready to land: '
     '{unproven}. Close the tasks still open, then land through the `stick-the-landing` skill, '
-    'whose step 1 proves the contract at HEAD with `mightymodels verify run --slug {slug} --all '
-    '--phase landing`; the push goes through once that has passed. The hook also holds a command '
+    'whose step 1 proves the contract at HEAD with the `contract_run` tool and phase `landing`; '
+    'the push goes through once every live command has passed at HEAD and at least one is a live '
+    '`L*`. The hook also holds a command '
     'whose words `git` and `push` it cannot place, so reword one that is no push.'
 )
 PUSH_UNREADABLE = (
@@ -142,6 +157,11 @@ async def tool_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Rul
 
 
 async def main_thread_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Ruling:
+    tool_name = payload.tool_name or ''
+    if tool_name in PRIMARY_ONLY_TOOLS and payload.agent_id is not None:
+        tool = tool_name.rsplit('__', 1)[-1]
+        return Denied(reason=CONTRACT_PRIMARY_ONLY.format(tool=tool))
+
     if plugin_caller(payload.agent_type) is not None:
         return None
 

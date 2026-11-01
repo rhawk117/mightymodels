@@ -12,7 +12,8 @@ from mightymodels_core.tasks.records import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Collection
+    from collections.abc import Collection, Sequence
+    from datetime import datetime
 
     from mightymodels_core.primitives import RedactedText, TaskId
     from mightymodels_core.schemas.tasks import ArchitectMode, TaskStatus, Worker
@@ -81,6 +82,13 @@ class FakeTaskRepository:
             for task in self.ledger.tasks_of(ticket_id)
             if task.status == 'in-progress' and latest_worker.get((ticket_id, task.key)) == worker
         )
+
+    def declare(self, ticket_id: int, task_keys: Sequence[TaskId], _at: datetime) -> None:
+        for task_key in task_keys:
+            self.ledger.held.setdefault(
+                (ticket_id, task_key), TaskRecord(key=task_key, status='pending')
+            )
+        self.refuse_too_many_tasks(ticket_id)
 
     def record_start(self, ticket_id: int, transition: Transition, attempt: Attempt) -> None:
         address = (ticket_id, transition.task_key)

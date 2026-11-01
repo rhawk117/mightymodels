@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         ApprovedCommand,
         Receipt,
         RecordedCommand,
+        Retirement,
     )
 
 
@@ -29,5 +30,7 @@ class ContractRepository(Protocol):
     def approve(
         self, ticket_id: int, commands: Sequence[ApprovedCommand], approval: Approval
     ) -> None: ...
+
+    def retire(self, ticket_id: int, key: str, retirement: Retirement) -> None: ...
 
     def record(self, ticket_id: int, receipts: Sequence[Receipt]) -> None: ...

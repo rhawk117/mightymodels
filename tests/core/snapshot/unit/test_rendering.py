@@ -46,8 +46,8 @@ def section_line_cases() -> pytest.MarkDecorator:
         [
             '- T1 blocked (engineer 2 | a wall)',
             '- T2 not started',
-            '- T1.AC-1 never-run',
-            '- T1.AC-2: `pytest -q`',
+            '- I1 never-run',
+            '- I2: `pytest -q`',
             '- use sqlite [doc] (cache e1)',
             '- which size (cache e2)',
             '- T1 blocked at aaaaaaaaaaaa: a wall',
@@ -140,8 +140,8 @@ class TestFilledSnapshot:
                 ),
                 TaskState(task=TaskId('T2'), status='not started', attempts={}, reasons=()),
             ),
-            checks=(CheckState(key='T1.AC-1', state='never-run'),),
-            works=(PassingCommand(key='T1.AC-2', argv=('pytest', '-q')),),
+            checks=(CheckState(key='I1', state='never-run'),),
+            works=(PassingCommand(key='I2', argv=('pytest', '-q')),),
             decisions=(
                 LedgerLine(kind='decision', text='use sqlite', cite='doc', origin='cache e1'),
             ),

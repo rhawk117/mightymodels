@@ -114,7 +114,7 @@ def seed_investigation(ledger: InvestigationLedger) -> None:
 
 def create_service_command() -> ApprovedCommand:
     return ApprovedCommand(
-        key='T1.AC-1', argv=('true',), expect_exit=0, timeout=10, approved_by='the user'
+        key='I1', argv=('true',), expect_exit=0, timeout=10, approved_by='the user'
     )
 
 

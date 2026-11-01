@@ -26,7 +26,7 @@ SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 BASE_COMMIT = 'base001'
 DONE_COMMIT = 'abc1234'
 OWNED_FILE = 'src/a.py'
-COMMAND_KEY = f'{FIRST_TASK}.AC-1'
+COMMAND_KEY = 'L1'
 BRIEF_TEXT = f'## ASKED\nacceptance:\n  - AC-1: it works\n## DONE\ncommit: {DONE_COMMIT}\n'
 
 
@@ -62,7 +62,7 @@ def create_verify_request(seen: TaskRecord, *, changed_files: frozenset[str]) ->
     return VerifyRequest(
         seen=seen,
         commit=DONE_COMMIT,
-        assertions={},
+        assertions={'AC-1': f'{OWNED_FILE}:1'},
         git=create_git_facts(changed_files=changed_files),
         brief=Brief(text=BRIEF_TEXT),
     )

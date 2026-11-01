@@ -71,7 +71,7 @@ MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 TASK = TaskId('T1')
 REVIEW_RUN = RunId('20260506-070809')
 FINDING_KEY = 'MV-1'
-COMMAND_KEY = 'T1.AC-1'
+COMMAND_KEY = 'I1'
 
 
 class UnitFailedError(Exception):

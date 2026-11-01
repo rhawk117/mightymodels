@@ -1,9 +1,9 @@
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract.records import Receipt, RecordedCommand
+from mightymodels_core.contract.records import Receipt, RecordedCommand, Retirement
 from mightymodels_core.investigations import InvestigationRecord, Ledger, LedgerRecord
-from mightymodels_core.primitives import Slug, TaskId, redact
+from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.ticket_closing import (
     ArchivedCommand,
     ArchivedDecision,
@@ -11,6 +11,7 @@ from mightymodels_core.ticket_closing import (
     archived_decisions,
     archived_review,
 )
+from mightymodels_core.ticket_closing.archive import ArchivedRetirement
 
 from tests.core.ticket_closing.closing_builders import (
     REVIEW_RUN,
@@ -24,9 +25,7 @@ if TYPE_CHECKING:
 
 FIRST = Slug('first-probe')
 SECOND = Slug('second-probe')
-COMMAND = RecordedCommand(
-    key='T1.AC-1', task_key=TaskId('T1'), argv=('true',), expect_exit=0, timeout=10
-)
+COMMAND = RecordedCommand(key='I1', argv=('true',), expect_exit=0, timeout=10)
 
 
 def create_entry(seq: int, text: str, *, kind: EntryKind = 'decision') -> LedgerRecord:
@@ -67,18 +66,33 @@ def create_receipt() -> Receipt:
 class TestArchivedCommand:
     def test_a_command_with_no_receipt_is_never_run(self) -> None:
         assert archived_command(COMMAND, None) == ArchivedCommand(
-            key='T1.AC-1',
+            key='I1',
             argv=('true',),
             expect_exit=0,
             outcome='never-run',
             head=None,
             digest=None,
+            approval_source='fallback',
+            retirement=None,
         )
 
     def test_a_command_with_a_receipt_carries_its_outcome_head_and_digest(self) -> None:
         archived = archived_command(COMMAND, create_receipt())
 
         assert (archived.outcome, archived.head, archived.digest) == ('fail', 'abc1234', 'digest1')
+
+    def test_a_retired_command_carries_its_retirer_reason_and_source(self) -> None:
+        retirement = Retirement(
+            by='ana', why='replaced\nby I2', approval_source='form', at=SERVICE_MOMENT
+        )
+        retired = replace(COMMAND, retirement=retirement, approval_source='form')
+
+        archived = archived_command(retired, create_receipt())
+
+        assert archived.approval_source == 'form'
+        assert archived.retirement == ArchivedRetirement(
+            by=redact('ana'), why=redact('replaced by I2'), approval_source='form'
+        )
 
 
 class TestArchivedReview:

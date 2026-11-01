@@ -43,6 +43,12 @@ class UpsertTaskParams(Struct, frozen=True, kw_only=True):
     updated_at: datetime
 
 
+class DeclareTaskParams(Struct, frozen=True, kw_only=True):
+    ticket_id: int
+    task_key: str
+    updated_at: datetime
+
+
 class RecordTaskVerificationParams(Struct, frozen=True, kw_only=True):
     ticket_id: int
     task_key: str
@@ -139,6 +145,7 @@ IN_PROGRESS_TASKS_STARTED_BY = Query(
     name='in_progress_tasks_started_by', params=StartedByParams, row=TaskKeyRow
 )
 UPSERT_TASK = Query(name='upsert_task', params=UpsertTaskParams, row=TaskIdRow)
+DECLARE_TASK = Command(name='declare_task', params=DeclareTaskParams)
 RECORD_TASK_VERIFICATION = Query(
     name='record_task_verification', params=RecordTaskVerificationParams, row=TaskIdRow
 )
@@ -161,6 +168,7 @@ DECLARATIONS: tuple[Declaration, ...] = (
     TASK_COUNT,
     IN_PROGRESS_TASKS_STARTED_BY,
     UPSERT_TASK,
+    DECLARE_TASK,
     RECORD_TASK_VERIFICATION,
     ADD_TASK_ATTEMPT,
     ATTEMPTS_BY_WORKER,

@@ -146,17 +146,30 @@ CREATE TABLE contract_commands (
   id INTEGER CONSTRAINT pk_contract_commands PRIMARY KEY,
   ticket_id INTEGER NOT NULL,
   command_key TEXT NOT NULL,
-  task_key TEXT,
   argv TEXT NOT NULL,
   expect_exit INTEGER NOT NULL DEFAULT 0,
   timeout INTEGER NOT NULL DEFAULT 300,
   approved_by TEXT NOT NULL,
+  approval_source TEXT NOT NULL DEFAULT 'fallback',
   approved_at INTEGER NOT NULL DEFAULT (unixepoch()),
   head TEXT,
+  retired_by TEXT,
+  retired_why TEXT,
+  retired_approval_source TEXT,
+  retired_at INTEGER,
   CONSTRAINT fk_contract_commands_ticket FOREIGN KEY (ticket_id)
     REFERENCES tickets (id) ON DELETE CASCADE,
   CONSTRAINT uq_contract_commands_key UNIQUE (ticket_id, command_key),
-  CONSTRAINT ck_contract_commands_argv CHECK (json_valid(argv))
+  CONSTRAINT ck_contract_commands_argv CHECK (json_valid(argv)),
+  CONSTRAINT ck_contract_commands_approval_source CHECK (approval_source IN ('form', 'fallback')),
+  CONSTRAINT ck_contract_commands_retired_approval_source
+    CHECK (retired_approval_source IS NULL OR retired_approval_source IN ('form', 'fallback')),
+  CONSTRAINT ck_contract_commands_retired_together CHECK (
+    (retired_by IS NULL AND retired_why IS NULL AND retired_approval_source IS NULL
+      AND retired_at IS NULL)
+    OR (retired_by IS NOT NULL AND retired_why IS NOT NULL AND retired_approval_source IS NOT NULL
+      AND retired_at IS NOT NULL)
+  )
 ) STRICT;
 
 CREATE TABLE receipts (

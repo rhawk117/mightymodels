@@ -1,18 +1,24 @@
 """The two gates of the task domain: what keeps a task from verified and a ticket from ready.
 
 A task is proven only when the reported commit is the current HEAD and descends from the task's
-base, every contract command for it passed at that HEAD, its DONE brief names the commit, every
-other acceptance criterion carries a citation, and the commit touched only the files the task
-owns. A ticket is ready only when a plan task has been started, every plan task is closed and no
-fix is stuck.
+base, its DONE brief names the commit, every acceptance criterion carries a citation, and the
+commit touched only the files the task owns. Contract commands and receipts play no part. A
+ticket is ready only when a plan task has been started, every plan task is closed and no fix is
+stuck.
 
 The caller passes the git facts and the brief text in as values; the gates call no git, read no
 file and return their problems as the lines the caller shows, an empty list being a pass.
+
+Landing is a separate rule, `get_landing_problems`: every command passed in needs a receipt at
+HEAD with a passing outcome, and at least one of them must be a landing (`L*`) command, or
+`NO_LANDING_COMMAND` leads the problems.
 """
 
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from mightymodels_core.contract.policy import is_landing_command
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -28,6 +34,7 @@ DONE_COMMIT = re.compile(r'^\s*commit:\s*([0-9a-fA-F]{7,64})\s*$', re.MULTILINE)
 STUCK: frozenset[TaskStatus] = frozenset({'failed', 'blocked'})
 CLOSED: frozenset[TaskStatus] = frozenset({'verified', 'superseded'})
 PLAN_TASK_PREFIX = 'T'
+NO_LANDING_COMMAND = 'the contract has no live L* command; approve one with contract_approve'
 
 
 def is_plan_task(task_key: TaskId) -> bool:
@@ -38,11 +45,6 @@ def done_commit(brief_text: str) -> str | None:
     _, separator, done = brief_text.partition(DONE_HEADING)
     named = DONE_COMMIT.search(done)
     return str(named[1]) if separator and named else None
-
-
-def criterion_of_command(key: str) -> str | None:
-    _, separator, criterion = key.partition('.')
-    return criterion if separator else None
 
 
 def criteria_in_brief(brief_text: str) -> list[str]:
@@ -69,8 +71,6 @@ class Evidence:
     commit: str
     brief: Brief | None
     assertions: Mapping[str, str]
-    commands: Sequence[RecordedCommand]
-    receipts: Mapping[str, Receipt]
 
 
 def get_receipt_problem(command_key: str, receipt: Receipt | None, head: str | None) -> str | None:
@@ -92,6 +92,16 @@ def get_receipt_problems(
     return [problem for problem in problems if problem is not None]
 
 
+def get_landing_problems(
+    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
+) -> list[str]:
+    problems = get_receipt_problems(commands, receipts, head)
+    if any(is_landing_command(command) for command in commands):
+        return problems
+
+    return [NO_LANDING_COMMAND, *problems]
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class VerificationGate:
     task: TaskRecord
@@ -105,9 +115,7 @@ class VerificationGate:
 
     @property
     def proven_criteria(self) -> set[str]:
-        criteria = (criterion_of_command(command.key) for command in self.evidence.commands)
-        by_command = {criterion for criterion in criteria if criterion is not None}
-        return by_command | set(self.evidence.assertions)
+        return set(self.evidence.assertions)
 
     def commit_problems(self) -> list[str]:
         if self.evidence.commit != self.git.head:
@@ -120,9 +128,6 @@ class VerificationGate:
             return ['the task base is not an ancestor of the reported commit']
 
         return []
-
-    def receipt_problems(self) -> list[str]:
-        return get_receipt_problems(self.evidence.commands, self.evidence.receipts, self.git.head)
 
     def brief_problems(self) -> list[str]:
         if self.evidence.brief is None:
@@ -140,12 +145,10 @@ class VerificationGate:
         asked = criteria_in_brief(self.brief_text or '')
         proven = self.proven_criteria
         problems = [
-            f'{criterion} has neither a contract command nor a citation'
-            for criterion in asked
-            if criterion not in proven
+            f'{criterion} has no citation' for criterion in asked if criterion not in proven
         ]
         if not proven:
-            problems.append('no contract command and no cited assertion proves this task')
+            problems.append('no cited assertion proves this task')
 
         return problems
 
@@ -158,7 +161,6 @@ class VerificationGate:
             return problems
 
         return [
-            *self.receipt_problems(),
             *self.brief_problems(),
             *self.criteria_problems(),
             *self.ownership_problems(),
@@ -167,7 +169,7 @@ class VerificationGate:
 
 def get_plan_task_problem(record: TaskRecord) -> str | None:
     if record.status == 'pending':
-        return f'{record.key} has contract commands but was never started'
+        return f'{record.key} was never started'
 
     if record.status in CLOSED:
         return None

@@ -8,9 +8,8 @@ whose branch is checked out, and the task's brief has no DONE half that names a 
 each task and what its brief lacks.
 
 A residual (an `R` id) has no brief and is held on the rest of what verifies a task: a commit
-follows its base, each contract command of its own passed at HEAD, and the commits since its base
-touched only the files it owns. The reason names each residual and which of the three it lacks. A
-fix for a failing CI check (a `C` id) is not held.
+follows its base and the commits since its base touched only the files it owns. The reason names
+each residual and which of the two it lacks. A fix for a failing CI check (a `C` id) is not held.
 
 The gate keeps no marker of its own. Claude Code sets `stop_hook_active` on the stop that follows a
 block, and the gate lets that one through, so a subagent that cannot finish is never trapped.
@@ -51,10 +50,7 @@ NOTHING_COMMITTED = 'no commit follows its base'
 FINISH_A_PLAN_TASK = (
     'Append the `## DONE` half with a `commit: <hash>` line naming your commit, then report.'
 )
-FINISH_A_RESIDUAL = (
-    'Commit the fix inside the files the residual owns and take each receipt named with '
-    '`mightymodels verify run --slug {slug} --id <id>`, then report.'
-)
+FINISH_A_RESIDUAL = 'Commit the fix inside the files the residual owns, then report.'
 
 
 def create_implementers() -> Implementers:
@@ -85,8 +81,6 @@ def residual_problems(facts: ResidualFacts) -> list[str]:
         commit=head,
         brief=Brief(text=None),
         assertions={},
-        commands=facts.commands,
-        receipts=facts.receipts,
     )
     gate = VerificationGate(task=facts.task, evidence=evidence, git=facts.git)
     if problems := gate.commit_problems():
@@ -95,7 +89,7 @@ def residual_problems(facts: ResidualFacts) -> list[str]:
     if facts.base_commit == head:
         return [NOTHING_COMMITTED]
 
-    return [*gate.receipt_problems(), *gate.ownership_problems()]
+    return gate.ownership_problems()
 
 
 def residual_lines(unfinished: Unfinished) -> list[str]:
@@ -116,7 +110,7 @@ def unfinished_reason(unfinished: Unfinished) -> str | None:
 
     remedies = [
         *([FINISH_A_PLAN_TASK] if briefs else []),
-        *([FINISH_A_RESIDUAL.format(slug=unfinished.slug)] if residuals else []),
+        *([FINISH_A_RESIDUAL] if residuals else []),
     ]
     return (
         f'You are stopping with work unfinished on ticket {unfinished.slug}: '

@@ -15,6 +15,7 @@ a process or the filesystem.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from mightymodels_core.contract.policy import live_commands
 from mightymodels_core.investigations.ledger import linked_ledgers
 from mightymodels_core.snapshot.records import DEFAULT_LIMIT, SnapshotRecord
 from mightymodels_core.snapshot.sections import (
@@ -65,7 +66,7 @@ class SnapshotService:
         ticket = self.tickets.staged_ticket(request.slug)
         limit = request.limit
         repository = repository_state(request.repository, limit)
-        commands = self.contracts.commands(ticket.id)
+        commands = live_commands(self.contracts.commands(ticket.id))
         receipts = self.contracts.latest_receipts(ticket.id)
         linked = linked_ledgers(self.investigations, ticket.investigations)
         attempts = self.attempts.attempts_by_worker(ticket.id)

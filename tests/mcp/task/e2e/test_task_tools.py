@@ -189,17 +189,23 @@ class TestTaskMark:
 class TestTaskReady:
     async def test_unverified_plan_task_is_not_ready(self, staged: TaskHarness) -> None:
         await staged.commit('first')
+        view_of(await staged.call('task_declare', {'slug': SLUG, 'task_ids': ['T1']}))
         view_of(await staged.call('task_start', {**START, 'task_id': 'T1'}))
 
         view = view_of(await staged.call('task_ready', {'slug': SLUG}))
 
-        assert view['text'] == 'not ready\n  - T1 is in-progress, not verified\n'
+        assert view['text'] == (
+            'not ready\n'
+            '  - T1 is in-progress, not verified\n'
+            '  - the contract has no live L* command; approve one with contract_approve\n'
+        )
         assert not view['advanced']
         assert staged.git_calls == ['resolve_head']
 
     async def test_verified_plan_task_is_ready_at_head(self, staged: TaskHarness) -> None:
         head = await staged.commit('first')
         await staged.verify_plan_task()
+        await staged.prove_landing(head)
 
         view = view_of(await staged.call('task_ready', {'slug': SLUG}))
 

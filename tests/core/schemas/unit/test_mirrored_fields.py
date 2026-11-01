@@ -70,7 +70,13 @@ MIRRORED_PAIRS = (
         params=ApproveContractCommandParams,
         row=ContractCommandRow,
         params_only=frozenset({'ticket_id'}),
-        row_only=frozenset({'id'}),
+        row_only=frozenset({
+            'id',
+            'retired_by',
+            'retired_why',
+            'retired_approval_source',
+            'retired_at',
+        }),
     ),
     MirroredPair(
         name='receipt',

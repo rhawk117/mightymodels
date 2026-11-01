@@ -11,12 +11,15 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
 from mightymodels_core.contract.errors import (
+    AlreadyRetiredError,
     ChangedCommandError,
     InvalidArgvError,
     InvalidCommandKeyError,
     InvalidTimeoutError,
     MissingApprovalError,
     NoContractError,
+    RetiredCommandError,
+    RetiredPickError,
     UnknownCommandError,
 )
 
@@ -32,7 +35,16 @@ type CommandShapeIssue = (
     InvalidCommandKeyError | InvalidArgvError | InvalidTimeoutError | MissingApprovalError
 )
 
-COMMAND_KEY_PATTERN = re.compile(r'[A-Za-z0-9._-]+')
+COMMAND_KEY_PATTERN = re.compile(r'[IL][0-9]+')
+LANDING_COMMAND_PREFIX = 'L'
+
+
+def is_landing_command(command: RecordedCommand) -> bool:
+    return command.key.startswith(LANDING_COMMAND_PREFIX)
+
+
+def live_commands(commands: Sequence[RecordedCommand]) -> list[RecordedCommand]:
+    return [command for command in commands if command.retirement is None]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -105,11 +117,21 @@ class ApprovalPolicy:
 
         return [command for key, command in first_of_key.items() if key not in held]
 
-    def get_approval_problem(self) -> CommandShapeIssue | ChangedCommandError | None:
+    @property
+    def retired_keys(self) -> set[str]:
+        return {command.key for command in self.held if command.retirement is not None}
+
+    def get_approval_problem(
+        self,
+    ) -> CommandShapeIssue | RetiredCommandError | ChangedCommandError | None:
         for command in self.commands:
             policy = CommandPolicy(command=command, options=self.options)
             if problem := policy.get_command_problem():
                 return problem
+
+        retired = self.retired_keys
+        if (key := next((c.key for c in self.commands if c.key in retired), None)) is not None:
+            return RetiredCommandError(command_key=key)
 
         approved = self.held_argv | {command.key: command.argv for command in self.new_commands}
         changed = next((c.key for c in self.commands if approved[c.key] != c.argv), None)
@@ -126,30 +148,67 @@ class PickPolicy:
     asked: Sequence[str] | None
 
     @property
-    def held_by_key(self) -> Mapping[str, RecordedCommand]:
-        return {command.key: command for command in self.held}
+    def live_by_key(self) -> Mapping[str, RecordedCommand]:
+        return {command.key: command for command in live_commands(self.held)}
+
+    @property
+    def retired_keys(self) -> set[str]:
+        return {command.key for command in self.held if command.retirement is not None}
 
     @property
     def picked_keys(self) -> list[str]:
         if self.asked is None:
-            return sorted(self.held_by_key)
+            return list(self.live_by_key)
 
         return list(self.asked)
 
     @property
+    def retired_asked(self) -> list[str]:
+        return [key for key in self.picked_keys if key in self.retired_keys]
+
+    @property
     def unknown_keys(self) -> list[str]:
-        return [key for key in self.picked_keys if key not in self.held_by_key]
+        known = self.live_by_key.keys() | self.retired_keys
+        return [key for key in self.picked_keys if key not in known]
 
     @property
     def picked_commands(self) -> list[RecordedCommand]:
-        return [self.held_by_key[key] for key in self.picked_keys]
+        return [self.live_by_key[key] for key in self.picked_keys]
 
-    def get_pick_problem(self) -> NoContractError | UnknownCommandError | None:
+    def get_pick_problem(
+        self,
+    ) -> NoContractError | RetiredPickError | UnknownCommandError | None:
         if not self.held:
             return NoContractError(slug=self.slug)
 
+        if retired := self.retired_asked:
+            return RetiredPickError(retired=retired)
+
         if unknown := self.unknown_keys:
             return UnknownCommandError(unknown=unknown)
+
+        if not self.live_by_key:
+            return NoContractError(slug=self.slug)
+
+        return None
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RetirePolicy:
+    key: str
+    held: Sequence[RecordedCommand]
+
+    @property
+    def held_command(self) -> RecordedCommand | None:
+        return next((command for command in self.held if command.key == self.key), None)
+
+    def get_retire_problem(self) -> UnknownCommandError | AlreadyRetiredError | None:
+        command = self.held_command
+        if command is None:
+            return UnknownCommandError(unknown=[self.key])
+
+        if command.retirement is not None:
+            return AlreadyRetiredError(command_key=self.key)
 
         return None
 

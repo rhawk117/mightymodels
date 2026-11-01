@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from msgspec import Struct
 
 from mightymodels_core.database import Command, Query
-from mightymodels_core.vocabulary.contract import Outcome, Phase
+from mightymodels_core.vocabulary.contract import ApprovalSource, Outcome, Phase
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Declaration
@@ -15,13 +15,22 @@ if TYPE_CHECKING:
 class ApproveContractCommandParams(Struct, frozen=True, kw_only=True):
     ticket_id: int
     command_key: str
-    task_key: str | None
     argv: list[str]
     expect_exit: int
     timeout: int
     approved_by: str
+    approval_source: ApprovalSource
     approved_at: datetime
     head: str | None
+
+
+class RetireContractCommandParams(Struct, frozen=True, kw_only=True):
+    ticket_id: int
+    command_key: str
+    retired_by: str
+    retired_why: str
+    retired_approval_source: ApprovalSource
+    retired_at: datetime
 
 
 class ContractCommandsParams(Struct, frozen=True, kw_only=True, gc=False):
@@ -46,13 +55,17 @@ class RecordReceiptParams(Struct, frozen=True, kw_only=True):
 class ContractCommandRow(Struct, frozen=True, kw_only=True):
     id: int
     command_key: str
-    task_key: str | None
     argv: list[str]
     expect_exit: int
     timeout: int
     approved_by: str
+    approval_source: ApprovalSource
     approved_at: datetime
     head: str | None
+    retired_by: str | None
+    retired_why: str | None
+    retired_approval_source: ApprovalSource | None
+    retired_at: datetime | None
 
 
 class ReceiptRow(Struct, frozen=True, kw_only=True):
@@ -75,11 +88,15 @@ APPROVE_CONTRACT_COMMAND = Command(
 CONTRACT_COMMANDS_OF_TICKET = Query(
     name='contract_commands_of_ticket', params=ContractCommandsParams, row=ContractCommandRow
 )
+RETIRE_CONTRACT_COMMAND = Command(
+    name='retire_contract_command', params=RetireContractCommandParams
+)
 RECORD_RECEIPT = Command(name='record_receipt', params=RecordReceiptParams)
 LATEST_RECEIPTS = Query(name='latest_receipts', params=ContractCommandsParams, row=ReceiptRow)
 
 DECLARATIONS: tuple[Declaration, ...] = (
     APPROVE_CONTRACT_COMMAND,
+    RETIRE_CONTRACT_COMMAND,
     CONTRACT_COMMANDS_OF_TICKET,
     RECORD_RECEIPT,
     LATEST_RECEIPTS,

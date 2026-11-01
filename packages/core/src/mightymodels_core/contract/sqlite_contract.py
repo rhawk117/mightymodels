@@ -1,14 +1,15 @@
 """The contract repository over a core unit."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import (
     COMMANDS,
     Receipt,
     RecordedCommand,
+    Retirement,
     duplicate_command_error,
-    owning_task,
     unapproved_command_error,
 )
 from mightymodels_core.primitives import redact
@@ -17,9 +18,11 @@ from mightymodels_core.schemas.contract import (
     CONTRACT_COMMANDS_OF_TICKET,
     LATEST_RECEIPTS,
     RECORD_RECEIPT,
+    RETIRE_CONTRACT_COMMAND,
     ApproveContractCommandParams,
     ContractCommandsParams,
     RecordReceiptParams,
+    RetireContractCommandParams,
 )
 
 if TYPE_CHECKING:
@@ -30,13 +33,22 @@ if TYPE_CHECKING:
     from mightymodels_core.schemas.contract import ContractCommandRow, ReceiptRow
 
 
+def retirement_of(row: ContractCommandRow) -> Retirement | None:
+    match (row.retired_by, row.retired_why, row.retired_approval_source, row.retired_at):
+        case (str() as by, str() as why, 'form' | 'fallback' as source, datetime() as at):
+            return Retirement(by=by, why=why, approval_source=source, at=at)
+        case _:
+            return None
+
+
 def command_of(row: ContractCommandRow) -> RecordedCommand:
     return RecordedCommand(
         key=row.command_key,
-        task_key=owning_task(row.command_key),
         argv=tuple(row.argv),
         expect_exit=row.expect_exit,
         timeout=row.timeout,
+        approval_source=row.approval_source,
+        retirement=retirement_of(row),
     )
 
 
@@ -62,11 +74,11 @@ def approve_params_of(
     return ApproveContractCommandParams(
         ticket_id=ticket_id,
         command_key=command.key,
-        task_key=owning_task(command.key),
         argv=list(command.argv),
         expect_exit=command.expect_exit,
         timeout=command.timeout,
         approved_by=command.approved_by,
+        approval_source=command.approval_source,
         approved_at=approval.at,
         head=approval.head,
     )
@@ -116,6 +128,17 @@ class SqliteContractRepository:
 
         batch = [approve_params_of(ticket_id, command, approval) for command in commands]
         self.unit.run_many(APPROVE_CONTRACT_COMMAND, batch)
+
+    def retire(self, ticket_id: int, key: str, retirement: Retirement) -> None:
+        params = RetireContractCommandParams(
+            ticket_id=ticket_id,
+            command_key=key,
+            retired_by=retirement.by,
+            retired_why=retirement.why,
+            retired_approval_source=retirement.approval_source,
+            retired_at=retirement.at,
+        )
+        self.unit.run(RETIRE_CONTRACT_COMMAND, params)
 
     def record(self, ticket_id: int, receipts: Sequence[Receipt]) -> None:
         ids = {row.command_key: row.id for row in self.command_rows(ticket_id)}

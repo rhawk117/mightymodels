@@ -7,7 +7,6 @@ from mightymodels_core.tickets import ClosedTicketError
 
 from tests.core.tasks.service_builders import (
     BASE_COMMIT,
-    COMMAND_KEY,
     DONE_COMMIT,
     FIRST_TASK,
     OWNED_FILE,
@@ -86,13 +85,19 @@ class TestVerify:
 
         assert (record.status, record.commit, record.reasons) == ('verified', DONE_COMMIT, ())
 
-    def test_verify_blocks_a_task_with_no_receipt_and_lists_why(
-        self, contracted_harness: ServiceHarness
+    def test_verify_blocks_a_task_with_an_uncited_criterion_and_lists_why(
+        self, proven_harness: ServiceHarness
     ) -> None:
-        record = verify_as_asked(contracted_harness, OWNED_CHANGE)
+        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+        request = replace(create_verify_request(seen, changed_files=OWNED_CHANGE), assertions={})
+
+        record = proven_harness.service.verify(SERVICE_SLUG, request)
 
         assert record.status == 'blocked'
-        assert record.reasons == (f'{COMMAND_KEY} has no receipt at the current HEAD',)
+        assert record.reasons == (
+            'AC-1 has no citation',
+            'no cited assertion proves this task',
+        )
 
     def test_verify_blocks_a_commit_that_touched_files_outside_the_owned_set(
         self, proven_harness: ServiceHarness
@@ -101,13 +106,6 @@ class TestVerify:
 
         assert record.status == 'blocked'
         assert record.reasons == (f'changed outside the owned set: {OUTSIDE_FILE}',)
-
-    def test_verify_counts_only_the_commands_of_its_own_task(
-        self, foreign_command_harness: ServiceHarness
-    ) -> None:
-        record = verify_as_asked(foreign_command_harness, OWNED_CHANGE)
-
-        assert record.status == 'verified'
 
     def move_task(self, harness: ServiceHarness, seen: TaskRecord, movement: Movement) -> None:
         address = (harness.ticket_id, FIRST_TASK)

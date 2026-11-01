@@ -16,14 +16,12 @@ from mightymodels_core.contract import (
     InvalidCommandKeyError,
     InvalidTimeoutError,
     MissingApprovalError,
-    NoContractError,
-    PickPolicy,
     ReceiptAssessment,
     RecordedCommand,
-    UnknownCommandError,
     is_argv,
 )
-from mightymodels_core.primitives import Slug, TaskId
+from mightymodels_core.contract.policy import is_landing_command
+from mightymodels_core.primitives import Slug
 
 from tests.core.contract.contract_builders import (
     FIRST_KEY,
@@ -72,13 +70,13 @@ class AssessmentScenario:
 
 
 def recorded(key: str, argv: tuple[str, ...] = ('make', 'test')) -> RecordedCommand:
-    return RecordedCommand(key=key, task_key=TaskId('T1'), argv=argv, expect_exit=0, timeout=300)
+    return RecordedCommand(key=key, argv=argv, expect_exit=0, timeout=300)
 
 
 def command_shape_cases() -> pytest.MarkDecorator:
     scenarios = [
         ShapeScenario(name='valid'),
-        ShapeScenario(name='key-at-limit', key='a' * OPTIONS.key_limit),
+        ShapeScenario(name='key-at-limit', key='I' + '1' * (OPTIONS.key_limit - 1)),
         ShapeScenario(
             name='key-over-limit',
             key='a' * (OPTIONS.key_limit + 1),
@@ -178,6 +176,14 @@ class TestCommandPolicy:
         assert type(problem) is InvalidCommandKeyError
 
 
+class TestIsLandingCommand:
+    def test_a_landing_key_is_a_landing_command(self) -> None:
+        assert is_landing_command(recorded('L1')) is True
+
+    def test_an_implementation_key_is_not_a_landing_command(self) -> None:
+        assert is_landing_command(recorded(FIRST_KEY)) is False
+
+
 class TestIsArgv:
     argument_lists = st.lists(st.text(), min_size=1)
     argv_values = st.one_of(argument_lists, argument_lists.map(tuple))
@@ -247,36 +253,6 @@ class TestApprovalPolicy:
 
         assert policy.get_approval_problem() is None
         assert policy.new_commands == [second]
-
-
-class TestPickPolicy:
-    held = (recorded(SECOND_KEY), recorded(FIRST_KEY))
-
-    def test_a_ticket_with_no_commands_has_no_contract(self) -> None:
-        problem = PickPolicy(slug=SLUG, held=(), asked=None).get_pick_problem()
-
-        assert isinstance(problem, NoContractError)
-        assert problem.slug == SLUG
-
-    def test_ids_outside_the_contract_are_unknown(self) -> None:
-        asked = [FIRST_KEY, 'T9.AC-9', 'T8.AC-8']
-
-        problem = PickPolicy(slug=SLUG, held=self.held, asked=asked).get_pick_problem()
-
-        assert isinstance(problem, UnknownCommandError)
-        assert problem.unknown == ('T9.AC-9', 'T8.AC-8')
-
-    def test_no_ids_picks_every_command_in_key_order(self) -> None:
-        policy = PickPolicy(slug=SLUG, held=self.held, asked=None)
-
-        assert policy.get_pick_problem() is None
-        assert [command.key for command in policy.picked_commands] == [FIRST_KEY, SECOND_KEY]
-
-    def test_asked_ids_pick_in_the_order_asked(self) -> None:
-        policy = PickPolicy(slug=SLUG, held=self.held, asked=[SECOND_KEY, FIRST_KEY])
-
-        assert policy.get_pick_problem() is None
-        assert [command.key for command in policy.picked_commands] == [SECOND_KEY, FIRST_KEY]
 
 
 class TestReceiptAssessment:

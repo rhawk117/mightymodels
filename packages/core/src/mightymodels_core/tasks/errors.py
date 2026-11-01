@@ -18,6 +18,14 @@ class UnknownTaskError(StateError):
         super().__init__(f'ticket {ticket_id} holds no task {task_key}; start the task first')
 
 
+class UndeclaredPlanTaskError(StateError):
+    def __init__(self, *, task_key: TaskId) -> None:
+        self.task_key = task_key
+        super().__init__(
+            f'{task_key} was never declared; declare the plan tasks with task_declare first'
+        )
+
+
 class TransitionError(StateError):
     def __init__(self, *, task_key: TaskId, current: TaskStatus, target: TaskStatus) -> None:
         self.task_key = task_key
@@ -77,6 +85,15 @@ class FixNotUnderwayError(StateError):
         super().__init__(
             f'{task_key} is {current}; a failed fix is recorded on a task in progress, started '
             'by the dispatching primary'
+        )
+
+
+class NotPlanTaskError(StateError):
+    def __init__(self, *, task_key: TaskId) -> None:
+        self.task_key = task_key
+        super().__init__(
+            f'{task_key} is not a plan task; only plan task ids (T*) are declared, and other '
+            'tasks start freely'
         )
 
 

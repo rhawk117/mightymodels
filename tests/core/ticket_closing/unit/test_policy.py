@@ -150,7 +150,7 @@ class TestTaskBlockers:
     def test_a_task_never_started_is_named_before_the_missing_verified_work(self) -> None:
         blockers = find_live_work(tasks=(create_task('T1', 'pending'),))
 
-        assert blockers == ['T1 has contract commands but was never started', NO_VERIFIED_WORK]
+        assert blockers == ['T1 was never started', NO_VERIFIED_WORK]
 
     @given(status=unverified_statuses)
     @example(status='in-progress')

@@ -1,6 +1,7 @@
-"""The contract records, their repository seam, the sqlite store, the policy and the service."""
+"""The contract records, the repository seam, the sqlite store, the policy, service and runner."""
 
 from .errors import (
+    AlreadyRetiredError,
     ChangedCommandError,
     DuplicateCommandError,
     InvalidArgvError,
@@ -8,6 +9,9 @@ from .errors import (
     InvalidTimeoutError,
     MissingApprovalError,
     NoContractError,
+    RetiredCommandError,
+    RetiredPickError,
+    TrackedChangesError,
     UnapprovedCommandError,
     UnknownCommandError,
 )
@@ -18,14 +22,32 @@ from .policy import (
     PickPolicy,
     ReceiptAssessment,
     ReceiptState,
+    RetirePolicy,
     is_argv,
+    live_commands,
 )
-from .records import Approval, ApprovedCommand, Receipt, RecordedCommand
+from .records import Approval, ApprovedCommand, Receipt, RecordedCommand, Retirement
 from .repository import ContractRepository
-from .services import ApprovalResult, CommandStatus, ContractService, ContractStatus
+from .runs import (
+    ContractRunner,
+    RunOptions,
+    RunProgress,
+    RunReporter,
+    RunRequest,
+    RunResult,
+    child_environment,
+)
+from .services import (
+    ApprovalResult,
+    CommandStatus,
+    ContractService,
+    ContractStatus,
+    RetireRequest,
+)
 from .sqlite_contract import SqliteContractRepository
 
 __all__ = [
+    'AlreadyRetiredError',
     'Approval',
     'ApprovalPolicy',
     'ApprovalResult',
@@ -35,6 +57,7 @@ __all__ = [
     'CommandStatus',
     'ContractOptions',
     'ContractRepository',
+    'ContractRunner',
     'ContractService',
     'ContractStatus',
     'DuplicateCommandError',
@@ -48,8 +71,21 @@ __all__ = [
     'ReceiptAssessment',
     'ReceiptState',
     'RecordedCommand',
+    'RetirePolicy',
+    'RetireRequest',
+    'RetiredCommandError',
+    'RetiredPickError',
+    'Retirement',
+    'RunOptions',
+    'RunProgress',
+    'RunReporter',
+    'RunRequest',
+    'RunResult',
     'SqliteContractRepository',
+    'TrackedChangesError',
     'UnapprovedCommandError',
     'UnknownCommandError',
+    'child_environment',
     'is_argv',
+    'live_commands',
 ]

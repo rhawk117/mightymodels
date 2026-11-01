@@ -85,11 +85,11 @@ class TestApprove:
         self, stocked_service_harness: ServiceHarness
     ) -> None:
         harness = stocked_service_harness
-        again = [create_command(FIRST_KEY), create_command('T1.AC-3')]
+        again = [create_command(FIRST_KEY), create_command('I4')]
 
         result = harness.service.approve(SERVICE_SLUG, again, HEAD)
 
-        assert (result.held, result.new_keys) == (3, ('T1.AC-3',))
+        assert (result.held, result.new_keys) == (3, ('I4',))
         assert len(harness.ledger.approved) == 3
 
     @approval_refusal_cases()
@@ -97,7 +97,7 @@ class TestApprove:
         self, stocked_service_harness: ServiceHarness, refused: RefusedApproval
     ) -> None:
         harness = stocked_service_harness
-        batch = [create_command('T1.AC-3'), refused.command]
+        batch = [create_command('I4'), refused.command]
 
         with pytest.raises(refused.error_type):
             harness.service.approve(SERVICE_SLUG, batch, HEAD)
@@ -177,7 +177,7 @@ class TestPick:
 
     def test_an_unknown_id_is_refused(self, stocked_service_harness: ServiceHarness) -> None:
         with pytest.raises(UnknownCommandError):
-            stocked_service_harness.service.pick(SERVICE_SLUG, [FIRST_KEY, 'T9.AC-9'])
+            stocked_service_harness.service.pick(SERVICE_SLUG, [FIRST_KEY, 'I10'])
 
 
 class TestRecord:
@@ -195,4 +195,4 @@ class TestRecord:
         self, stocked_service_harness: ServiceHarness
     ) -> None:
         with pytest.raises(UnapprovedCommandError):
-            stocked_service_harness.service.record(SERVICE_SLUG, [create_receipt('T9.AC-9')])
+            stocked_service_harness.service.record(SERVICE_SLUG, [create_receipt('I10')])

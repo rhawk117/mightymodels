@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 import anyio
 from mcp import Client
+from mightymodels_core.contract import ApprovedCommand, Receipt
 from mightymodels_core.edge import OpenState
-from mightymodels_core.primitives import TaskId
+from mightymodels_core.primitives import TaskId, redact
 from mightymodels_core.tasks import Attempt, Transition
 from mightymodels_mcp.main import create_catalog
 from mightymodels_mcp.server.app import create_server
@@ -128,6 +129,29 @@ class TaskHarness:
             with create_task_work(state).write() as unit:
                 ticket_id = unit.tasks.tickets.staged_ticket(SLUG).id
                 unit.tasks.tasks.record_start(ticket_id, verified, attempt)
+
+    async def prove_landing(self, head: str) -> None:
+        moment = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
+        command = ApprovedCommand(
+            key='L1', argv=('make', 'test'), expect_exit=0, timeout=300, approved_by='planner'
+        )
+        receipt = Receipt(
+            key='L1',
+            argv=('make', 'test'),
+            outcome='pass',
+            exit=0,
+            duration_ms=1,
+            stdout_tail=redact(''),
+            stderr_tail=redact(''),
+            digest='digest',
+            head=head,
+            phase='landing',
+            at=moment,
+        )
+        async with self.opener.open() as state:
+            with create_task_work(state).write() as unit:
+                unit.contracts.approve(SLUG, [command], head=head)
+                unit.contracts.record(SLUG, [receipt])
 
     async def commit_owned_file(self) -> str:
         path = anyio.Path(self.server.repository, OWNED)
