@@ -1,5 +1,5 @@
-"""The `main-thread-hook` subcommand, which the plugin's PreToolUse hook on `Edit`, `Write` and
-`Bash` runs.
+"""The `main-thread-hook` subcommand, which the plugin's PreToolUse hook on `Edit`, `Write`,
+`Bash`, `contract_run`, `contract_approve` and `contract_retire` runs.
 
 While the checked-out branch has one unclosed ticket the main thread hands repository edits to a
 worker and pushes only a proven landing. The caller rule is the dispatch hook's: a caller whose

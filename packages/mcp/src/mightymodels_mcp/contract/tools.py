@@ -9,8 +9,10 @@ assignment and `ContractApproveRequest` a runtime import.
 
 contract_run runs the approved commands without a form, because the approved contract is the
 permission. Only the primary may call it, as it may call contract_approve and contract_retire;
-the main-thread hook denies all three to a subagent. Its progress goes out as notifications whose
-position rises on every one, since a heartbeat repeats a command's position.
+the main-thread hook denies all three to a subagent. When that hook cannot run, its shell wrapper
+refuses a subagent's contract_run only, so a subagent's contract_approve or contract_retire goes
+through. Its progress goes out as notifications whose position rises on every one, since a
+heartbeat repeats a command's position.
 """
 
 import itertools
