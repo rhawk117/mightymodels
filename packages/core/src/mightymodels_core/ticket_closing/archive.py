@@ -14,7 +14,7 @@ from mightymodels_core.ticket_closing.policy import one_line
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from mightymodels_core.contract.records import Receipt, RecordedCommand
+    from mightymodels_core.contract.records import Receipt, RecordedCommand, Retirement
     from mightymodels_core.investigations.ledger import Ledger
     from mightymodels_core.primitives import RedactedText, RunId, Slug, TaskId
     from mightymodels_core.reviews.records import DecidedFinding
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from mightymodels_core.ticket_closing.records import ClosingRecord
     from mightymodels_core.ticket_decisions.records import TicketDecision
     from mightymodels_core.tickets.records import TicketRecord, Tracker
-    from mightymodels_core.vocabulary.contract import Outcome
+    from mightymodels_core.vocabulary.contract import ApprovalSource, Outcome
     from mightymodels_core.vocabulary.reviews import Depth
     from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
 
@@ -37,6 +37,13 @@ class ArchivedTask:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class ArchivedRetirement:
+    by: RedactedText
+    why: RedactedText
+    approval_source: ApprovalSource
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ArchivedCommand:
     key: str
     argv: tuple[str, ...]
@@ -44,6 +51,8 @@ class ArchivedCommand:
     outcome: CommandOutcome
     head: str | None
     digest: str | None
+    approval_source: ApprovalSource
+    retirement: ArchivedRetirement | None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -88,7 +97,19 @@ class ArchiveSources:
     ticket_decisions: Sequence[TicketDecision]
 
 
+def archived_retirement(retirement: Retirement | None) -> ArchivedRetirement | None:
+    if retirement is None:
+        return None
+
+    return ArchivedRetirement(
+        by=redact(one_line(retirement.by)),
+        why=redact(one_line(retirement.why)),
+        approval_source=retirement.approval_source,
+    )
+
+
 def archived_command(command: RecordedCommand, receipt: Receipt | None) -> ArchivedCommand:
+    retirement = archived_retirement(command.retirement)
     if receipt is None:
         return ArchivedCommand(
             key=command.key,
@@ -97,6 +118,8 @@ def archived_command(command: RecordedCommand, receipt: Receipt | None) -> Archi
             outcome='never-run',
             head=None,
             digest=None,
+            approval_source=command.approval_source,
+            retirement=retirement,
         )
 
     return ArchivedCommand(
@@ -106,6 +129,8 @@ def archived_command(command: RecordedCommand, receipt: Receipt | None) -> Archi
         outcome=receipt.outcome,
         head=receipt.head,
         digest=receipt.digest,
+        approval_source=command.approval_source,
+        retirement=retirement,
     )
 
 

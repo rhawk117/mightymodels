@@ -13,6 +13,7 @@ from mightymodels_core.ticket_closing import (
     ArchiveRecord,
     archive_markdown,
 )
+from mightymodels_core.ticket_closing.archive import ArchivedRetirement
 from mightymodels_core.tickets import Tracker
 
 from tests.core.ticket_closing.closing_builders import REVIEW_RUN, create_closing
@@ -35,9 +36,18 @@ class ArchiveParts:
     review: ArchivedReview | None
 
 
-def create_command(key: str, outcome: CommandOutcome) -> ArchivedCommand:
+def create_command(
+    key: str, outcome: CommandOutcome, retirement: ArchivedRetirement | None = None
+) -> ArchivedCommand:
     return ArchivedCommand(
-        key=key, argv=('true',), expect_exit=0, outcome=outcome, head=None, digest=None
+        key=key,
+        argv=('true',),
+        expect_exit=0,
+        outcome=outcome,
+        head=None,
+        digest=None,
+        approval_source='form',
+        retirement=retirement,
     )
 
 
@@ -164,6 +174,23 @@ class TestArchiveMarkdown:
 
     def test_never_run_command_is_not_passing(self, never_run_parts: ArchiveParts) -> None:
         assert self.render(never_run_parts)[3].endswith('0 passing at last run; not passing: I1')
+
+    def test_retired_command_names_its_retirer_reason_and_source(self) -> None:
+        retirement = ArchivedRetirement(
+            by=redact('ana'), why=redact('replaced by I2'), approval_source='fallback'
+        )
+        parts = create_parts()
+        retired_parts = ArchiveParts(
+            tracker=parts.tracker,
+            tasks=parts.tasks,
+            verification=(create_command('I1', 'pass', retirement),),
+            decisions=(),
+            review=None,
+        )
+
+        assert self.render(retired_parts)[3].endswith(
+            '; retired: I1 by ana (fallback): replaced by I2'
+        )
 
     @given(ledger_count=ledger_counts)
     @example(ledger_count=DECISION_LIMIT)

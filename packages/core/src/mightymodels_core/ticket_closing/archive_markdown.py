@@ -63,11 +63,23 @@ def tasks_line(tasks: Mapping[TaskId, ArchivedTask]) -> str:
     return f'tasks: {shown or NONE_RECORDED}'
 
 
+def retired_texts(verification: Sequence[ArchivedCommand]) -> list[str]:
+    return [
+        f'{command.key} by {command.retirement.by} ({command.retirement.approval_source}): '
+        f'{command.retirement.why}'
+        for command in verification
+        if command.retirement
+    ]
+
+
 def checks_line(verification: Sequence[ArchivedCommand]) -> str:
     not_passing = [command.key for command in verification if command.outcome != 'pass']
     passing = len(verification) - len(not_passing)
     tail = f'; not passing: {", ".join(not_passing)}' if not_passing else ''
-    return f'checks: {len(verification)} contract commands, {passing} passing at last run{tail}'
+    retired = '; '.join(retired_texts(verification))
+    retired_tail = f'; retired: {retired}' if retired else ''
+    counts = f'{len(verification)} contract commands, {passing} passing at last run'
+    return f'checks: {counts}{tail}{retired_tail}'
 
 
 def review_line(review: ArchivedReview | None) -> str:
