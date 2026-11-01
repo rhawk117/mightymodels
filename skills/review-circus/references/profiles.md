@@ -32,4 +32,4 @@ Weights do three things: pick the persona for a quick review that names none, dr
 
 ## History window for signals
 
-qualitylens needs a window. Default to `--baseline-ref BASE_REF` for branch and ticket scope, and `--max-commits 500` for codebase scope. A legacy repository with slow history can ask for `--all-history` or a release range (`--baseline-ref v2.0.0`); never assume a fixed number of days fits.
+qualitylens needs a window. Default to `baseline_ref` BASE_REF for branch and ticket scope, and `max_commits` 500 for codebase scope. A legacy repository with slow history can ask for `all_history` or a release range (`baseline_ref` `v2.0.0`); never assume a fixed number of days fits.

@@ -132,7 +132,7 @@ isolate from change (DIP — depend on interfaces, stub them in tests).
 | Asserts per test            | minimize; 1 concept per test                    |
 | Test:code LOC               | ~1:1 aspiration; 0 tests = top-severity finding |
 
-`mightymodels review-metrics` computes the mechanical rows; you judge the rest.
+The metrics file review-circus handed you holds the mechanical rows; you judge the rest.
 
 ## 11. Smells and Heuristics — full catalog (ch 17)
 

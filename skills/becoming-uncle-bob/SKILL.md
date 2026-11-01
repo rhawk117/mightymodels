@@ -43,8 +43,7 @@ read-only command, and returns an XML `<report>` carrying a verdict (`VERIFIED`,
 `INFERRED`, `NEEDS-ANALYSIS`, `UNKNOWN-BLOCKED`), `file:line` findings, and
 sometimes a `<follow_up>`.
 
-`qualitylens`: runs `mightymodels review-signals` for churn, change coupling, and hotspot
-measurements, only when review-circus supplied a signals history window. Its numbers
+`qualitylens`: measures churn, change coupling, and hotspots with its signals tools, only when review-circus supplied a signals history window. Its numbers
 back a finding's future-pressure and expected-churn fields; they never make a
 finding.
 

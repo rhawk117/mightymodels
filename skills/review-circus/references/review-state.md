@@ -1,10 +1,10 @@
 # Review state
 
-Read before the first `review` call in a session, and before another skill reads a review run. The `review` tool (`mcp__plugin_mightymodels_state__review`) is the only writer of a run's rows; `snapshot` and `close` read a ticket's latest run and write none.
+Read before the first `review_*` call in a session, and before another skill reads a review run. The `review_*` tools (`review_start`, `review_add`, `review_dispose`, `review_resolve` and `review_override`) are the only writers of a run's rows; `snapshot_take` and `close_check` read a ticket's latest run and write none.
 
 ## What a run keeps
 
-A run is rows in the state database, `mightymodels.db` in the plugin data directory, and a directory of files under `.mightymodels/`. `start` writes the run's row and creates the directory. The server and `mightymodels verify run` add `.mightymodels/` to the repository's local exclude file, so the files are never tracked, and the database is outside the repository.
+A run is rows in the state database, `mightymodels.db` in the plugin data directory, and a directory of files under `.mightymodels/`. `start` writes the run's row and creates the directory. `.mightymodels/` is a local-only git exclusion, so the files are never tracked, and the database is outside the repository.
 
 With a ticket: `.mightymodels/SLUG/review/RUN/`. Without one: `.mightymodels/.runtime/reviews/RUN/`. `RUN` is the UTC start time, `YYYYMMDD-HHMMSS`; a second `start` in the same second is refused.
 
@@ -18,7 +18,7 @@ With a ticket: `.mightymodels/SLUG/review/RUN/`. Without one: `.mightymodels/.ru
 | File                                           | Written by                                                   | Holds                      |
 | ---------------------------------------------- | ------------------------------------------------------------ | -------------------------- |
 | `MERGE-VADER-REPORT.md`, `UNCLE-BOB-REPORT.md` | the primary, from the persona's response unchanged           | the reports `add` reads    |
-| `uncle-bob-metrics.json`                       | `mightymodels review-metrics`                                | the structure measurements |
+| `uncle-bob-metrics.json`                       | `review_metrics`                                             | the structure measurements |
 | `report.md`                                    | the primary, from the `report` answer                        | the full report            |
 | `pr-comment.md`                                | the primary, from the `report` answer with `shape` `comment` | the abridged PR comment    |
 

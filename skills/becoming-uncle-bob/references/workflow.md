@@ -37,12 +37,12 @@ than sampling everything thinly.
 
 ## 2. Mechanical pass
 
-review-circus runs `mightymodels review-metrics` (py/js/ts) before
+review-circus measures structure (py/js/ts) with the `review_metrics` tool before
 dispatching you and passes the absolute path of its JSON output,
 `uncle-bob-metrics.json` in the review run directory. Read that file; you
-do not run the command. When the dispatch carries no metrics path, say so in
+hold no tool that measures. When the dispatch carries no metrics path, say so in
 Coverage and method and gather the same facts by reading, marking every such
-number as estimated. The command computes the layer that must not drift
+number as estimated. The measurement computes the layer that must not drift
 between runs: function LOC/params/flag-args/nesting, file sizes, long lines,
 test-to-source ratio, the module import graph, dependency cycles (ADP), and
 per-package Ca/Ce/I/A/D.
