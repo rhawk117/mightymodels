@@ -41,10 +41,13 @@ if TYPE_CHECKING:
 EDIT_TOOLS = frozenset({'Edit', 'Write'})
 BASH_TOOL = 'Bash'
 CONTRACT_RUN_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_run'
-CONTRACT_RUN_DENIED = (
-    'mightymodels: only the primary runs the contract, so this `contract_run` call from a '
-    'subagent was refused. Report back what you changed and verified, and the primary will run '
-    'the contract.'
+CONTRACT_APPROVE_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_approve'
+CONTRACT_RETIRE_TOOL = 'mcp__plugin_mightymodels_workflow_state__contract_retire'
+PRIMARY_ONLY_TOOLS = frozenset({CONTRACT_RUN_TOOL, CONTRACT_APPROVE_TOOL, CONTRACT_RETIRE_TOOL})
+CONTRACT_PRIMARY_ONLY = (
+    'mightymodels: only the primary runs, approves and retires contract commands, so this '
+    '`{tool}` call from a subagent was refused. Report back what you changed and verified, and '
+    'the primary will act on the contract.'
 )
 EDIT_OUTSIDE = (
     'mightymodels: ticket {slug} is unclosed on the checked-out branch, and this {tool} of {path} '
@@ -149,8 +152,10 @@ async def tool_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Rul
 
 
 async def main_thread_ruling(payload: PreToolUsePayload, ticket: TicketOnBranch) -> Ruling:
-    if payload.tool_name == CONTRACT_RUN_TOOL and payload.agent_id is not None:
-        return Denied(reason=CONTRACT_RUN_DENIED)
+    tool_name = payload.tool_name or ''
+    if tool_name in PRIMARY_ONLY_TOOLS and payload.agent_id is not None:
+        tool = tool_name.rsplit('__', 1)[-1]
+        return Denied(reason=CONTRACT_PRIMARY_ONLY.format(tool=tool))
 
     if plugin_caller(payload.agent_type) is not None:
         return None

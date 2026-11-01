@@ -3,7 +3,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_hooks.cli import create_hook_router
-from mightymodels_hooks.main_thread import CONTRACT_RUN_TOOL
+from mightymodels_hooks.main_thread import (
+    CONTRACT_APPROVE_TOOL,
+    CONTRACT_RETIRE_TOOL,
+    CONTRACT_RUN_TOOL,
+)
 from mightymodels_hooks.session_pointer import create_pointer_fields
 
 from tests.hooks.registration.registration_builders import ROOT
@@ -12,7 +16,9 @@ if TYPE_CHECKING:
     from tests.hooks.registration.registration_builders import RegisteredHook
 
 POINTER_TOOLS = create_pointer_fields().tool_names
-MAIN_THREAD_MATCHER = 'Edit|Write|Bash|' + CONTRACT_RUN_TOOL
+MAIN_THREAD_MATCHER = (
+    f'Edit|Write|Bash|{CONTRACT_RUN_TOOL}|{CONTRACT_APPROVE_TOOL}|{CONTRACT_RETIRE_TOOL}'
+)
 POINTER_MATCHER = '^mcp__plugin_mightymodels_workflow_state__(' + '|'.join(POINTER_TOOLS) + ')$'
 EXPECTED = [
     ('SessionStart', None, 'hook.sh', 'session-start'),

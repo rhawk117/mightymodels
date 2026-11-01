@@ -2,7 +2,11 @@ import re
 
 import pytest
 from mightymodels_hooks.branch_state import Landing
-from mightymodels_hooks.main_thread import CONTRACT_RUN_TOOL
+from mightymodels_hooks.main_thread import (
+    CONTRACT_APPROVE_TOOL,
+    CONTRACT_RETIRE_TOOL,
+    CONTRACT_RUN_TOOL,
+)
 from mightymodels_hooks.payloads import PreToolUsePayload
 
 from tests.hooks.dispatch.dispatch_builders import SLUG
@@ -16,9 +20,22 @@ from tests.hooks.main_thread.main_thread_builders import (
 from tests.hooks.registration.registration_builders import read_registered_hooks
 
 
-def contract_run_payload(agent_id: str | None, agent_type: str | None = None) -> PreToolUsePayload:
+def contract_payload(
+    agent_id: str | None, agent_type: str | None = None, tool: str = CONTRACT_RUN_TOOL
+) -> PreToolUsePayload:
     return PreToolUsePayload(
-        tool_name=CONTRACT_RUN_TOOL, tool_input={}, agent_id=agent_id, agent_type=agent_type
+        tool_name=tool, tool_input={}, agent_id=agent_id, agent_type=agent_type
+    )
+
+
+def primary_only_tool_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize(
+        'tool',
+        [
+            pytest.param(CONTRACT_RUN_TOOL, id='run'),
+            pytest.param(CONTRACT_APPROVE_TOOL, id='approve'),
+            pytest.param(CONTRACT_RETIRE_TOOL, id='retire'),
+        ],
     )
 
 
@@ -27,15 +44,17 @@ def subagent_cases() -> pytest.MarkDecorator:
 
 
 class TestContractRunDenial:
+    @primary_only_tool_cases()
     @subagent_cases()
-    async def test_a_subagent_is_denied(self, agent_type: str | None) -> None:
+    async def test_a_subagent_is_denied(self, agent_type: str | None, tool: str) -> None:
         fake = FakeTicketOnBranch()
-        verdict = await judge(contract_run_payload('agent-1', agent_type), fake)
+        verdict = await judge(contract_payload('agent-1', agent_type, tool), fake)
         assert (verdict.decision, fake.reads) == ('deny', [])
 
-    async def test_the_primary_passes_without_a_read(self) -> None:
+    @primary_only_tool_cases()
+    async def test_the_primary_passes_without_a_read(self, tool: str) -> None:
         fake = FakeTicketOnBranch()
-        verdict = await judge(contract_run_payload(None), fake)
+        verdict = await judge(contract_payload(None, tool=tool), fake)
         assert (verdict.decision, fake.reads) == (None, [])
 
     async def test_another_mcp_tool_from_a_subagent_passes(self) -> None:
@@ -63,6 +82,16 @@ class TestHookMatcher:
         assert len(matchers) == 1
         return matchers[0]
 
-    @pytest.mark.parametrize('tool', [CONTRACT_RUN_TOOL, 'Edit', 'Write', 'Bash'])
+    @pytest.mark.parametrize(
+        'tool',
+        [
+            CONTRACT_RUN_TOOL,
+            CONTRACT_APPROVE_TOOL,
+            CONTRACT_RETIRE_TOOL,
+            'Edit',
+            'Write',
+            'Bash',
+        ],
+    )
     def test_it_matches_the_tool(self, tool: str) -> None:
         assert re.search(self.matcher(), tool)

@@ -20,6 +20,11 @@ STATUS = {'tool_name': 'Bash', 'tool_input': {'command': 'git status'}}
 EDIT = {'tool_name': 'Edit', 'tool_input': {'file_path': 'a.py'}}
 WRITE = {'tool_name': 'Write', 'tool_input': {'file_path': 'a.py'}}
 READ = {'tool_name': 'Read', 'tool_input': {'file_path': 'a.py'}}
+CONTRACT_RUN = {
+    'tool_name': 'mcp__plugin_mightymodels_workflow_state__contract_run',
+    'tool_input': {},
+}
+SUBAGENT_CONTRACT_RUN = {**CONTRACT_RUN, 'agent_id': 'agent-1'}
 WORKER_PUSH = {**PUSH, 'agent_type': 'mightymodels:workers:engineer'}
 
 
@@ -98,5 +103,22 @@ class TestMainThreadWrapper:
         self, main_thread_runner: WrapperRunner, launcher: str, payload: Mapping[str, object]
     ) -> None:
         outcome = main_thread_runner.run(launcher, payload)
+
+        assert (outcome.code, outcome.stdout) == (0, '')
+
+    @broken_launcher_cases()
+    def test_refuses_a_subagent_contract_run_when_the_launcher_breaks(
+        self, main_thread_runner: WrapperRunner, launcher: str
+    ) -> None:
+        outcome = main_thread_runner.run(launcher, SUBAGENT_CONTRACT_RUN)
+
+        assert outcome.code == 2
+        assert 'contract_run' in outcome.stderr
+
+    @broken_launcher_cases()
+    def test_lets_the_primary_contract_run_through_when_the_launcher_breaks(
+        self, main_thread_runner: WrapperRunner, launcher: str
+    ) -> None:
+        outcome = main_thread_runner.run(launcher, CONTRACT_RUN, with_ticket_dir=True)
 
         assert (outcome.code, outcome.stdout) == (0, '')

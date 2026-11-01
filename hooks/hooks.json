@@ -23,7 +23,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|Bash|mcp__plugin_mightymodels_workflow_state__contract_run",
+        "matcher": "Edit|Write|Bash|mcp__plugin_mightymodels_workflow_state__contract_run|mcp__plugin_mightymodels_workflow_state__contract_approve|mcp__plugin_mightymodels_workflow_state__contract_retire",
         "hooks": [
           {
             "type": "command",
