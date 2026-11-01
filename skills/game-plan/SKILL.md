@@ -104,8 +104,9 @@ sees it; the user's time is for direction, not for catching a task with no accep
 only the primary runs them. An invariant's proving command gets an `I` id (`I1`, `I2`): it must
 stay true across the sprint. A landing command gets an `L` id (`L1`, `L2`): it is what the push
 hold re-runs at HEAD before anything is pushed, so every ticket needs at least one, usually the
-repository's full test or check command. A plan with no `L` command cannot land: add one or
-tell the user why none exists. A task's acceptance command takes no contract id: the engineer
+repository's full test or check command. A plan with no `L` command cannot land: add one, and
+when the repository has no obvious check command, ask the user through `AskUserQuestion` what it
+should be. A task's acceptance command takes no contract id: the engineer
 runs it in the sandbox and cites it in `task_verify`. Call `contract_approve` once with the
 `slug` and the full list of `commands`, each with an `id` and an `argv` (and optionally
 `expect_exit` and `timeout`), and leave `approved_by` out; the tool shows the user each id and
