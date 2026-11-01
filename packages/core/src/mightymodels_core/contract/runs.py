@@ -9,8 +9,10 @@ the cause as the last line of stderr. A run that HEAD moved under cannot pass.
 """
 
 import hashlib
+import os
 import time
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 import anyio
@@ -24,7 +26,6 @@ from .records import Receipt
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
-    from pathlib import Path
 
     from mightymodels_core.git import Git
     from mightymodels_core.primitives import Clock, Slug
@@ -124,7 +125,14 @@ class RunReporter(Protocol):
 
 
 def child_environment(parent: Mapping[str, str]) -> dict[str, str]:
-    return {name: value for name, value in parent.items() if name not in DROPPED_VARIABLES}
+    child = {name: value for name, value in parent.items() if name not in DROPPED_VARIABLES}
+    virtual_env = parent.get('VIRTUAL_ENV', '')
+    if virtual_env and 'PATH' in child:
+        plugin_bin = str(Path(virtual_env) / 'bin')
+        entries = child['PATH'].split(os.pathsep)
+        child['PATH'] = os.pathsep.join(entry for entry in entries if entry != plugin_bin)
+
+    return child
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

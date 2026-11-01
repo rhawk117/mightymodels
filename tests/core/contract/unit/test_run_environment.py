@@ -24,3 +24,8 @@ class TestChildEnvironment:
 
     def test_an_environment_without_the_names_is_copied_whole(self) -> None:
         assert child_environment({'PATH': '/usr/bin'}) == {'PATH': '/usr/bin'}
+
+    def test_the_virtual_environment_is_removed_from_the_path(self) -> None:
+        parent = {'PATH': '/plugin/.venv/bin:/usr/bin', 'VIRTUAL_ENV': '/plugin/.venv'}
+
+        assert child_environment(parent) == {'PATH': '/usr/bin'}
