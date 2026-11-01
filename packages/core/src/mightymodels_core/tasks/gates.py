@@ -14,6 +14,8 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from mightymodels_core.contract.policy import is_landing_command
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
@@ -28,7 +30,6 @@ DONE_COMMIT = re.compile(r'^\s*commit:\s*([0-9a-fA-F]{7,64})\s*$', re.MULTILINE)
 STUCK: frozenset[TaskStatus] = frozenset({'failed', 'blocked'})
 CLOSED: frozenset[TaskStatus] = frozenset({'verified', 'superseded'})
 PLAN_TASK_PREFIX = 'T'
-LANDING_COMMAND_PREFIX = 'L'
 NO_LANDING_COMMAND = 'the contract has no live L* command; approve one with contract_approve'
 
 
@@ -91,7 +92,7 @@ def get_landing_problems(
     commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
 ) -> list[str]:
     problems = get_receipt_problems(commands, receipts, head)
-    if any(command.key.startswith(LANDING_COMMAND_PREFIX) for command in commands):
+    if any(is_landing_command(command) for command in commands):
         return problems
 
     return [NO_LANDING_COMMAND, *problems]

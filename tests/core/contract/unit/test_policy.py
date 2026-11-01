@@ -23,6 +23,7 @@ from mightymodels_core.contract import (
     UnknownCommandError,
     is_argv,
 )
+from mightymodels_core.contract.policy import is_landing_command
 from mightymodels_core.primitives import Slug
 
 from tests.core.contract.contract_builders import (
@@ -176,6 +177,14 @@ class TestCommandPolicy:
         problem = self.find_problem(ShapeScenario(name='forbidden', key=key))
 
         assert type(problem) is InvalidCommandKeyError
+
+
+class TestIsLandingCommand:
+    def test_a_landing_key_is_a_landing_command(self) -> None:
+        assert is_landing_command(recorded('L1')) is True
+
+    def test_an_implementation_key_is_not_a_landing_command(self) -> None:
+        assert is_landing_command(recorded(FIRST_KEY)) is False
 
 
 class TestIsArgv:

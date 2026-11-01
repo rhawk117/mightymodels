@@ -35,6 +35,11 @@ type CommandShapeIssue = (
 )
 
 COMMAND_KEY_PATTERN = re.compile(r'[IL][0-9]+')
+LANDING_COMMAND_PREFIX = 'L'
+
+
+def is_landing_command(command: RecordedCommand) -> bool:
+    return command.key.startswith(LANDING_COMMAND_PREFIX)
 
 
 def live_commands(commands: Sequence[RecordedCommand]) -> list[RecordedCommand]:
