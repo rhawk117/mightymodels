@@ -32,8 +32,8 @@ Read `references/ticket-schema.md` and `references/mightymodels-dir.md` before t
 in a session; they are the contract this skill instantiates. State goes through the plugin's MCP
 tools: `ticket_write`, `ticket_validate`, `investigation_knowns` and `investigation_list`.
 
-Nothing under `.mightymodels/` is ever tracked by git. The session-start hook adds `.mightymodels/`
-to the repository's local exclude file when it starts, so a `git add -A` cannot ship briefs,
+Nothing under `.mightymodels/` is ever tracked by git. The state server adds `.mightymodels/`
+to the repository's local exclude file when it opens its database, so a `git add -A` cannot ship briefs,
 reports, or the database, which may carry raw command output.
 
 ## The interview

@@ -56,4 +56,4 @@ The database's only writers are the mighty-mcp tools. Each group of tables has o
 
 ## Never tracked
 
-Nothing under `.mightymodels/` is ever committed. The session-start hook adds `.mightymodels/` to the repository's local exclude file (`info/exclude` in the common git dir, so worktrees share it). `briefs/`, `review/`, and the database carry raw command output that can hold secrets, and local-only exclusion means a careless `git add -A` cannot ship them. A later session that finds `.mightymodels/` missing from the exclude file restarts the server, which restores it before anything is written there.
+Nothing under `.mightymodels/` is ever committed. The state server adds `.mightymodels/` to the repository's local exclude file (`info/exclude` in the common git dir, so worktrees share it) when it opens its database, not when it starts. `briefs/`, `review/`, and the database carry raw command output that can hold secrets, and local-only exclusion means a careless `git add -A` cannot ship them. A later session that finds `.mightymodels/` missing from the exclude file restarts the server, which restores it before anything is written there.
