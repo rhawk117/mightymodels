@@ -31,15 +31,25 @@ PROBE = (
     ' [print(name, name in os.environ) for name in'
     ' ("UV_PROJECT", "UV_PROJECT_ENVIRONMENT", "VIRTUAL_ENV")]'
 )
-INTEGRATION = {'id': 'I1', 'argv': (sys.executable, '-c', PROBE), 'approved_by': APPROVER}
-LANDING = {'id': 'L1', 'argv': (sys.executable, '-c', 'print("landed")'), 'approved_by': APPROVER}
 SILENT_SECONDS = 32
-SILENT = {
-    'id': 'I1',
-    'argv': (sys.executable, '-c', f'import time; time.sleep({SILENT_SECONDS})'),
-    'timeout': 120,
-    'approved_by': APPROVER,
-}
+
+
+def integration_command() -> dict[str, Any]:
+    return {'id': 'I1', 'argv': (sys.executable, '-c', PROBE), 'approved_by': APPROVER}
+
+
+def landing_command() -> dict[str, Any]:
+    argv = (sys.executable, '-c', 'print("landed")')
+    return {'id': 'L1', 'argv': argv, 'approved_by': APPROVER}
+
+
+def silent_command() -> dict[str, Any]:
+    return {
+        'id': 'I1',
+        'argv': (sys.executable, '-c', f'import time; time.sleep({SILENT_SECONDS})'),
+        'timeout': 120,
+        'approved_by': APPROVER,
+    }
 
 
 @dataclass(slots=True, kw_only=True)
@@ -121,7 +131,7 @@ async def flow(server_harness: ServerHarness, environment_directory: Path) -> As
 
 class TestLandingFlow:
     async def test_readiness_lifts_only_after_a_pass_at_head(self, flow: Flow) -> None:
-        await flow.approve(INTEGRATION, LANDING)
+        await flow.approve(integration_command(), landing_command())
         await flow.start_and_verify_task()
         head = await flow.head()
 
@@ -152,7 +162,7 @@ class TestLandingFlow:
     async def test_child_runs_in_the_target_repository_without_the_launcher_variables(
         self, flow: Flow
     ) -> None:
-        await flow.approve(INTEGRATION, LANDING)
+        await flow.approve(integration_command(), landing_command())
 
         view = await flow.run('task')
 
@@ -166,7 +176,7 @@ class TestLandingFlow:
         ]
 
     async def test_a_passing_integration_command_alone_is_not_ready(self, flow: Flow) -> None:
-        await flow.approve(INTEGRATION)
+        await flow.approve(integration_command())
         await flow.start_and_verify_task()
         await flow.run('task')
 
@@ -175,7 +185,7 @@ class TestLandingFlow:
         assert text == f'not ready\n  - {NO_LANDING_COMMAND}\n'
 
     async def test_a_retired_command_stops_counting(self, flow: Flow) -> None:
-        await flow.approve(INTEGRATION, LANDING)
+        await flow.approve(integration_command(), landing_command())
         await flow.start_and_verify_task()
         await flow.run('landing', None, 'L1')
         assert 'I1 has no receipt' in await flow.ready()
@@ -188,7 +198,7 @@ class TestLandingFlow:
 
 class TestHeartbeat:
     async def test_a_silent_command_still_reports_progress_while_it_runs(self, flow: Flow) -> None:
-        await flow.approve(SILENT)
+        await flow.approve(silent_command())
         log = ProgressLog()
 
         with anyio.fail_after(SILENT_SECONDS + 20):

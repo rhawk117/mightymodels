@@ -17,6 +17,11 @@ if TYPE_CHECKING:
     from tests.hooks.main_thread.main_thread_builders import MainThreadHarness
 
 
+@pytest.fixture
+def ticket_directory(harness: MainThreadHarness) -> None:
+    harness.dispatch.make_ticket_directory()
+
+
 class TestWithoutATicketDirectory:
     async def test_push_is_not_judged(self, harness: MainThreadHarness) -> None:
         verdict = await harness.verdict(bash_payload(PUSH))
@@ -25,10 +30,6 @@ class TestWithoutATicketDirectory:
 
 @pytest.mark.usefixtures('ticket_directory')
 class TestWithATicket:
-    @pytest.fixture
-    def ticket_directory(self, harness: MainThreadHarness) -> None:
-        harness.dispatch.make_ticket_directory()
-
     async def test_push_with_no_ticket_recorded_is_not_judged(
         self, harness: MainThreadHarness
     ) -> None:
@@ -85,10 +86,6 @@ class TestWithATicket:
 
 @pytest.mark.usefixtures('ticket_directory')
 class TestLandingRule:
-    @pytest.fixture
-    def ticket_directory(self, harness: MainThreadHarness) -> None:
-        harness.dispatch.make_ticket_directory()
-
     async def test_push_of_a_pass_at_head_in_the_task_phase_is_not_judged(
         self, harness: MainThreadHarness
     ) -> None:

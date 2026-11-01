@@ -17,7 +17,10 @@ if TYPE_CHECKING:
     from tests.core.tasks.service_builders import ServiceHarness
 
 BRIEF = f'## ASKED\n  - AC-1: first\n  - AC-2: second\n## DONE\ncommit: {DONE_COMMIT}\n'
-CITED = {'AC-1': f'{OWNED_FILE}:1', 'AC-2': f'{OWNED_FILE}:2'}
+
+
+def cited_assertions() -> dict[str, str]:
+    return {'AC-1': f'{OWNED_FILE}:1', 'AC-2': f'{OWNED_FILE}:2'}
 
 
 def create_gate(assertions: dict[str, str]) -> VerificationGate:
@@ -28,10 +31,10 @@ def create_gate(assertions: dict[str, str]) -> VerificationGate:
 
 class TestGatesWithoutReceipts:
     def test_a_task_with_every_criterion_cited_verifies_without_a_receipt(self) -> None:
-        assert create_gate(CITED).get_verification_problems() == []
+        assert create_gate(cited_assertions()).get_verification_problems() == []
 
     def test_a_task_with_an_uncited_criterion_is_refused_naming_it(self) -> None:
-        gate = create_gate({'AC-1': CITED['AC-1']})
+        gate = create_gate({'AC-1': cited_assertions()['AC-1']})
 
         assert gate.get_verification_problems() == ['AC-2 has no citation']
 

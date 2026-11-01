@@ -22,9 +22,18 @@ if TYPE_CHECKING:
 
 PHASES = ('planning', 'task', 'review', 'landing')
 GIT_IDENTITY = ('-c', 'user.name=probe', '-c', 'user.email=probe@example.com')
-PASSING = {'id': 'I1', 'argv': (sys.executable, '-c', 'print("one")')}
-FAILING = {'id': 'I2', 'argv': (sys.executable, '-c', 'import sys; sys.exit(3)')}
-LAST = {'id': 'I3', 'argv': (sys.executable, '-c', 'print("three")')}
+
+
+def passing_command() -> dict[str, Any]:
+    return {'id': 'I1', 'argv': (sys.executable, '-c', 'print("one")')}
+
+
+def failing_command() -> dict[str, Any]:
+    return {'id': 'I2', 'argv': (sys.executable, '-c', 'import sys; sys.exit(3)')}
+
+
+def last_command() -> dict[str, Any]:
+    return {'id': 'I3', 'argv': (sys.executable, '-c', 'print("three")')}
 
 
 @dataclass(slots=True, kw_only=True)
@@ -91,7 +100,7 @@ class TestContractRun:
     async def test_every_live_command_gets_a_result_in_approved_order(
         self, harness: RunHarness
     ) -> None:
-        await harness.approve(PASSING, LAST)
+        await harness.approve(passing_command(), last_command())
 
         view = view_of(await harness.run())
 
@@ -101,7 +110,7 @@ class TestContractRun:
         assert len(view['text'].splitlines()) == 2
 
     async def test_failed_command_does_not_stop_the_run(self, harness: RunHarness) -> None:
-        await harness.approve(PASSING, FAILING, LAST)
+        await harness.approve(passing_command(), failing_command(), last_command())
 
         view = view_of(await harness.run())
 
@@ -114,14 +123,14 @@ class TestContractRun:
         assert view['passing'] is False
 
     async def test_ids_pick_the_commands_to_run(self, harness: RunHarness) -> None:
-        await harness.approve(PASSING, LAST)
+        await harness.approve(passing_command(), last_command())
 
         view = view_of(await harness.run(ids=['I3']))
 
         assert [row['id'] for row in view['receipts']] == ['I3']
 
     async def test_progress_rises_and_names_each_command(self, harness: RunHarness) -> None:
-        await harness.approve(PASSING, FAILING)
+        await harness.approve(passing_command(), failing_command())
         log = ProgressLog()
 
         view_of(await harness.run(log))
@@ -138,7 +147,7 @@ class TestContractRun:
     async def test_phase_left_out_or_unknown_is_refused(
         self, harness: RunHarness, extra: dict[str, str]
     ) -> None:
-        await harness.approve(PASSING)
+        await harness.approve(passing_command())
         arguments = {'slug': SLUG, **extra}
         server = harness.tickets.server.create_server(create_catalog())
 
@@ -149,14 +158,14 @@ class TestContractRun:
 
     @pytest.mark.parametrize('phase', PHASES)
     async def test_each_phase_is_accepted(self, harness: RunHarness, phase: str) -> None:
-        await harness.approve(PASSING)
+        await harness.approve(passing_command())
 
         view = view_of(await harness.run(phase=phase))
 
         assert view['passing'] is True
 
     async def test_task_shaped_id_is_refused(self, harness: RunHarness) -> None:
-        await harness.approve(PASSING)
+        await harness.approve(passing_command())
 
         result = await harness.run(ids=['T1.AC-1'])
 
@@ -166,7 +175,7 @@ class TestContractRun:
     async def test_tracked_changes_are_refused(
         self, harness: RunHarness, server_harness: ServerHarness
     ) -> None:
-        await harness.approve(PASSING)
+        await harness.approve(passing_command())
         tracked = server_harness.repository.joinpath('tracked.txt')
         tracked.write_text('one\n', encoding='utf-8')
         await harness.git('add', 'tracked.txt')
@@ -181,8 +190,8 @@ class TestContractRun:
     async def test_receipt_reports_form_and_fallback_approval_sources(
         self, harness: RunHarness
     ) -> None:
-        await harness.approve(PASSING)
-        await harness.approve({**LAST, 'approved_by': 'lead'})
+        await harness.approve(passing_command())
+        await harness.approve({**last_command(), 'approved_by': 'lead'})
 
         view = view_of(await harness.run())
 
