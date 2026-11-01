@@ -9,7 +9,7 @@
   "author": {
     "name": "rhawk117"
   },
-  "mcpServers": "./mcp-servers/workflow_state.json",
+  "mcpServers": "./mcp-servers/mighty-mcp.json",
   "keywords": [
     "workflow",
     "human-in-the-loop",

@@ -21,7 +21,7 @@ EDIT = {'tool_name': 'Edit', 'tool_input': {'file_path': 'a.py'}}
 WRITE = {'tool_name': 'Write', 'tool_input': {'file_path': 'a.py'}}
 READ = {'tool_name': 'Read', 'tool_input': {'file_path': 'a.py'}}
 CONTRACT_RUN = {
-    'tool_name': 'mcp__plugin_mightymodels_workflow_state__contract_run',
+    'tool_name': 'mcp__plugin_mightymodels_mighty-mcp__contract_run',
     'tool_input': {},
 }
 SUBAGENT_CONTRACT_RUN = {**CONTRACT_RUN, 'agent_id': 'agent-1'}

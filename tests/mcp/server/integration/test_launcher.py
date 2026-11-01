@@ -30,7 +30,7 @@ class Launcher:
 
 
 class TestLauncher:
-    SERVER_NAME = 'workflow_state'
+    SERVER_NAME = 'mighty-mcp'
 
     @pytest.fixture
     def servers(self) -> dict[str, DeclaredServer]:
@@ -47,7 +47,7 @@ class TestLauncher:
         )
         return Launcher(servers=servers, parameters=parameters)
 
-    def test_declares_only_the_workflow_state_server(self, launcher: Launcher) -> None:
+    def test_declares_only_the_mighty_mcp_server(self, launcher: Launcher) -> None:
         assert list(launcher.servers) == [self.SERVER_NAME]
 
     async def test_declared_command_serves_every_tool_over_stdio(self, launcher: Launcher) -> None:
@@ -63,7 +63,7 @@ class TestPluginOnlyServer:
     def test_plugin_only_server_file_is_the_one_plugin_json_names(self) -> None:
         manifest = json.loads(CHECKOUT.joinpath('.claude-plugin', 'plugin.json').read_text())
 
-        assert manifest['mcpServers'] == './mcp-servers/workflow_state.json'
+        assert manifest['mcpServers'] == './mcp-servers/mighty-mcp.json'
 
     def test_plugin_only_root_mcp_json_declares_no_servers(self) -> None:
         project_config = json.loads(CHECKOUT.joinpath('.mcp.json').read_text())

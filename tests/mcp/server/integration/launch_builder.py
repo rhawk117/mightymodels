@@ -14,7 +14,7 @@ CHECKOUT = Path(__file__).resolve().parents[4]
 PLUGIN_ROOT_VARIABLE = '${CLAUDE_PLUGIN_ROOT}'
 ENVIRONMENT_VARIABLE = 'UV_PROJECT_ENVIRONMENT'
 CACHE_VARIABLE = 'UV_CACHE_DIR'
-SERVER_NAME = 'workflow_state'
+SERVER_NAME = 'mighty-mcp'
 
 
 class DeclaredServer(BaseModel):
@@ -33,7 +33,7 @@ def expand(value: str) -> str:
 
 def load_declared_servers() -> dict[str, DeclaredServer]:
     return PluginMcpConfig.model_validate_json(
-        CHECKOUT.joinpath('mcp-servers', 'workflow_state.json').read_text()
+        CHECKOUT.joinpath('mcp-servers', 'mighty-mcp.json').read_text()
     ).servers
 
 

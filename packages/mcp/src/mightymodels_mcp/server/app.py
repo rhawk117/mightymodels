@@ -1,4 +1,4 @@
-"""Build the workflow_state MCP server over an injected dependencies container."""
+"""Build the mighty-mcp MCP server over an injected dependencies container."""
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .dependencies import ServerDependencies
     from .registration import ToolCatalog
 
-SERVER_NAME = 'workflow_state'
+SERVER_NAME = 'mighty-mcp'
 REQUEST_STATE_TTL_SECONDS = 3600
 INSTRUCTIONS = (
     'Tools read and change the mightymodels workflow state of the current repository. '
