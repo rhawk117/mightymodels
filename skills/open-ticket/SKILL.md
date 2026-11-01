@@ -127,20 +127,14 @@ branch exists locally. When it is the current checkout, create nothing. A detach
 checkout the sprint can run on; the tool refuses it, so ask the user for a branch name and call
 `ticket_write` again with `branch`.
 
-**D. ticket.yml.** Call `ticket_write` with the `slug` and the rollup and tracker answers as
-arguments, and no `scope`, `compaction` or `branch`; the tool asks the user for those three:
-
-```json
-{"slug": "SLUG", "summary": "...", "context": ["...", "..."], "issue": 42, "jira": "PLAT-41",
- "reference_urls": ["https://..."], "investigations": ["20260928-..."]}
-```
+**D. ticket.yml.** Call `ticket_write` with the rollup and tracker answers as arguments, and no
+`scope`, `compaction` or `branch`; the tool asks the user for those three.
 
 An answer starting `needs input` means no one could be asked through the tool: put each question
 it names to the user in one `AskUserQuestion` dialog, then call again with those arguments
 (`scope`, `compaction`, and `branch` as the current branch name or the new branch name).
 
-The tool derives the model routing from the scope and `plan-first` from the compaction answer,
-per the schema, and refuses to overwrite an existing ticket.yml. Tell the user the file exists
+The tool refuses to overwrite an existing ticket.yml. Tell the user the file exists
 and pause: they tweak it by hand before anything else happens, and their
 edit wins over the derivation.
 
@@ -148,10 +142,8 @@ edit wins over the derivation.
 
 Call `ticket_validate` with the `slug`.
 
-It parses ticket.yml in the canonical subset the schema describes, checks every field and every
-linked investigation, and stages the ticket as a row in the state database. A hand edit outside
-the subset is reported with its line; fix it rather than working around it. The ticket is not
-staged until this passes.
+A hand edit outside the schema's subset is reported with its line; fix it rather than working
+around it. The ticket is not staged until this passes.
 
 ## What next
 

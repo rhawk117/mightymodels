@@ -107,17 +107,8 @@ hold re-runs at HEAD before anything is pushed, so every ticket needs at least o
 repository's full test or check command. A plan with no `L` command cannot land: add one, and
 when the repository has no obvious check command, ask the user through `AskUserQuestion` what it
 should be. A task's acceptance command takes no contract id: the engineer
-runs it in the sandbox and cites it in `task_verify`. Call `contract_approve` once with the
-`slug` and the full list of `commands`, each with an `id` and an `argv` (and optionally
-`expect_exit` and `timeout`), and leave `approved_by` out; the tool shows the user each id and
-argv and records the commands only when the user approves them:
-
-```json
-{"slug": "SLUG", "commands": [
-  {"id": "I1", "argv": ["uv", "run", "pytest", "-q", "-m", "unit"]},
-  {"id": "L1", "argv": ["uv", "run", "pytest", "-q"], "timeout": 600}
-]}
-```
+runs it in the sandbox and cites it in `task_verify`. Call `contract_approve` once with the full
+list of commands and leave `approved_by` out; the tool puts each id and argv to the user.
 
 An answer starting `not approved` means the user wants the list changed: change it as they said
 and call again. An answer starting `needs input` means no one could be asked through the tool: put
@@ -125,9 +116,8 @@ the question it names to the user in one `AskUserQuestion` dialog, and on approv
 `"approved_by": "user"` on each command.
 
 Then call `contract_run` with the `slug`, phase `planning` and `ids` of the new commands, to run
-them at HEAD. Commands are argv lists with no shell, so a check that needs a pipeline belongs in
-a script the repository owns. An approved id never changes its argv; a different command gets a
-new id. Record each command's planning outcome in the plan: an invariant that fails at HEAD is a
+them at HEAD. A check that needs a pipeline belongs in a script the repository owns. A different
+command gets a new id. Record each command's planning outcome in the plan: an invariant that fails at HEAD is a
 finding for the user before anything is built; a landing command that fails because the thing it
 tests does not exist yet is the expected baseline. Call `contract_status` when a run is refused,
 and read `references/verification-contract.md` for the rules behind it.

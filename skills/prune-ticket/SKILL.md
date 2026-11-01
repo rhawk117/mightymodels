@@ -45,18 +45,9 @@ it hides it.
 
 ## 2. Close into the archive
 
-Write the three judgment lines the rows cannot hold, then call `close_ticket` with the `slug` and the closing as arguments:
-
-```json
-{"slug": "SLUG", "shipped": "<what this ticket delivered, one line>",
- "pr": "<PR URL>", "gotchas": ["<what bit us, what to know before touching this area again>"]}
-```
-
-Take `shipped` from REPORT.md and the PR, the URL from `gh pr view`, and at most three gotchas
-from BATON.md, REPORT.md, and the review reports. `close_ticket` adds everything objective (tasks
-and attempts, every contract command with its last result, ledger decisions, review outcomes
-and reasons), stores the closing and marks the ticket closed in one transaction, and returns
-the archive: write its Markdown to `markdown_path` and its record to `record_path`, then read
+Write the three judgment lines the rows cannot hold (`shipped`, `pr`, `gotchas`), then call
+`close_ticket`. Take `shipped` from REPORT.md and the PR, the URL from `gh pr view`, and at most three gotchas
+from BATON.md, REPORT.md, and the review reports. `close_ticket` adds everything objective and returns the archive: write its Markdown to `markdown_path` and its record to `record_path`, then read
 both back. The compression test: a teammate touching this area next quarter reads 30
 lines and knows what happened and what to watch for.
 

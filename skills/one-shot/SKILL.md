@@ -70,12 +70,8 @@ re-asked.
 
 **3. Materialize the minimum.** Only when no ticket exists: the issue via `gh issue create` if
 one was asked for (else `issue-body.md`), then stage the ticket with `ticket_write`, as
-open-ticket does. Pass the `slug` and the answers as arguments, with no `scope` or `branch`; the
-tool asks the user for both:
-
-```json
-{"slug": "SLUG", "summary": "...", "compaction": false, "context": ["..."]}
-```
+open-ticket does. Pass the answers as arguments, with `compaction` false and no `scope` or `branch`; the
+tool asks the user for both.
 
 An answer starting `needs input` means no one could be asked through the tool: put each question
 it names to the user in one `AskUserQuestion` dialog, then call again with those arguments. Then read `branch-name` from ticket.yml: when it is not the current branch, create that
@@ -115,13 +111,7 @@ The contract holds the commands only the primary runs, and every ticket needs at
 landing command, an `L` id, because the push hold re-runs the live `L` commands at HEAD and a
 ticket with none cannot land. Use `L1` for the repository's check command (the full test run, or
 the narrowest command that proves the whole change), and add an `I1` only for an invariant that
-must hold throughout. Approve them with one call to `contract_approve`, passing the `slug` and
-the `commands`, each with an `id` and an `argv`, and no `approved_by`; the tool asks the user and
-records the commands only when the user approves:
-
-```json
-{"slug": "SLUG", "commands": [{"id": "L1", "argv": ["..."], "expect_exit": 0, "timeout": 300}]}
-```
+must hold throughout. Approve them with one call to `contract_approve` and no `approved_by`; the tool asks the user.
 
 An answer starting `not approved` means the user wants the list changed: change it and call
 again. An answer starting `needs input` means no one could be asked through the tool: put the
