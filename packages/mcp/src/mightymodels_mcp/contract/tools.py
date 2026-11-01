@@ -49,6 +49,7 @@ from .schemas import (
     create_retire_request,
     leaves_approver_blank,
 )
+from .settings import InvalidHeartbeatError, parse_run_options
 from .use_cases import (
     ContractApproval,
     approve_contract,
@@ -208,6 +209,10 @@ async def contract_run(request: ContractRunRequest, ctx: ToolContext) -> Contrac
     to run every live command. A failed command does not stop the run. Refused while tracked files
     have changes.
     """
+    options = parse_run_options(os.environ)
+    if isinstance(options, InvalidHeartbeatError):
+        raise options
+
     async with open_tool_state(ctx) as state:
         work = create_work(state, TaskWork)
         runner = ContractRunner(
@@ -218,6 +223,7 @@ async def contract_run(request: ContractRunRequest, ctx: ToolContext) -> Contrac
             root=state.checkout.toplevel,
             environment=child_environment(os.environ),
             reporter=ToolProgressReporter(ctx=ctx),
+            options=options,
         )
         run = RunRequest(slug=request.slug, asked=request.ids, phase=request.phase)
         result = await runner.run(run)

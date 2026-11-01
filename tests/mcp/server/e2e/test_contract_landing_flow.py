@@ -1,6 +1,7 @@
 """The contract flow through the launcher's real server over stdio against a real git repository."""
 
 import sys
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -8,6 +9,7 @@ import anyio
 import pytest
 from mcp import Client
 from mightymodels_core.tasks.gates import NO_LANDING_COMMAND
+from mightymodels_mcp.contract.settings import HEARTBEAT_VARIABLE
 
 from tests.core.git.git_builders import commit_file, run_git
 from tests.mcp.server.integration.launch_builder import (
@@ -19,7 +21,7 @@ from tests.mcp.server.server_harness import view_of
 from tests.mcp.ticket.ticket_harness import ANSWERED, SLUG
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator, AsyncIterator
     from pathlib import Path
 
     from tests.mcp.server.server_harness import ServerHarness
@@ -31,7 +33,9 @@ PROBE = (
     ' [print(name, name in os.environ) for name in'
     ' ("UV_PROJECT", "UV_PROJECT_ENVIRONMENT", "VIRTUAL_ENV")]'
 )
-SILENT_SECONDS = 32
+SILENT_SECONDS = 3
+HEARTBEAT_SECONDS = 0.5
+SILENT_PROGRESS = 'I1 running (1 of 1)'
 
 
 def integration_command() -> dict[str, Any]:
@@ -47,7 +51,7 @@ def silent_command() -> dict[str, Any]:
     return {
         'id': 'I1',
         'argv': (sys.executable, '-c', f'import time; time.sleep({SILENT_SECONDS})'),
-        'timeout': 120,
+        'timeout': 30,
         'approved_by': APPROVER,
     }
 
@@ -112,12 +116,15 @@ def environment_directory(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return tmp_path_factory.mktemp('launcher').joinpath('venv')
 
 
-@pytest.fixture
-async def flow(server_harness: ServerHarness, environment_directory: Path) -> AsyncIterator[Flow]:
+@asynccontextmanager
+async def open_flow(
+    server_harness: ServerHarness, environment_directory: Path, extra_environ: dict[str, str]
+) -> AsyncGenerator[Flow]:
     parameters = create_launch_parameters(
         declared=load_declared_servers()[SERVER_NAME],
         server_harness=server_harness,
         environment_directory=environment_directory,
+        extra_environ=extra_environ,
     )
     repository = server_harness.repository
     async with Client(parameters) as client:
@@ -127,6 +134,21 @@ async def flow(server_harness: ServerHarness, environment_directory: Path) -> As
         await created.call('task_declare', {'slug': SLUG, 'task_ids': ['T1']})
         await commit_file(repository, 'base.txt')
         yield created
+
+
+@pytest.fixture
+async def flow(server_harness: ServerHarness, environment_directory: Path) -> AsyncIterator[Flow]:
+    async with open_flow(server_harness, environment_directory, {}) as opened:
+        yield opened
+
+
+@pytest.fixture
+async def quick_heartbeat_flow(
+    server_harness: ServerHarness, environment_directory: Path
+) -> AsyncIterator[Flow]:
+    environ = {HEARTBEAT_VARIABLE: str(HEARTBEAT_SECONDS)}
+    async with open_flow(server_harness, environment_directory, environ) as opened:
+        yield opened
 
 
 class TestLandingFlow:
@@ -197,17 +219,32 @@ class TestLandingFlow:
 
 
 class TestHeartbeat:
-    async def test_a_silent_command_still_reports_progress_while_it_runs(self, flow: Flow) -> None:
-        await flow.approve(silent_command())
+    async def test_a_silent_command_still_reports_progress_while_it_runs(
+        self, quick_heartbeat_flow: Flow
+    ) -> None:
+        await quick_heartbeat_flow.approve(silent_command())
         log = ProgressLog()
 
         with anyio.fail_after(SILENT_SECONDS + 20):
-            view = await flow.run('task', log)
+            view = await quick_heartbeat_flow.run('task', log)
 
         assert view['passing'] is True
-        running = [
-            (progress, message) for progress, message in log.notes if 'running' in str(message)
-        ]
+        running = [message for _, message in log.notes if 'running' in str(message)]
         assert len(running) >= 1
+        assert set(running) == {SILENT_PROGRESS}
         positions = [progress for progress, _ in log.notes]
         assert positions == sorted(set(positions))
+
+    async def test_an_invalid_interval_is_refused_before_any_command_runs(
+        self, server_harness: ServerHarness, environment_directory: Path
+    ) -> None:
+        async with open_flow(
+            server_harness, environment_directory, {HEARTBEAT_VARIABLE: 'soon'}
+        ) as opened:
+            await opened.approve(silent_command())
+
+            result = await opened.client.call_tool('contract_run', {'slug': SLUG, 'phase': 'task'})
+
+            assert result.is_error
+            assert HEARTBEAT_VARIABLE in str(result.content)
+            assert "'soon'" in str(result.content)
