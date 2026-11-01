@@ -1,11 +1,11 @@
 # Template: qualitylens dispatch
 
-For one bounded measurement request from a persona reviewer or review-circus. qualitylens runs the review signals script and transcribes its output; its contract lives in the qualitylens agent file. The worker launches the script by name, as `mightymodels review-signals`, so the dispatch carries no path to it.
+For one bounded measurement request from a persona reviewer or review-circus. qualitylens works through the `signals_code_churn`, `signals_change_coupling` and `signals_code_hotspots` tools and transcribes their output; its contract lives in the qualitylens agent file. The dispatch carries no command and no path to a script.
 
 **Ten-second checklist:** the target is the changed files or one directory, not the repository root · the history window is explicit (`since`, `max-commits`, or `baseline-ref`) and fits the repository's age · broader context (hotspots) is asked for only when it changes a finding.
 
 ```text
-<objective>Measure <target> with the review signals script and report the values.</objective>
+<objective>Measure <target> with the `signals_*` tools and report the values.</objective>
 <context>
 Target: <paths>
 History window: <since=DATE | max-commits=N | all-history | baseline-ref=REF>

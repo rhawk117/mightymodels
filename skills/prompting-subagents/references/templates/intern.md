@@ -9,7 +9,7 @@ For one `tiny` task inside an active mightymodels sprint, given to the intern fo
 
 <ASKED stanza here>
 
-<constraints>Commit when done with message "<message>" and never push.
+<constraints>Run each verification command in sandboxed Bash and cite its output as evidence. Commit when done with message "<message>" and never push.
 </constraints>
 ```
 
@@ -17,4 +17,4 @@ Slots: objective · ACs · verification · files-in-scope · toolchain lines · 
 
 ## When it comes back blocked
 
-The intern does not debug and is not dispatched again on the same task; `task` `start` refuses a second attempt by it. Mark the task `blocked` with the intern's blocker as the reason, start it with `by` `engineer` and the same owned set and acceptance, and dispatch the engineer with the same ASKED stanza and the intern's blocker in `<context>`. No question goes to the user for this handover.
+The intern does not debug and is not dispatched again on the same task; `task_start` refuses a second attempt by it. Mark the task `blocked` (`task_mark`) with the intern's blocker as the reason, start it with `by` `engineer` and the same owned set and acceptance, and dispatch the engineer with the same ASKED stanza and the intern's blocker in `<context>`. No question goes to the user for this handover.

@@ -12,7 +12,7 @@ objective: <one sentence — what and why>
 acceptance:
   - AC-1: <runnable command, or checkable assertion with file/behavior named>
   - AC-2: <...>
-verification: <commands, in order>
+verification: <commands, in order; the task runs them in sandboxed Bash and cites the output as evidence>
 files-in-scope: [<paths this task owns>]
 engineer-tier: <model from ticket.yml, or bumped one tier: reason>
 uses: [<repository skills or instruction files, when the task names them>]
@@ -34,7 +34,7 @@ Slots: objective · ACs · verification · files-in-scope · tier(+reason) · to
 
 ## Residual variant
 
-For one named residual with a bounded fix: a verification leftover, a mechanical CI failure, or a review finding carrying Fix: and Verify: lines. The finding's own lines are the payload; paste them verbatim, never paraphrase, because paraphrase is where scope creep starts. No brief is written for a residual, so the dispatch itself carries the ticket slug and the task id the brief path would have given. The task id is the one `task` `start` just took: `R<n>` for a verification leftover or a review finding, `C<n>` for a CI failure. The finding's own id (`MV-3`, `UB-2`, `FC-1`) goes in its own slot and is never the task id, because the state tools refuse it.
+For one named residual with a bounded fix: a verification leftover, a mechanical CI failure, or a review finding carrying Fix: and Verify: lines. The finding's own lines are the payload; paste them verbatim, never paraphrase, because paraphrase is where scope creep starts. No brief is written for a residual, so the dispatch itself carries the ticket slug and the task id the brief path would have given. The task id is the one `task_start` just took: `R<n>` for a verification leftover or a review finding, `C<n>` for a CI failure. The finding's own id (`MV-3`, `UB-2`, `FC-1`) goes in its own slot and is never the task id, because the state tools refuse it.
 
 **Ten-second checklist:** exactly one issue named · the task id is started and is not the finding id · Fix: is a bounded action, not a goal · Verify: is a command or grep the engineer can run · files-in-scope names every file the Fix touches · commit/push instructions explicit.
 
@@ -47,8 +47,7 @@ finding: <the finding's own id, or the CI check's name>
 files-in-scope: [<every file the Fix touches>]
 Fix: <verbatim from the finding or verification failure>
 Verify: <verbatim check>
-contract-id: <the id the Verify line was approved under, such as R<n>.AC-1; left out when it was not approved as a contract command>
-<constraints>Commit as "<message>" and never push. One attempt: if Verify still fails, report failed with the output tail; if the Fix needs a file outside files-in-scope, report blocked.</constraints>
+<constraints>Commit as "<message>" and never push. One attempt: run Verify in sandboxed Bash and cite its output as evidence; the residual needs only a commit inside files-in-scope. If Verify still fails, report failed with the output tail; if the Fix needs a file outside files-in-scope, report blocked.</constraints>
 ```
 
-Slots: finding id · source line · slug · task id · files-in-scope · Fix · Verify · contract id · commit message.
+Slots: finding id · source line · slug · task id · files-in-scope · Fix · Verify · commit message.
