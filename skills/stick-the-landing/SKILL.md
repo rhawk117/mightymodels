@@ -50,10 +50,14 @@ none was given, and the ticket is the session's active one.
 loop stopped early. Say so and stop rather than papering over it. Then call `task_ready` with
 the `slug`. It answers `ready` only when a plan task has been started, every plan task is
 verified or superseded, and no C or R task is failed or blocked; otherwise it answers
-`not ready` and lists the reasons. Any reason is the loop's unfinished work: list the reasons
-and send the user back to agents-assemble.
+`not ready` and lists the reasons. It also answers `not ready` while a live command has no
+passing receipt at HEAD, or while no live `L*` command exists. Route by reason. When the only
+reasons are receipts not passing at HEAD, run the landing contract as the next paragraph
+describes, once, and call `task_ready` again. When the reason is the missing `L*` command, say so
+and send the user back to game-plan. Any other reason is the loop's unfinished work: list the
+reasons and send the user back to agents-assemble.
 
-Then run the landing contract with `contract_run`, the `slug` and phase `landing`, leaving `ids`
+Run the landing contract with `contract_run`, the `slug` and phase `landing`, leaving `ids`
 out so every live command runs. Only the primary holds this tool, because a hook denies it to
 subagents. A run longer than about two minutes moves to the background: wait for its result, and
 do not treat the notice that it moved as a pass. The push hold lifts when at least one live `L*`
