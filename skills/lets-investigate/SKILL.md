@@ -68,7 +68,8 @@ Once the user confirms the target, open the ledger and record their answers as r
 Call `investigation_start` with the `target` line and leave `kind` out: the tool asks the user for
 the classification and records the answer. An answer starting `needs input` means no one could
 be asked through the tool: put the question it names to the user in one `AskUserQuestion`
-dialog, then call again with `kind`.
+dialog, then call again with `kind`. Kind `change` means a proposed change to weigh, which what-we-know opens.
+`investigation_start` returns the investigation id, and every later call names it.
 
 The session is pointed at the
 investigation from the first call that names the id, not from `investigation_start`. From then
@@ -76,7 +77,9 @@ on the recorder hook on `AskUserQuestion` writes each answer the user gives in a
 ledger as a `decision` entry from `user`, which covers every gate answer, because the round's
 `investigation_add` comes before its gate. Do not write those yourself. The framing answers come
 earlier, so nothing records them: record each as a `known` from `user` in round 0, along with
-any fact the user states, since facts are not decisions (cite `user`, source `user`).
+any fact the user states, since facts are not decisions (cite `user`, source `user`). `known` and
+`resource` entries need a `cite`, and a `decision` entry's source can only be `user`, which is why
+the recorder writes it.
 
 When the user is resuming an earlier investigation, `investigation_list` shows the ids and
 `investigation_render` restores the ledger.
@@ -116,10 +119,13 @@ is an entry `kind`:
   both citations; never reconcile it silently.
 
 **4. Persist, then restate the whole ledger.** Write the round's entries in one
-`investigation_add` call, then call `investigation_render`.
+`investigation_add` call, then call `investigation_render`. Each scout wave's `investigation_add`
+uses the next `round` number, one above the last: core refuses only a round lower than the latest
+and accepts a skipped one.
 
 An answered Open question is retired by the entry that answers it (`supersedes`), never
-edited. Paste the `render` output into chat as the restatement: not a delta, the whole ledger.
+edited. `supersedes` takes the `e` numbers that `investigation_add` and `investigation_render`
+print, naming an entry from an earlier call. Paste the `render` output into chat as the restatement: not a delta, the whole ledger.
 If `add` cannot write at all, stop at the gate and say so. A gate on an unpersisted round is the loss this skill exists to
 prevent.
 
