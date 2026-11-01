@@ -95,6 +95,8 @@ The user's answers to wingman's questions go through `AskUserQuestion`, and the 
 that tool writes each answer, verbatim, as a decision in the ledger or ticket the session is
 pointed at. Write nothing by hand: a second entry would record the same answer twice. If the
 user settles the choice in chat instead of the dialog, nothing records it, so put the choice to
-them again through `AskUserQuestion` before work resumes. With no investigation or ticket in
+them again through `AskUserQuestion` before work resumes. This includes a deferral to wingman's
+recommendation: it is a choice made in chat, which has no writer, so put it through
+`AskUserQuestion` so the recorder takes it. With no investigation or ticket in
 the session, nothing is persisted; baton-pass hands the settled decisions on when the session
 ends.

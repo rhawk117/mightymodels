@@ -81,8 +81,10 @@ Act on the second answer before writing anything else. The baton describes the t
 after that action, and a baton that describes a stash that was never made is worse than none.
 
 Write no decision entry by hand. The recorder hook on `AskUserQuestion` already stored every
-answer the user gave in a dialog this session, including the two just given, in the ledger or
-ticket the session was pointed at, and the snapshot carries them to the next session. A choice
+answer the user gave in a dialog, including the two just given, but only if the session was
+pointed at a ledger or ticket when it was given; the snapshot carries those to the next session.
+In a session with no ticket and no pointer it stored nothing, so those decisions go in
+BATON.md. A choice
 the user made only in chat has no writer: if it matters to the next session, put it to them
 through `AskUserQuestion` now, so the recorder takes it. One only in the baton is one more line
 to drift.

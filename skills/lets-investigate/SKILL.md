@@ -73,11 +73,13 @@ the classification and records the answer. The kinds are `behavior`, `claim`, `r
 means no one could be asked through the tool: put the question it names to the user in one
 `AskUserQuestion` dialog, then call again with `kind`.
 
-`start` returns the investigation id; every later call names it. From then on the session is
-pointed at that investigation, and the recorder hook on `AskUserQuestion` writes each answer the
-user gives in a dialog into the ledger as a `decision` entry from `user`: the framing answers
-and every gate answer. Do not write those yourself. Facts the user states are not decisions, so
-record them with `investigation_add` as round 0:
+`start` returns the investigation id; every later call names it. The session is pointed at the
+investigation from the first call that names the id, not from `investigation_start`. From then
+on the recorder hook on `AskUserQuestion` writes each answer the user gives in a dialog into the
+ledger as a `decision` entry from `user`, which covers every gate answer, because the round's
+`investigation_add` comes before its gate. Do not write those yourself. The framing answers come
+earlier, so nothing records them: record each as a `known` from `user` in round 0, along with
+any fact the user states, since facts are not decisions:
 
 ```json
 {"investigation_id": "ID", "round": 0,
