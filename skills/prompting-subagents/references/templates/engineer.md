@@ -34,9 +34,9 @@ Slots: objective · ACs · verification · files-in-scope · tier(+reason) · to
 
 ## Residual variant
 
-For one named residual with a bounded fix: a verification leftover, a mechanical CI failure, or a review finding carrying Fix: and Verify: lines. The finding's own lines are the payload; paste them verbatim, never paraphrase, because paraphrase is where scope creep starts. No brief is written for a residual, so the dispatch itself carries the ticket slug and the task id the brief path would have given. The task id is the one `task_start` just took: `R<n>` for a verification leftover or a review finding, `C<n>` for a CI failure. The finding's own id (`MV-3`, `UB-2`, `FC-1`) goes in its own slot and is never the task id, because the state tools refuse it.
+For one named residual with a bounded fix: a verification leftover, a mechanical CI failure, or a review finding carrying Fix: and Verify: lines. The finding's own lines are the payload; paste them verbatim, never paraphrase, because paraphrase is where scope creep starts. No brief is written for a residual, so the dispatch itself carries the ticket slug and the task id the brief path would have given. The task id is the one `task_start` just took: `R<n>` for a verification leftover or a review finding, `C<n>` for a CI failure. The finding's own id (`MV-3`, `UB-2`, `FC-1`) goes in its own slot.
 
-**Ten-second checklist:** exactly one issue named · the task id is started and is not the finding id · Fix: is a bounded action, not a goal · Verify: is a command or grep the engineer can run · files-in-scope names every file the Fix touches · commit/push instructions explicit.
+**Ten-second checklist:** exactly one issue named · the task id is started · Fix: is a bounded action, not a goal · Verify: is a command or grep the engineer can run · files-in-scope names every file the Fix touches · commit/push instructions explicit.
 
 ```text
 <objective>Close one residual: <finding id and one-line name>. Treat it as a group of one task with the id <task id>.</objective>
