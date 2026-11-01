@@ -199,7 +199,7 @@ class GoneContext:
     async def report_progress(
         self, progress: float, total: float | None = None, message: str | None = None
     ) -> None:
-        assert (progress, total, message) is not None
+        assert (progress, total, message) == (0, None, 'I1 running (1 of 1)')
         raise self.error
 
 

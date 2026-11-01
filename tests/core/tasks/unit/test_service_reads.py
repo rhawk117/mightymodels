@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.tasks import MarkRequest
+from mightymodels_core.tasks.gates import NO_LANDING_COMMAND
 from mightymodels_core.tickets import NotStagedError
 
 from tests.core.tasks.service_builders import (
@@ -50,7 +51,7 @@ class TestReady:
     ) -> None:
         readiness = service_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
 
-        assert readiness.problems[0] == 'no plan task has been started'
+        assert readiness.problems == ['no plan task has been started', NO_LANDING_COMMAND]
 
     def test_ready_is_clear_when_every_plan_task_is_proven_at_head(
         self, verified_harness: ServiceHarness

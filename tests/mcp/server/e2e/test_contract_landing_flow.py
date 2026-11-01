@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import pytest
 from mcp import Client
+from mightymodels_core.tasks.gates import NO_LANDING_COMMAND
 
 from tests.core.git.git_builders import commit_file, run_git
 from tests.mcp.server.integration.launch_builder import (
@@ -171,8 +172,7 @@ class TestLandingFlow:
 
         text = await flow.ready()
 
-        assert text.startswith('not ready')
-        assert 'the contract has no live L* command' in text
+        assert text == f'not ready\n  - {NO_LANDING_COMMAND}\n'
 
     async def test_a_retired_command_stops_counting(self, flow: Flow) -> None:
         await flow.approve(INTEGRATION, LANDING)

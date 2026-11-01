@@ -94,4 +94,18 @@ class TestHookMatcher:
         ],
     )
     def test_it_matches_the_tool(self, tool: str) -> None:
-        assert re.search(self.matcher(), tool)
+        assert re.fullmatch(self.matcher(), tool)
+
+    @pytest.mark.parametrize(
+        'tool',
+        [
+            'Read',
+            'Grep',
+            'Editor',
+            'mcp__plugin_mightymodels_workflow_state__task_start',
+            f'{CONTRACT_RUN_TOOL}_extra',
+            CONTRACT_RUN_TOOL.removeprefix('mcp__'),
+        ],
+    )
+    def test_it_ignores_every_other_tool(self, tool: str) -> None:
+        assert re.fullmatch(self.matcher(), tool) is None

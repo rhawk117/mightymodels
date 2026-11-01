@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING
 
 import pytest
+from mightymodels_core.contract import RetireRequest
 from mightymodels_core.snapshot import DEFAULT_LIMIT, SnapshotRequest, snapshot_markdown
 from mightymodels_core.ticket_decisions import IncomingDecision
+from mightymodels_core.units_of_work import TaskWork
 
 from tests.core.snapshot.snapshot_builders import seed_ticket_decision
 
@@ -84,6 +86,26 @@ class TestSnapshotRead:
         record = take_snapshot(snapshot_read, seeded, repository_facts)
 
         assert [command.key for command in record.works] == ['I1']
+
+    @pytest.fixture
+    def retired(
+        self, database: Database, repository_key: RepositoryKey, clock: Clock, seeded: Slug
+    ) -> Slug:
+        work = TaskWork(database=database, repository_key=repository_key, clock=clock)
+        request = RetireRequest(
+            key='I1', by='planner', why='no longer applies', approval_source='fallback'
+        )
+        with work.write() as unit:
+            unit.contracts.retire(seeded, request)
+        return seeded
+
+    def test_a_retired_command_leaves_the_checks_and_the_works(
+        self, snapshot_read: SnapshotRead, retired: Slug, repository_facts: RepositoryFacts
+    ) -> None:
+        record = take_snapshot(snapshot_read, retired, repository_facts)
+
+        assert [check.key for check in record.checks] == ['I2', 'I3']
+        assert record.works == ()
 
     def test_do_not_retry_holds_the_blocked_move_with_its_reason(
         self, snapshot_read: SnapshotRead, seeded: Slug, repository_facts: RepositoryFacts

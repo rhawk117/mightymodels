@@ -3,9 +3,10 @@
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.primitives import TaskId
+from mightymodels_core.primitives import TaskId, WriteLimitError
 from mightymodels_core.tasks import TaskRecord, get_readiness_problems
 from mightymodels_core.tasks.errors import NotPlanTaskError
+from mightymodels_core.tasks.records import TASKS
 
 from tests.core.tasks.repository_builders import SECOND_TASK, create_attempt, create_transition
 from tests.core.tasks.service_builders import (
@@ -80,12 +81,25 @@ class TestDeclareInTheSqliteRepository:
         assert task.status == 'in-progress'
         assert task.base == 'abc1234'
 
+    def test_declaring_past_the_cap_is_refused(self, harness: TaskHarness) -> None:
+        keys = [TaskId(f'T{number}') for number in range(TASKS.rows + 1)]
+
+        with pytest.raises(WriteLimitError):
+            harness.tasks.declare(harness.ticket_id, keys, SERVICE_MOMENT)
+
+    def test_declaring_up_to_the_cap_is_kept(self, harness: TaskHarness) -> None:
+        keys = [TaskId(f'T{number}') for number in range(TASKS.rows)]
+
+        harness.tasks.declare(harness.ticket_id, keys, SERVICE_MOMENT)
+
+        assert len(harness.tasks.tasks(harness.ticket_id)) == TASKS.rows
+
     def test_a_declared_unstarted_task_blocks_readiness(self, harness: TaskHarness) -> None:
-        harness.tasks.declare(harness.ticket_id, [FIRST_TASK], SERVICE_MOMENT)
+        harness.tasks.declare(harness.ticket_id, [FIRST_TASK, TaskId('T10')], SERVICE_MOMENT)
 
         problems = get_readiness_problems(harness.tasks.tasks(harness.ticket_id))
 
-        assert any(FIRST_TASK in problem for problem in problems)
+        assert problems == ['T1 was never started', 'T10 was never started']
 
 
 class TestDeclareInTheService:

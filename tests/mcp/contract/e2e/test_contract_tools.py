@@ -207,7 +207,9 @@ class TestContractApprove:
         result = await approved.call('contract_approve', create_approve(changed))
 
         assert result.is_error
-        assert 'I1' in str(result.content)
+        assert 'I1 is already approved with a different argv; give it a new id' in str(
+            result.content
+        )
 
     async def test_asks_git_only_for_head(self, harness: ContractHarness) -> None:
         view_of(await harness.call('contract_approve', create_approve(CHECK, LINT)))
