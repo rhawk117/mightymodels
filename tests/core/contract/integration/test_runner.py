@@ -1,7 +1,7 @@
 """The contract runner over a real repository, real processes and real sqlite."""
 
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import anyio
@@ -60,6 +60,12 @@ class RecordingReporter:
         self.seen.append(progress)
         if self.on_report is not None and (progress.key, progress.state) == self.trigger:
             self.on_report.set()
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RaisingReporter:
+    async def report(self, progress: RunProgress) -> None:
+        raise RuntimeError(progress.state)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -243,6 +249,22 @@ class TestGitState:
         assert receipt.exit == 0
         assert 'HEAD changed during verification' in receipt.stderr_tail
 
+    async def test_a_command_that_edits_a_tracked_file_and_later_ones_do_not_pass(
+        self, root: Path, database: Database
+    ) -> None:
+        edit = 'import pathlib; pathlib.Path("tracked.txt").write_text("edited")'
+        harness = await create_harness(
+            root, database, [approved('I1', edit), approved('I2', 'pass')]
+        )
+
+        result = await harness.runner.run(request())
+
+        first, second = result.receipts
+        assert [first.outcome, second.outcome] == ['fail', 'fail']
+        assert first.exit == 0
+        assert 'Tracked files changed during verification' in first.stderr_tail
+        assert not result.is_passing
+
 
 class TestReceipt:
     async def test_receipts_keep_forty_lines_and_four_thousand_characters_redacted(
@@ -309,6 +331,22 @@ class TestProgress:
         (launched,) = waiting.launched
         assert launched.env == {'PATH': '/usr/bin:/bin'}
         assert launched.cwd == root
+
+    async def test_a_raising_reporter_costs_no_command_and_no_receipt(
+        self, root: Path, database: Database
+    ) -> None:
+        harness = await create_harness(
+            root,
+            database,
+            [approved('I1', 'pass'), approved('I2', 'pass')],
+            options=RunOptions(heartbeat_seconds=HEARTBEAT_SECONDS),
+        )
+        runner = replace(harness.runner, reporter=RaisingReporter())
+
+        result = await runner.run(request())
+
+        assert [receipt.outcome for receipt in result.receipts] == ['pass', 'pass']
+        assert harness.receipts() == {'I1': 'pass', 'I2': 'pass'}
 
     async def test_the_reporter_is_a_protocol(self) -> None:
         assert isinstance(RecordingReporter(), RunReporter)

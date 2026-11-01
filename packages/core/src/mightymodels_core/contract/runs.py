@@ -26,11 +26,11 @@ from .records import Receipt
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from contextlib import AbstractContextManager
 
     from mightymodels_core.git import Git
     from mightymodels_core.primitives import Clock, Slug
     from mightymodels_core.process import CompletedRun, FailureKind, ProcessRunner, RunOutcome
-    from mightymodels_core.units_of_work import TaskWork
     from mightymodels_core.vocabulary.contract import Outcome, Phase
 
     from .records import RecordedCommand
@@ -39,12 +39,7 @@ TAIL_LINES = 40
 TAIL_CHARS = 4000
 HEAD_MOVED = '\nHEAD changed during verification; rerun at the current HEAD.'
 DROPPED_VARIABLES = frozenset({'UV_PROJECT', 'UV_PROJECT_ENVIRONMENT', 'VIRTUAL_ENV'})
-FAILURE_OUTCOMES: dict[FailureKind, Outcome] = {
-    'timed_out': 'timeout',
-    'not_found': 'not-found',
-    'refused': 'refused',
-    'undecodable': 'undecodable',
-}
+TREE_CHANGED = '\nTracked files changed during verification; rerun on a clean tree.'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -70,9 +65,9 @@ class Execution:
     stdout: str
     stderr: str
 
-    def after_head_moved(self) -> Execution:
+    def failing_with(self, cause: str) -> Execution:
         return Execution(
-            outcome='fail', exit=self.exit, stdout=self.stdout, stderr=self.stderr + HEAD_MOVED
+            outcome='fail', exit=self.exit, stdout=self.stdout, stderr=self.stderr + cause
         )
 
 
@@ -85,10 +80,20 @@ def with_cause(captured: str, cause: str) -> str:
     return f'{captured}{separator}{cause}'
 
 
+def failure_outcome(kind: FailureKind) -> Outcome:
+    outcomes: dict[FailureKind, Outcome] = {
+        'timed_out': 'timeout',
+        'not_found': 'not-found',
+        'refused': 'refused',
+        'undecodable': 'undecodable',
+    }
+    return outcomes[kind]
+
+
 def execution_of(command: RecordedCommand, run: CompletedRun | FailedRun) -> Execution:
     if isinstance(run, FailedRun):
         return Execution(
-            outcome=FAILURE_OUTCOMES[run.kind],
+            outcome=failure_outcome(run.kind),
             exit=None,
             stdout=run.stdout,
             stderr=with_cause(run.stderr, run.detail),
@@ -120,6 +125,26 @@ class RunProgress:
 
 
 @runtime_checkable
+class RunLedger(Protocol):
+    def pick(self, slug: Slug, asked: Sequence[str] | None) -> list[RecordedCommand]: ...
+
+    def record(self, slug: Slug, receipts: Sequence[Receipt]) -> None: ...
+
+
+@runtime_checkable
+class RunUnit(Protocol):
+    @property
+    def contracts(self) -> RunLedger: ...
+
+
+@runtime_checkable
+class RunWork(Protocol):
+    def read(self) -> AbstractContextManager[RunUnit]: ...
+
+    def write(self) -> AbstractContextManager[RunUnit]: ...
+
+
+@runtime_checkable
 class RunReporter(Protocol):
     async def report(self, progress: RunProgress) -> None: ...
 
@@ -137,7 +162,7 @@ def child_environment(parent: Mapping[str, str]) -> dict[str, str]:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ContractRunner:
-    work: TaskWork
+    work: RunWork
     processes: ProcessRunner
     git: Git
     clock: Clock
@@ -171,12 +196,12 @@ class ContractRunner:
     async def run_command(
         self, request: RunRequest, command: RecordedCommand, started: RunProgress
     ) -> Receipt:
-        await self.reporter.report(started)
+        await self.notify(started)
         receipt = await self.receipt_for(command, request.phase, replace(started, state='running'))
         with self.work.write() as unit:
             unit.contracts.record(request.slug, [receipt])
 
-        await self.reporter.report(replace(started, state='finished', outcome=receipt.outcome))
+        await self.notify(replace(started, state='finished', outcome=receipt.outcome))
         return receipt
 
     async def receipt_for(
@@ -187,7 +212,10 @@ class ContractRunner:
         run = await self.launch(command, running)
         execution = execution_of(command, run)
         if await self.git.resolve_head() != head:
-            execution = execution.after_head_moved()
+            execution = execution.failing_with(HEAD_MOVED)
+
+        if await self.git.dirty_paths(untracked=UntrackedFiles.NO) != []:
+            execution = execution.failing_with(TREE_CHANGED)
 
         elapsed = int((time.monotonic() - started) * 1000)
         return Receipt(
@@ -224,4 +252,10 @@ class ContractRunner:
                 await finished.wait()
 
             if not finished.is_set():
-                await self.reporter.report(running)
+                await self.notify(running)
+
+    async def notify(self, progress: RunProgress) -> None:
+        try:
+            await self.reporter.report(progress)
+        except Exception:  # noqa: BLE001  progress is best-effort; a failing reporter must never cost a command or a receipt
+            return
