@@ -7,6 +7,11 @@ worker and pushes only a proven landing. The caller rule is the dispatch hook's:
 caller is judged as the main thread. Input that is not a JSON object never reaches this module;
 the command exits 2 on it, and hooks/main-thread-hook.sh turns that into a block for a push.
 
+A call to `contract_run`, `contract_approve` or `contract_retire` (`PRIMARY_ONLY_TOOLS`) is denied
+whenever the payload carries an `agent_id`, because only the primary runs, approves and retires
+contract commands. That check comes before the plugin-worker rule, so a `mightymodels:` subagent
+is denied too.
+
 An `Edit` or `Write` whose `file_path` is in a ticket directory gets no decision and reads no
 state. Any other one is answered `ask` while the branch has one unclosed ticket, so the user
 approves it in the permission prompt. When the tickets cannot be read the edit goes ahead and the

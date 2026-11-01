@@ -8,6 +8,10 @@ stuck.
 
 The caller passes the git facts and the brief text in as values; the gates call no git, read no
 file and return their problems as the lines the caller shows, an empty list being a pass.
+
+Landing is a separate rule, `get_landing_problems`: every command passed in needs a receipt at
+HEAD with a passing outcome, and at least one of them must be a landing (`L*`) command, or
+`NO_LANDING_COMMAND` leads the problems.
 """
 
 import re

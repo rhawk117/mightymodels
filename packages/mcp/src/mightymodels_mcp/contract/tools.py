@@ -1,14 +1,16 @@
 """The contract tools: thin async handlers over the sync use cases, and their registration.
 
 contract_approve asks one form, listing every command with its argv, when some command leaves its
-approver blank; the user approves the list or declines it. A declined or cancelled form returns
-the needs-input text as a normal result. Both tools ask git only for HEAD. The resolver's
-annotations are read at runtime, so `RoundAsk` is a module-level plain assignment and
-`ContractApproveRequest` a runtime import.
+approver blank; the user approves the list or declines it. contract_retire asks its own form
+under the same condition. A declined or cancelled form returns the needs-input text as a normal
+result. contract_approve and contract_status ask git only for HEAD, and contract_retire asks it
+nothing. The resolver's annotations are read at runtime, so `RoundAsk` is a module-level plain
+assignment and `ContractApproveRequest` a runtime import.
 
 contract_run runs the approved commands without a form, because the approved contract is the
-permission. Its progress goes out as notifications whose position rises on every one, since a
-heartbeat repeats a command's position.
+permission. Only the primary may call it, as it may call contract_approve and contract_retire;
+the main-thread hook denies all three to a subagent. Its progress goes out as notifications whose
+position rises on every one, since a heartbeat repeats a command's position.
 """
 
 import itertools

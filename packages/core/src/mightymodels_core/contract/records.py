@@ -1,6 +1,6 @@
 """The values the contract repository hands out and takes in: frozen, never a database row.
 
-An `ApprovedCommand` is what an approval writes. A `RecordedCommand` is what `verify run`
+An `ApprovedCommand` is what an approval writes. A `RecordedCommand` is what `contract_run`
 executes. A `Receipt` is the result of one run of a command. The
 output tails of a receipt are redacted text, which only `redact` produces, so a secret cannot
 reach a receipt by the type alone.

@@ -59,9 +59,9 @@ async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
 
 
 async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> TaskView:
-    """Verify a task against the reported commit, its contract receipts and its brief. Use when a
-    worker reports done, before the task closes. To record a failure or block instead, use
-    task_mark.
+    """Verify a task against the reported commit, its brief's citations and its owned
+    files. Use when a worker reports done, before the task closes. To record a failure or block
+    instead, use task_mark.
     """
     async with open_tool_state(ctx) as state:
         work = create_task_work(state)
