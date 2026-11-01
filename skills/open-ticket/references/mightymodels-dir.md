@@ -22,33 +22,33 @@ The state itself is rows in one SQLite database, `mightymodels.db`, and that fil
 └── archives/<task-slug>.{md,json}     ≤30-line archive plus bounded JSON record, written by prune-ticket from the close tool's text
 ```
 
-The subagent recorder hooks write no row: they spool each scout's report as a file in the plugin data directory, and the state server stores it as a `scout_reports` row when a tool is next called.
+The subagent recorder hooks write no row: they spool each scout's report as a file in the plugin data directory, and the mighty-mcp server stores it as a `scout_reports` row when a tool is next called.
 
 ## Writer/reader matrix: one writer per file class
 
-The database's only writers are the state server's ten tools and `mightymodels verify run`. Each group of tables has one.
+The database's only writers are the mighty-mcp tools. Each group of tables has one.
 
 | Path or tables                                                       | Writer                                                                                              | Readers                                                  |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `tickets`                                                            | the `ticket` tool (`validate` and `update-context` stage the row); the `task` tool moves a staged ticket to in-progress and refuses a closed one, and the `close` tool moves the ticket to closed                                   | every session                                            |
-| `tasks`, `task_attempts`, `task_transitions`, `task_failed_fixes`  | the `task` tool, called by agents-assemble; the `failed_fix` tool for `task_failed_fixes`, called by an engineer |  agents-assemble, stick-the-landing, baton-pass           |
-| `contract_commands`                                                  | the `contract` tool's `approve`, called by game-plan and one-shot                                   | the `task` tool, every skill that proves work            |
-| `receipts`                                                           | `mightymodels verify run`                                                                           | the `task` and `snapshot` tools, every skill that proves work |
-| `ledger_entries`                                                     | the `investigation` tool                                                                            | what-we-know, open-ticket, the `snapshot` tool           |
-| `review_runs`, `review_findings`, `review_dispositions`, `review_outcomes` | the `review` tool                                                                             | review-circus, stick-the-landing, the `close` tool       |
-| `crashouts`                                                          | the `crashout` tool                                                                                 | crashout                                                 |
-| `closings`                                                           | the `close` tool                                                                                    | prune-ticket, future sessions                            |
-| ticket.yml                                                           | open-ticket's `ticket` `write`, or one-shot when ramping without a ticket (then the user's hand)    | every session                                            |
+| `tickets`                                                            | `ticket_validate` and `ticket_update_context` stage the row; the task tools move a staged ticket to in-progress and refuses a closed one, and `close_ticket` moves the ticket to closed                                   | every session                                            |
+| `tasks`, `task_attempts`, `task_transitions`, `task_failed_fixes`  | the task tools (`task_declare`, `task_start`, `task_verify`, `task_mark`), called by the plan skills and agents-assemble; `failed_fix_record` for `task_failed_fixes`, called by an engineer |  agents-assemble, stick-the-landing, baton-pass           |
+| `contract_commands`                                                  | `contract_approve` and `contract_retire`, called by game-plan and one-shot                                   | the task tools, every skill that proves work            |
+| `receipts`                                                           | `contract_run`, primary only                                                                           | the task tools and `snapshot_take`, every skill that proves work |
+| `ledger_entries`                                                     | the `investigation_*` tools                                                                            | what-we-know, open-ticket, the `snapshot` tool           |
+| `review_runs`, `review_findings`, `review_dispositions`, `review_outcomes` | the `review_*` tools                                                                             | review-circus, stick-the-landing, `close_ticket`       |
+| `crashouts`                                                          | the `crashout_*` tools                                                                                 | crashout                                                 |
+| `closings`                                                           | `close_ticket`                                                                                    | prune-ticket, future sessions                            |
+| ticket.yml                                                           | open-ticket's `ticket_write`, or one-shot when ramping without a ticket (then the user's hand)    | every session                                            |
 | plan.md                                                              | game-plan primary, after user approval                                                              | primary, dispatch compilation                            |
 | toolchain.md                                                         | game-plan primary, verbatim from terry-toolchain's report                                           | primary, dispatch compilation                            |
 | briefs/ ASKED half                                                   | primary at dispatch                                                                                 | implementer, fact-checker                                |
 | briefs/ DONE half                                                    | implementer                                                                                         | primary, fact-checker                                    |
-| review/<run>/ directory                                              | the `review` tool's `start` creates it; the primary writes persona reports, metrics and the rendered report | review-circus, stick-the-landing, prune-ticket, the user |
+| review/<run>/ directory                                              | `review_start` creates it; the primary writes persona reports, metrics and the rendered report | review-circus, stick-the-landing, prune-ticket, the user |
 | issue-body.md, pr-body.md                                            | open-ticket or one-shot (issue-body.md), stick-the-landing (pr-body.md)                             | `gh issue create`, `gh pr create`                        |
-| handoffs/                                                            | baton-pass, from the `snapshot` tool's text; BATON.md is the primary's own                          | the next session's primary                               |
-| whats-broken.md                                                      | the whats-broken primary                                                                              | the `close` tool, which blocks closing while it exists   |
+| handoffs/                                                            | baton-pass, from `snapshot_take`'s text; BATON.md is the primary's own                          | the next session's primary                               |
+| whats-broken.md                                                      | the whats-broken primary                                                                              | `close_check`, which blocks closing while it exists   |
 | REPORT.md                                                            | agents-assemble primary                                                                             | stick-the-landing, review-circus, prune-ticket           |
-| archives/                                                            | prune-ticket, from the `close` tool's text                                                          | future humans and sessions                               |
+| archives/                                                            | prune-ticket, from `close_ticket`'s text                                                          | future humans and sessions                               |
 
 ## Thinness rule for handoffs
 
@@ -56,4 +56,4 @@ The database's only writers are the state server's ten tools and `mightymodels v
 
 ## Never tracked
 
-Nothing under `.mightymodels/` is ever committed. The state server at start and `mightymodels verify run` add `.mightymodels/` to the repository's local exclude file (`info/exclude` in the common git dir, so worktrees share it). `briefs/`, `review/`, and the database carry raw command output that can hold secrets, and local-only exclusion means a careless `git add -A` cannot ship them. A later session that finds `.mightymodels/` missing from the exclude file restarts the server, which restores it before anything is written there.
+Nothing under `.mightymodels/` is ever committed. The session-start hook adds `.mightymodels/` to the repository's local exclude file (`info/exclude` in the common git dir, so worktrees share it). `briefs/`, `review/`, and the database carry raw command output that can hold secrets, and local-only exclusion means a careless `git add -A` cannot ship them. A later session that finds `.mightymodels/` missing from the exclude file restarts the server, which restores it before anything is written there.

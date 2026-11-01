@@ -1,6 +1,6 @@
 # ticket.yml schema
 
-The per-ticket source of truth, written once by open-ticket (the `ticket` tool's `write`) from the interview answers, then hand-tweaked by the user and checked by the `ticket` tool's `validate`, which stages the ticket as a row in the state database. Every later session reads it before doing anything else.
+The per-ticket source of truth, written once by open-ticket (`ticket_write`) from the interview answers, then hand-tweaked by the user and checked by `ticket_validate`, which stages the ticket as a row in the state database. Every later session reads it before doing anything else.
 
 ```yaml
 task: "<slug>"                   # directory name under .mightymodels/
@@ -39,14 +39,14 @@ investigations:                  # lets-investigate ids whose ledgers this ticke
 
 ## The subset
 
-The `ticket` tool writes this file and reads back exactly this YAML subset, so hand edits validate as long as they stay inside it:
+`ticket_write` writes this file and reads back exactly this YAML subset, so hand edits validate as long as they stay inside it:
 
 - mappings indented by two spaces (the tool writes them two levels deep and checks keys, not depth);
 - scalars: double-quoted strings (JSON escapes), plain words, integers, `true`/`false`, or empty for null;
 - lists of scalars, one `- item` per line;
 - `#` comments on their own line or after a value.
 
-Anchors, flow collections (`[a, b]`, `{a: b}`), single quotes, and block scalars (`|`, `>`) are refused with the line number. `validate` refuses unknown keys too, at the top level and under `companion-docs`, `handoff-context` and `subagent-models`, including retired worker keys such as `scout` or `budgetron`, because a key nobody reads is a setting that silently does nothing. It also requires a non-empty `summary`, a `task` equal to the slug, one to six `context` lines, a `scope` of sm, med or large, a boolean `plan-first`, a boolean `auto-escalate` when the key is there, a non-empty `branch-name`, a numeric `issue-number`, a model for `engineer` and `architect`, no model for a fixed worker (every worker but the two reviewers) other than the one routing fixes, and a ledger for every linked investigation.
+Anchors, flow collections (`[a, b]`, `{a: b}`), single quotes, and block scalars (`|`, `>`) are refused with the line number. `ticket_validate` refuses unknown keys too, at the top level and under `companion-docs`, `handoff-context` and `subagent-models`, including retired worker keys such as `scout` or `budgetron`, because a key nobody reads is a setting that silently does nothing. It also requires a non-empty `summary`, a `task` equal to the slug, one to six `context` lines, a `scope` of sm, med or large, a boolean `plan-first`, a boolean `auto-escalate` when the key is there, a non-empty `branch-name`, a numeric `issue-number`, a model for `engineer` and `architect`, no model for a fixed worker (every worker but the two reviewers) other than the one routing fixes, and a ledger for every linked investigation.
 
 ## Derivation rules
 

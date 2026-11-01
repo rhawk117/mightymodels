@@ -7,8 +7,9 @@ description: >-
   write the ticket's plan.md as a compaction-safe ledger: intent, approach, invariants that
   must hold throughout, dependency-ordered tasks each with deterministic acceptance criteria
   and the commands that verify them, non-goals, and risks with the user's chosen handling. No
-  file:line citations. Records every verification command in a user-approved contract and
-  runs it at HEAD through a no-shell runner before approval, then invokes agents-assemble.
+  file:line citations. Records the invariant (I) and landing (L) commands in a user-approved
+  contract and runs them at HEAD before approval, declares the plan's tasks, then invokes
+  agents-assemble.
   Not for small tickets (one-shot), not a design
   document or ADR (the plan sequences work on a settled design).
 when_to_use: >-
@@ -18,8 +19,11 @@ when_to_use: >-
 argument-hint: "[ticket-slug]"
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_state__contract
-  - mcp__plugin_mightymodels_state__ticket
+  - mcp__plugin_mightymodels_mighty-mcp__contract_approve
+  - mcp__plugin_mightymodels_mighty-mcp__contract_run
+  - mcp__plugin_mightymodels_mighty-mcp__contract_status
+  - mcp__plugin_mightymodels_mighty-mcp__task_declare
+  - mcp__plugin_mightymodels_mighty-mcp__ticket_validate
 ---
 
 # game-plan
@@ -96,17 +100,22 @@ Then read the draft as the post-compaction primary would and check every line of
 under "Consistency check". Fix the draft until the list is clean. Do this before the user
 sees it; the user's time is for direction, not for catching a task with no acceptance.
 
-**4b. Approve and run the verification commands.** Every invariant's proving command and
-every command-shaped acceptance criterion gets a contract id (`I1`, `T1.AC-1`) and an argv
-list. Make one call to `mcp__plugin_mightymodels_state__contract` with action `approve`, the full
-list, and no `approved_by`; the tool shows the user each id and argv and records the commands
-only when the user approves them:
+**4b. Approve and run the contract commands.** The contract holds two kinds of command, and
+only the primary runs them. An invariant's proving command gets an `I` id (`I1`, `I2`): it must
+stay true across the sprint. A landing command gets an `L` id (`L1`, `L2`): it is what the push
+hold re-runs at HEAD before anything is pushed, so every ticket needs at least one, usually the
+repository's full test or check command. A plan with no `L` command cannot land: add one or
+tell the user why none exists. A task's acceptance command takes no contract id: the engineer
+runs it in the sandbox and cites it in `task_verify`. Call `contract_approve` once with the
+`slug` and the full list of `commands`, each with an `id` and an `argv` (and optionally
+`expect_exit` and `timeout`), and leave `approved_by` out; the tool shows the user each id and
+argv and records the commands only when the user approves them:
 
 ```json
-{"request": {"action": "approve", "slug": "SLUG", "commands": [
-  {"id": "I1", "argv": ["uv", "run", "pytest", "-q"]},
-  {"id": "T1.AC-1", "argv": ["uv", "run", "pytest", "-q", "tests/test_queue.py"], "timeout": 120}
-]}}
+{"slug": "SLUG", "commands": [
+  {"id": "I1", "argv": ["uv", "run", "pytest", "-q", "-m", "unit"]},
+  {"id": "L1", "argv": ["uv", "run", "pytest", "-q"], "timeout": 600}
+]}
 ```
 
 An answer starting `not approved` means the user wants the list changed: change it as they said
@@ -114,19 +123,13 @@ and call again. An answer starting `needs input` means no one could be asked thr
 the question it names to the user in one `AskUserQuestion` dialog, and on approval call again with
 `"approved_by": "user"` on each command.
 
-Then run them at HEAD with a bare Bash command (the plugin's `bin/` is on the Bash PATH):
-
-```bash
-mightymodels verify run --slug SLUG --phase planning --id I1 --id T1.AC-1
-```
-
-The runner takes ids only, never an argv, so nothing unapproved runs through it; commands
-are argv lists with no shell, so a check that needs a pipeline belongs in a script the
-repository owns. An approved id never changes its argv; a different command gets a new id.
-Record each command's planning outcome in the plan: an invariant that fails at HEAD is a
-finding for the user before anything is built; an acceptance command that fails because the
-thing it tests does not exist yet is the expected baseline. Read
-`references/verification-contract.md` when a record or run is refused.
+Then call `contract_run` with the `slug`, phase `planning` and `ids` of the new commands, to run
+them at HEAD. Commands are argv lists with no shell, so a check that needs a pipeline belongs in
+a script the repository owns. An approved id never changes its argv; a different command gets a
+new id. Record each command's planning outcome in the plan: an invariant that fails at HEAD is a
+finding for the user before anything is built; a landing command that fails because the thing it
+tests does not exist yet is the expected baseline. Call `contract_status` when a run is refused,
+and read `references/verification-contract.md` for the rules behind it.
 
 **5. Interview the user on risks.** Every risk in the draft gets a handling chosen by the user,
 not by you. One `AskUserQuestion` dialog, risks batched up to four a call, each offering the same
@@ -151,19 +154,16 @@ default first:
   puts the block and its reasons to the user before the architect or the wingman is dispatched for
   it, and the dispatch hook answers a main-thread dispatch of either with `ask`.
 - **Escalate automatically**: add the line `  auto-escalate: true` under `handoff-context` in
-  ticket.yml, then call `mcp__plugin_mightymodels_state__ticket` with action `validate`, which
-  stores it. A block then goes to the architect once with no question.
-
-```json
-{"request": {"action": "validate", "slug": "SLUG"}}
-```
+  ticket.yml, then call `ticket_validate` with the `slug`, which stores it. A block then goes
+  to the architect once with no question.
 
 A ticket.yml that already has the key has its answer, so do not ask again. When no dialog is
 available, ask in chat with both answers spelled out, and wait.
 
 **6. Get approval.** Write `plan.md` with the handlings folded in, present it, and ask through
 `AskUserQuestion`: approve, revise, or abandon. This gate is the user's, and it is the last cheap
-moment to change direction. On approve, invoke agents-assemble. On revise, regenerate the whole
+moment to change direction. On approve, call `task_declare` with the `slug` and the plan's task
+ids (`T1`, `T2`, ...), so each can be started, then invoke agents-assemble. On revise, regenerate the whole
 plan (never append to it) and state in one paragraph what changed and why, so the user reviews
 a delta rather than re-reading two hundred lines. A revision that contradicts a Decided line
 is a new decision: put it back through one cross-examine round rather than editing the plan
@@ -179,13 +179,16 @@ approach: <the strategy, and why it beats the alternative considered>
 ## Invariants
 - I1: <what must stay true across every task> | proves: <contract id I1: the command, and its outcome at HEAD>
 
+## Landing
+- L1: <the command the push hold re-runs at HEAD> | planning outcome: <its outcome at HEAD>
+
 ## Tasks
 ### T1 (<tiny|sm|med|large>): <one-line intent: what and where, no how>
 depends-on: []
 acceptance:
-- AC-1: <contract id T1.AC-1 with its command and planning outcome, or an assertion naming a file or behavior>
+- AC-1: <a command with its expected result, or an assertion naming a file or behavior>
 - AC-2: <...>
-verify: <contract ids, in order; each run at HEAD in step 4b>
+verify: <the acceptance commands, in order>
 
 ### T2 (<size>): <...>
 depends-on: [T1]
@@ -218,11 +221,14 @@ What each section is for, since the reader will not have this file:
   now: every criterion is a command someone runs or an assertion someone checks at a named
   location. "Works correctly", "handles errors appropriately", and "is consistent with the
   rest of the code" are refused at write time. Two to four criteria per task; a task needing
-  more is two tasks, and `task` `start` refuses one with more than four criteria or more than
+  more is two tasks, and `task_start` refuses one with more than four criteria or more than
   ten owned files, naming break-it-down.
-- **verify** is the sequence of contract ids the engineer runs before appending DONE and the
-  loop re-runs with `mightymodels verify run` afterwards. It is the same sequence in both places,
-  which is what makes verification comparable across tasks.
+- **verify** is the sequence of acceptance commands the engineer runs in the sandbox before
+  appending DONE and cites in `task_verify`. It is the same sequence in every task, which is what
+  makes verification comparable across tasks. These commands are not in the contract; only the
+  `I` and `L` commands are, and only the primary runs those.
+- **Landing** holds the `L` commands the push hold re-runs at HEAD. There is at least one; a plan
+  without one cannot be pushed.
 - **Non-goals** are load-bearing: they are what keeps a long sprint from growing sideways while
   nobody is watching. Each carries its one-line why so a later session does not relitigate it.
 - **Risks** carry the user's handling verbatim, tagged `(user)`, so the sprint knows the
@@ -235,8 +241,9 @@ approval. Each item is a way plans have gone wrong; each is a yes/no question.
 
 - Every task has at least one acceptance criterion that is a command or a located assertion,
   and none of the refused phrasings appear anywhere.
-- Every command in any `verify` or `proves` line is a contract id the user approved in step
-  4b, and the plan states its planning outcome at HEAD.
+- Every `proves` line names a contract id the user approved in step 4b, and the plan states its
+  planning outcome at HEAD. At least one `L` command exists. No task criterion carries a
+  contract id.
 - Every Decided line in the cross-examine record appears in the plan as the approach, a task,
   an invariant, a non-goal, or an acceptance criterion, and no plan line contradicts one.
 - Every Open and Assumed line in the record appears as a Risk with a signal.
@@ -257,8 +264,8 @@ approval. Each item is a way plans have gone wrong; each is a yes/no question.
 ## Boundaries
 
 game-plan writes `toolchain.md` from the survey's report and `plan.md`, the plan only after
-cross-examine and the risk interview, plus the ticket's verification contract and its planning
-receipts, and the `auto-escalate` line of ticket.yml when the user chose it. It dispatches scouts and terry-toolchain and runs only approved contract commands;
+cross-examine and the risk interview, plus the ticket's contract commands and their planning
+receipts, and the declared plan tasks, and the `auto-escalate` line of ticket.yml when the user chose it. It dispatches scouts and terry-toolchain and runs only approved contract commands through `contract_run`;
 no engineer, no architect, no edits to the repository. If step 2
 shows the ticket's claims are wrong enough that the approach changes, that is a report to the
 user and possibly a return to open-ticket, not a plan built on a corrected premise the

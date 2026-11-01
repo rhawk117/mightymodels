@@ -16,8 +16,10 @@ when_to_use: >-
 argument-hint: "[slug]"
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_state__investigation
-  - mcp__plugin_mightymodels_state__ticket
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_knowns
+  - mcp__plugin_mightymodels_mighty-mcp__investigation_list
+  - mcp__plugin_mightymodels_mighty-mcp__ticket_write
+  - mcp__plugin_mightymodels_mighty-mcp__ticket_validate
 ---
 
 # open-ticket
@@ -28,9 +30,9 @@ tracker; what happens next is the user's call, asked at the end.
 
 Read `references/ticket-schema.md` and `references/mightymodels-dir.md` before the first run
 in a session; they are the contract this skill instantiates. State goes through the plugin's MCP
-tools, called by full name: `mcp__plugin_mightymodels_state__ticket`, `..._investigation`.
+tools: `ticket_write`, `ticket_validate`, `investigation_knowns` and `investigation_list`.
 
-Nothing under `.mightymodels/` is ever tracked by git. The state server adds `.mightymodels/`
+Nothing under `.mightymodels/` is ever tracked by git. The session-start hook adds `.mightymodels/`
 to the repository's local exclude file when it starts, so a `git add -A` cannot ship briefs,
 reports, or the database, which may carry raw command output.
 
@@ -48,7 +50,7 @@ quotes mean none was given. A slug given here is an answer already given to ques
 2. **Tracker**: GitHub issue, Jira ticket, both, or none.
 
 The branch, the compaction and the scope of each anticipated task are not asked here: the
-`ticket` `write` call (step D) leaves them out and asks the user itself.
+`ticket_write` call (step D) leaves them out and asks the user itself.
 
 When the tracker answer includes Jira, ask once, in chat, for the fields in one line: project
 key, parent epic, issue type, story points, labels. Take whatever the user gives ("under
@@ -63,18 +65,8 @@ the end.
 The tracker body is built from the triage, not from memory of it. Take the findings in this
 order of preference:
 
-1. **The investigation ledger.** Call `mcp__plugin_mightymodels_state__investigation` with
-   action `knowns`:
-
-   ```json
-   {"request": {"action": "knowns", "investigation_id": "ID"}}
-   ```
-
-   With action `list` when the id is unknown:
-
-   ```json
-   {"request": {"action": "list"}}
-   ```
+1. **The investigation ledger.** Call `investigation_knowns` with the `investigation_id`, or
+   `investigation_list` when the id is unknown.
 
    Rows marked `current` are findings. Rows marked `lead` were cited at an older HEAD: they go
    under Open questions as "unverified at HEAD", never under Findings, because the ramp would
@@ -133,21 +125,19 @@ it exits 0. No body reaches a tracker before it passes.
 it; a rejected push (no remote, no auth) is a note in the summary, not a blocker, since the
 branch exists locally. When it is the current checkout, create nothing. A detached HEAD is not a
 checkout the sprint can run on; the tool refuses it, so ask the user for a branch name and call
-`write` again with `branch` in `fields`.
+`ticket_write` again with `branch`.
 
-**D. ticket.yml.** Call `mcp__plugin_mightymodels_state__ticket` with action `write` and
-the rollup and tracker answers under `fields`, and no `scope`, `compaction` or `branch`; the tool
-asks the user for those three:
+**D. ticket.yml.** Call `ticket_write` with the `slug` and the rollup and tracker answers as
+arguments, and no `scope`, `compaction` or `branch`; the tool asks the user for those three:
 
 ```json
-{"request": {"action": "write", "slug": "SLUG",
- "fields": {"summary": "...", "context": ["...", "..."], "issue": 42, "jira": "PLAT-41",
-            "reference_urls": ["https://..."], "investigations": ["20260928-..."]}}}
+{"slug": "SLUG", "summary": "...", "context": ["...", "..."], "issue": 42, "jira": "PLAT-41",
+ "reference_urls": ["https://..."], "investigations": ["20260928-..."]}
 ```
 
 An answer starting `needs input` means no one could be asked through the tool: put each question
-it names to the user in one `AskUserQuestion` dialog, then call again with those arguments in
-`fields` (`scope`, `compaction`, and `branch` as the current branch name or the new branch name).
+it names to the user in one `AskUserQuestion` dialog, then call again with those arguments
+(`scope`, `compaction`, and `branch` as the current branch name or the new branch name).
 
 The tool derives the model routing from the scope and `plan-first` from the compaction answer,
 per the schema, and refuses to overwrite an existing ticket.yml. Tell the user the file exists
@@ -156,11 +146,7 @@ edit wins over the derivation.
 
 **E. Validate and stage.** After the tweak pass:
 
-Call `mcp__plugin_mightymodels_state__ticket` with action `validate`:
-
-```json
-{"request": {"action": "validate", "slug": "SLUG"}}
-```
+Call `ticket_validate` with the `slug`.
 
 It parses ticket.yml in the canonical subset the schema describes, checks every field and every
 linked investigation, and stages the ticket as a row in the state database. A hand edit outside

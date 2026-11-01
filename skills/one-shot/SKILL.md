@@ -5,9 +5,9 @@ description: >-
   pasted issue, or a task described in chat. One AskUserQuestion dialog covers the questions
   open-ticket would have asked and that the context has not already answered (slug, scope,
   branch, progress view), then two or three scouts confirm the claims at HEAD, the task
-  list is written with a checkable acceptance criterion per task, its commands are
-  approved into the verification contract, and agents-assemble takes over. Stages the ticket
-  through the ticket tool when none exists. Assumes no compaction, so there is no
+  list is written with a checkable acceptance criterion per task, a landing command is
+  approved into the verification contract, the tasks are declared, and agents-assemble takes
+  over. Stages the ticket through ticket_write when none exists. Assumes no compaction, so there is no
   plan.md. Not the ramp for work expected to survive a compaction (game-plan).
 when_to_use: >-
   Auto-invoke at session start when the active ticket says scope sm and plan-first
@@ -17,8 +17,11 @@ when_to_use: >-
 argument-hint: "[ticket-slug, issue or task]"
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_state__contract
-  - mcp__plugin_mightymodels_state__ticket
+  - mcp__plugin_mightymodels_mighty-mcp__ticket_write
+  - mcp__plugin_mightymodels_mighty-mcp__ticket_validate
+  - mcp__plugin_mightymodels_mighty-mcp__contract_approve
+  - mcp__plugin_mightymodels_mighty-mcp__contract_run
+  - mcp__plugin_mightymodels_mighty-mcp__task_declare
 ---
 
 # one-shot
@@ -28,7 +31,7 @@ stanza written before the engineer starts, verification by a fact-checker that d
 the code. The plan exists for a different reason: surviving a compaction. When the user does not
 expect one, the plan is ceremony, and this ramp skips it. The ticket directory holds the
 briefs; the state database holds the ticket, the verification contract and the task rows, and
-the `task` tool's rows are the progress view.
+the task rows are the progress view.
 
 That is an assumption, and one-shot states it once at the start of every run: *no compaction
 expected; if one happens, stop and re-ramp through game-plan, because the task list alone
@@ -52,10 +55,10 @@ options each, and the user can always type an answer of their own), containing o
 questions the context has not answered. The full set, in open-ticket's order, minus the one one-shot answers itself:
 
 - Slug for this unit of work (the options are one derived from the target and a shorter variant).
-- Progress view: a GitHub issue, or a local `issue-body.md`; task progress is the `task`
-  tool's rows either way.
+- Progress view: a GitHub issue, or a local `issue-body.md`; task progress is the task
+  rows either way.
 
-The scope of each anticipated task and the branch are not asked here: the `ticket` `write` call
+The scope of each anticipated task and the branch are not asked here: the `ticket_write` call
 in step 3 leaves them out and asks the user itself. Compaction is not asked. one-shot answers it:
 `plan-first: false`. When the scope the user chose comes back med or large (read `scope` in
 ticket.yml after the write), one more `AskUserQuestion` before the loop starts: proceed under the
@@ -66,26 +69,20 @@ Answers already in the conversation or the ticket are confirmed in the target su
 re-asked.
 
 **3. Materialize the minimum.** Only when no ticket exists: the issue via `gh issue create` if
-one was asked for (else `issue-body.md`), then stage the ticket through the `ticket` tool, as
-open-ticket does. Call `mcp__plugin_mightymodels_state__ticket` with action `write`, the answers
-under `fields`, and no `scope` or `branch`; the tool asks the user for both:
+one was asked for (else `issue-body.md`), then stage the ticket with `ticket_write`, as
+open-ticket does. Pass the `slug` and the answers as arguments, with no `scope` or `branch`; the
+tool asks the user for both:
 
 ```json
-{"request": {"action": "write", "slug": "SLUG",
- "fields": {"summary": "...", "compaction": false, "context": ["..."]}}}
+{"slug": "SLUG", "summary": "...", "compaction": false, "context": ["..."]}
 ```
 
 An answer starting `needs input` means no one could be asked through the tool: put each question
-it names to the user in one `AskUserQuestion` dialog, then call again with those arguments in
-`fields`. Then read `branch-name` from ticket.yml: when it is not the current branch, create that
+it names to the user in one `AskUserQuestion` dialog, then call again with those arguments. Then read `branch-name` from ticket.yml: when it is not the current branch, create that
 branch from HEAD.
 
-Then call it again with action `validate`, which stages the ticket as a row in the state
-database:
-
-```json
-{"request": {"action": "validate", "slug": "SLUG"}}
-```
+Then call `ticket_validate` with the `slug`, which stages the ticket as a row in the state
+database.
 
 open-ticket's schema reference,
 `${CLAUDE_PLUGIN_ROOT}/skills/open-ticket/references/ticket-schema.md`, describes the fields. No `plan.md`; nothing is written for a next session that is not
@@ -102,7 +99,7 @@ is enough, and zero is not.
 **5. Enumerate the tasks.** Write the task list into the issue body (`gh issue edit`) or
 `issue-body.md`. Each item is one thing agents-assemble can run through the loop, sized per
 the scope answer, and carries its acceptance inline so the ASKED stanza lifts it. The list has
-no boxes; progress is the `task` tool's rows, which the loop starts and marks:
+no boxes; progress is the task rows, which the loop starts and marks:
 
 ```markdown
 - T1: <one-line intent> | AC: <runnable command with expected result, or a checkable assertion naming a file or behavior>
@@ -110,15 +107,20 @@ no boxes; progress is the `task` tool's rows, which the loop starts and marks:
 
 Without a plan, the task list is the only enumerable list of work the loop has, and an item with
 no acceptance makes the verification step theater. "Works correctly" is refused here for the
-same reason it is refused in the ASKED stanza. Give every command-shaped AC a contract id
-(`T1.AC-1`) and an argv list, and show the task list with its commands. The loop's runner
-executes only contract commands, so approve them with one call to
-`mcp__plugin_mightymodels_state__contract` with action `approve` and no `approved_by`; the tool
-asks the user and records the commands only when the user approves:
+same reason it is refused in the ASKED stanza. A task's acceptance command takes no contract id:
+the engineer runs it in the sandbox and cites it in `task_verify`. Show the task list with its
+commands.
+
+The contract holds the commands only the primary runs, and every ticket needs at least one
+landing command, an `L` id, because the push hold re-runs the live `L` commands at HEAD and a
+ticket with none cannot land. Use `L1` for the repository's check command (the full test run, or
+the narrowest command that proves the whole change), and add an `I1` only for an invariant that
+must hold throughout. Approve them with one call to `contract_approve`, passing the `slug` and
+the `commands`, each with an `id` and an `argv`, and no `approved_by`; the tool asks the user and
+records the commands only when the user approves:
 
 ```json
-{"request": {"action": "approve", "slug": "SLUG",
- "commands": [{"id": "T1.AC-1", "argv": ["..."], "expect_exit": 0, "timeout": 300}]}}
+{"slug": "SLUG", "commands": [{"id": "L1", "argv": ["..."], "expect_exit": 0, "timeout": 300}]}
 ```
 
 An answer starting `not approved` means the user wants the list changed: change it and call
@@ -126,23 +128,20 @@ again. An answer starting `needs input` means no one could be asked through the 
 question it names to the user in one `AskUserQuestion` dialog, and on approval call again with
 `"approved_by": "user"` on each command.
 
-Then baseline each one with `mightymodels verify run`, a bare Bash command (the plugin's
-`bin/` is on the Bash PATH):
+Then baseline them with `contract_run`, passing the `slug`, phase `planning` and `ids` `["L1"]`
+(plus any `I` id). Revise regenerates the list.
 
-```bash
-mightymodels verify run --slug SLUG --phase planning --id T1.AC-1
-```
-
-Revise regenerates the list.
+Once the commands are approved, call `task_declare` with the `slug` and the task ids
+(`T1`, `T2`, ...), so the loop can start each one.
 
 **6. Hand off.** Invoke agents-assemble. Nothing else is written; a staged ticket plus a
-task list with approved acceptance commands is what the small path needs, and the whole point
+declared task list with an approved landing command is what the small path needs, and the whole point
 of one-shot is that it is enough.
 
 ## Boundaries
 
-one-shot stages the ticket (when absent) through the `ticket` tool, the branch and issue
-if asked, the task list, and the verification contract. It never writes `plan.md` or
+one-shot stages the ticket (when absent) through `ticket_write`, the branch and issue
+if asked, the task list, the declared tasks, and the verification contract. It never writes `plan.md` or
 `handoffs/`. It dispatches scouts and nothing
 else before agents-assemble takes over. When the context shows the work is bigger than the
 user thinks (five med tasks on a "sm" answer), that is a sentence to the user and a routing
