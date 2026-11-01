@@ -10,12 +10,13 @@ argument or a working directory that holds a NUL is a refused launch too, and so
 working directory that does not exist. A caller that cancels the run gets its own
 cancellation back. The child starts in a session of its own, and a timeout or a
 cancellation ends the whole process group, so a grandchild does not outlive the run.
-`env` is the child's whole environment; left out, the child inherits the parent's.
+`setting.env` is the child's whole environment; left out, the child inherits the parent's.
 
 A finished run is decoded as `text=True` decodes it. What a timed-out run printed before
 it was killed is decoded with the same encoding and the same newline handling, except
 that bytes which are not text are replaced: the kill can cut a character in half, and a
-timeout stays a timeout.
+timeout stays a timeout. An undecodable run keeps its output the same way, so the tail
+that failed to decode is still there to read.
 """
 
 import contextlib
@@ -58,15 +59,20 @@ type LaunchError = OSError | ValueError
 type DecodeErrors = Literal['strict', 'replace']
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class ChildSetting:
+    cwd: Path | None = None
+    env: Mapping[str, str] | None = None
+
+
 @runtime_checkable
 class ProcessRunner(Protocol):
-    async def run(  # noqa: PLR0913  the contract runner needs the working directory and the environment next to the argument vector and timeout
+    async def run(
         self,
         argv: Sequence[str],
         *,
         timeout: float,
-        cwd: Path | None = None,
-        env: Mapping[str, str] | None = None,
+        setting: ChildSetting = ChildSetting(),  # noqa: B008  a frozen value, shared safely
     ) -> RunOutcome: ...
 
 
@@ -83,7 +89,7 @@ def failed_run(error: LaunchError, *, program: str) -> FailedRun:
 
 def end_group(process: Process) -> None:
     with contextlib.suppress(ProcessLookupError):
-        os.kill(-process.pid, signal.Signals['SIGKILL'])
+        os.killpg(process.pid, signal.SIGKILL)  # ty: ignore[possibly-missing-attribute]  killpg and SIGKILL are absent on Windows, which python-platform all models; the child starts in its own session on POSIX
 
 
 async def drain_stream(stream: ByteReceiveStream | None, sink: bytearray) -> None:
@@ -108,7 +114,12 @@ class CapturedOutput:
             stdout = captured_text(self.stdout, errors='strict')
             stderr = captured_text(self.stderr, errors='strict')
         except UnicodeDecodeError as error:
-            return FailedRun(kind='undecodable', detail=str(error), stdout='', stderr='')
+            return FailedRun(
+                kind='undecodable',
+                detail=str(error),
+                stdout=captured_text(self.stdout, errors='replace'),
+                stderr=captured_text(self.stderr, errors='replace'),
+            )
         return CompletedRun(exit=exit_code, stdout=stdout, stderr=stderr)
 
     def timed_out_run(self, timeout: float) -> FailedRun:
@@ -120,42 +131,51 @@ class CapturedOutput:
         )
 
 
+async def launch(argv: Sequence[str], setting: ChildSetting) -> Process | FailedRun:
+    try:
+        return await anyio.open_process(
+            list(argv),
+            stdin=subprocess.DEVNULL,
+            cwd=setting.cwd,
+            env=setting.env,
+            start_new_session=True,
+        )
+    except (OSError, ValueError) as error:
+        return failed_run(error, program=argv[0])
+
+
+async def settle(process: Process, *, timeout: float) -> RunOutcome:
+    output = CapturedOutput()
+    exit_code: int | None = None
+    async with process:
+        try:
+            with anyio.move_on_after(timeout):
+                await output.collect(process)
+                exit_code = await process.wait()
+        finally:
+            if exit_code is None:
+                end_group(process)
+
+    if exit_code is None:
+        return output.timed_out_run(timeout)
+
+    return output.decoded_run(exit_code)
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class SubprocessRunner:
-    async def run(  # noqa: PLR0913  the ProcessRunner Protocol fixes this signature
+    async def run(
         self,
         argv: Sequence[str],
         *,
         timeout: float,
-        cwd: Path | None = None,
-        env: Mapping[str, str] | None = None,
+        setting: ChildSetting = ChildSetting(),  # noqa: B008  a frozen value, shared safely
     ) -> RunOutcome:
-        try:
-            process = await anyio.open_process(
-                list(argv),
-                stdin=subprocess.DEVNULL,
-                cwd=cwd,
-                env=env,
-                start_new_session=True,
-            )
-        except (OSError, ValueError) as error:
-            return failed_run(error, program=argv[0])
+        launched = await launch(argv, setting)
+        if isinstance(launched, FailedRun):
+            return launched
 
-        output = CapturedOutput()
-        exit_code: int | None = None
-        async with process:
-            try:
-                with anyio.move_on_after(timeout):
-                    await output.collect(process)
-                    exit_code = await process.wait()
-            finally:
-                if exit_code is None:
-                    end_group(process)
-
-        if exit_code is None:
-            return output.timed_out_run(timeout)
-
-        return output.decoded_run(exit_code)
+        return await settle(launched, timeout=timeout)
 
 
 def get_process_runner() -> ProcessRunner:

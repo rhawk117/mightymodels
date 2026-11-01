@@ -19,7 +19,7 @@ import anyio
 
 from mightymodels_core.git import GitUnavailableError, UntrackedFiles
 from mightymodels_core.primitives import redact
-from mightymodels_core.process import FailedRun
+from mightymodels_core.process import ChildSetting, FailedRun
 
 from .errors import TrackedChangesError
 from .records import Receipt
@@ -249,7 +249,9 @@ class ContractRunner:
             group.start_soon(self.beat, running, finished)
             outcomes.append(
                 await self.processes.run(
-                    command.argv, timeout=command.timeout, cwd=self.root, env=self.environment
+                    command.argv,
+                    timeout=command.timeout,
+                    setting=ChildSetting(cwd=self.root, env=self.environment),
                 )
             )
             finished.set()

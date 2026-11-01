@@ -5,7 +5,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import anyio
-from mightymodels_core.process import CompletedRun, FailedRun, SubprocessRunner
+from mightymodels_core.process import (
+    ChildSetting,
+    CompletedRun,
+    FailedRun,
+    SubprocessRunner,
+    launch,
+    settle,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -14,6 +21,7 @@ if TYPE_CHECKING:
 
 WAIT_SECONDS = 10
 POLL_SECONDS = 0.05
+SETTLE_SECONDS = 0.5
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -74,9 +82,12 @@ class TestSubprocessRunnerGroups:
     async def test_timeout_ends_child_and_grandchild(self, tmp_path: Path) -> None:
         marker = tmp_path.joinpath('pids')
 
-        outcome = await self.runner.run(self.spawning_argv(marker), timeout=2)
-
+        launched = await launch(self.spawning_argv(marker), ChildSetting())
+        assert not isinstance(launched, FailedRun)
         pair = await wait_for_pair(marker)
+
+        outcome = await settle(launched, timeout=SETTLE_SECONDS)
+
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'timed_out'
         assert await wait_until_gone(pair.child)
@@ -109,7 +120,9 @@ class TestSubprocessRunnerGroups:
         script = 'import os; print(os.environ.get("MM_PROBE"))'
 
         outcome = await self.runner.run(
-            [sys.executable, '-c', script], timeout=30, env={'MM_PROBE': 'given'}
+            [sys.executable, '-c', script],
+            timeout=30,
+            setting=ChildSetting(env={'MM_PROBE': 'given'}),
         )
 
         assert outcome == CompletedRun(exit=0, stdout='given\n', stderr='')

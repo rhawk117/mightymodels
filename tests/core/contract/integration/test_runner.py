@@ -19,7 +19,7 @@ from mightymodels_core.contract import (
 )
 from mightymodels_core.git import GitCommand, ProcessGit
 from mightymodels_core.primitives import RepositoryKey, Slug
-from mightymodels_core.process import CompletedRun, SubprocessRunner
+from mightymodels_core.process import ChildSetting, CompletedRun, SubprocessRunner
 from mightymodels_core.units_of_work import TaskWork
 
 from tests.core.contract.contract_builders import SERVICE_MOMENT, create_ticket_section
@@ -27,7 +27,7 @@ from tests.core.git.git_builders import commit_file, run_git
 from tests.core.primitives.clock import create_fake_clock
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
     from pathlib import Path
 
     from mightymodels_core.contract import RunProgress
@@ -72,8 +72,7 @@ class RaisingReporter:
 class LaunchedRun:
     argv: tuple[str, ...]
     timeout: float
-    cwd: Path | None
-    env: Mapping[str, str] | None
+    setting: ChildSetting
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -86,10 +85,9 @@ class WaitingRunner:
         argv: Sequence[str],
         *,
         timeout: float,  # noqa: ASYNC109  the ProcessRunner Protocol fixes this signature; the fake records the timeout, never enforces it
-        cwd: Path | None = None,
-        env: Mapping[str, str] | None = None,
+        setting: ChildSetting = ChildSetting(),  # noqa: B008  a frozen value, shared safely
     ) -> RunOutcome:
-        self.launched.append(LaunchedRun(argv=tuple(argv), timeout=timeout, cwd=cwd, env=env))
+        self.launched.append(LaunchedRun(argv=tuple(argv), timeout=timeout, setting=setting))
         await self.released.wait()
         return CompletedRun(exit=0, stdout='', stderr='')
 
@@ -329,8 +327,8 @@ class TestProgress:
         assert 'running' in states
         assert states[-1] == 'finished'
         (launched,) = waiting.launched
-        assert launched.env == {'PATH': '/usr/bin:/bin'}
-        assert launched.cwd == root
+        assert launched.setting.env == {'PATH': '/usr/bin:/bin'}
+        assert launched.setting.cwd == root
 
     async def test_a_raising_reporter_costs_no_command_and_no_receipt(
         self, root: Path, database: Database

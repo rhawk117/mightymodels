@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import anyio
 from hypothesis import strategies as st
 from mightymodels_core.git import Checkout, GitCommand, ProcessGit
-from mightymodels_core.process import CompletedRun, SubprocessRunner
+from mightymodels_core.process import ChildSetting, CompletedRun, SubprocessRunner
 
 from tests.core.git.fakes import (
     ANSWERED,
@@ -50,7 +50,9 @@ class ScriptedHarness:
 
 async def run_git(root: Path, *arguments: str) -> str:
     identity = ['-c', 'user.name=Tester', '-c', 'user.email=tester@example.com']
-    done = await SubprocessRunner().run(['git', *identity, *arguments], timeout=30, cwd=root)
+    done = await SubprocessRunner().run(
+        ['git', *identity, *arguments], timeout=30, setting=ChildSetting(cwd=root)
+    )
     assert isinstance(done, CompletedRun)
     assert done.exit == 0, done.stderr
     return done.stdout.strip()

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from mightymodels_core.process import CompletedRun, FailedRun, SubprocessRunner
+from mightymodels_core.process import ChildSetting, CompletedRun, FailedRun, SubprocessRunner
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -36,7 +36,7 @@ class TestSubprocessRunner:
     async def test_working_directory_is_applied(self, tmp_path: Path) -> None:
         child = ChildPython(script='import os; print(os.getcwd())')
 
-        outcome = await self.runner.run(child.argv, timeout=30, cwd=tmp_path)
+        outcome = await self.runner.run(child.argv, timeout=30, setting=ChildSetting(cwd=tmp_path))
 
         assert isinstance(outcome, CompletedRun)
         assert is_same_directory(outcome.stdout, tmp_path)
@@ -54,7 +54,7 @@ class TestSubprocessRunner:
         child = ChildPython(script='pass')
         missing = tmp_path.joinpath('no-such-directory')
 
-        outcome = await self.runner.run(child.argv, timeout=30, cwd=missing)
+        outcome = await self.runner.run(child.argv, timeout=30, setting=ChildSetting(cwd=missing))
 
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'refused'
@@ -89,3 +89,15 @@ class TestSubprocessRunner:
 
         assert isinstance(outcome, FailedRun)
         assert outcome.kind == 'undecodable'
+
+    async def test_undecodable_run_keeps_its_output_with_replacement_characters(self) -> None:
+        child = ChildPython(
+            script='import sys; sys.stdout.buffer.write(b"tail \\xff end"); sys.stderr.write("x")'
+        )
+
+        outcome = await self.runner.run(child.argv, timeout=30)
+
+        assert isinstance(outcome, FailedRun)
+        assert outcome.kind == 'undecodable'
+        assert outcome.stdout == 'tail \ufffd end'
+        assert outcome.stderr == 'x'
