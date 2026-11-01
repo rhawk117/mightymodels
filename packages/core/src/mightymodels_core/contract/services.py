@@ -41,10 +41,16 @@ class CommandStatus:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class RetiredCommand:
+    key: str
+    retirement: Retirement
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class ContractStatus:
     head: str | None
     commands: list[CommandStatus]
-    retired: list[RecordedCommand] = field(default_factory=list)
+    retired: list[RetiredCommand] = field(default_factory=list)
 
     @property
     def is_passing(self) -> bool:
@@ -90,7 +96,11 @@ class ContractService:
             )
             for command in live_commands(held)
         ]
-        retired = [command for command in held if command.retirement is not None]
+        retired = [
+            RetiredCommand(key=command.key, retirement=command.retirement)
+            for command in held
+            if command.retirement is not None
+        ]
         return ContractStatus(head=head, commands=statuses, retired=retired)
 
     def pick(self, slug: Slug, asked: Sequence[str] | None) -> list[RecordedCommand]:

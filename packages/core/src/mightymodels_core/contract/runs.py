@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from mightymodels_core.process import CompletedRun, FailureKind, ProcessRunner, RunOutcome
     from mightymodels_core.vocabulary.contract import Outcome, Phase
 
-    from .records import RecordedCommand
+    from .records import ApprovalSource, RecordedCommand
 
 TAIL_LINES = 40
 TAIL_CHARS = 4000
@@ -50,12 +50,22 @@ class RunRequest:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class CommandRun:
+    receipt: Receipt
+    approval_source: ApprovalSource
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class RunResult:
-    receipts: list[Receipt]
+    runs: list[CommandRun]
+
+    @property
+    def receipts(self) -> list[Receipt]:
+        return [run.receipt for run in self.runs]
 
     @property
     def is_passing(self) -> bool:
-        return all(receipt.outcome == 'pass' for receipt in self.receipts)
+        return all(run.receipt.outcome == 'pass' for run in self.runs)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -183,7 +193,7 @@ class ContractRunner:
             raise TrackedChangesError(paths=dirty)
 
         total = len(commands)
-        receipts = [
+        runs = [
             await self.run_command(
                 request,
                 command,
@@ -191,18 +201,18 @@ class ContractRunner:
             )
             for position, command in enumerate(commands, start=1)
         ]
-        return RunResult(receipts=receipts)
+        return RunResult(runs=runs)
 
     async def run_command(
         self, request: RunRequest, command: RecordedCommand, started: RunProgress
-    ) -> Receipt:
+    ) -> CommandRun:
         await self.notify(started)
         receipt = await self.receipt_for(command, request.phase, replace(started, state='running'))
         with self.work.write() as unit:
             unit.contracts.record(request.slug, [receipt])
 
         await self.notify(replace(started, state='finished', outcome=receipt.outcome))
-        return receipt
+        return CommandRun(receipt=receipt, approval_source=command.approval_source)
 
     async def receipt_for(
         self, command: RecordedCommand, phase: Phase, running: RunProgress

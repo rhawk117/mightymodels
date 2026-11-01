@@ -49,10 +49,5 @@ def retire_contract(work: TaskWork, slug: Slug, request: RetireRequest) -> Contr
     return render_retired(request)
 
 
-def show_contract_run(work: TaskWork, slug: Slug, result: RunResult) -> ContractRunView:
-    head = result.receipts[0].head if result.receipts else None
-    with work.read() as unit:
-        status = unit.contracts.status(slug, head)
-
-    sources = {item.command.key: item.command.approval_source for item in status.commands}
-    return render_run(result, sources)
+def show_contract_run(result: RunResult) -> ContractRunView:
+    return render_run(result)

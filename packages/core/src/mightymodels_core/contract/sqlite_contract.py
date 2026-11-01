@@ -1,6 +1,7 @@
 """The contract repository over a core unit."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import (
@@ -33,15 +34,11 @@ if TYPE_CHECKING:
 
 
 def retirement_of(row: ContractCommandRow) -> Retirement | None:
-    if row.retired_at is None:
-        return None
-
-    return Retirement(
-        by=row.retired_by or '',
-        why=row.retired_why or '',
-        approval_source=row.retired_approval_source or 'fallback',
-        at=row.retired_at,
-    )
+    match (row.retired_by, row.retired_why, row.retired_approval_source, row.retired_at):
+        case (str() as by, str() as why, 'form' | 'fallback' as source, datetime() as at):
+            return Retirement(by=by, why=why, approval_source=source, at=at)
+        case _:
+            return None
 
 
 def command_of(row: ContractCommandRow) -> RecordedCommand:

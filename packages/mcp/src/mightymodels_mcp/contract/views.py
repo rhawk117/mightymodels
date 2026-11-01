@@ -6,8 +6,6 @@ from mightymodels_core.primitives import short_head
 from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from mightymodels_core.contract.policy import ReceiptAssessment
     from mightymodels_core.contract.records import Receipt, RecordedCommand, Retirement
     from mightymodels_core.contract.runs import RunResult
@@ -90,9 +88,7 @@ def render_declined(choice: str) -> ContractView:
 def render_status(status: ContractStatus) -> ContractView:
     views = tuple(map(create_command_view, status.commands))
     retired = tuple(
-        create_retired_view(command.key, command.retirement)
-        for command in status.retired
-        if command.retirement
+        create_retired_view(command.key, command.retirement) for command in status.retired
     )
     live = ''.join(f'{view.id} {view.state}\n' for view in views)
     gone = ''.join(
@@ -147,11 +143,8 @@ def render_run_line(view: RunReceiptView) -> str:
     )
 
 
-def render_run(result: RunResult, sources: Mapping[str, str]) -> ContractRunView:
-    views = tuple(
-        create_run_receipt_view(receipt, sources.get(receipt.key, 'fallback'))
-        for receipt in result.receipts
-    )
+def render_run(result: RunResult) -> ContractRunView:
+    views = tuple(create_run_receipt_view(run.receipt, run.approval_source) for run in result.runs)
     return ContractRunView(
         text=''.join(map(render_run_line, views)), passing=result.is_passing, receipts=views
     )

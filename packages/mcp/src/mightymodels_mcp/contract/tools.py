@@ -207,7 +207,7 @@ async def contract_run(request: ContractRunRequest, ctx: ToolContext) -> Contrac
         )
         run = RunRequest(slug=request.slug, asked=request.ids, phase=request.phase)
         result = await runner.run(run)
-        return show_contract_run(work, request.slug, result)
+        return show_contract_run(result)
 
 
 async def contract_status(request: ContractRequest, ctx: ToolContext) -> ContractView:

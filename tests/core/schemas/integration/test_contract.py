@@ -2,7 +2,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from mightymodels_core.database import DatabaseError, DuplicateRowError, MissingParentError
+from mightymodels_core.database import (
+    DatabaseError,
+    DuplicateRowError,
+    MissingParentError,
+    RejectedValueError,
+)
 from mightymodels_core.schemas.contract import (
     APPROVE_CONTRACT_COMMAND,
     CONTRACT_COMMANDS_OF_TICKET,
@@ -14,6 +19,7 @@ from mightymodels_core.schemas.contract import (
     RecordReceiptParams,
     RetireContractCommandParams,
 )
+from msgspec.structs import replace
 
 if TYPE_CHECKING:
     from mightymodels_core.database import Database
@@ -164,6 +170,14 @@ class TestRetirement:
 
         with pytest.raises(DatabaseError), database.write() as unit:
             unit.run(RETIRE_CONTRACT_COMMAND, retirement(ticket_id, 'I1', 'claimed'))
+
+    def test_a_partial_retirement_is_refused(self, database: Database, ticket_id: int) -> None:
+        partial = replace(retirement(ticket_id, 'I1'), retired_why=None)
+        with database.write() as unit:
+            unit.run_many(APPROVE_CONTRACT_COMMAND, [command(ticket_id, 'I1')])
+
+        with pytest.raises(RejectedValueError), database.write() as unit:
+            unit.run(RETIRE_CONTRACT_COMMAND, partial)
 
 
 class TestReceipts:
