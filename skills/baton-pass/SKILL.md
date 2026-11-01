@@ -33,10 +33,8 @@ hour re-deriving it, and it will re-derive some of it wrong.
 The first kind is materialized by a tool, not recalled: `snapshot` reads the ticket's rows and
 git and returns the record and its Markdown, and you write them to `handoffs/snapshot.json` and
 `snapshot.md`. BATON.md then carries the second kind and only the second kind. Call
-`snapshot_take` with the `slug` (`limit`, 1 to 100, cuts each list; the default is 20).
-
-Write the record to the `record_path` the answer gives and the Markdown to its `markdown_path`.
-Read `references/snapshot-schema.md` before the first run in a session.
+`snapshot_take` with the `slug`, then write the record to the `record_path` the answer gives and
+the Markdown to its `markdown_path`. Read `references/snapshot-schema.md` before the first run in a session.
 
 <important>Invoke `prompting-subagents` before the first dispatch.</important>
 
@@ -159,7 +157,6 @@ prevents.
 Writes `handoffs/snapshot.json`, `snapshot.md`, `BATON.md`, the `context:` lines of ticket.yml,
 and whatever the user chose for uncommitted work;
 through open-ticket, the ticket directory when none existed. Refresh ticket.yml `context` with
-`ticket_update_context` with the `slug` and `context`, the whole list of lines. It replaces them and restages the ticket, so the edit stays
-inside the schema's subset. Never marks a task verified, appends a DONE half, or writes
+`ticket_update_context` (it replaces the whole list). Never marks a task verified, appends a DONE half, or writes
 REPORT.md; those belong to the loop and the engineer, and a baton that closes a task the loop
 did not verify is a lie the next session inherits.

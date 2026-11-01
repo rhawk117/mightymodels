@@ -102,21 +102,12 @@ would ask, state a working assumption for each, and proceed on the assumptions l
 assumptions.
 
 **Persist before analysing.** Write the session's verdicts in one batch with
-`investigation_add`: `investigation_id`, `round` (the next round after the ledger's latest) and
-`entries`:
-
-```json
-{"investigation_id": "ID", "round": 2,
- "entries": [{"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout", "supersedes": [4]}]}
-```
-
-The batch
+`investigation_add`, with `round` the next one after the ledger's latest. The batch
 carries re-verified leads as new `known` entries that supersede the lead, scout findings that
 contradict a lead as `open` entries superseding it, user answers as `known` with source `user`,
 and each unresolved uncertainty as `open` with where its answer lives. The analysis below is
-judgment and stays in chat; only cited facts and open questions go in the ledger. When the write is
-rejected, fix the entry the error names; when it cannot be written at all, say so before
-continuing, because a consolidation that is not persisted is lost at the next compaction.
+judgment and stays in chat; only cited facts and open questions go in the ledger. When it
+cannot be written at all, say so before continuing, because a consolidation that is not persisted is lost at the next compaction.
 
 **5. Analysis, shaped by the target.** A paragraph per part at most; this is a decision aid,
 not a consulting deliverable.

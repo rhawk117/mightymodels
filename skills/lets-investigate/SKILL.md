@@ -31,9 +31,7 @@ sufficient. The ledger is persisted before every gate by the `investigation_*` t
 or a new conversation resumes from the database instead of from memory; the chat restatement is
 the tool's own rendering, so the two cannot disagree.
 
-State goes through the plugin's MCP tools (`investigation_start`, `investigation_add`,
-`investigation_render`, `investigation_list`), which take flat arguments. Read `references/ledger-schema.md` when an
-entry is rejected.
+Read `references/ledger-schema.md` when an entry is rejected.
 
 <important>Invoke `prompting-subagents` before the first dispatch.</important>
 
@@ -68,23 +66,17 @@ the user already holds cost nothing to record and a round to rediscover.
 Once the user confirms the target, open the ledger and record their answers as round 0:
 
 Call `investigation_start` with the `target` line and leave `kind` out: the tool asks the user for
-the classification and records the answer. The kinds are `behavior`, `claim`, `research` and
-`change` (a proposed change to weigh, which what-we-know opens). An answer starting `needs input`
-means no one could be asked through the tool: put the question it names to the user in one
-`AskUserQuestion` dialog, then call again with `kind`.
+the classification and records the answer. An answer starting `needs input` means no one could
+be asked through the tool: put the question it names to the user in one `AskUserQuestion`
+dialog, then call again with `kind`.
 
-`start` returns the investigation id; every later call names it. The session is pointed at the
+The session is pointed at the
 investigation from the first call that names the id, not from `investigation_start`. From then
 on the recorder hook on `AskUserQuestion` writes each answer the user gives in a dialog into the
 ledger as a `decision` entry from `user`, which covers every gate answer, because the round's
 `investigation_add` comes before its gate. Do not write those yourself. The framing answers come
 earlier, so nothing records them: record each as a `known` from `user` in round 0, along with
-any fact the user states, since facts are not decisions:
-
-```json
-{"investigation_id": "ID", "round": 0,
- "entries": [{"kind": "known", "text": "<fact the user holds>", "cite": "user", "source": "user"}]}
-```
+any fact the user states, since facts are not decisions (cite `user`, source `user`).
 
 When the user is resuming an earlier investigation, `investigation_list` shows the ids and
 `investigation_render` restores the ledger.
@@ -123,24 +115,12 @@ is an entry `kind`:
 - Two scouts disagreeing is a finding. Record the contradiction as its own Open question with
   both citations; never reconcile it silently.
 
-**4. Persist, then restate the whole ledger.** Write the round's entries in one `add` call:
+**4. Persist, then restate the whole ledger.** Write the round's entries in one
+`investigation_add` call, then call `investigation_render`.
 
-```json
-{"investigation_id": "ID", "round": 1, "entries": [
-  {"kind": "known", "text": "...", "cite": "src/queue.py:41", "source": "code-scout"},
-  {"kind": "open", "text": "... rests on ...", "cite": "CHANGELOG 3.x", "source": "web-scout"},
-  {"kind": "known", "text": "...", "cite": "https://...#backoff", "source": "web-scout", "supersedes": [4]},
-  {"kind": "next", "text": "<exact question>", "source": "code-scout"}
-]}
-```
-
-Then call `investigation_render` with the `investigation_id`.
-
-An answered Open question is retired by the entry that answers it (`supersedes`, naming an
-entry from an earlier call), never edited. Paste the `render` output into chat as the
-restatement: not a delta, the whole ledger.
-If `add` is rejected, fix the entry the error names and retry; if it cannot be written at all,
-stop at the gate and say so. A gate on an unpersisted round is the loss this skill exists to
+An answered Open question is retired by the entry that answers it (`supersedes`), never
+edited. Paste the `render` output into chat as the restatement: not a delta, the whole ledger.
+If `add` cannot write at all, stop at the gate and say so. A gate on an unpersisted round is the loss this skill exists to
 prevent.
 
 **5. Stop at the gate.** Open an `AskUserQuestion` dialog with the round's decision and any questions
@@ -163,33 +143,13 @@ out, and wait for the answer.
 
 ## The ledger
 
-`render` prints it in this shape. The sections are ordered so what-we-know can lift
+`render` prints it as Knowns, Open, Decisions, Resources and Next, so what-we-know can lift
 Knowns and Open straight into its knowns table and uncertainties list.
-
-```markdown
-## Ledger, round N
-Target: <one line> (<behavior | claim | research | change>)
-
-### Knowns
-- e<seq>: <claim> [<file:line> | <URL#heading> | user] (<source>, round N)
-
-### Open
-- e<seq>: <question>: rests on <what> [<where the answer lives>] (<source>, round N)
-
-### Decisions
-- e<seq>: <what was settled> (user, round N)
-
-### Resources
-- e<seq>: <what it answered, and the version or date if it matters> [<path or URL>] (...)
-
-### Next
-- e<seq>: <exact question> (<code-scout | web-scout | user>, round N)
-```
 
 Rules that keep the ledger honest:
 
-- A Known has a citation or it is not a Known. "The retry wrapper is applied everywhere" with
-  no line goes in Open.
+- A claim with no citation goes in Open. ("The retry wrapper is applied everywhere" with no
+  line is not a Known.)
 - A Decision carries the user's word from a gate or a framing dialog, and the recorder hook
   writes it when the user answers an `AskUserQuestion`; you never add one. Your own conclusion,
   however well cited, is a Known or an Open item until the user takes it through a dialog.

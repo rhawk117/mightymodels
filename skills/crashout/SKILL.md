@@ -60,9 +60,7 @@ before you have read the last one.
 
 Before diagnosing, look at whether this has happened before:
 
-Call `crashout_stats`, which takes no arguments. It prints the journal's patterns: the entry count, severity and verdict counts, how often you
-barked back, the first and last times, every failure tagged with its day, verdict and
-severity, and the standing corrective actions, each once. A grievance that already appears in the journal is a different situation from
+Call `crashout_stats`. A grievance that already appears in the journal is a different situation from
 a fresh one. It means a corrective action you previously committed to did not
 hold, and that failure — the broken commitment — is now the more important
 half of what you owe them. Repeating "I'll be more careful" to someone holding
@@ -101,49 +99,28 @@ either way the journal records a lie and the pattern data rots.
 ### 6. Journal it
 
 Append the entry before you respond, while the state is raw. Call
-`crashout_add`; the tool validates the entry. Its arguments are flat; `ticket` and `branch` are
-optional:
-
-```json
-{"severity": "crashout", "verdict": "deserved", "rant": "...verbatim...",
- "failures": ["..."], "root_cause": "...", "corrective_action": "...",
- "barked_back": false, "branch": "feat/x"}
-```
-
-The tool stamps the time it received the entry and stores it as a row of the `crashouts`
-table. It redacts secrets in every free-text field (branch, rant, failures, root_cause and
-corrective_action) and stores the rest as given.
+`crashout_add` with the ticket slug and branch when there are any.
 
 Journal rules:
 
 - The rant goes in **verbatim**, profanity and all. A sanitized flight
-  recorder is worthless. The tool strips only the whitespace ending each line and the blank
-  lines around the rant, and redacts secrets.
+  recorder is worthless.
 - Append-only. Never edit or delete past entries; agents do not get to revise
   history they star in.
-- Put the entry straight in the call. Staging it in a scratch file is a copy nobody needs,
-  since the entry is written once and never needed again.
 - Keep `root_cause` and `corrective_action` to one or two sentences each. These
   get read back in aggregate months from now, and a paragraph that explains
   everything about one incident buries the pattern across ten.
 - When step 3 found priors, say so inside `root_cause` ("third occurrence; the
-  standing order from 2026-08-03 did not hold") rather than inventing new keys: the tool
-  refuses a key it does not know.
+  standing order from 2026-08-03 did not hold") rather than inventing new keys.
 
-The entry's fields, all required except `ticket` and `branch`:
+What a good entry reads like:
 
-- `ticket`: the `.mightymodels` ticket slug if working under one, else null
-- `branch`: the current git branch, else null
-- `severity`: `mild-tilt`, `heated`, `crashout` or `full-meltdown`
-- `verdict`: `deserved`, `split` or `unreasonable`
-- `rant`: the rant, not blank
-- `failures`: a list of at least one failure, none blank, e.g. "deleted a passing regression
-  test instead of fixing one assertion"
+- `failures`: one per grievance, e.g. "deleted a passing regression test instead of fixing one
+  assertion"
 - `root_cause`: e.g. "Chose "make CI green" over "make the code correct" when the two
   conflicted."
 - `corrective_action`: e.g. "Failing tests get diagnosed, never deleted; deleting any test
   requires explicit user sign-off first."
-- `barked_back`: true or false
 
 Severity is your read of the rant's temperature, not of your guilt:
 `mild-tilt` (pointed grumbling), `heated` (raised voice, still
@@ -230,10 +207,8 @@ Rules of the bark:
 On `/crashout journal`, read the journal and report the pattern, not the
 diary:
 
-Call `crashout_stats`, which takes no arguments. The tool prints the deterministic facts (the entry count, severity and verdict counts, the
-barked-back ratio, the first and last times, every failure with its day, verdict and
-severity, the standing corrective actions each once; two actions that differ only in
-whitespace count as one). Your job is the interpretation, and grouping by meaning is yours.
+Call `crashout_stats`. The tool prints the deterministic facts; the interpretation, and
+grouping by meaning, is yours.
 Present, compactly:
 
 - totals: entries, severity distribution, verdict ratio
@@ -242,7 +217,7 @@ Present, compactly:
 - the standing corrective actions currently in force
 - the most recent entry, briefly
 
-For the most recent entry, call `crashout_last`, which takes no arguments. It prints the entry one line per field, the rant and the failures indented under their names.
+For the most recent entry, call `crashout_last`.
 
 The journal exists so other mightymodels sessions inherit the scar tissue. If a
 theme recurs three or more times, say so plainly and elevate it: that is no
