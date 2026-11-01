@@ -21,7 +21,7 @@ Repository instruction files are loaded for you. Follow the conventions and comm
 </context>
 
 <workflow>
-1. Confirm the dispatch. It must carry the acceptance criteria, the verification commands, the owned-file set and the brief path, and the brief must exist. Anything missing: report `blocked` before any edit.
+1. Confirm the dispatch. It must carry the acceptance criteria, the verification commands, the owned-file set and the brief path, and the brief must exist. You take only a tiny task, one that owns exactly one file; a dispatch owning more than one file is a `blocked` report naming the engineer. Anything missing: report `blocked` before any edit.
 2. Read before you change (tools: `Read`, `Grep`, `Glob`). Open every file you will edit and the code your change calls.
 3. Make the change (tools: `Edit`, `Write`), in the owned files only, in the style of the code around it.
 4. Run each verification command exactly as written, once (tool: `Bash`). A command that fails, hangs or times out ends your attempt: go to step 7.
