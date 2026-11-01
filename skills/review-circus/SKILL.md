@@ -44,10 +44,8 @@ Run the commands from the repository root. `${CLAUDE_SKILL_DIR}` is this skill's
 Claude Code substitutes in this file as an absolute path. Subagents do not inherit it, so every
 path a dispatch carries is absolute.
 
-- `review_start`, `review_override`, `review_add`, `review_gate`, `review_dispose`, `review_report` and `review_resolve` record the run, the findings, and the decisions.
 - `review_metrics` measures structure (fan-in, fan-out, cycles, sizes) into the run directory. Only this session's primary calls it.
 - Git history (churn, coupling, hotspots) is measured by qualitylens with the `signals_*` tools; the personas dispatch it, this skill does not call them.
-- `task_start`, `task_verify`, `task_mark`, `task_show` and `task_ready` for remediation tasks, and `contract_run` for the landing run.
 
 Read `references/profiles.md` and `references/review-state.md` before the first run in a
 session, and `agents-assemble/references/contracts.md` for the severity table. Dispatch every
@@ -70,10 +68,8 @@ and `emphasis` that the call leaves out to the user and starts the run with the 
 ```
 
 An answer starting `needs input` means no one could be asked through the tool: put each question
-it names to the user in one `AskUserQuestion` dialog, then call again with those arguments. A scope of branch needs `base`, a scope of ticket needs `slug`, and an emphasis of custom
-needs `weights`; a refusal naming one of them means: ask the user for it, then call again.
-
-For a quick review with balanced weights, ask the user which persona and pass it as `persona`.
+it names to the user in one `AskUserQuestion` dialog, then call again with those arguments. A refusal
+naming a missing argument means: ask the user for it, then call again.
 
 It answers with the run id, the run directory, and each persona's model. Every later step
 names the run with `run_id`.
@@ -84,7 +80,7 @@ A run may spend one override on its heavier-weighted reviewer (the first persona
 {"run_id": "20261005-103000"}
 ```
 
-The answer names the reviewer and says to dispatch it with effort high; a second request on the run is refused. A ticket's reviewer keys change no review.
+The answer names the reviewer and says to dispatch it with effort high. A ticket's reviewer keys change no review.
 
 ## 2. Measure
 
@@ -132,10 +128,9 @@ Call `review_add` once per persona in the run:
 {"run_id": "20261005-103000", "persona": "merge-vader"}
 ```
 
-`review_add` reads that persona's report itself, so no step retypes a finding, and one finding it
-refuses rejects the batch with the reason and stores nothing. A quality finding at Medium or
-above needs typed evidence (idiom-evidence.md): lower it to Low or find the evidence, never
-relabel it a defect. A security question a reviewer left UNKNOWN-BLOCKED belongs in its report
+`review_add` reads that persona's report itself, so no step retypes a finding. When it refuses a
+quality finding at Medium or above for lacking typed evidence (idiom-evidence.md), lower it to Low
+or find the evidence, never relabel it a defect. A security question a reviewer left UNKNOWN-BLOCKED belongs in its report
 as a High finding in the `security` dimension whose Fix is to answer it, since CLEAR is
 impossible while it stands. Overlapping findings merge in the tool, and a two-level severity
 gap is flagged for the user. When `review_add` answers that findings are `back to undecided`, show
@@ -205,7 +200,7 @@ each finding `Fn` chosen for fixing:
    engineer runs the Verify command in sandboxed Bash and cites its output.
 3. `task_verify` with `slug`, `task_id` that `R<n>`, the fix `commit`, and `assertions` mapping
    `AC-1` to the cited Verify output, then `review_resolve` with `run_id`, `finding` `Fn`,
-   `result` `fixed` and `commit` (it takes only a finding the user chose to fix).
+   `result` `fixed` and `commit`.
 4. Failed or blocked: `task_mark` with `to` `failed` or `blocked` and a `reason` (a task the gate
    blocked already is `blocked`), then the owner's question unless `auto-escalate` is on,
    `task_start` on that `R<n>` with `by` `architect`, and **architect** once, then whats-broken,

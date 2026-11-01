@@ -50,19 +50,19 @@ With a ticket: `.mightymodels/SLUG/review/RUN/`. Without one: `.mightymodels/.ru
 - `severity` is the heading's, with uncle-bob's Blocker recorded as High.
 - Every text field is scanned for secrets and redacted before it is stored.
 
-One bad finding rejects the whole batch, and nothing is written. `add` refuses a missing report, a report without `## Findings`, an unknown severity heading, a finding before any severity heading, a heading it cannot read, an id that is not the persona's own, an unknown dimension or evidence kind, an empty title, location, Fix, Verify or evidence cite, a location of another shape, and a quality finding at Medium or above without typed evidence.
+One bad finding rejects the whole batch, and nothing is written.
 
 Each new finding takes the next id, `F1`, `F2`, and so on. A finding whose location overlaps a recorded one on the same file, in this report or an earlier one, merges into it: the sources join, the higher severity wins together with its title, location, Fix, Verify and kind, the security mark stays if either had it, and a gap of two or more levels records a `conflict` the user decides in the gate.
 
 ## Dispositions
 
-`dispose` takes `run_id` and either no `decisions`, when the tool asks the user about up to ten undecided findings and records the answers, or `decisions` with `by`, a map from finding id to `decision` and `reason`. Decisions: `fix`, `defer` (ticketed for later), `accept-risk`, `dismiss`. The last two need a non-blank reason, and an unknown finding id rejects the call. A later `dispose` replaces a finding's decision, and the answer lists the findings still undecided. Only `fix` routes to remediation.
+`dispose` takes `run_id` and either no `decisions`, when the tool asks the user about up to ten undecided findings and records the answers, or `decisions` with `by`, a map from finding id to `decision` and `reason`. Decisions: `fix`, `defer` (ticketed for later), `accept-risk`, `dismiss`. A later `dispose` replaces a finding's decision, and the answer lists the findings still undecided. Only `fix` routes to remediation.
 
 A decision stands for the finding as the user saw it. When a later `add` merges into a decided finding and changes it, the finding's decision and outcome rows are deleted and `add` answers that it is `back to undecided`; the gate shows it again.
 
 ## Outcomes and verdict
 
-`resolve` takes `finding`, `result`, `commit` and `reason`, and only for a finding the user chose to fix. `fixed` needs `commit`, and `failed` or `blocked` need `reason`. A later `resolve` replaces the outcome.
+`resolve` takes `finding`, `result`, `commit` and `reason`. A later `resolve` replaces the outcome.
 
 The verdict is computed from the findings, the decisions and the outcomes, never written by hand. A finding is open until its outcome is `fixed` or its decision is `dismiss`: undecided, deferred, accepted and failed findings are all open.
 
