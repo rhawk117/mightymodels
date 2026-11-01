@@ -2,7 +2,7 @@
 name: break-it-down
 description: >-
   Split one mightymodels task that is too large into tasks of one reviewable unit of work each,
-  and put the split to the user before anything changes. Use when the `task` tool's `start`
+  and put the split to the user before anything changes. Use when `task_start`
   refuses a task for more than four acceptance criteria or more than ten owned files, when an
   engineer or architect returns `too-large` with its cuts, or when a plan task is plainly several
   changes. Ends in one AskUserQuestion dialog showing every piece (id, intent, acceptance, owned
@@ -11,34 +11,35 @@ description: >-
   task past the refusal.
 when_to_use: >-
   Use for "break this task down", "split T4", "this task is too big", and when agents-assemble
-  routes a `too-large` report or a `start` refusal here.
+  routes a `too-large` report or a `task_start` refusal here.
 argument-hint: "[task id]"
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_state__contract
-  - mcp__plugin_mightymodels_state__task
+  - mcp__plugin_mightymodels_mighty-mcp__task_show
+  - mcp__plugin_mightymodels_mighty-mcp__task_mark
+  - mcp__plugin_mightymodels_mighty-mcp__task_declare
 ---
 
 # break-it-down
 
 One dispatch is one reviewable unit of work. A task past that size fails in a known way: the
 implementer runs out of room, the verification proves half of it, and the reviewer gets a diff
-nobody can hold in their head. So the `task` tool's `start` refuses a task with more than four
+nobody can hold in their head. So `task_start` refuses a task with more than four
 acceptance criteria or more than ten owned files, and an engineer or architect that finds one
 mid-task returns `too-large`. Both end here.
 
 **Nothing changes before the user answers.** Until the dialog in step 4 is answered this skill
-writes nothing: no `task` call that moves a task, no contract approval, no edit to the plan or to a
+writes nothing: no task call that moves a task, no edit to the plan or to a
 brief. The pieces are a proposal, and the plan is the user's. A dialog that timed out, was
 dismissed or came back empty is not an answer: open it again. Do not decide for the user, do not
 ask in prose instead, and do not start on a piece while you wait.
 
 **Never fit a task under the bound by editing its lists.** Dropping a criterion, folding two into
-one sentence or leaving a file out of `owned` gets a call past `start` and leaves the task exactly
+one sentence or leaving a file out of `owned` gets a call past `task_start` and leaves the task exactly
 as large. The gate then blocks the commit for the file that was left out.
 
 **Argument:** the id of the task to split, given when the skill was started: "$ARGUMENTS". Empty
-quotes mean none was given, and the task is the one `start` just refused or a worker just returned
+quotes mean none was given, and the task is the one `task_start` just refused or a worker just returned
 as `too-large`.
 
 **Preconditions:** a staged ticket and the task's entry in the task list (`plan.md`, or the
@@ -48,11 +49,7 @@ issue's task list after one-shot). Missing either: stop and name it.
 
 **1. Read the task as it stands.** Its entry in the task list (intent, acceptance, `depends-on`,
 verify), the ASKED stanza of its brief when one was written, and its status from
-`mcp__plugin_mightymodels_state__task` with action `show`:
-
-```json
-{"request": {"action": "show", "slug": "SLUG"}}
-```
+`task_show` with the `slug`.
 
 A worker's `cuts` are where to begin, because it has read the code. Check them against step 2
 before you adopt them, and read the files it listed as already edited: that work is in the tree,
@@ -80,10 +77,7 @@ Some tasks do not cut: one rename across thirty files is one change. Say so in t
 and offer the task whole; the user decides, not the bound.
 
 **3. Give the pieces ids.** The next free `T` ids of the task list, in dependency order. The
-original's id is never reused, because its history and its contract commands stay under it. A
-criterion that is a command gets an id under its new task (`T7.AC-1`) with the argv it had: an
-approved id never changes its argv, so the old ids close with the original. Each task that named
-the original in `depends-on` will name the piece that carries what it waited for.
+original's id is never reused, because its history stays under it. Task ids are plain T numbers (`T7`), never dotted or lettered. A criterion that is a command keeps its argv: the piece's engineer runs it in sandboxed Bash and cites the output in `task_verify`, so it needs no contract id. Each task that named the original in `depends-on` will name the piece that carries what it waited for.
 
 **4. Ask the user once.** Write the pieces out in full in your message, then open one
 `AskUserQuestion` dialog about them. Each piece shows its id, its intent, its acceptance and its
@@ -93,7 +87,7 @@ owned files:
 T7 (sm): <one-line intent: what and where>
   depends-on: []
   acceptance:
-  - AC-1: <the criterion, as the original stated it> (was T4.AC-1; contract id T7.AC-1, argv [...])
+  - AC-1: <the criterion, as the original stated it> (was T4.AC-1; command argv [...])
   - AC-2: <...>
   owned: src/queue.py, tests/test_queue.py
 ```
@@ -110,37 +104,19 @@ The dialog has one question with these options:
 
 **Split as shown.** In this order, so that a session cut off halfway still has a true record:
 
-1. Supersede the original with `mcp__plugin_mightymodels_state__task` and action `mark`, the
-   reason naming the pieces. The tool takes this for a task `start` refused, which never
-   started, as it does for one a worker returned:
-
-   ```json
-   {"request": {"action": "mark", "slug": "SLUG", "payload": {"task_id": "T4", "change": {"to": "superseded", "reason": "split into T7, T8 and T9"}}}}
-   ```
-
+1. Supersede the original with `task_mark`, `to` `superseded` and a `reason` naming the pieces (such as "split into T7, T8 and T9"). The tool takes this for a task `task_start` refused, which never started, as it does for one a worker returned.
 2. Update the task list where it lives (`plan.md`, or the issue's task list as one-shot wrote
    it). Under the original's heading leave one line, `superseded: split into T7, T8, T9`, in place
    of its acceptance and verify. Add the pieces in dependency order, and repoint each `depends-on`
    as the dialog listed.
-3. Record the pieces' commands with `mcp__plugin_mightymodels_state__contract` and action
-   `approve`. The user approved each id and argv in the dialog, so each command carries that:
-
-   ```json
-   {"request": {"action": "approve", "slug": "SLUG", "commands": [{"id": "T7.AC-1", "argv": ["uv", "run", "pytest", "-q", "tests/test_queue.py"], "approved_by": "user"}]}}
-   ```
-
+3. Declare the pieces with `task_declare`, passing the `slug` and the new `T` ids, so each can be started. Contract invariants (`I*`) and landing commands (`L*`) are not task commands: they stay in the contract and are not split.
 4. Report one line per piece (id, size, intent) and the original as superseded, then hand back
    to agents-assemble. Each piece runs through its loop as a task of its own, from what-we-know
    onward; the original's brief is not reused.
 
 **Keep it as one task.** Split nothing and change nothing in the task list. A task a worker
-returned as `too-large` is still in progress, and `start` does not take one: `mark` it `blocked`
-with that reason first. Then start the task with the call `start` refused and one more field,
-which the tool accepts only as `user` (`mcp__plugin_mightymodels_state__task`, action `start`):
-
-```json
-{"request": {"action": "start", "slug": "SLUG", "payload": {"task_id": "T4", "change": {"by": "engineer", "owned": ["<files-in-scope>"], "acceptance": ["AC-1", "AC-2", "AC-3", "AC-4", "AC-5"], "too_large_approved_by": "user"}}}}
-```
+returned as `too-large` is still in progress, and `task_start` does not take one: mark it `blocked`
+with that reason first (`task_mark`). Then agents-assemble calls `task_start` with the call it refused and one more field, `too_large_approved_by` set to `user`, which the tool accepts only as that value.
 
 This answer is the only thing that permits that field. It is never added because a refusal was in
 the way, and never on a different task than the one the user was shown.

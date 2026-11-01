@@ -6,8 +6,8 @@ when_to_use: >-
   stick-the-landing or agents-assemble routes a failure here.
 argument-hint: "[failing check, test or symptom]"
 allowed-tools:
-  - mcp__plugin_mightymodels_state__contract
-  - mcp__plugin_mightymodels_state__task
+  - mcp__plugin_mightymodels_mighty-mcp__contract_approve
+  - mcp__plugin_mightymodels_mighty-mcp__task_start
 ---
 
 # whats-broken
@@ -38,9 +38,9 @@ Current-state only — each attempt regenerates the file (prior attempts live in
 
 **4. Test the hypothesis, minimally.** The cheapest check that could falsify it — a log line, a one-off command, a narrowed test invocation. Not a fix. Falsified → back to phase 3 with the new evidence, attempt counter up. Confirmed → phase 5.
 
-**5. Fix, through the normal path.** A confirmed cause is new, well-understood work, so it goes to a fresh **engineer** dispatch whose ASKED stanza includes a regression test as an acceptance criterion. With an active ticket, the regression test gets a contract id through `mcp__plugin_mightymodels_state__contract` with action `approve`, as game-plan shows (the user approves it in the dialog, as every contract command is), and is proven with `mightymodels verify run`, not by the engineer's word; the task the fix goes under is started with `task` `start` before the dispatch, because the dispatch hook refuses an engineer while the ticket has no task in progress. The fix targets the confirmed cause: if the diff patches the symptom's location instead of the hypothesis's location, that is the quick fix wearing a lab coat; reject it.
+**5. Fix, through the normal path.** A confirmed cause is new, well-understood work, so it goes to a fresh **engineer** dispatch whose ASKED stanza includes a regression test as an acceptance criterion. With an active ticket, the regression test is a task command: the engineer runs it in sandboxed Bash and the output is cited in `task_verify`, so it needs no contract id. Only a command that should keep guarding the ticket afterward becomes an invariant (`I*`) through `contract_approve`, which the user approves in its own dialog; the primary proves it with `contract_run`. The task the fix goes under is started with `task_start` before the dispatch, because the dispatch hook refuses an engineer while the ticket has no task in progress. The fix targets the confirmed cause: if the diff patches the symptom's location instead of the hypothesis's location, that is the quick fix wearing a lab coat; reject it.
 
-Route to **architect** instead only when the confirmed cause needs a design decision or files outside the task's owned set: `diagnose-replan` when the fix is not yet clear, `systemic-refactor` only after the user approves the expanded envelope, started through the `task` tool on the task that is still in progress. A task the architect replans is marked `superseded`, and its revised contract is a new task. `diagnose-replan` stays allowed after the architect's one implementation attempt. Diagnosis stays here and implementation stays with them; architect never widens scope it discovered while debugging.
+Route to **architect** instead only when the confirmed cause needs a design decision or files outside the task's owned set: `diagnose-replan` when the fix is not yet clear, `systemic-refactor` only after the user approves the expanded envelope, started with `task_start` on the task that is still in progress. A task the architect replans is marked `superseded`, and its revised contract is a new task. `diagnose-replan` stays allowed after the architect's one implementation attempt. Diagnosis stays here and implementation stays with them; architect never widens scope it discovered while debugging.
 
 ## The breaker
 

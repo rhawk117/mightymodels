@@ -6,12 +6,12 @@ when_to_use: >-
   fails on your change, or a fix you tried did not make it pass.
 user-invocable: false
 allowed-tools:
-  - mcp__plugin_mightymodels_state__failed_fix
+  - mcp__plugin_mightymodels_mighty-mcp__failed_fix_record
 ---
 
 # agent-debugging
 
-The engineer's form of whats-broken, for one worker with no one to dispatch. The rule is the same: **no fix before evidence.** The engineer does not dispatch architect, code-scout or web-scout here; it reads, runs and tests with its own tools. The task tool counts the failed fixes, so the limit holds even when the engineer would rather try one more.
+The engineer's form of whats-broken, for one worker with no one to dispatch. The rule is the same: **no fix before evidence.** The engineer does not dispatch architect, code-scout or web-scout here; it reads, runs and tests with its own tools. `failed_fix_record` counts the failed fixes, so the limit holds even when the engineer would rather try one more.
 
 ## Steps
 
@@ -25,14 +25,10 @@ The engineer's form of whats-broken, for one worker with no one to dispatch. The
 
 **5. Fix inside your owned files, then run the verification again.** A fix that needs a file outside the owned set is not yours to make: report `blocked` with the file and the hypothesis.
 
-**6. Record a fix that failed.** When the verification still fails, call `mcp__plugin_mightymodels_state__failed_fix` with action `record` before you try anything else (`SLUG` is the directory in the brief path `.mightymodels/<slug>/briefs/`, `T1` the task id from the dispatch):
-
-```json
-{"request": {"action": "record", "slug": "SLUG", "payload": {"task_id": "T1", "change": {"hypothesis": "I believe the batch size is zero because the drain log shows an empty batch; the fix that set it did not change the log"}}}}
-```
+**6. Record a fix that failed.** When the verification still fails, call `failed_fix_record` before you try anything else, with the `slug` (the directory in the brief path `.mightymodels/<slug>/briefs/`), the `task_id` from the dispatch, and a `hypothesis` in one sentence, such as "I believe the batch size is zero because the drain log shows an empty batch; the fix that set it did not change the log".
 
 The answer says how many fixes are left. The hypothesis is stored redacted, so keep secrets out of it anyway.
 
 ## The limit
 
-The tool stores three failed fixes per task. A fourth call is refused with an error that says the task is blocked and lists the three hypotheses in order. That refusal ends the work: report `blocked`, copy the listed hypotheses into the report, and make no further edit. The coordinator routes a blocked report to the owner's question and the architect, then to whats-broken, and the engineer dispatches neither; a hypothesis already tried is not tried again there. The `task` tool is not yours: do not start, mark or verify a task to get around the refusal.
+The tool stores three failed fixes per task. A fourth call is refused with an error that says the task is blocked and lists the three hypotheses in order. That refusal ends the work: report `blocked`, copy the listed hypotheses into the report, and make no further edit. The coordinator routes a blocked report to the owner's question and the architect, then to whats-broken, and the engineer dispatches neither; a hypothesis already tried is not tried again there. The task tools other than `failed_fix_record` are not yours: do not start, mark or verify a task to get around the refusal.
