@@ -30,7 +30,6 @@ allowed-tools:
   - mcp__plugin_mightymodels_mighty-mcp__task_mark
   - mcp__plugin_mightymodels_mighty-mcp__task_show
   - mcp__plugin_mightymodels_mighty-mcp__task_ready
-  - mcp__plugin_mightymodels_mighty-mcp__contract_run
 ---
 
 # review-circus
@@ -190,16 +189,17 @@ each finding `Fn` chosen for fixing:
 
 1. `task_start` with `slug`, `task_id` the next `R<n>` that `task_show` does not list, `by`
    `engineer`, `owned` the files the Fix touches and `acceptance` `AC-1`, the criterion the
-   finding's Verify line proves. That number is the task's own and not the finding's: a sprint
+   finding's Verify outcome sentence proves. That number is the task's own and not the finding's: a sprint
    residual may hold `R1` already, so `F1` can be fixed under `R2`.
 2. Dispatch an **engineer**: the residual variant for a single-concern merge-vader finding
    with usable Fix and Verify lines; the full template for uncle-bob findings, findings both
    personas raised, and anything Critical or High security. Either way the dispatch carries
    SLUG, that `R<n>` as the task id, and the persona's own id (`MV-n`, `UB-n`) in a slot of its
-   own as the finding: a finding id is never the task id. A residual carries no contract id: the
-   engineer runs the Verify command in sandboxed Bash and cites its output.
-3. `task_verify` with `slug`, `task_id` that `R<n>`, the fix `commit`, and `assertions` mapping
-   `AC-1` to the cited Verify output, then `review_resolve` with `run_id`, `finding` `Fn`,
+   own as the finding: a finding id is never the task id. A residual carries `Fix:` and an outcome
+   sentence; the finding's `Verify:` bullet holds that outcome sentence and is not a command the
+   reader must run. The engineer runs the tests that show the outcome and names them.
+3. `task_verify` with `slug`, `task_id` that `R<n>`, the fix `commit` and `verdict`
+   `verified`, then `review_resolve` with `run_id`, `finding` `Fn`,
    `result` `fixed` and `commit`.
 4. Failed or blocked: `task_mark` with `to` `failed` or `blocked` and a `reason` (a task the gate
    blocked already is `blocked`), then the owner's question unless `auto-escalate` is on,
@@ -211,7 +211,7 @@ A finding whose reviewer wrote an Architect escalation line (a design decision b
 Fix) is a question for the user first. On their yes, dispatch architect in diagnose-replan
 mode; its revised plan goes back to agents-assemble as new tasks, not into this loop.
 
-Before every push: `contract_run` with `slug` and phase `landing`, and `task_ready`, as stick-the-landing does, then push (only the primary pushes) and dispatch gitty-up
+Before every push: `task_ready`, as stick-the-landing does, then push (only the primary pushes) and dispatch gitty-up
 with the PR number to watch CI.
 
 ## 8. Close

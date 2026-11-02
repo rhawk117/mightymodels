@@ -33,18 +33,18 @@ With a ticket: `.mightymodels/SLUG/review/RUN/`. Without one: `.mightymodels/.ru
 
 - Evidence: `src/auth/session.py:88` `if token == stored:`
 - Fix: Use `hmac.compare_digest` for the comparison.
-- Verify: `uv run pytest -q tests/test_session.py`
+- Verify: Comparing a wrong token of the same length no longer takes a different time than a right one.
 
 #### UB-3 | [F1] Output argument in drain - `src/queue/worker.py:101`
 
 - Evidence (idiom): https://docs.python.org/3.14/tutorial/controlflow.html#defining-functions
 - Fix: Return the results from `drain`.
-- Verify: `rg -n 'def drain' src/queue/worker.py`
+- Verify: `drain` hands its results back to the caller and no longer fills a list passed in.
 ```
 
 - The id is the persona's own, `MV-n` in merge-vader's report and `UB-n` in uncle-bob's.
 - `location` is the first word of merge-vader's untyped `Evidence:` bullet, and for uncle-bob the backticked path after the dash in the heading. It must be `path:line` or `path:start-end`.
-- `title` is the heading text, and the `Fix:` and `Verify:` bullets are required. A bullet's continuation lines join it. Bullets the tool does not read (Why it matters, Confidence, Signals, Architect escalation) stay in the report file.
+- `title` is the heading text, and the `Fix:` and `Verify:` bullets are required. The `Verify:` bullet holds an outcome sentence, not a command the reader must run; the engineer runs the tests that show the outcome and names them. A bullet's continuation lines join it. Bullets the tool does not read (Why it matters, Confidence, Signals, Architect escalation) stay in the report file.
 - `kind` and `security` come from the dimension, never from another label: merge-vader's `quality` is a quality finding, `security` is a defect with the security mark, and `sdlc`, `docs` and `plan` are defects. Every uncle-bob finding is a quality finding.
 - A quality finding at Medium or above needs a typed bullet naming one kind (`Evidence (metric): <cite>`, or `idiom` or `convention` in its place; idiom-evidence.md); at Low it needs none.
 - `severity` is the heading's, with uncle-bob's Blocker recorded as High.
