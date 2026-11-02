@@ -76,8 +76,8 @@ The session is pointed at the investigation by the first `investigation_add`,
 does not point it. Until a pointer exists the recorder writes nothing. After that, the recorder
 hook on `AskUserQuestion` writes each answer the user gives in a dialog into the ledger as a
 `decision` entry from `user`, stamped with the ledger's latest round, or round 1 when that is 0,
-never round 0. An answer given before a round's `investigation_add` lands in the latest existing
-round. Do not write a gate answer yourself. Record by hand, as a `known` from `user` in round 0
+never round 0. An answer given before a round's `investigation_add` is stamped by the same rule, so it
+lands in the latest existing round, or in round 1 when only round 0 exists. Do not write a gate answer yourself. Record by hand, as a `known` from `user` in round 0
 (cite `user`, source `user`), each framing answer and any answer given before the first call
 naming the id, along with any fact the user states. The kind answer goes through the tool's own
 form: `investigation_start` stores it as the investigation's kind, and it is not a ledger entry.
