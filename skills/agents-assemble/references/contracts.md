@@ -60,7 +60,7 @@ IDs are stable within their report (MV-n, UB-n) and aggregation preserves proven
 
 ## Caps are contracts
 
-Brief 80 lines · REPORT.md 50 · archive 30 · plan.md ~200 · one task at most four acceptance criteria and ten owned files: `task_start` refuses a larger one by the name of break-it-down, unless the start names the approval of the user who kept it whole · whats-broken.md current-state only, regenerated per attempt · one architect implementation attempt per task, plus one `systemic-refactor` pass after an approved scope expansion; `diagnose-replan` passes never count against it. Hitting a cap means the content belongs in a different layer, not that the file grows.
+Brief 80 lines · REPORT.md 50 · archive 30 · plan.md ~200 · one task is meant to stay near three owned files and four acceptance criteria: `task_start` starts a larger one anyway and its warning names break-it-down · whats-broken.md current-state only, regenerated per attempt · one architect implementation attempt per task, plus one `systemic-refactor` pass after an approved scope expansion; `diagnose-replan` passes never count against it. Hitting a cap means the content belongs in a different layer, not that the file grows.
 
 ## Durable-before-advance
 

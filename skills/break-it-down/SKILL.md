@@ -2,16 +2,14 @@
 name: break-it-down
 description: >-
   Split one mightymodels task that is too large into tasks of one reviewable unit of work each,
-  and put the split to the user before anything changes. Use when `task_start`
-  refuses a task for more than four acceptance criteria or more than ten owned files, when an
-  engineer or architect returns `too-large` with its cuts, or when a plan task is plainly several
-  changes. Ends in one AskUserQuestion dialog showing every piece (id, intent, acceptance, owned
+  and put the split to the user before anything changes. Size is guidance. Use when
+  `task_start` warns that a task is large, when an engineer or architect returns `too-large` with
+  its cuts, or when a plan task is plainly several changes. Ends in one AskUserQuestion dialog showing every piece (id, intent, acceptance, owned
   files); only after the user answers is the original superseded and the plan updated. Not for
-  revising the contract of one task (the architect's `replanned`), and not a way to get a large
-  task past the refusal.
+  revising the ASKED stanza of one task (the architect's `replanned`).
 when_to_use: >-
   Use for "break this task down", "split T4", "this task is too big", and when agents-assemble
-  routes a `too-large` report or a `task_start` refusal here.
+  routes a `too-large` report or a `task_start` warning here.
 argument-hint: "[task id]"
 allowed-tools:
   - AskUserQuestion
@@ -24,9 +22,10 @@ allowed-tools:
 
 One dispatch is one reviewable unit of work. A task past that size fails in a known way: the
 implementer runs out of room, the verification proves half of it, and the reviewer gets a diff
-nobody can hold in their head. So `task_start` refuses a task with more than four
-acceptance criteria or more than ten owned files, and an engineer or architect that finds one
-mid-task returns `too-large`. Both end here.
+nobody can hold in their head. Size is guidance, not a gate: `task_start` starts every task and
+warns above three owned files or four criteria, and an engineer or architect that finds one
+mid-task returns `too-large`. Those two, or a plan task that is plainly several changes, are the
+routes here, and the user decides whether to split.
 
 **Nothing changes before the user answers.** Until the dialog in step 4 is answered this skill
 writes nothing: no task call that moves a task, no edit to the plan or to a
@@ -34,12 +33,8 @@ brief. The pieces are a proposal, and the plan is the user's. A dialog that time
 dismissed or came back empty is not an answer: open it again. Do not decide for the user, do not
 ask in prose instead, and do not start on a piece while you wait.
 
-**Never fit a task under the bound by editing its lists.** Dropping a criterion, folding two into
-one sentence or leaving a file out of `owned` gets a call past `task_start` and leaves the task exactly
-as large. The gate then blocks the commit for the file that was left out.
-
 **Argument:** the id of the task to split, given when the skill was started: "$ARGUMENTS". Empty
-quotes mean none was given, and the task is the one `task_start` just refused or a worker just returned
+quotes mean none was given, and the task is the one `task_start` just warned about or a worker just returned
 as `too-large`.
 
 **Preconditions:** a staged ticket and the task's entry in the task list (`plan.md`, or the
@@ -64,20 +59,20 @@ uncommitted, and the pieces have to account for it.
 
 Every piece has to stand alone, so hold each one to this:
 
-- At most four acceptance criteria and ten owned files. Two to four criteria is the usual size.
+- Two to four acceptance criteria and about three owned files, the sizes `task_start` does not warn about.
 - Every criterion of the original lands in exactly one piece, in its own words. None is dropped
   and none is invented. A criterion that two pieces each need half of is two criteria: write both
-  out and say in the dialog that it was divided, because that changes the contract.
+  out and say in the dialog that it was divided, because that changes what is asked.
 - Every file the original owned lands in a piece. Two pieces that edit the same file run in
   order, joined by `depends-on`, never side by side.
 - The repository passes after each piece, not only after the last: the plan's invariants hold at
   every task boundary. A piece that cannot be verified alone is not a piece yet.
 
 Some tasks do not cut: one rename across thirty files is one change. Say so in the dialog
-and offer the task whole; the user decides, not the bound.
+and offer the task whole; the user decides, and a warning stops nothing.
 
 **3. Give the pieces ids.** The next free `T` ids of the task list, in dependency order. The
-original's id is never reused, because its history stays under it. A criterion that is a command keeps its argv: the piece's engineer runs it in sandboxed Bash and cites the output in `task_verify`, so it needs no contract id. Each task that named the original in `depends-on` will name the piece that carries what it waited for.
+original's id is never reused, because its history stays under it. Each task that named the original in `depends-on` will name the piece that carries what it waited for.
 
 **4. Ask the user once.** Write the pieces out in full in your message, then open one
 `AskUserQuestion` dialog about them. Each piece shows its id, its intent, its acceptance and its
@@ -87,8 +82,8 @@ owned files:
 T7 (sm): <one-line intent: what and where>
   depends-on: []
   acceptance:
-  - AC-1: <the criterion, as the original stated it> (was T4.AC-1; command argv [...])
-  - AC-2: <...>
+  - <the criterion, as the original stated it> (was the first criterion of T4)
+  - <another outcome sentence>
   owned: src/queue.py, tests/test_queue.py
 ```
 
@@ -109,17 +104,14 @@ The dialog has one question with these options:
    it). Under the original's heading leave one line, `superseded: split into T7, T8, T9`, in place
    of its acceptance and verify. Add the pieces in dependency order, and repoint each `depends-on`
    as the dialog listed.
-3. Declare the pieces with `task_declare`, passing the `slug` and the new `T` ids, so each can be started. Contract invariants (`I*`) and landing commands (`L*`) are not task commands: they stay in the contract and are not split.
+3. Declare the pieces with `task_declare`, passing the `slug` and the new `T` ids, so each can be started.
 4. Report one line per piece (id, size, intent) and the original as superseded, then hand back
    to agents-assemble. Each piece runs through its loop as a task of its own, from what-we-know
    onward; the original's brief is not reused.
 
 **Keep it as one task.** Split nothing and change nothing in the task list. A task a worker
-returned as `too-large` is still in progress, and `task_start` does not take one: mark it `blocked`
-with that reason first (`task_mark`). Then agents-assemble calls `task_start` with the call it refused and one more field, `too_large_approved_by` set to `user`.
-
-This answer is the only thing that permits that field. It is never added because a refusal was in
-the way, and never on a different task than the one the user was shown.
+returned as `too-large` is still in progress: mark it `blocked` with that reason (`task_mark`),
+then agents-assemble starts it again whole, or continues it whole, and the warning stops nothing.
 
 **Change the split.** Return to step 2 with what the user said and ask again with the new pieces.
 The earlier answer approved nothing.

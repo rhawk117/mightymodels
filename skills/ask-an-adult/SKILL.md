@@ -10,7 +10,9 @@ when_to_use: >-
   Use when the user says they want a second opinion, when they invoke
   /ask-an-adult, or when the session has stalled on a judgment call - two
   defensible options, a hard-to-reverse choice, conflicting scout reports, a
-  failure that survived two attempts, or a guess about user intent.
+  failure that survived two attempts, or a guess about user intent. Also use when whats-broken
+  ends its phases with a judgment call between defensible options still open, and when any model
+  does not know what to do next.
 allowed-tools:
   - AskUserQuestion
 ---
@@ -33,6 +35,8 @@ Escalate when the decision is **genuinely undecidable from what you have**:
 - Scout reports conflict with each other or with the plan.
 - The same failure has survived two attempts.
 - You are about to guess at what the user wants.
+- whats-broken has finished its phases and a judgment call between defensible options remains.
+- You do not know what to do next, whichever model you are.
 
 Do not escalate to have a plan blessed, to retrieve a fact a scout can fetch, to
 re-open a decision the user already made, or a second time on the same packet.
@@ -85,9 +89,10 @@ wingman returns a `<report agent="wingman">` block. Handle it in this order:
 Surface `<verdict>`, `<confidence>`, and `<user_questions>` to the user verbatim.
 Summarizing an advisor whose whole value is its reasoning defeats the call.
 
-The user decides; this skill is the only tie-break path. When the user cannot choose and
-says so ("you pick", "either is fine"), adopt wingman's verdict, and say in chat that the user
-deferred to it. Do not escalate the same packet again.
+The user decides; this skill is the only tie-break path. wingman's verdict alone is never the
+user's answer. When the user explicitly defers to it ("you pick", "go with wingman"), that
+deferral is the user's answer: adopt wingman's verdict, say in chat that the user deferred to it,
+and record it as described below. Do not escalate the same packet again.
 
 ## Record it
 
@@ -95,8 +100,8 @@ The user's answers to wingman's questions go through `AskUserQuestion`, and the 
 that tool writes each answer, verbatim, as a decision in the ledger or ticket the session is
 pointed at. Write nothing by hand: a second entry would record the same answer twice. If the
 user settles the choice in chat instead of the dialog, nothing records it, so put the choice to
-them again through `AskUserQuestion` before work resumes. This includes a deferral to wingman's
-recommendation: it is a choice made in chat, which has no writer, so put it through
+them again through `AskUserQuestion` before work resumes. This includes the user's deferral to wingman's
+recommendation: it is a choice made in chat, which has no writer, so confirm it through
 `AskUserQuestion` so the recorder takes it. With no investigation or ticket in
 the session, nothing is persisted; baton-pass hands the settled decisions on when the session
 ends.
