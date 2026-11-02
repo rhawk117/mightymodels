@@ -159,6 +159,40 @@ class TestTaskStart:
         assert (await started.call('task_start', START)).is_error
 
 
+@pytest.fixture
+async def restarted(started: TaskHarness) -> tuple[TaskHarness, str]:
+    elsewhere = anyio.Path(started.server.repository, 'src/elsewhere.py')
+    await elsewhere.parent.mkdir(parents=True, exist_ok=True)
+    await elsewhere.write_text('elsewhere\n')
+    await started.git('add', 'src/elsewhere.py')
+    later = await started.commit('between the attempts')
+    view_of(await started.call('task_mark', {**KEY, 'to': 'blocked', 'reason': 'waiting'}))
+    view_of(await started.call('task_start', START))
+    return started, later
+
+
+class TestTaskRestart:
+    async def test_a_restart_takes_the_current_head_as_its_base(
+        self, restarted: tuple[TaskHarness, str]
+    ) -> None:
+        harness, later = restarted
+
+        view = view_of(await harness.call('task_show', {'slug': SLUG}))
+
+        assert view['tasks'][0]['base'] == later
+
+    async def test_verify_after_a_restart_judges_files_against_the_new_base(
+        self, restarted: tuple[TaskHarness, str]
+    ) -> None:
+        harness, _later = restarted
+        head = await harness.commit_owned_file()
+
+        arguments = {**KEY, 'commit': head, 'verdict': 'verified'}
+        view = view_of(await harness.call('task_verify', arguments))
+
+        assert view['outside_owned'] == []
+
+
 class TestTaskShow:
     async def test_unstarted_ticket_has_no_tasks(self, staged: TaskHarness) -> None:
         view = view_of(await staged.call('task_show', {'slug': SLUG}))

@@ -191,7 +191,7 @@ VALUES (:ticket_id, :task_key, :status, :owned, :base, :commit, :reasons, :updat
 ON CONFLICT (ticket_id, task_key) DO UPDATE SET
   status = excluded.status,
   owned = excluded.owned,
-  base = coalesce(tasks.base, excluded.base),
+  base = coalesce(excluded.base, tasks.base),
   "commit" = excluded."commit",
   reasons = excluded.reasons,
   updated_at = excluded.updated_at

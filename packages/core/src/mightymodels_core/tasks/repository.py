@@ -2,8 +2,8 @@
 
 `TaskRepository` reads and writes the task rows. `declare` writes `pending` rows for the ids that
 have no row and leaves every existing row, and the transitions, as they were. `record_start`
-upserts the task as in progress, keeps the base it first had, and writes the attempt and the
-transition with it.
+upserts the task as in progress, takes the current head as its base, and writes the attempt and
+the transition with it.
 `record_verification` sets the verified commit and refuses a task that was never started.
 `record_mark` moves a task that may never have started, keeping what it held. A write that leaves
 the ticket with more tasks than one read returns is refused.

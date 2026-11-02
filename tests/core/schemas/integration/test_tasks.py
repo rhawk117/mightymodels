@@ -93,7 +93,7 @@ class TestTasks:
         assert task.updated_at == STARTED_AT
         assert missing is None
 
-    def test_restarting_keeps_the_first_base_and_the_task_id(
+    def test_restarting_takes_the_new_base_and_keeps_the_task_id(
         self, database: Database, ticket_id: int
     ) -> None:
         first = start(database, upsert(ticket_id, 'T1', base='base1'))
@@ -104,7 +104,7 @@ class TestTasks:
 
         assert again == first
         assert task is not None
-        assert task.base == 'base1'
+        assert task.base == 'base2'
 
     def test_a_mark_before_any_start_has_no_base(self, database: Database, ticket_id: int) -> None:
         start(database, upsert(ticket_id, 'T1', status='blocked', base=None))

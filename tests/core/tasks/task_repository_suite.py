@@ -47,7 +47,7 @@ class TaskRepositoryContract:
 
             assert started.tasks.task(started.ticket_id, FIRST_TASK) == expected
 
-        def test_restart_keeps_the_first_base_and_takes_the_new_owned_files(
+        def test_restart_takes_the_new_base_and_the_new_owned_files(
             self, started: TaskHarness
         ) -> None:
             restart = create_transition(FIRST_TASK, 'failed', 'in-progress', day=3, head='def5678')
@@ -58,7 +58,7 @@ class TaskRepositoryContract:
 
             task = started.tasks.task(started.ticket_id, FIRST_TASK)
             assert task is not None
-            assert (task.base, task.owned) == ('abc1234', ('src/c.py',))
+            assert (task.base, task.owned) == ('def5678', ('src/c.py',))
 
         def test_tasks_come_back_in_start_order(self, started: TaskHarness) -> None:
             second = create_transition(SECOND_TASK, 'pending', 'in-progress')
