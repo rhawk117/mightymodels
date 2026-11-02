@@ -1,4 +1,4 @@
-"""What a hook reads of the ticket whose branch is checked out: its started and blocked tasks.
+"""What a hook reads of the ticket whose branch is checked out: its started tasks.
 
 The ticket is the one ticket of this repository, not closed, whose branch is the checked-out
 branch. A detached HEAD, no match and more than one match mean no ticket, and the hook does
@@ -11,26 +11,19 @@ as the error, so the caller can tell none from unreadable.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository
-from mightymodels_core.tasks.gates import STUCK
+from mightymodels_core.tasks import SqliteTaskRepository
 from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError
 
 from mightymodels_hooks.hook_context import STATE_UNREADABLE
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from mightymodels_core.edge import OpenState
-    from mightymodels_core.primitives import TaskId
-    from mightymodels_core.tasks import TaskRecord
     from mightymodels_core.tickets import TicketRecord
     from mightymodels_core.units_of_work import Entry
-    from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
+    from mightymodels_core.vocabulary.tasks import Worker
 
     from mightymodels_hooks.hook_context import HookContext
-
-IN_PROGRESS: frozenset[TaskStatus] = frozenset({'in-progress'})
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -40,18 +33,9 @@ class StartedTask:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class BlockedTask:
-    id: str
-    status: str
-    reasons: tuple[str, ...]
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
 class BranchTickets:
     unclosed: tuple[str, ...] = ()
     in_progress: tuple[str, ...] = ()
-    auto_escalate: bool = False
-    blocked: tuple[BlockedTask, ...] = ()
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -67,7 +51,6 @@ type BranchTicketsOrUnreadable = BranchTickets | Exception
 @dataclass(slots=True, kw_only=True, frozen=True)
 class TicketReads:
     tasks: SqliteTaskRepository
-    attempts: SqliteAttemptRepository
     ticket_id: int
 
     def started_by(self, worker: Worker) -> tuple[StartedTask, ...]:
@@ -75,29 +58,10 @@ class TicketReads:
         keys = self.tasks.in_progress_started_by(self.ticket_id, worker)
         return tuple(StartedTask(id=key, owned=owned[key]) for key in keys)
 
-    def escalated(self) -> set[TaskId]:
-        starts = self.attempts.latest_transition_of_each_task_into(self.ticket_id, IN_PROGRESS)
-        started = self.tasks.in_progress_started_by(self.ticket_id, 'architect')
-        return {key for key in started if starts[key].before in STUCK}
-
-    def blocked(self, records: Sequence[TaskRecord]) -> tuple[BlockedTask, ...]:
-        blocks = self.attempts.latest_transition_of_each_task_into(self.ticket_id, STUCK)
-        escalated = self.escalated()
-        return tuple(
-            BlockedTask(
-                id=record.key,
-                status=blocks[record.key].after,
-                reasons=tuple(map(str, blocks[record.key].reasons)),
-            )
-            for record in records
-            if record.status in STUCK or record.key in escalated
-        )
-
 
 def ticket_reads_of(entry: Entry, ticket_id: int) -> TicketReads:
     return TicketReads(
         tasks=SqliteTaskRepository(unit=entry.unit),
-        attempts=SqliteAttemptRepository(unit=entry.unit),
         ticket_id=ticket_id,
     )
 
@@ -136,8 +100,6 @@ def tickets_on_branch(entry: Entry, branch: str | None) -> BranchTickets:
     return BranchTickets(
         unclosed=names,
         in_progress=tuple(record.key for record in records if record.status == 'in-progress'),
-        auto_escalate=ticket.section.auto_escalate,
-        blocked=reads.blocked(records),
     )
 
 

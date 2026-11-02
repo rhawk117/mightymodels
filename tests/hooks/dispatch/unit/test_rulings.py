@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE
 from mightymodels_core.primitives import StateError
-from mightymodels_hooks.branch_state import BlockedTask, BranchTickets, StartedTask
+from mightymodels_hooks.branch_state import BranchTickets, StartedTask
 from mightymodels_hooks.cli import REFUSED, HookCommand, create_hook_router
 from mightymodels_hooks.workers import agent_type
 
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 ENGINEER = agent_type('engineer')
 ARCHITECT = agent_type('architect')
 INTERN = agent_type('intern')
-BLOCK = BlockedTask(id='T2', status='blocked', reasons=('stuck on the schema',))
 UNREADABLE = StateError('the database is locked')
 
 
@@ -96,10 +95,6 @@ def outside_caller_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('caller', ['Explore', 'other-plugin:agent', 'mightymodels'])
 
 
-def escalation_target_cases() -> pytest.MarkDecorator:
-    return pytest.mark.parametrize('target', [ARCHITECT, 'wingman', agent_type('wingman')])
-
-
 def intern_tasks_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(
         'tasks',
@@ -170,29 +165,12 @@ class TestMainThreadStartedTask:
 
 
 class TestEscalation:
-    blocked = one_ticket(in_progress=('T1',), blocked=(BLOCK,))
+    async def test_architect_denial_names_the_missing_task(self) -> None:
+        assert (await judge(ARCHITECT, FakeStartedTasks(tickets=one_ticket()))).decision == 'deny'
 
-    @escalation_target_cases()
-    async def test_block_with_auto_escalate_off_is_asked_about(self, target: str) -> None:
-        verdict = await judge(target, FakeStartedTasks(tickets=self.blocked))
-        assert (verdict.decision, 'T2 blocked: stuck on the schema' in verdict.detail) == (
-            'ask',
-            True,
-        )
-
-    async def test_block_with_auto_escalate_on_is_not_judged(self) -> None:
-        tickets = one_ticket(in_progress=('T1',), auto_escalate=True, blocked=(BLOCK,))
-        assert (await judge(ARCHITECT, FakeStartedTasks(tickets=tickets))).decision is None
-
-    async def test_engineer_is_not_asked_about_a_block(self) -> None:
-        assert (await judge(ENGINEER, FakeStartedTasks(tickets=self.blocked))).decision is None
-
-    async def test_architect_denial_comes_before_the_question(self) -> None:
-        tickets = one_ticket(blocked=(BLOCK,))
-        assert (await judge(ARCHITECT, FakeStartedTasks(tickets=tickets))).decision == 'deny'
-
-    async def test_wingman_with_unreadable_tickets_is_not_judged(self) -> None:
-        assert (await judge('wingman', FakeStartedTasks(tickets=UNREADABLE))).decision is None
+    async def test_wingman_is_not_judged(self) -> None:
+        fake = FakeStartedTasks(tickets=one_ticket(in_progress=('T1',)))
+        assert (await judge('wingman', fake)).decision is None
 
 
 class TestIntern:

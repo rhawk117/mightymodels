@@ -13,11 +13,6 @@ denied, with the step to take, while the one unclosed ticket on the checked-out 
 in progress, and when the tickets cannot be read. With no unclosed ticket on the branch it gets no
 decision. With several it gets no decision either, and the user is shown one line naming them.
 
-Its dispatch of the architect or the wingman is an escalation, and the owner hears of a block
-before one is spent on it. While the one unclosed ticket on the checked-out branch has a task a
-block stopped and the ticket's `auto-escalate` is off, the dispatch is answered `ask`, naming each
-such task with the reasons of its block. For the architect the denial above comes first.
-
 Its dispatch of any other worker but the intern gets no decision and reads no state.
 
 One rule holds whoever the caller is. The intern takes only a tiny task, so a dispatch of the
@@ -32,7 +27,7 @@ from mightymodels_core.primitives import AgentName, encode_compact
 
 from mightymodels_hooks.branch_state import BranchState
 from mightymodels_hooks.hook_context import create_hook_context_at
-from mightymodels_hooks.rulings import Asked, Denied, Unjudged, hook_output
+from mightymodels_hooks.rulings import Denied, Unjudged, hook_output
 from mightymodels_hooks.workers import agent_type, plugin_caller, worker_named
 
 if TYPE_CHECKING:
@@ -40,11 +35,7 @@ if TYPE_CHECKING:
 
     from mightymodels_core.vocabulary.tasks import Worker as TaskWorker
 
-    from mightymodels_hooks.branch_state import (
-        BlockedTask,
-        BranchTicketsOrUnreadable,
-        StartedOrUnreadable,
-    )
+    from mightymodels_hooks.branch_state import BranchTicketsOrUnreadable, StartedOrUnreadable
     from mightymodels_hooks.payloads import PreToolUsePayload
     from mightymodels_hooks.rulings import Ruling
 
@@ -66,14 +57,6 @@ SEVERAL_TICKETS = (
     'branch has {count} unclosed tickets ({names}), and the hook acts only when it has one'
 )
 STARTED_BEFORE_DISPATCH = frozenset({'engineer', 'architect'})
-ESCALATIONS = frozenset({'architect', 'wingman'})
-BLOCK_GOES_TO_THE_OWNER_FIRST = (
-    '{target} was held for the owner: ticket {slug}, whose branch is checked out, has a task a '
-    'block stopped ({blocks}), and its `auto-escalate` is off. Approve this dispatch to '
-    'escalate, or decline it and say what to do about the block. `auto-escalate: true` under '
-    '`handoff-context` in ticket.yml, validated with the `ticket_validate` tool, lets '
-    'an escalation through without this question.'
-)
 
 
 @runtime_checkable
@@ -173,27 +156,8 @@ def unstarted_ruling(target: str, tickets: BranchTicketsOrUnreadable) -> Ruling:
     return Denied(reason=NO_TASK_IN_PROGRESS.format(target=target, slug=tickets.unclosed[0]))
 
 
-def block_line(task: BlockedTask) -> str:
-    return f'{task.id} {task.status}: {"; ".join(task.reasons)}'
-
-
-def escalation_ruling(target: str, tickets: BranchTicketsOrUnreadable) -> Ruling:
-    if isinstance(tickets, Exception) or tickets.auto_escalate or not tickets.blocked:
-        return None
-
-    blocks = ' | '.join(map(block_line, tickets.blocked))
-    reason = BLOCK_GOES_TO_THE_OWNER_FIRST.format(
-        target=target, slug=tickets.unclosed[0], blocks=blocks
-    )
-    return Asked(reason=reason)
-
-
 def ticket_ruling(target: AgentName, tickets: BranchTicketsOrUnreadable) -> Ruling:
-    named = agent_type(target)
-    if target in STARTED_BEFORE_DISPATCH and (unstarted := unstarted_ruling(named, tickets)):
-        return unstarted
-
-    return escalation_ruling(named, tickets) if target in ESCALATIONS else None
+    return unstarted_ruling(agent_type(target), tickets)
 
 
 async def started_ruling(caller: str | None, target: AgentName, started: StartedTasks) -> Ruling:
@@ -201,7 +165,7 @@ async def started_ruling(caller: str | None, target: AgentName, started: Started
         refused = intern_denial(await started.started_by('intern'))
         return None if refused is None else Denied(reason=refused)
 
-    if caller is None and target in STARTED_BEFORE_DISPATCH | ESCALATIONS:
+    if caller is None and target in STARTED_BEFORE_DISPATCH:
         return ticket_ruling(target, await started.tickets_on_branch())
 
     return None

@@ -47,28 +47,13 @@ class TestWithATicket:
         verdict = await harness.verdict(ENGINEER)
         assert verdict.decision is None
 
-    async def test_architect_is_asked_about_a_block_while_auto_escalate_is_off(
+    async def test_architect_and_wingman_are_not_judged_during_a_block(
         self, harness: DispatchHarness
     ) -> None:
         tasks = (SeededTask(key='T1'), SeededTask(key='T2', status='blocked', reasons=('stuck',)))
         await harness.seed(tasks)
-        verdict = await harness.verdict(ARCHITECT)
-        assert (verdict.decision, 'T2 blocked: stuck' in verdict.detail) == ('ask', True)
-
-    async def test_architect_is_let_through_when_auto_escalate_is_on(
-        self, harness: DispatchHarness
-    ) -> None:
-        tasks = (SeededTask(key='T1'), SeededTask(key='T2', status='blocked', reasons=('stuck',)))
-        await harness.seed(tasks, auto_escalate=True)
-        verdict = await harness.verdict(ARCHITECT)
-        assert verdict.decision is None
-
-    async def test_wingman_is_asked_about_a_block_without_a_started_task(
-        self, harness: DispatchHarness
-    ) -> None:
-        await harness.seed((SeededTask(key='T1', status='failed', reasons=('broke',)),))
-        verdict = await harness.verdict('wingman')
-        assert verdict.decision == 'ask'
+        verdicts = [await harness.verdict(target) for target in (ARCHITECT, 'wingman')]
+        assert [verdict.decision for verdict in verdicts] == [None, None]
 
     async def test_intern_with_one_owned_file_is_let_through(
         self, harness: DispatchHarness
@@ -86,15 +71,6 @@ class TestWithATicket:
     async def test_unrecorded_repository_holds_no_ticket(self, harness: DispatchHarness) -> None:
         verdict = await harness.verdict(ENGINEER)
         assert verdict.decision is None
-
-    async def test_task_the_architect_took_over_still_counts_as_blocked(
-        self, harness: DispatchHarness
-    ) -> None:
-        stuck = SeededTask(key='T1', status='failed', reasons=('broke',))
-        taken_over = SeededTask(key='T1', worker='architect', before='failed')
-        await harness.seed((stuck, taken_over))
-        verdict = await harness.verdict(ARCHITECT)
-        assert (verdict.decision, 'T1 failed: broke' in verdict.detail) == ('ask', True)
 
 
 class TestTicketDirectory:
