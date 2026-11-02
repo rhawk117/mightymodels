@@ -5,9 +5,8 @@ description: >-
   pasted issue, or a task described in chat. One AskUserQuestion dialog covers the questions
   open-ticket would have asked and that the context has not already answered (slug, scope,
   branch, progress view), then two or three scouts confirm the claims at HEAD, the task
-  list is written with a checkable acceptance criterion per task, a landing command is
-  approved into the verification contract, the tasks are declared, and agents-assemble takes
-  over. Stages the ticket through ticket_write when none exists. Assumes no compaction, so there is no
+  list is written as small tasks with an observable outcome sentence each, the tasks are
+  declared, and agents-assemble takes over. Stages the ticket through ticket_write when none exists. Assumes no compaction, so there is no
   plan.md. Not the ramp for work expected to survive a compaction (game-plan).
 when_to_use: >-
   Auto-invoke at session start when the active ticket says scope sm and plan-first
@@ -19,8 +18,6 @@ allowed-tools:
   - AskUserQuestion
   - mcp__plugin_mightymodels_mighty-mcp__ticket_write
   - mcp__plugin_mightymodels_mighty-mcp__ticket_validate
-  - mcp__plugin_mightymodels_mighty-mcp__contract_approve
-  - mcp__plugin_mightymodels_mighty-mcp__contract_run
   - mcp__plugin_mightymodels_mighty-mcp__task_declare
 ---
 
@@ -30,7 +27,7 @@ The loop's value is the scout-and-engineer discipline: claims confirmed at HEAD,
 stanza written before the engineer starts, verification by a fact-checker that did not write
 the code. The plan exists for a different reason: surviving a compaction. When the user does not
 expect one, the plan is ceremony, and this ramp skips it. The ticket directory holds the
-briefs; the state database holds the ticket, the verification contract and the task rows, and
+briefs; the state database holds the ticket and the task rows, and
 the task rows are the progress view.
 
 That is an assumption, and one-shot states it once at the start of every run: *no compaction
@@ -94,44 +91,37 @@ is enough, and zero is not.
 
 **5. Enumerate the tasks.** Write the task list into the issue body (`gh issue edit`) or
 `issue-body.md`. Each item is one thing agents-assemble can run through the loop, sized per
-the scope answer, and carries its acceptance inline so the ASKED stanza lifts it. The list has
+the scope answer, and carries its outcome inline so the ASKED stanza lifts it. The list has
 no boxes; progress is the task rows, which the loop starts and marks:
 
 ```markdown
-- T1: <one-line intent> | AC: <runnable command with expected result, or a checkable assertion naming a file or behavior>
+- T1: <one-line intent> | outcome: <observable sentence>
 ```
 
-Without a plan, the task list is the only enumerable list of work the loop has, and an item with
-no acceptance makes the verification step theater. "Works correctly" is refused here for the
-same reason it is refused in the ASKED stanza. A task's acceptance command takes no contract id:
-the engineer runs it in the sandbox and cites it in `task_verify`. Show the task list with its
-commands.
+A task is one reviewable change of about 1-3 files. A large wrong task derails the sprint: the
+implementer runs out of room, the check proves only half of it, and the reviewer cannot hold the
+diff. `task_start` warns above 3 owned files or 4 criteria and names break-it-down. `tiny` means
+one file and a mechanical change.
 
-The contract holds the commands only the primary runs, and every ticket needs at least one
-landing command, an `L` id, because the push hold re-runs the live `L` commands at HEAD and a
-ticket with none cannot land. Use `L1` for the repository's check command (the full test run, or
-the narrowest command that proves the whole change), and add an `I1` only for an invariant that
-must hold throughout. Approve them with one call to `contract_approve` and no `approved_by`; the tool asks the user.
+An observable outcome sentence says what a person or a test can see happen, with no ids and no
+commands. Good: "Asking for a ticket that does not exist returns a not-found message instead of
+a stack trace." Refused: "Error handling works correctly." Without a plan, the task list is the
+only enumerable list of work the loop has, and an item with no observable outcome makes the
+verification step theater. A sentence with no observable effect is refused at write time, for
+the same reason it is refused in the ASKED stanza. Show the task list. CI is the hard gate at
+landing.
 
-An answer starting `not approved` means the user wants the list changed: change it and call
-again. An answer starting `needs input` means no one could be asked through the tool: put the
-question it names to the user in one `AskUserQuestion` dialog, and on approval call again with
-`"approved_by": "user"` on each command.
-
-Then baseline them with `contract_run`, passing the `slug`, phase `planning` and `ids` `["L1"]`
-(plus any `I` id). Revise regenerates the list.
-
-Once the commands are approved, call `task_declare` with the `slug` and the task ids
+Once the list is agreed, call `task_declare` with the `slug` and the task ids
 (`T1`, `T2`, ...), so the loop can start each one.
 
 **6. Hand off.** Invoke agents-assemble. Nothing else is written; a staged ticket plus a
-declared task list with an approved landing command is what the small path needs, and the whole point
+declared task list is what the small path needs, and the whole point
 of one-shot is that it is enough.
 
 ## Boundaries
 
 one-shot stages the ticket (when absent) through `ticket_write`, the branch and issue
-if asked, the task list, the declared tasks, and the verification contract. It never writes `plan.md` or
+if asked, the task list, and the declared tasks. It never writes `plan.md` or
 `handoffs/`. It dispatches scouts and nothing
 else before agents-assemble takes over. When the context shows the work is bigger than the
 user thinks (five med tasks on a "sm" answer), that is a sentence to the user and a routing
