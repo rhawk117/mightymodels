@@ -85,7 +85,6 @@ class TestClose:
         assert archive.slug == SERVICE_SLUG
         assert archive.investigations == (LINKED,)
         assert {key: task.status for key, task in archive.tasks.items()} == {PLAN_TASK: 'verified'}
-        assert [(item.key, item.outcome) for item in archive.verification] == [('I1', 'never-run')]
         assert [(item.text, item.origin) for item in archive.decisions] == [
             ('use a policy', 'linked-probe e1')
         ]

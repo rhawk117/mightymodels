@@ -6,22 +6,18 @@ from hypothesis import example, given
 from hypothesis import strategies as st
 from mightymodels_core.primitives import Slug, TaskId, redact
 from mightymodels_core.ticket_closing import (
-    ArchivedCommand,
     ArchivedDecision,
     ArchivedReview,
     ArchivedTask,
     ArchiveRecord,
     archive_markdown,
 )
-from mightymodels_core.ticket_closing.archive import ArchivedRetirement
 from mightymodels_core.tickets import Tracker
 
 from tests.core.ticket_closing.closing_builders import REVIEW_RUN, create_closing
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    from mightymodels_core.ticket_closing.archive import CommandOutcome
 
 RECORD_NAME = 'closing-subject-2.json'
 DECISION_LIMIT = 4
@@ -31,24 +27,8 @@ DECISION_LIMIT = 4
 class ArchiveParts:
     tracker: Tracker
     tasks: dict[TaskId, ArchivedTask]
-    verification: tuple[ArchivedCommand, ...]
     decisions: tuple[ArchivedDecision, ...]
     review: ArchivedReview | None
-
-
-def create_command(
-    key: str, outcome: CommandOutcome, retirement: ArchivedRetirement | None = None
-) -> ArchivedCommand:
-    return ArchivedCommand(
-        key=key,
-        argv=('true',),
-        expect_exit=0,
-        outcome=outcome,
-        head=None,
-        digest=None,
-        approval_source='form',
-        retirement=retirement,
-    )
 
 
 def create_decisions(count: int) -> tuple[ArchivedDecision, ...]:
@@ -76,7 +56,6 @@ def create_record(parts: ArchiveParts) -> ArchiveRecord:
         investigations=(),
         closing=create_closing('Retry queue drains'),
         tasks=parts.tasks,
-        verification=parts.verification,
         decisions=parts.decisions,
         review=parts.review,
     )
@@ -94,7 +73,6 @@ def create_parts(
             TaskId('T1'): ArchivedTask(status='verified', attempts={'engineer': 1}),
             TaskId('C1'): ArchivedTask(status='verified', attempts={'engineer': 1, 'architect': 1}),
         },
-        verification=(create_command('I1', 'pass'), create_command('I2', 'fail')),
         decisions=decisions,
         review=review,
     )
@@ -123,18 +101,6 @@ class TestArchiveMarkdown:
         return ArchiveParts(
             tracker=Tracker(issue=None, jira=None),
             tasks={},
-            verification=(),
-            decisions=(),
-            review=None,
-        )
-
-    @pytest.fixture
-    def never_run_parts(self) -> ArchiveParts:
-        parts = create_parts()
-        return ArchiveParts(
-            tracker=parts.tracker,
-            tasks=parts.tasks,
-            verification=(create_command('I1', 'never-run'),),
             decisions=(),
             review=None,
         )
@@ -149,7 +115,6 @@ class TestArchiveMarkdown:
             '# closing-subject',
             ' · '.join(self.shipped_parts),
             'tasks: T1 (engineer 1); C1 (engineer 1, architect 1)',
-            'checks: 2 contract commands, 1 passing at last run; not passing: I2',
             'review: run 20260506-070809 (standard), 3 findings; fix MV-1, MV-2; wontfix MV-3',
             'decisions:',
             '- decision 0 (first-probe)',
@@ -164,33 +129,12 @@ class TestArchiveMarkdown:
     def test_empty_parts_print_none_recorded(self, empty_parts: ArchiveParts) -> None:
         lines = self.render(empty_parts)
         assert lines[1].split(' · ')[2] == 'tracker: none'
-        assert lines[2:7] == [
+        assert lines[2:6] == [
             'tasks: none recorded',
-            'checks: 0 contract commands, 0 passing at last run',
             'review: none',
             'decisions:',
             '- none recorded',
         ]
-
-    def test_never_run_command_is_not_passing(self, never_run_parts: ArchiveParts) -> None:
-        assert self.render(never_run_parts)[3].endswith('0 passing at last run; not passing: I1')
-
-    def test_retired_command_names_its_retirer_reason_and_source(self) -> None:
-        retirement = ArchivedRetirement(
-            by=redact('ana'), why=redact('replaced by I2'), approval_source='fallback'
-        )
-        parts = create_parts()
-        retired_parts = ArchiveParts(
-            tracker=parts.tracker,
-            tasks=parts.tasks,
-            verification=(create_command('I1', 'pass', retirement),),
-            decisions=(),
-            review=None,
-        )
-
-        assert self.render(retired_parts)[3].endswith(
-            '; retired: I1 by ana (fallback): replaced by I2'
-        )
 
     @given(ledger_count=ledger_counts)
     @example(ledger_count=DECISION_LIMIT)

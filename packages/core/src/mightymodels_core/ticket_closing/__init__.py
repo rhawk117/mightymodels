@@ -1,14 +1,11 @@
 """The closing record of a ticket, its policy and service, its repository seam and store."""
 
 from .archive import (
-    ArchivedCommand,
     ArchivedDecision,
     ArchivedReview,
     ArchivedTask,
     ArchiveRecord,
     ArchiveSources,
-    CommandOutcome,
-    archived_command,
     archived_decisions,
     archived_review,
     create_archive_record,
@@ -45,7 +42,6 @@ __all__ = [
     'NO_VERIFIED_WORK',
     'ArchiveRecord',
     'ArchiveSources',
-    'ArchivedCommand',
     'ArchivedDecision',
     'ArchivedReview',
     'ArchivedTask',
@@ -60,7 +56,6 @@ __all__ = [
     'ClosingRecord',
     'ClosingRepository',
     'ClosingService',
-    'CommandOutcome',
     'LiveWorkPolicy',
     'LiveWorkRemainsError',
     'OneLinedClosing',
@@ -69,7 +64,6 @@ __all__ = [
     'TicketMovedError',
     'TooManyGotchasError',
     'archive_markdown',
-    'archived_command',
     'archived_decisions',
     'archived_review',
     'create_archive_record',

@@ -116,7 +116,6 @@ class UnitsOfWorkContract(UnitsOfWorkFastPaths):
                 assert unit.tickets.investigations.investigation(Slug('first-look')) is None
                 assert unit.closing.tasks.task(failed_ticket_id, TASK) is None
                 assert unit.closing.attempts.failed_fixes(failed_ticket_id, TASK) == []
-                assert unit.closing.contracts.commands(failed_ticket_id) == []
                 assert unit.closing.review_decisions.reviews.run(REVIEW_RUN) is None
                 assert unit.closing.review_decisions.decisions.dispositions(REVIEW_RUN) == []
                 assert unit.closing.closings.closing(failed_ticket_id) is None

@@ -6,7 +6,7 @@ a list item.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import redact
 from mightymodels_core.ticket_closing.policy import one_line
@@ -14,7 +14,6 @@ from mightymodels_core.ticket_closing.policy import one_line
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from mightymodels_core.contract.records import Receipt, RecordedCommand, Retirement
     from mightymodels_core.investigations.ledger import Ledger
     from mightymodels_core.primitives import RedactedText, RunId, Slug, TaskId
     from mightymodels_core.reviews.records import DecidedFinding
@@ -23,36 +22,14 @@ if TYPE_CHECKING:
     from mightymodels_core.ticket_closing.records import ClosingRecord
     from mightymodels_core.ticket_decisions.records import TicketDecision
     from mightymodels_core.tickets.records import TicketRecord, Tracker
-    from mightymodels_core.vocabulary.contract import ApprovalSource, Outcome
     from mightymodels_core.vocabulary.reviews import Depth
     from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
-
-type CommandOutcome = Outcome | Literal['never-run']
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class ArchivedTask:
     status: TaskStatus
     attempts: Mapping[Worker, int]
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ArchivedRetirement:
-    by: RedactedText
-    why: RedactedText
-    approval_source: ApprovalSource
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class ArchivedCommand:
-    key: str
-    argv: tuple[str, ...]
-    expect_exit: int
-    outcome: CommandOutcome
-    head: str | None
-    digest: str | None
-    approval_source: ApprovalSource
-    retirement: ArchivedRetirement | None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -78,7 +55,6 @@ class ArchiveRecord:
     investigations: tuple[str, ...]
     closing: ClosingRecord
     tasks: Mapping[TaskId, ArchivedTask]
-    verification: tuple[ArchivedCommand, ...]
     decisions: tuple[ArchivedDecision, ...]
     review: ArchivedReview | None
 
@@ -89,49 +65,10 @@ class ArchiveSources:
     closing: ClosingRecord
     tasks: Sequence[TaskRecord]
     attempts: AttemptCounts
-    commands: Sequence[RecordedCommand]
-    receipts: Mapping[str, Receipt]
     ledgers: Sequence[Ledger]
     review: LatestReview | None
     decision_limit: int
     ticket_decisions: Sequence[TicketDecision]
-
-
-def archived_retirement(retirement: Retirement | None) -> ArchivedRetirement | None:
-    if retirement is None:
-        return None
-
-    return ArchivedRetirement(
-        by=redact(one_line(retirement.by)),
-        why=redact(one_line(retirement.why)),
-        approval_source=retirement.approval_source,
-    )
-
-
-def archived_command(command: RecordedCommand, receipt: Receipt | None) -> ArchivedCommand:
-    retirement = archived_retirement(command.retirement)
-    if receipt is None:
-        return ArchivedCommand(
-            key=command.key,
-            argv=command.argv,
-            expect_exit=command.expect_exit,
-            outcome='never-run',
-            head=None,
-            digest=None,
-            approval_source=command.approval_source,
-            retirement=retirement,
-        )
-
-    return ArchivedCommand(
-        key=command.key,
-        argv=command.argv,
-        expect_exit=command.expect_exit,
-        outcome=receipt.outcome,
-        head=receipt.head,
-        digest=receipt.digest,
-        approval_source=command.approval_source,
-        retirement=retirement,
-    )
 
 
 def decision_label(review: LatestReview, disposition: DecidedFinding) -> str:
@@ -192,10 +129,6 @@ def create_archive_record(sources: ArchiveSources) -> ArchiveRecord:
             task.key: ArchivedTask(status=task.status, attempts=sources.attempts.get(task.key, {}))
             for task in sources.tasks
         },
-        verification=tuple(
-            archived_command(command, sources.receipts.get(command.key))
-            for command in sources.commands
-        ),
         decisions=archived_decisions(
             sources.ledgers, sources.decision_limit, sources.ticket_decisions
         ),

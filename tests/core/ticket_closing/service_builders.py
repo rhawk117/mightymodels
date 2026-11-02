@@ -3,13 +3,11 @@
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract.records import Approval, ApprovedCommand
 from mightymodels_core.investigations import InvestigationRecord, LedgerRecord
 from mightymodels_core.primitives import Slug, redact
 from mightymodels_core.reviews.services import ReviewDecisionService
 from mightymodels_core.ticket_closing import CloseRequest, ClosingService
 
-from tests.core.contract.fakes import ContractLedger, FakeContractRepository
 from tests.core.investigations.fakes import (
     FakeInvestigationRepository,
     InvestigationLedger,
@@ -112,12 +110,6 @@ def seed_investigation(ledger: InvestigationLedger) -> None:
     investigations.append(LINKED, [create_decision_entry(1, 'use a policy')])
 
 
-def create_service_command() -> ApprovedCommand:
-    return ApprovedCommand(
-        key='I1', argv=('true',), expect_exit=0, timeout=10, approved_by='the user'
-    )
-
-
 def create_service_harness() -> ServiceHarness:
     tickets = FakeTicketRepository(recorded_investigations=(LINKED,))
     record = tickets.stage(
@@ -128,10 +120,6 @@ def create_service_harness() -> ServiceHarness:
     task_ledger.held[record.id, PLAN_TASK] = create_task()
     seed_review(review_ledger)
     seed_investigation(investigation_ledger)
-    contracts = FakeContractRepository(ledger=ContractLedger())
-    contracts.approve(
-        record.id, [create_service_command()], Approval(at=SERVICE_MOMENT, head='base001')
-    )
     closings = FakeClosingRepository()
     ticket_decisions = FakeTicketDecisionRepository(decided_at=SERVICE_MOMENT)
     clock = create_fake_clock(SERVICE_MOMENT)
@@ -139,7 +127,6 @@ def create_service_harness() -> ServiceHarness:
         tickets=tickets,
         tasks=FakeTaskRepository(ledger=task_ledger),
         attempts=FakeAttemptRepository(ledger=task_ledger),
-        contracts=contracts,
         review_decisions=ReviewDecisionService(
             reviews=FakeReviewRepository(ledger=review_ledger),
             decisions=FakeReviewDecisionRepository(ledger=review_ledger),

@@ -28,7 +28,6 @@ from mightymodels_core.tickets.errors import ClosedTicketError
 from mightymodels_core.tickets.policy import open_ticket
 
 if TYPE_CHECKING:
-    from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.investigations.repository import InvestigationRepository
     from mightymodels_core.primitives import Clock, Slug
     from mightymodels_core.reviews.services import LatestReview, ReviewDecisionService
@@ -70,7 +69,6 @@ class ClosingService:
     tickets: TicketRepository
     tasks: TaskRepository
     attempts: AttemptRepository
-    contracts: ContractRepository
     review_decisions: ReviewDecisionService
     investigations: InvestigationRepository
     closings: ClosingRepository
@@ -148,8 +146,6 @@ class ClosingService:
             closing=closing,
             tasks=self.tasks.tasks(ticket.id),
             attempts=self.attempts.attempts_by_worker(ticket.id),
-            commands=self.contracts.commands(ticket.id),
-            receipts=self.contracts.latest_receipts(ticket.id),
             ledgers=linked_ledgers(self.investigations, ticket.investigations).ledgers,
             review=review,
             decision_limit=self.options.decision_limit,
