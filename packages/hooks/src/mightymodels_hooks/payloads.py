@@ -12,6 +12,8 @@ class SessionStartPayload(
 ):
     session_id: str | None = None
     cwd: str | None = None
+    source: str | None = None
+    agent_type: str | None = None
 
 
 class PreToolUsePayload(

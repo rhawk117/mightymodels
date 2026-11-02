@@ -31,6 +31,7 @@ from mightymodels_core.units_of_work import UnknownRepositoryError, read_entry, 
 from mightymodels_core.workspace import find_root
 
 from mightymodels_hooks.hook_context import STATE_UNREADABLE, LookupOnlyBackends, directory_of
+from mightymodels_hooks.phase_directive import phase_directive
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -98,11 +99,11 @@ class SessionStartHandler:
                 )
                 return pointers.prune()
 
-    async def handle(self, payload: SessionStartPayload) -> str | None:
+    async def housekeep(self, payload: SessionStartPayload) -> None:
         exported = export_data_directory(self.environ)
         if isinstance(exported, StateError):
             self.note(exported)
-            return None
+            return
 
         start = find_root(self.environ, directory_of(payload.cwd))
         try:
@@ -110,4 +111,6 @@ class SessionStartHandler:
         except STATE_UNREADABLE as error:
             self.note(error)
 
-        return None
+    async def handle(self, payload: SessionStartPayload) -> str | None:
+        await self.housekeep(payload)
+        return phase_directive(payload.agent_type, payload.source)
