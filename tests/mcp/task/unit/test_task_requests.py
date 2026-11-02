@@ -58,7 +58,6 @@ def invalid_start_cases() -> pytest.MarkDecorator:
         pytest.param({'owned': ('x' * (PROSE_LIMIT + 1),)}, id='owned-oversized'),
         pytest.param({'acceptance': ('x' * (NAME_LIMIT + 1),)}, id='criterion-oversized'),
         pytest.param({'mode': 'improvise'}, id='mode'),
-        pytest.param({'too_large_approved_by': 'robot'}, id='approver'),
         pytest.param({'slug': 'Not A Slug'}, id='slug'),
         pytest.param({'unknown': 'field'}, id='extra-field'),
     ]
@@ -91,12 +90,10 @@ class TestTaskStartRequest:
             3,
             'abc123',
         )
-        assert not started.too_large_approved
 
-    def test_start_request_is_approved_only_when_the_user_is_named(self) -> None:
-        started = create_start_request(create_start(too_large_approved_by='user'), None)
+    def test_start_request_without_a_head_carries_none(self) -> None:
+        started = create_start_request(create_start(), None)
 
-        assert started.too_large_approved
         assert started.head is None
 
 

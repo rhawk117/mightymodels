@@ -1,7 +1,7 @@
 """The task tools' requests, and the core requests they turn into.
 
-A task id is held to core's pattern and length. The size bounds on a task (criteria and owned
-files) stay core's, which refuses a task that is too large; a request only needs one of each.
+A task id is held to core's pattern and length. A request only needs one criterion and one owned
+file; a task above the warning bounds is started and its answer carries a warning.
 """
 
 from typing import Annotated, Literal, Self
@@ -48,10 +48,6 @@ class TaskStartRequest(RequestModel):
     )
     mode: ArchitectMode | None = Field(
         default=None, description='The architect mode; pass it only when the worker is architect.'
-    )
-    too_large_approved_by: Literal['user'] | None = Field(
-        default=None,
-        description='Pass user only after the user approved starting a task above the size bounds.',
     )
 
 
@@ -114,7 +110,6 @@ def create_start_request(request: TaskStartRequest, head: str | None) -> StartRe
         owned=request.owned,
         acceptance_count=len(request.acceptance),
         head=head,
-        too_large_approved=request.too_large_approved_by is not None,
     )
 
 

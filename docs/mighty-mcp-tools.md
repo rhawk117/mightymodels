@@ -16,7 +16,7 @@ One row per registered tool, 39 in all, `task_declare`, `contract_retire` and `c
 | `ticket` | `update-context` | `ticket_update_context` | `slug`, `context` | Update a ticket's context | false | true | true | false |
 | `close` | `check` | `close_check` | `slug` | Check a ticket for live work | true | false | true | false |
 | `close` | `close` | `close_ticket` | `slug`, `shipped`, `pr`, `gotchas` | Close a ticket | false | true | false | false |
-| `task` | `start` | `task_start` | `slug`, `task_id`, `by`, `owned`, `acceptance`, `mode`, `too_large_approved_by` | Start a task | false | false | false | false |
+| `task` | `start` | `task_start` | `slug`, `task_id`, `by`, `owned`, `acceptance`, `mode` | Start a task | false | false | false | false |
 | `none` | `none` | `task_declare` | `slug`, `task_ids` | Declare the plan tasks | false | false | true | false |
 | `task` | `verify` | `task_verify` | `slug`, `task_id`, `commit`, `verdict`, `reason` | Verify a task | false | false | false | false |
 | `task` | `mark` | `task_mark` | `slug`, `task_id`, `to`, `reason` | Mark a task | false | true | false | false |

@@ -56,17 +56,6 @@ class ModeNeedsArchitectError(StateError):
         super().__init__(f'{mode} is an architect mode; start the task by architect to use it')
 
 
-class TaskTooLargeError(StateError):
-    def __init__(self, *, counted: str, count: int, limit: int) -> None:
-        self.counted = counted
-        self.count = count
-        self.limit = limit
-        super().__init__(
-            f'{count} {counted} is over the {limit} one task may have; split the task with '
-            'break-it-down, which puts the split to the user'
-        )
-
-
 class FixesSpentError(StateError):
     def __init__(self, *, task_key: TaskId, tried: Sequence[str]) -> None:
         self.task_key = task_key

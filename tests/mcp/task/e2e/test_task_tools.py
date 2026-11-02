@@ -35,7 +35,6 @@ START = {
 }
 KEY = {'slug': SLUG, 'task_id': 'R1'}
 SHORT = 12
-MAX_CRITERIA = 4
 
 
 def listed_tool_cases() -> pytest.MarkDecorator:
@@ -97,10 +96,8 @@ def sized_start_cases() -> pytest.MarkDecorator:
 
 
 def create_sized_start(files: int, criteria: int) -> dict[str, object]:
-    approved = {'too_large_approved_by': 'user'} if criteria > MAX_CRITERIA else {}
     return {
         **START,
-        **approved,
         'owned': [f'src/file_{number}.py' for number in range(files)],
         'acceptance': [f'AC-{number}' for number in range(criteria)],
     }
@@ -136,9 +133,14 @@ class TestTaskStart:
         assert (view['warning'] is not None) is warns
         assert ('break-it-down' in view['text']) is warns
 
-    async def test_approved_too_large_start_carries_the_warning(self, staged: TaskHarness) -> None:
-        view = view_of(await staged.call('task_start', create_sized_start(11, 5)))
+    async def test_start_above_the_old_bounds_is_not_refused_and_carries_the_warning(
+        self, staged: TaskHarness
+    ) -> None:
+        result = await staged.call('task_start', create_sized_start(11, 5))
+        view = view_of(result)
 
+        assert not result.is_error
+        assert view['advanced']
         assert 'break-it-down' in view['warning']
 
     async def test_start_counts_repeated_owned_files_once(self, staged: TaskHarness) -> None:

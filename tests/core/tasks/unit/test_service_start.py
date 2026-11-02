@@ -8,7 +8,6 @@ from mightymodels_core.tasks import (
     MarkRequest,
     ModeNeedsArchitectError,
     TaskRecord,
-    TaskTooLargeError,
     TransitionError,
 )
 from mightymodels_core.tickets import ClosedTicketError, NotStagedError
@@ -46,12 +45,7 @@ def start_refusal_cases() -> pytest.MarkDecorator:
         request=create_start_request(mode='systemic-refactor'),
         error_type=ModeNeedsArchitectError,
     )
-    too_large = RefusedStart(
-        name='too-large',
-        request=create_start_request(acceptance_count=5),
-        error_type=TaskTooLargeError,
-    )
-    return pytest.mark.parametrize('refused', [mode_needs_architect.param, too_large.param])
+    return pytest.mark.parametrize('refused', [mode_needs_architect.param])
 
 
 class TestStart:

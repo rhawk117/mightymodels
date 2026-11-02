@@ -49,7 +49,6 @@ class StartRequest:
     owned: tuple[str, ...]
     acceptance_count: int
     head: str | None
-    too_large_approved: bool = False
 
 
 type VerifyVerdict = Literal['verified', 'failed', 'blocked']
@@ -244,9 +243,6 @@ class TaskService:
             implementation_spent=self.attempts.attempts_in_modes(
                 ticket_id, task_key, IMPLEMENTATION_MODES
             ),
-            acceptance_count=request.acceptance_count,
-            owned_count=len(set(request.owned)),
-            too_large_approved=request.too_large_approved,
             options=self.options,
         )
 

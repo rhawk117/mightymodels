@@ -7,7 +7,6 @@ from .errors import (
     InternSpentError,
     ModeNeedsArchitectError,
     TaskMovedError,
-    TaskTooLargeError,
     TransitionError,
     UnknownTaskError,
 )
@@ -60,7 +59,6 @@ __all__ = [
     'TaskRecord',
     'TaskRepository',
     'TaskService',
-    'TaskTooLargeError',
     'Transition',
     'TransitionError',
     'TransitionPolicy',
