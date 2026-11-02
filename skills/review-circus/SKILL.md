@@ -84,8 +84,9 @@ The answer names the reviewer and says to dispatch it with effort high. A ticket
 ## 2. Measure
 
 When uncle-bob is in the run, call `review_metrics` with the `run_id`. It measures the repository
-into `uncle-bob-metrics.json` in the run directory and returns the path; that path goes into
-uncle-bob's dispatch, because uncle-bob holds no state tool and only reads the file.
+into `uncle-bob-metrics.json` in the run directory and returns the path relative to the repository
+root; make it absolute before it goes into uncle-bob's dispatch, because uncle-bob holds no state
+tool and only reads the file.
 
 Pass `package_depth` 2 when the repository is one top-level package. When the languages are
 ones it does not parse (it reads Python, JavaScript, and TypeScript), skip it and say so in
@@ -138,10 +139,12 @@ the gate again and call `review_dispose` for them again before any remediation c
 ## 5. The finding gate
 
 Always, when any finding exists. Show the user the `review_gate` answer: findings
-by severity, security first, then by persona weight, with sources, location, any severity
+in gate order (severity, security first, then persona weight, then finding number), the order
+`review_report` and `review_gate` both return, with sources, location, any severity
 conflict, and the decision so far. Then call `review_dispose` with the `run_id` and no `decisions`. The tool
-asks the user which of up to ten undecided findings to fix, then a reason for each one left
-unchecked, and records the answers. A severity conflict is settled here by the decision the user
+asks the user which of up to ten undecided findings to fix, then what to do with each one left
+unchecked (defer, accept-risk or dismiss; accept-risk and dismiss need a reason, defer does not),
+and records the answers. A severity conflict is settled here by the decision the user
 makes about it. Call again while the answer shows findings still undecided:
 
 ```json
@@ -184,7 +187,7 @@ Remediation needs a ticket, because its tasks live in the ticket. In
 a codebase or branch run without one, offer open-ticket with the chosen findings as the
 rollup, and stop.
 
-Order: Critical findings and High security findings first, then the rest in gate order. For
+Order: gate order, the order `review_gate` returned. For
 each finding `Fn` chosen for fixing:
 
 1. `task_start` with `slug`, `task_id` the next `R<n>` that `task_show` does not list, `by`
@@ -201,8 +204,8 @@ each finding `Fn` chosen for fixing:
 3. `task_verify` with `slug`, `task_id` that `R<n>`, the fix `commit` and `verdict`
    `verified`, then `review_resolve` with `run_id`, `finding` `Fn`,
    `result` `fixed` and `commit`.
-4. Failed or blocked: `task_mark` with `to` `failed` or `blocked` and a `reason` (a task the gate
-   blocked already is `blocked`), then the owner's question unless `auto-escalate` is on,
+4. Failed or blocked: `task_mark` with `slug`, `task_id` that `R<n>`, `to` `failed`, `blocked` or `superseded`
+   and a `reason` (a task the gate blocked already is `blocked`), then the owner's question unless `auto-escalate` is on,
    `task_start` on that `R<n>` with `by` `architect`, and **architect** once, then whats-broken,
    as in agents-assemble. Record `review_resolve` with `result` `failed` or `blocked` and a
    `reason` when a finding stops.
