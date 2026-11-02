@@ -48,52 +48,6 @@ One row per registered tool, 35 in all, `task_declare` among them, which is new 
 
 Most new names are `<tool>_<action>`. Three differ: `close` with `close` is `close_ticket`, `ticket` with `update-context` is `ticket_update_context`, and `snapshot` is `snapshot_take`.
 
-## Calls in the old skills and agents
-
-The counts come from this command, run at the repository root:
-
-```
-rg --no-config -uu -o --no-filename 'mcp__plugin_mightymodels_state__\w+' .ref/mightymodels/skills .ref/mightymodels/agents | sort | uniq -c
-```
-
-Its scope is the skills and agents of the old plugin only, which hold 77 calls in 18 files. Over all of `.ref` the same pattern matches 80 times: these 77 and 3 in `tests/test_agent_frontmatter.py`. The `.ref` copy is untracked, so these counts are a record and no test reads them.
-
-| Old tool | Calls |
-| --- | --- |
-| `task` | 14 |
-| `ticket` | 14 |
-| `investigation` | 13 |
-| `contract` | 11 |
-| `review` | 7 |
-| `crashout` | 5 |
-| `snapshot` | 5 |
-| `failed_fix` | 4 |
-| `close` | 2 |
-| `similarity` | 2 |
-
-The per-file table comes from the same pattern with `rg --no-config -uu -c` over the same two paths. The tools column gives each tool the file calls with its count.
-
-| File | Calls | Tools called |
-| --- | --- | --- |
-| `agents/review/fact-checker.md` | 2 | `snapshot` 2 |
-| `agents/workers/engineer.md` | 2 | `failed_fix` 2 |
-| `skills/agent-debugging/SKILL.md` | 2 | `failed_fix` 2 |
-| `skills/agents-assemble/SKILL.md` | 6 | `contract` 1, `task` 3, `ticket` 2 |
-| `skills/ask-an-adult/SKILL.md` | 2 | `investigation` 2 |
-| `skills/baton-pass/SKILL.md` | 7 | `investigation` 2, `snapshot` 3, `ticket` 2 |
-| `skills/break-it-down/SKILL.md` | 6 | `contract` 2, `task` 4 |
-| `skills/crashout/SKILL.md` | 5 | `crashout` 5 |
-| `skills/game-plan/SKILL.md` | 4 | `contract` 2, `ticket` 2 |
-| `skills/lets-investigate/SKILL.md` | 4 | `investigation` 4 |
-| `skills/one-shot/SKILL.md` | 4 | `contract` 2, `ticket` 2 |
-| `skills/open-ticket/SKILL.md` | 6 | `investigation` 2, `ticket` 4 |
-| `skills/prune-ticket/SKILL.md` | 4 | `close` 2, `ticket` 2 |
-| `skills/review-circus/SKILL.md` | 7 | `review` 6, `task` 1 |
-| `skills/review-circus/references/review-state.md` | 1 | `review` 1 |
-| `skills/stick-the-landing/SKILL.md` | 7 | `contract` 2, `task` 5 |
-| `skills/what-we-know/SKILL.md` | 5 | `investigation` 3, `similarity` 2 |
-| `skills/whats-broken/SKILL.md` | 3 | `contract` 2, `task` 1 |
-
 ## The AskUserQuestion recorder and the session pointer
 
 The recorder, a PostToolUse hook on `AskUserQuestion`, is the only Decision record for
@@ -101,7 +55,7 @@ AskUserQuestion answers. The ported skills carry no gate-Decision writes of thei
 a skill that also writes one records the same answer twice.
 
 The session pointer tells the recorder which ticket or investigation a session works on. A
-PostToolUse hook sets it after each of the 20 slug-bearing mighty-mcp tools. A `slug` or
+PostToolUse hook sets it after each of the 19 slug-bearing mighty-mcp tools. A `slug` or
 `ticket` in `tool_input` points the session at a ticket, and an `investigation_id` points it at
 an investigation. The latest call wins. There is no ticket-directory gate: the pointer follows
 the call, whether or not a ticket directory exists. The recorder writes nothing for a session

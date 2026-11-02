@@ -24,7 +24,7 @@ allowed-tools:
 # baton-pass
 
 A session that ends mid-work leaves two kinds of knowledge behind. One kind is already in
-artifacts: ticket.yml, the ticket's rows, the ledger, the verification receipts, the task
+artifacts: ticket.yml, the ticket's rows, the ledger, the task
 transitions, the review run, the commits. The other kind is only in this conversation: the
 approach that failed before it was ever recorded, the gotcha that cost an hour, the thread
 the user said to park. The next agent either receives that second kind or spends its first
@@ -159,7 +159,7 @@ game-plan to re-plan; review-circus to review; the ramp per the
 routing table for a freshly prepared ticket). To land, the prompt names no skill to invoke: only
 the user can start stick-the-landing, so the prompt tells the next session to hand the user
 `/mightymodels:stick-the-landing <slug>`. The snapshot is a picture of the moment it was
-written; the next session calls `task_show` and `contract_status` before
+written; the next session calls `task_show` before
 acting on it. It carries the focus line verbatim and
 nothing else that lives in a file, so it cannot drift from them.
 
