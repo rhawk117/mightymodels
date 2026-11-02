@@ -91,8 +91,9 @@ Summarizing an advisor whose whole value is its reasoning defeats the call.
 
 The user decides; this skill is the only tie-break path. wingman's verdict alone is never the
 user's answer. When the user explicitly defers to it ("you pick", "go with wingman"), that
-deferral is the user's answer: adopt wingman's verdict, say in chat that the user deferred to it,
-and record it as described below. Do not escalate the same packet again.
+deferral is the user's answer: confirm it through `AskUserQuestion` (below) before work resumes,
+then adopt wingman's verdict, say in chat that the user deferred to it, and record it as
+described below. Do not escalate the same packet again.
 
 ## Record it
 

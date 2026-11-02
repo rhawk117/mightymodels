@@ -101,7 +101,7 @@ The comparison against the branch version is then yours to make, and it is judgm
 </example>
 <example>
 Findings: one Medium (new parser lacks tests), two Low (naming, stale internal comment). No Critical, no High, nothing UNKNOWN-BLOCKED.
-Verdict: MERGE WITH CONDITIONS. Condition 1: add parser tests covering the two malformed-input paths named in MV-1; verify with `pytest tests/test_parser.py`. Epigraph: "Impressive. Most impressive. But you are not a Jedi yet."
+Verdict: MERGE WITH CONDITIONS. Condition 1: the parser tests cover both malformed-input paths named in MV-1 and pass. Epigraph: "Impressive. Most impressive. But you are not a Jedi yet."
 </example>
 </examples>
 
