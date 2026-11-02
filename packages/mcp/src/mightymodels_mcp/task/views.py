@@ -79,6 +79,10 @@ def render_started(record: TaskRecord, attempts: AttemptCounts, origin: StartOri
     return TaskView(text=text, advanced=True, tasks=create_record_views([record], attempts))
 
 
+def yes_or_no(*, answer: bool) -> str:
+    return 'yes' if answer else 'no'
+
+
 def render_verified(
     record: TaskRecord, attempts: AttemptCounts, request: VerifyRequest
 ) -> VerifyView:
@@ -86,8 +90,8 @@ def render_verified(
     commit_is_head = request.commit == git.head
     outside_owned = tuple(sorted(git.changed_files - set(record.owned)))
     facts = (
-        f'  commit is HEAD: {"yes" if commit_is_head else "no"}\n'
-        f'  base is ancestor of commit: {"yes" if git.base_is_ancestor else "no"}\n'
+        f'  commit is HEAD: {yes_or_no(answer=commit_is_head)}\n'
+        f'  base is ancestor of commit: {yes_or_no(answer=git.base_is_ancestor)}\n'
         f'  changed outside the owned set: {", ".join(outside_owned) or "none"}\n'
     )
     text = f'{record.key} {record.status}\n{facts}{render_problems(record.reasons)}'

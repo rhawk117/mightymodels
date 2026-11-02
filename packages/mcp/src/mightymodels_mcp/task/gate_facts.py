@@ -1,7 +1,7 @@
 """The verification facts git answers, gathered for core's `TaskService`.
 
 Core takes values and never asks git. A refusing git raises its refusal. A commit that does not
-resolve is verified under the request's own text. The base is compared with the commit only when
+resolve is recorded under the request's own text. The base is compared with the commit only when
 both resolve. None of the facts changes the verdict the request carries.
 """
 

@@ -2,7 +2,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.tasks import MarkRequest, TaskMovedError, TransitionError
+from mightymodels_core.tasks import MarkRequest, TaskMovedError, TransitionError, VerifyRequest
 from mightymodels_core.tickets import ClosedTicketError
 
 from tests.core.tasks.service_builders import (
@@ -90,18 +90,22 @@ class TestVerify:
 
         assert (record.status, record.commit, record.reasons) == ('verified', DONE_COMMIT, ())
 
-    def test_verify_records_a_verified_task_that_is_not_head_and_touched_other_files(
-        self, contracted_harness: ServiceHarness
-    ) -> None:
+    @pytest.fixture
+    def off_head_request(self, contracted_harness: ServiceHarness) -> VerifyRequest:
         seen = contracted_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
         facts = replace(
             create_git_facts(changed_files=frozenset({OWNED_FILE, OUTSIDE_FILE})),
             head='fff9999',
             base_is_ancestor=False,
         )
-        request = replace(create_verify_request(seen, changed_files=OWNED_CHANGE), git=facts)
+        return VerifyRequest(
+            seen=seen, commit=DONE_COMMIT, verdict='verified', reason=None, git=facts
+        )
 
-        record = contracted_harness.service.verify(SERVICE_SLUG, request)
+    def test_verify_records_a_verified_task_that_is_not_head_and_touched_other_files(
+        self, contracted_harness: ServiceHarness, off_head_request: VerifyRequest
+    ) -> None:
+        record = contracted_harness.service.verify(SERVICE_SLUG, off_head_request)
 
         assert (record.status, record.commit, record.reasons) == ('verified', DONE_COMMIT, ())
 

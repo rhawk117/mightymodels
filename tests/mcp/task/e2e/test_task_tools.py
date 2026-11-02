@@ -161,21 +161,25 @@ class TestTaskVerify:
         )
         assert 'resolve_head' in started.git_calls
 
-    async def test_verifies_a_commit_that_is_not_head_and_touches_other_files(
-        self, started: TaskHarness
-    ) -> None:
+    @pytest.fixture
+    async def earlier_commit(self, started: TaskHarness) -> str:
         outside = anyio.Path(started.server.repository, 'src/elsewhere.py')
         await outside.parent.mkdir(parents=True, exist_ok=True)
         await outside.write_text('elsewhere\n')
         await started.git('add', 'src/elsewhere.py')
         earlier = await started.commit_owned_file()
         await started.commit('later')
+        return earlier
 
-        view = view_of(
-            await started.call('task_verify', {**KEY, 'commit': earlier, 'verdict': 'verified'})
-        )
+    async def test_verifies_a_commit_that_is_not_head_and_touches_other_files(
+        self, started: TaskHarness, earlier_commit: str
+    ) -> None:
+        arguments = {**KEY, 'commit': earlier_commit, 'verdict': 'verified'}
+
+        view = view_of(await started.call('task_verify', arguments))
 
         assert view['tasks'][0]['status'] == 'verified'
+        assert view['tasks'][0]['commit'] == earlier_commit
         assert view['advanced']
         assert (view['commit_is_head'], view['base_is_ancestor']) == (False, True)
         assert view['outside_owned'] == ['src/elsewhere.py']

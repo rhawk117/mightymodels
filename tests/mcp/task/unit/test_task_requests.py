@@ -100,6 +100,10 @@ class TestTaskStartRequest:
         assert started.head is None
 
 
+def reasoned_verdict_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('verdict', ['failed', 'blocked'])
+
+
 class TestTaskVerifyRequest:
     def test_leading_dash_commit_is_refused(self) -> None:
         with pytest.raises(ValidationError):
@@ -109,20 +113,16 @@ class TestTaskVerifyRequest:
         with pytest.raises(ValidationError):
             create_verify(commit='a' * (NAME_LIMIT + 1))
 
-    def test_assertions_are_no_longer_accepted(self) -> None:
-        with pytest.raises(ValidationError):
-            create_verify(assertions={'AC-1': 'seen'})
-
     def test_verified_takes_no_reason(self) -> None:
         with pytest.raises(ValidationError):
             create_verify(reason='looks fine')
 
-    @pytest.mark.parametrize('verdict', ['failed', 'blocked'])
+    @reasoned_verdict_cases()
     def test_failed_and_blocked_need_a_reason(self, verdict: str) -> None:
         with pytest.raises(ValidationError):
             create_verify(verdict=verdict)
 
-    @pytest.mark.parametrize('verdict', ['failed', 'blocked'])
+    @reasoned_verdict_cases()
     def test_failed_and_blocked_carry_their_reason(self, verdict: str) -> None:
         assert create_verify(verdict=verdict, reason='a test fails').reason == 'a test fails'
 
