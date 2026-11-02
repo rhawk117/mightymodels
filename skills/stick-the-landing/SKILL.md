@@ -89,7 +89,7 @@ tail alone?*
   Fix:/Verify: verbatim, with SLUG, `C1` as the task id and the check's name as the finding:
 
   The call carries SLUG, `C1` as the task id, `by` `engineer`, `owned` the files the log tail
-  names and `acceptance` the criterion ids.
+  names and `acceptance` the outcome sentence the Fix must make true, as one short sentence.
 
   The residual carries `Fix:` and an outcome sentence, for example "the lint check passes on
   this file". When a local command reproduces the check, the engineer runs it in sandboxed Bash,

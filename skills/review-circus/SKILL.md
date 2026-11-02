@@ -188,9 +188,9 @@ Order: Critical findings and High security findings first, then the rest in gate
 each finding `Fn` chosen for fixing:
 
 1. `task_start` with `slug`, `task_id` the next `R<n>` that `task_show` does not list, `by`
-   `engineer`, `owned` the files the Fix touches and `acceptance` `AC-1`, the criterion the
-   finding's Verify outcome sentence proves. That number is the task's own and not the finding's: a sprint
-   residual may hold `R1` already, so `F1` can be fixed under `R2`.
+   `engineer`, `owned` the files the Fix touches and `acceptance` the finding's `Verify:`
+   outcome sentence as one short sentence (shortened to 255 characters at most). The `R<n>` is the task's own and not the
+   finding's: a sprint residual may hold `R1` already, so `F1` can be fixed under `R2`.
 2. Dispatch an **engineer**: the residual variant for a single-concern merge-vader finding
    with usable Fix and Verify lines; the full template for uncle-bob findings, findings both
    personas raised, and anything Critical or High security. Either way the dispatch carries
