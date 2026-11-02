@@ -57,18 +57,6 @@ class TaskState:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class CheckState:
-    key: str
-    state: str
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class PassingCommand:
-    key: str
-    argv: tuple[str, ...]
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
 class FailedAttempt:
     task: TaskId
     to: TaskStatus
@@ -110,8 +98,6 @@ class SnapshotRecord:
     ticket: TicketSummary
     repository: RepositoryState
     tasks: tuple[TaskState, ...]
-    checks: tuple[CheckState, ...]
-    works: tuple[PassingCommand, ...]
     decisions: tuple[LedgerLine, ...]
     open_questions: tuple[LedgerLine, ...]
     do_not_retry: tuple[FailedAttempt, ...]

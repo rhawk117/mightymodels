@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from mightymodels_core.snapshot import RepositoryFacts, SnapshotRecord
     from mightymodels_core.units_of_work import SnapshotRead
 
-CAPPED_SECTIONS = ('works', 'decisions', 'open_questions', 'review.decisions', 'do_not_retry')
+CAPPED_SECTIONS = ('decisions', 'open_questions', 'review.decisions', 'do_not_retry')
 UNCAPPED_LIMIT = 10
 CAP = 1
 
@@ -82,11 +82,6 @@ class TestSnapshotCaps:
         assert self.size_of(uncapped, section) == full
         assert self.size_of(capped, section) == CAP
 
-    def test_limit_caps_the_works(
-        self, snapshot_read: SnapshotRead, slug: Slug, repository_facts: RepositoryFacts
-    ) -> None:
-        self.assert_capped(snapshot_read, slug, repository_facts, 'works', full=3)
-
     def test_limit_caps_the_decisions(
         self, snapshot_read: SnapshotRead, slug: Slug, repository_facts: RepositoryFacts
     ) -> None:
@@ -119,7 +114,6 @@ class TestSnapshotLimitZero:
                 return unit.snapshots.take(request)
 
     @given(section=sections)
-    @example(section='works')
     @example(section='decisions')
     @example(section='open_questions')
     @example(section='review.decisions')
