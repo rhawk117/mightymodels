@@ -35,6 +35,7 @@ START = {
 }
 KEY = {'slug': SLUG, 'task_id': 'R1'}
 SHORT = 12
+MAX_CRITERIA = 4
 
 
 def listed_tool_cases() -> pytest.MarkDecorator:
@@ -86,6 +87,25 @@ class TestListedTools:
         assert tool.icons == [load_icon(icon)]
 
 
+def sized_start_cases() -> pytest.MarkDecorator:
+    sizes: list[ParameterSet] = [
+        pytest.param(3, 4, False, id='three-files-four-criteria'),
+        pytest.param(4, 4, True, id='four-files'),
+        pytest.param(3, 5, True, id='five-criteria'),
+    ]
+    return pytest.mark.parametrize(('files', 'criteria', 'warns'), sizes)
+
+
+def create_sized_start(files: int, criteria: int) -> dict[str, object]:
+    approved = {'too_large_approved_by': 'user'} if criteria > MAX_CRITERIA else {}
+    return {
+        **START,
+        **approved,
+        'owned': [f'src/file_{number}.py' for number in range(files)],
+        'acceptance': [f'AC-{number}' for number in range(criteria)],
+    }
+
+
 class TestTaskStart:
     async def test_start_records_the_task_from_head(self, staged: TaskHarness) -> None:
         head = await staged.commit('first')
@@ -106,6 +126,27 @@ class TestTaskStart:
             }
         ]
         assert staged.git_calls == ['resolve_head']
+
+    @sized_start_cases()
+    async def test_start_warns_only_above_the_size_bounds(
+        self, staged: TaskHarness, files: int, criteria: int, *, warns: bool
+    ) -> None:
+        view = view_of(await staged.call('task_start', create_sized_start(files, criteria)))
+
+        assert (view['warning'] is not None) is warns
+        assert ('break-it-down' in view['text']) is warns
+
+    async def test_approved_too_large_start_carries_the_warning(self, staged: TaskHarness) -> None:
+        view = view_of(await staged.call('task_start', create_sized_start(11, 5)))
+
+        assert 'break-it-down' in view['warning']
+
+    async def test_start_counts_repeated_owned_files_once(self, staged: TaskHarness) -> None:
+        arguments = {**START, 'owned': ['src/a.py'] * 5}
+
+        view = view_of(await staged.call('task_start', arguments))
+
+        assert view['warning'] is None
 
     async def test_start_without_a_commit_names_an_unknown_head(self, staged: TaskHarness) -> None:
         view = view_of(await staged.call('task_start', START))

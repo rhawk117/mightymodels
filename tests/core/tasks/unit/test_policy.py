@@ -18,6 +18,7 @@ from mightymodels_core.tasks import (
     TaskTooLargeError,
     TransitionError,
     TransitionPolicy,
+    get_size_warning,
 )
 from mightymodels_core.vocabulary.tasks import TaskStatus
 
@@ -240,6 +241,32 @@ class TestStartPolicy:
 
         assert isinstance(problem, TaskTooLargeError)
         assert (problem.counted, problem.count, problem.limit) == ('owned files', 11, 10)
+
+
+def size_warning_cases() -> pytest.MarkDecorator:
+    sizes: list[ParameterSet] = [
+        pytest.param(3, 4, False, id='three-files-four-criteria'),
+        pytest.param(4, 4, True, id='four-files'),
+        pytest.param(3, 5, True, id='five-criteria'),
+        pytest.param(12, 6, True, id='both-over'),
+    ]
+    return pytest.mark.parametrize(('owned_count', 'acceptance_count', 'warns'), sizes)
+
+
+class TestSizeWarning:
+    @size_warning_cases()
+    def test_warns_only_above_the_bounds(
+        self, owned_count: int, acceptance_count: int, *, warns: bool
+    ) -> None:
+        warning = get_size_warning(acceptance_count=acceptance_count, owned_count=owned_count)
+
+        assert (warning is not None) is warns
+
+    def test_warning_names_break_it_down(self) -> None:
+        warning = get_size_warning(acceptance_count=5, owned_count=4)
+
+        assert warning is not None
+        assert 'break-it-down' in warning
 
 
 class TestFixPolicy:

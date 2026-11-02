@@ -20,6 +20,7 @@ SHORT_HEAD_LENGTH = 12
 class StartOrigin:
     worker: Worker
     head: str | None
+    warning: str | None = None
 
 
 class TaskRecordView(BaseModel):
@@ -40,6 +41,7 @@ class TaskView(BaseModel):
     text: str
     advanced: bool
     tasks: tuple[TaskRecordView, ...] = ()
+    warning: str | None = None
 
 
 class VerifyView(TaskView):
@@ -76,7 +78,15 @@ def create_record_views(
 
 def render_started(record: TaskRecord, attempts: AttemptCounts, origin: StartOrigin) -> TaskView:
     text = f'{record.key} {record.status} by {origin.worker} from {short_head(origin.head)}\n'
-    return TaskView(text=text, advanced=True, tasks=create_record_views([record], attempts))
+    if origin.warning is not None:
+        text += f'warning: {origin.warning}\n'
+
+    return TaskView(
+        text=text,
+        advanced=True,
+        tasks=create_record_views([record], attempts),
+        warning=origin.warning,
+    )
 
 
 def yes_or_no(*, answer: bool) -> str:

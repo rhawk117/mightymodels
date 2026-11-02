@@ -56,8 +56,24 @@ class TaskOptions:
     failed_fix_limit: int = 3
     acceptance_limit: int = 4
     owned_limit: int = 10
+    warn_owned_above: int = 3
+    warn_acceptance_above: int = 4
     hypothesis_limit: int = 4000
     transitions: Transitions = field(default_factory=create_transitions)
+
+
+def get_size_warning(
+    *, acceptance_count: int, owned_count: int, options: TaskOptions | None = None
+) -> str | None:
+    limits = options or TaskOptions()
+    if acceptance_count <= limits.warn_acceptance_above and owned_count <= limits.warn_owned_above:
+        return None
+
+    return (
+        f'{owned_count} owned files and {acceptance_count} acceptance criteria is more than one '
+        f'reviewable change ({limits.warn_owned_above} files, {limits.warn_acceptance_above} '
+        'criteria); split the task with break-it-down, which puts the split to the user'
+    )
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

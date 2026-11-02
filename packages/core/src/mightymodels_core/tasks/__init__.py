@@ -17,7 +17,7 @@ from .gates import (
     get_readiness_problems,
     is_plan_task,
 )
-from .policy import FixPolicy, StartPolicy, TaskOptions, TransitionPolicy
+from .policy import FixPolicy, StartPolicy, TaskOptions, TransitionPolicy, get_size_warning
 from .records import Attempt, AttemptCounts, FailedFix, TaskRecord, Transition
 from .repository import AttemptRepository, TaskRepository
 from .services import (
@@ -69,5 +69,6 @@ __all__ = [
     'VerifyVerdict',
     'get_plan_task_problem',
     'get_readiness_problems',
+    'get_size_warning',
     'is_plan_task',
 ]
