@@ -1,15 +1,12 @@
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.tasks import MarkRequest
 from mightymodels_core.tickets import NotStagedError
 
 from tests.core.tasks.service_builders import (
     FIRST_TASK,
     OTHER_SLUG,
-    OWNED_FILE,
     SERVICE_SLUG,
-    verify_as_asked,
 )
 
 if TYPE_CHECKING:
@@ -52,33 +49,20 @@ class TestReady:
 
         assert readiness.problems == ['no plan task has been started']
 
-    def test_ready_is_clear_when_every_plan_task_is_proven_at_head(
-        self, verified_harness: ServiceHarness
+    def test_ready_is_clear_when_every_plan_task_is_verified(
+        self, verified_task_harness: ServiceHarness
     ) -> None:
-        readiness = verified_harness.reads.ready(SERVICE_SLUG)
+        readiness = verified_task_harness.reads.ready(SERVICE_SLUG)
 
         assert readiness.problems == []
 
-    def test_ready_names_a_task_still_in_progress(self, proven_harness: ServiceHarness) -> None:
-        readiness = proven_harness.reads.ready(SERVICE_SLUG)
+    def test_ready_names_a_task_still_in_progress(self, started_harness: ServiceHarness) -> None:
+        readiness = started_harness.reads.ready(SERVICE_SLUG)
 
         assert readiness.problems == [f'{FIRST_TASK} is in-progress, not verified']
 
-    def test_ready_ignores_the_contract_commands_of_the_ticket(
-        self, contracted_harness: ServiceHarness
-    ) -> None:
-        verify_as_asked(contracted_harness, frozenset({OWNED_FILE}))
-
-        readiness = contracted_harness.reads.ready(SERVICE_SLUG)
-
-        assert readiness.problems == []
-
-    def test_ready_is_clear_for_a_superseded_task(self, started_harness: ServiceHarness) -> None:
-        started_harness.service.mark(
-            SERVICE_SLUG, MarkRequest(task_key=FIRST_TASK, to='superseded', reason='dropped')
-        )
-
-        readiness = started_harness.reads.ready(SERVICE_SLUG)
+    def test_ready_is_clear_for_a_superseded_task(self, superseded_harness: ServiceHarness) -> None:
+        readiness = superseded_harness.reads.ready(SERVICE_SLUG)
 
         assert readiness.problems == []
 

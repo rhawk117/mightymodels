@@ -8,7 +8,7 @@ from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_dat
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
 from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
-from mightymodels_core.tasks import TaskReadService, TaskService
+from mightymodels_core.tasks import MarkRequest, TaskReadService, TaskService
 from mightymodels_core.tickets import SqliteTicketRepository
 
 from tests.core.contract.fakes import ContractLedger, FakeContractRepository
@@ -111,6 +111,20 @@ def declared_harness(service_harness: ServiceHarness) -> ServiceHarness:
 def started_harness(declared_harness: ServiceHarness) -> ServiceHarness:
     declared_harness.service.start(SERVICE_SLUG, create_start_request())
     return declared_harness
+
+
+@pytest.fixture
+def verified_task_harness(started_harness: ServiceHarness) -> ServiceHarness:
+    verify_as_asked(started_harness, frozenset({OWNED_FILE}))
+    return started_harness
+
+
+@pytest.fixture
+def superseded_harness(started_harness: ServiceHarness) -> ServiceHarness:
+    started_harness.service.mark(
+        SERVICE_SLUG, MarkRequest(task_key=FIRST_TASK, to='superseded', reason='dropped')
+    )
+    return started_harness
 
 
 @pytest.fixture
