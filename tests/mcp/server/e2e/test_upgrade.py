@@ -12,6 +12,8 @@ from mcp.client.stdio import StdioServerParameters
 from mightymodels_core.database.connection import parse_schema
 from mightymodels_core.edge import DATABASE_NAME, create_database_spec
 
+from tests.mcp.journal.journal_harness import FIRST_ENTRY
+
 if TYPE_CHECKING:
     from mcp.types import CallToolResult
 
@@ -65,14 +67,19 @@ class TestUpgrade:
         async with Client(parameters) as client:
             return await client.call_tool('ticket_show', {'slug': SLUG})
 
+    async def add_crashout(self, parameters: StdioServerParameters) -> CallToolResult:
+        async with Client(parameters) as client:
+            return await client.call_tool('crashout_add', dict(FIRST_ENTRY))
+
     async def test_old_plugin_database_is_left_untouched_and_state_database_starts_fresh(
         self, parameters: StdioServerParameters, stored: StoredDatabase, old_plugin: StoredDatabase
     ) -> None:
         create_database(old_plugin.path, 1)
         before = old_plugin.path.read_bytes()
 
-        result = await self.show_ticket(parameters)
+        result = await self.add_crashout(parameters)
 
+        assert not result.is_error
         assert 'schema version' not in result_text(result)
         assert old_plugin.path.read_bytes() == before
         with closing(sqlite3.connect(stored.path)) as connection:
