@@ -56,11 +56,9 @@ async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
 
 
 async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> VerifyView:
-    """Record the primary's verdict on a task at the commit a worker reported: verified, failed or
-    blocked. Use after judging that commit. The answer reports commit-is-HEAD, the base status
-    (ancestor, not-ancestor or unresolved) and files changed outside the owned set; none changes
-    the verdict. Failed and blocked need a reason. For a stop with no commit to judge, use
-    task_mark.
+    """Record the primary's verdict on a reported commit: verified, failed or blocked (the last two
+    need a reason). Use after judging that commit. Reports the base status: ancestor, not-ancestor
+    or unresolved. For a stop with no commit, use task_mark.
     """
     async with open_tool_state(ctx) as state:
         work = create_task_work(state)
@@ -70,9 +68,8 @@ async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> VerifyVie
 
 
 async def task_mark(request: TaskMarkRequest, ctx: ToolContext) -> TaskView:
-    """Record a stop with no commit to judge, with the reason: failed or blocked when a worker's
-    own report says it cannot finish, superseded when the plan changed. To record the primary's
-    verdict on a reported commit, use task_verify.
+    """Record a stop with no commit to judge: failed or blocked from a worker's own report,
+    superseded for a plan change. Use task_verify to record a verdict on a reported commit.
     """
     async with open_tool_state(ctx) as state:
         return mark_task(create_task_work(state), request)
