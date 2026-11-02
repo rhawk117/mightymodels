@@ -151,8 +151,21 @@ since the dead ends and judgment from this session are not part of a triage roll
 
 ## 4. Print the prompt
 
+Pick the phase agent the next session runs as from the focus answer. Continue the in-flight task,
+start the next task, take a named open thread, and land it map to `implementation`; re-plan
+maps to `planning`; review it maps to `review`; a freshly prepared ticket, whether it came
+through the no-ticket path after open-ticket or has no plan yet, maps to `planning`. For
+something else, take the phase whose skills include the one skill the prompt names:
+`investigation` has lets-investigate and open-ticket, `planning` has game-plan and one-shot,
+`implementation` has agents-assemble and stick-the-landing, and `review` has review-circus.
+When this session runs as `mightymodels:<phase>` and the focus continues that phase's own work,
+such as a review session continuing in-place remediation, print that same phase.
+
+Print the launch command `claude --agent mightymodels:<phase>` in its own fenced block, before the
+prompt's block. The user runs the command, then pastes the prompt into the session it opens.
+
 Build the next session's opening prompt from prompting-subagents' next-session template, then print it
-in chat inside a fenced block. It is a pointer prompt: read ticket.yml, read the issue's task
+in chat inside a second fenced block. It is a pointer prompt: read ticket.yml, read the issue's task
 list or the plan, read `handoffs/snapshot.md`, read `handoffs/BATON.md`, invoke `prompting-subagents`,
 then the one skill to invoke for the focus (agents-assemble to continue or start a task;
 game-plan to re-plan; review-circus to review; the ramp per the

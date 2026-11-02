@@ -13,4 +13,10 @@ Invoke prompting-subagents before the first dispatch.
 <constraints>Invoke <the one skill: agents-assemble | game-plan | one-shot | review-circus> and follow it. <To land, in place of that sentence: Hand the user `/mightymodels:stick-the-landing <slug>`; only the user can start that skill.> Treat the files above as the only source of state.</constraints>
 ```
 
-Slots: slug · focus or purpose · issue or plan · snapshot and baton paths when present · next skill.
+The launch line goes in its own fenced block before the prompt, outside the `text` block above, and the user runs it to open the session the prompt is pasted into:
+
+```text
+claude --agent mightymodels:<phase>
+```
+
+Slots: slug · focus or purpose · issue or plan · snapshot and baton paths when present · next skill · phase (investigation | planning | implementation | review).
