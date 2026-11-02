@@ -21,12 +21,6 @@ EXPECTED = [
         'hook.sh',
         'subagent-record',
     ),
-    (
-        'SubagentStop',
-        '^mightymodels:workers:(engineer|architect|intern)$',
-        'hook.sh',
-        'completion-gate',
-    ),
     ('PostToolUse', 'SubagentHandback', 'hook.sh', 'subagent-handback'),
     ('PostToolUse', 'AskUserQuestion', 'hook.sh', 'ask-recorder'),
     ('PostToolUse', POINTER_MATCHER, 'hook.sh', 'session-pointer'),
@@ -44,7 +38,7 @@ def fixed_wrapper_cases() -> pytest.MarkDecorator:
 
 
 class TestHooksJson:
-    def test_the_eight_command_hooks_are_registered(
+    def test_the_seven_command_hooks_are_registered(
         self, registered_hooks: list[RegisteredHook]
     ) -> None:
         found = [(h.event, h.matcher, h.script, h.subcommand) for h in registered_hooks]

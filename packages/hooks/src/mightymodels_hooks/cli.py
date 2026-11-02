@@ -10,7 +10,6 @@ import msgspec
 from mightymodels_core.edge import create_clock
 
 from mightymodels_hooks.ask_recorder import AskRecorderHandler
-from mightymodels_hooks.completion_gate import CompletionGateHandler, create_implementers
 from mightymodels_hooks.dispatch import DispatchHandler, create_dispatch_rules
 from mightymodels_hooks.payloads import (
     PostToolUsePayload,
@@ -80,16 +79,12 @@ class HookRouter:
 def create_hook_router(environ: Mapping[str, str], stderr: TextIO) -> HookRouter:
     session_start = SessionStartHandler(environ=environ, stderr=stderr, clock=create_clock())
     dispatch = DispatchHandler(environ=environ, rules=create_dispatch_rules())
-    completion_gate = CompletionGateHandler(
-        environ=environ, stderr=stderr, implementers=create_implementers()
-    )
     keeper = ScoutReportKeeper(
         environ=environ, stderr=stderr, clock=create_clock(), scouts=create_scouts()
     )
     return HookRouter().mount({
         'session-start': PayloadRoute(payload_type=SessionStartPayload, handler=session_start),
         'dispatch-hook': PayloadRoute(payload_type=PreToolUsePayload, handler=dispatch),
-        'completion-gate': PayloadRoute(payload_type=SubagentStopPayload, handler=completion_gate),
         'pre-compact': PayloadRoute(
             payload_type=PreCompactPayload,
             handler=PreCompactHandler(environ=environ, stderr=stderr),
