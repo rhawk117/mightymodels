@@ -11,6 +11,7 @@ from tests.core.tasks.service_builders import (
     FIRST_TASK,
     OWNED_FILE,
     SERVICE_SLUG,
+    create_git_facts,
     create_verify_request,
     verify_as_asked,
 )
@@ -18,7 +19,7 @@ from tests.core.tasks.service_builders import (
 if TYPE_CHECKING:
     from _pytest.mark import ParameterSet
     from mightymodels_core.schemas.tasks import TaskStatus
-    from mightymodels_core.tasks import TaskRecord
+    from mightymodels_core.tasks import TaskRecord, VerifyVerdict
 
     from tests.core.tasks.service_builders import ServiceHarness
 
@@ -46,11 +47,15 @@ def verify_movement_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize('movement', [status.param, base.param, owned.param])
 
 
+def verdict_cases() -> pytest.MarkDecorator:
+    return pytest.mark.parametrize('verdict', ['failed', 'blocked'])
+
+
 class TestPrepareVerification:
     def test_prepare_returns_the_task_git_is_asked_about(
         self, started_harness: ServiceHarness
     ) -> None:
-        task = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+        task = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
 
         assert (task.base, task.owned) == (BASE_COMMIT, (OWNED_FILE,))
 
@@ -58,7 +63,7 @@ class TestPrepareVerification:
         self, service_harness: ServiceHarness
     ) -> None:
         with pytest.raises(TransitionError):
-            service_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+            service_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
 
     def test_prepare_refuses_a_task_that_cannot_move_to_verified(
         self, started_harness: ServiceHarness
@@ -68,13 +73,13 @@ class TestPrepareVerification:
         )
 
         with pytest.raises(TransitionError):
-            started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+            started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
 
     def test_prepare_refuses_a_closed_ticket(self, started_harness: ServiceHarness) -> None:
         started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         with pytest.raises(ClosedTicketError):
-            started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+            started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
 
 
 class TestVerify:
@@ -85,27 +90,37 @@ class TestVerify:
 
         assert (record.status, record.commit, record.reasons) == ('verified', DONE_COMMIT, ())
 
-    def test_verify_blocks_a_task_with_an_uncited_criterion_and_lists_why(
-        self, proven_harness: ServiceHarness
+    def test_verify_records_a_verified_task_that_is_not_head_and_touched_other_files(
+        self, contracted_harness: ServiceHarness
     ) -> None:
-        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
-        request = replace(create_verify_request(seen, changed_files=OWNED_CHANGE), assertions={})
+        seen = contracted_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+        facts = replace(
+            create_git_facts(changed_files=frozenset({OWNED_FILE, OUTSIDE_FILE})),
+            head='fff9999',
+            base_is_ancestor=False,
+        )
+        request = replace(create_verify_request(seen, changed_files=OWNED_CHANGE), git=facts)
 
-        record = proven_harness.service.verify(SERVICE_SLUG, request)
+        record = contracted_harness.service.verify(SERVICE_SLUG, request)
 
-        assert record.status == 'blocked'
-        assert record.reasons == (
-            'AC-1 has no citation',
-            'no cited assertion proves this task',
+        assert (record.status, record.commit, record.reasons) == ('verified', DONE_COMMIT, ())
+
+    @verdict_cases()
+    def test_verify_records_the_verdict_with_its_reason(
+        self, started_harness: ServiceHarness, verdict: VerifyVerdict
+    ) -> None:
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, verdict)
+        request = create_verify_request(
+            seen, changed_files=OWNED_CHANGE, verdict=verdict, reason='the test fails'
         )
 
-    def test_verify_blocks_a_commit_that_touched_files_outside_the_owned_set(
-        self, proven_harness: ServiceHarness
-    ) -> None:
-        record = verify_as_asked(proven_harness, frozenset({OWNED_FILE, OUTSIDE_FILE}))
+        record = started_harness.service.verify(SERVICE_SLUG, request)
 
-        assert record.status == 'blocked'
-        assert record.reasons == (f'changed outside the owned set: {OUTSIDE_FILE}',)
+        assert (record.status, record.commit, record.reasons) == (
+            verdict,
+            DONE_COMMIT,
+            ('the test fails',),
+        )
 
     def move_task(self, harness: ServiceHarness, seen: TaskRecord, movement: Movement) -> None:
         address = (harness.ticket_id, FIRST_TASK)
@@ -117,7 +132,7 @@ class TestVerify:
     def test_verify_refuses_a_task_that_moved_while_git_was_asked(
         self, proven_harness: ServiceHarness, movement: Movement
     ) -> None:
-        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
         request = create_verify_request(seen, changed_files=OWNED_CHANGE)
         self.move_task(proven_harness, seen, movement)
 
@@ -130,7 +145,7 @@ class TestVerify:
     def test_verify_refuses_a_ticket_closed_while_git_was_asked(
         self, proven_harness: ServiceHarness
     ) -> None:
-        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
         request = create_verify_request(seen, changed_files=OWNED_CHANGE)
         proven_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 

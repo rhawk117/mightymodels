@@ -1,14 +1,14 @@
 """The task service: starts, verifies and marks tasks, records failed fixes.
 
-It takes values and returns values. The caller asks git and reads the brief, passes HEAD, the git
-facts and the brief text in, and renders the records and problems this service returns; the service
-never touches git or the filesystem. Verify runs as two calls so the caller can ask git between
-them: `prepare_verification` reads the task, and `verify` takes the git facts, reads the task again
-and refuses when its status, base or owned set moved since.
+It takes values and returns values. The caller asks git, passes HEAD and the git facts in, and
+renders the records this service returns; the service never touches git or the filesystem. Verify
+runs as two calls so the caller can ask git between them: `prepare_verification` reads the task,
+and `verify` takes the git facts, reads the task again and refuses when its status, base or owned
+set moved since. The verdict is the caller's; git facts never change it.
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from mightymodels_core.primitives import redact, redact_within
 from mightymodels_core.tasks.errors import (
@@ -18,11 +18,7 @@ from mightymodels_core.tasks.errors import (
     UndeclaredPlanTaskError,
     UnknownTaskError,
 )
-from mightymodels_core.tasks.gates import (
-    Evidence,
-    VerificationGate,
-    is_plan_task,
-)
+from mightymodels_core.tasks.gates import is_plan_task
 from mightymodels_core.tasks.policy import (
     IMPLEMENTATION_MODES,
     FixPolicy,
@@ -34,11 +30,11 @@ from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
 from mightymodels_core.tickets import open_ticket_of
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
     from datetime import datetime
 
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
-    from mightymodels_core.tasks.gates import Brief, GitFacts
+    from mightymodels_core.tasks.gates import GitFacts
     from mightymodels_core.tasks.records import TaskRecord
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
     from mightymodels_core.tickets.repository import TicketRepository
@@ -56,13 +52,16 @@ class StartRequest:
     too_large_approved: bool = False
 
 
+type VerifyVerdict = Literal['verified', 'failed', 'blocked']
+
+
 @dataclass(slots=True, kw_only=True, frozen=True)
 class VerifyRequest:
     seen: TaskRecord
     commit: str
-    assertions: Mapping[str, str]
+    verdict: VerifyVerdict
+    reason: str | None
     git: GitFacts
-    brief: Brief | None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -83,14 +82,13 @@ def status_of(task: TaskRecord | None) -> TaskStatus:
     return 'pending' if task is None else task.status
 
 
-def verification_transition(gate: VerificationGate, at: datetime) -> Transition:
-    problems = gate.get_verification_problems()
+def verification_transition(request: VerifyRequest, at: datetime) -> Transition:
     return Transition(
-        task_key=gate.task.key,
-        before=gate.task.status,
-        after='blocked' if problems else 'verified',
-        reasons=tuple(map(redact, problems)),
-        head=gate.git.head,
+        task_key=request.seen.key,
+        before=request.seen.status,
+        after=request.verdict,
+        reasons=tuple(map(redact, filter(None, [request.reason]))),
+        head=request.git.head,
         at=at,
     )
 
@@ -167,18 +165,20 @@ class TaskService:
         self.tasks.declare(ticket_id, sorted(set(task_keys)), self.clock.now())
         return self.tasks.tasks(ticket_id)
 
-    def prepare_verification(self, slug: Slug, task_key: TaskId) -> TaskRecord:
+    def prepare_verification(
+        self, slug: Slug, task_key: TaskId, verdict: VerifyVerdict
+    ) -> TaskRecord:
         ticket_id = open_ticket_of(self.tickets, slug).id
         task = self.tasks.task(ticket_id, task_key)
         if task is None:
-            raise TransitionError(task_key=task_key, current='pending', target='verified')
+            raise TransitionError(task_key=task_key, current='pending', target=verdict)
 
-        self.check_verifiable(task)
+        self.check_verdict(task, verdict)
         return task
 
-    def check_verifiable(self, task: TaskRecord) -> None:
+    def check_verdict(self, task: TaskRecord, verdict: VerifyVerdict) -> None:
         policy = TransitionPolicy(
-            task_key=task.key, before=task.status, after='verified', options=self.options
+            task_key=task.key, before=task.status, after=verdict, options=self.options
         )
         if problem := policy.get_transition_problem():
             raise problem
@@ -191,21 +191,11 @@ class TaskService:
         if moved := get_moved_fields(request.seen, current):
             raise TaskMovedError(task_key=task_key, changed=moved)
 
-        self.check_verifiable(current)
-        gate = VerificationGate(
-            task=current, evidence=self.evidence_for(current, request), git=request.git
-        )
-        transition = verification_transition(gate, self.clock.now())
+        self.check_verdict(current, request.verdict)
+        transition = verification_transition(request, self.clock.now())
         self.tickets.mark_in_progress(ticket)
         self.tasks.record_verification(ticket_id, transition, request.commit)
         return self.task_held(ticket_id, task_key)
-
-    def evidence_for(self, task: TaskRecord, request: VerifyRequest) -> Evidence:
-        return Evidence(
-            commit=request.commit,
-            brief=request.brief if is_plan_task(task.key) else None,
-            assertions=request.assertions,
-        )
 
     def mark(self, slug: Slug, request: MarkRequest) -> TaskRecord:
         ticket = open_ticket_of(self.tickets, slug)

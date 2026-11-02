@@ -22,7 +22,12 @@ START = MappingProxyType({
     'owned': ('src/a.py',),
     'acceptance': ('AC-1: it passes',),
 })
-VERIFY = MappingProxyType({'slug': 'probe-ticket', 'task_id': 'T20', 'commit': 'HEAD'})
+VERIFY = MappingProxyType({
+    'slug': 'probe-ticket',
+    'task_id': 'T20',
+    'commit': 'HEAD',
+    'verdict': 'verified',
+})
 MARK = MappingProxyType({
     'slug': 'probe-ticket',
     'task_id': 'T20',
@@ -104,12 +109,26 @@ class TestTaskVerifyRequest:
         with pytest.raises(ValidationError):
             create_verify(commit='a' * (NAME_LIMIT + 1))
 
-    def test_assertions_default_to_none(self) -> None:
-        assert create_verify().assertions == {}
-
-    def test_assertion_over_the_prose_limit_is_refused(self) -> None:
+    def test_assertions_are_no_longer_accepted(self) -> None:
         with pytest.raises(ValidationError):
-            create_verify(assertions={'AC-1': 'x' * (PROSE_LIMIT + 1)})
+            create_verify(assertions={'AC-1': 'seen'})
+
+    def test_verified_takes_no_reason(self) -> None:
+        with pytest.raises(ValidationError):
+            create_verify(reason='looks fine')
+
+    @pytest.mark.parametrize('verdict', ['failed', 'blocked'])
+    def test_failed_and_blocked_need_a_reason(self, verdict: str) -> None:
+        with pytest.raises(ValidationError):
+            create_verify(verdict=verdict)
+
+    @pytest.mark.parametrize('verdict', ['failed', 'blocked'])
+    def test_failed_and_blocked_carry_their_reason(self, verdict: str) -> None:
+        assert create_verify(verdict=verdict, reason='a test fails').reason == 'a test fails'
+
+    def test_superseded_is_not_a_verdict(self) -> None:
+        with pytest.raises(ValidationError):
+            create_verify(verdict='superseded', reason='dropped')
 
 
 class TestTaskMarkRequest:

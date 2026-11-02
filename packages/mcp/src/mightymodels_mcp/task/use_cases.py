@@ -24,12 +24,18 @@ from .views import (
 
 if TYPE_CHECKING:
     from mightymodels_core.edge import OpenState
-    from mightymodels_core.primitives import Slug, TaskId
+    from mightymodels_core.primitives import Slug
     from mightymodels_core.tasks import VerifyRequest
     from mightymodels_core.tasks.records import TaskRecord
 
-    from .schemas import FailedFixRequest, TaskDeclareRequest, TaskMarkRequest, TaskStartRequest
-    from .views import TaskView
+    from .schemas import (
+        FailedFixRequest,
+        TaskDeclareRequest,
+        TaskMarkRequest,
+        TaskStartRequest,
+        TaskVerifyRequest,
+    )
+    from .views import TaskView, VerifyView
 
 
 def create_task_work(state: OpenState) -> TaskWork:
@@ -52,17 +58,17 @@ def declare_tasks(work: TaskWork, request: TaskDeclareRequest) -> TaskView:
     return render_listing(records, attempts)
 
 
-def prepare_verification(work: TaskWork, slug: Slug, task_id: TaskId) -> TaskRecord:
+def prepare_verification(work: TaskWork, request: TaskVerifyRequest) -> TaskRecord:
     with work.read() as unit:
-        return unit.tasks.prepare_verification(slug, task_id)
+        return unit.tasks.prepare_verification(request.slug, request.task_id, request.verdict)
 
 
-def verify_task(work: TaskWork, slug: Slug, request: VerifyRequest) -> TaskView:
+def verify_task(work: TaskWork, slug: Slug, request: VerifyRequest) -> VerifyView:
     with work.write() as unit:
         record = unit.tasks.verify(slug, request)
         attempts = unit.task_reads.show(slug).attempts
 
-    return render_verified(record, attempts)
+    return render_verified(record, attempts, request)
 
 
 def mark_task(work: TaskWork, request: TaskMarkRequest) -> TaskView:

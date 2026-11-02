@@ -4,12 +4,12 @@ A task id is held to core's pattern and length. The size bounds on a task (crite
 files) stay core's, which refuses a task that is too large; a request only needs one of each.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from mightymodels_core.primitives import TaskId, parse_task_id
 from mightymodels_core.tasks import MarkRequest, StartRequest
 from mightymodels_core.vocabulary.tasks import ArchitectMode, Worker
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, Field, model_validator
 
 from mightymodels_mcp.server.requests import (
     NameText,
@@ -66,10 +66,25 @@ class TaskVerifyRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
     commit: RevisionField = Field(description='The commit the worker reports for the task.')
-    assertions: dict[ProseText, ProseText] = Field(
-        default_factory=dict,
-        description='A citation for each acceptance criterion, as criterion to evidence.',
+    verdict: Literal['verified', 'failed', 'blocked'] = Field(
+        description='The primary verdict on the task; git facts never change it.'
     )
+    reason: ProseText | None = Field(
+        default=None,
+        description='Why the task failed or is blocked; required for those, refused for verified.',
+    )
+
+    @model_validator(mode='after')
+    def require_reason_unless_verified(self) -> Self:
+        if self.verdict == 'verified' and self.reason is not None:
+            message = 'a verified task takes no reason'
+            raise ValueError(message)
+
+        if self.verdict != 'verified' and not (self.reason or '').strip():
+            message = f'a {self.verdict} task needs a reason'
+            raise ValueError(message)
+
+        return self
 
 
 class TaskMarkRequest(RequestModel):

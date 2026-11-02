@@ -6,13 +6,18 @@ from typing import TYPE_CHECKING
 
 from mightymodels_core.contract.records import ApprovedCommand, Receipt
 from mightymodels_core.primitives import Slug, TaskId, redact
-from mightymodels_core.tasks import Brief, GitFacts, StartRequest, VerifyRequest
+from mightymodels_core.tasks import GitFacts, StartRequest, VerifyRequest
 
 from tests.core.tasks.fakes import FakeAttemptRepository, FakeTaskRepository
 
 if TYPE_CHECKING:
     from mightymodels_core.schemas.tasks import ArchitectMode, Worker
-    from mightymodels_core.tasks import TaskReadService, TaskRecord, TaskService
+    from mightymodels_core.tasks import (
+        TaskReadService,
+        TaskRecord,
+        TaskService,
+        VerifyVerdict,
+    )
 
     from tests.core.contract.fakes import FakeContractRepository
     from tests.core.primitives.clock import FakeClock
@@ -27,7 +32,6 @@ BASE_COMMIT = 'base001'
 DONE_COMMIT = 'abc1234'
 OWNED_FILE = 'src/a.py'
 COMMAND_KEY = 'L1'
-BRIEF_TEXT = f'## ASKED\nacceptance:\n  - AC-1: it works\n## DONE\ncommit: {DONE_COMMIT}\n'
 
 
 def create_start_request(
@@ -54,22 +58,27 @@ def create_git_facts(*, changed_files: frozenset[str] = frozenset({OWNED_FILE}))
         base_resolves=True,
         base_is_ancestor=True,
         changed_files=changed_files,
-        named_commit=DONE_COMMIT,
     )
 
 
-def create_verify_request(seen: TaskRecord, *, changed_files: frozenset[str]) -> VerifyRequest:
+def create_verify_request(
+    seen: TaskRecord,
+    *,
+    changed_files: frozenset[str],
+    verdict: VerifyVerdict = 'verified',
+    reason: str | None = None,
+) -> VerifyRequest:
     return VerifyRequest(
         seen=seen,
         commit=DONE_COMMIT,
-        assertions={'AC-1': f'{OWNED_FILE}:1'},
+        verdict=verdict,
+        reason=reason,
         git=create_git_facts(changed_files=changed_files),
-        brief=Brief(text=BRIEF_TEXT),
     )
 
 
 def verify_as_asked(harness: ServiceHarness, changed_files: frozenset[str]) -> TaskRecord:
-    seen = harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+    seen = harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
     request = create_verify_request(seen, changed_files=changed_files)
     return harness.service.verify(SERVICE_SLUG, request)
 

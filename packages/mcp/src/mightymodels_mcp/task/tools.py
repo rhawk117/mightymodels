@@ -7,8 +7,6 @@ task_show, task_mark and failed_fix_record never ask git.
 
 from typing import TYPE_CHECKING
 
-from mightymodels_core.workspace import workspace_at
-
 from mightymodels_mcp.server.annotations import MARKS, READS, REFRESHES, WRITES
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
@@ -32,7 +30,7 @@ from .use_cases import (
     start_task,
     verify_task,
 )
-from .views import TaskView
+from .views import TaskView, VerifyView
 
 if TYPE_CHECKING:
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
@@ -58,24 +56,21 @@ async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
         return start_task(create_task_work(state), request, head)
 
 
-async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> TaskView:
-    """Verify a task against the reported commit, its brief's citations and its owned
-    files. Use when a worker reports done, before the task closes. To record a failure or block
-    instead, use task_mark.
+async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> VerifyView:
+    """Record the verdict on a task at a commit: verified, failed or blocked. Use after judging a
+    worker's report. The answer reports commit-is-HEAD, base-is-ancestor and files changed outside
+    the owned set; none changes the verdict. Failed and blocked need a reason.
     """
     async with open_tool_state(ctx) as state:
         work = create_task_work(state)
-        seen = prepare_verification(work, request.slug, request.task_id)
-        sources = VerificationSources(
-            git=state.git, workspace=workspace_at(state.checkout.toplevel)
-        )
-        verification = await gather_verification(sources, seen, request)
+        seen = prepare_verification(work, request)
+        verification = await gather_verification(VerificationSources(git=state.git), seen, request)
         return verify_task(work, request.slug, verification)
 
 
 async def task_mark(request: TaskMarkRequest, ctx: ToolContext) -> TaskView:
     """Mark a task failed, blocked or superseded, with the reason. Use when a worker reports it
-    cannot finish or the plan changed. To close a task as done, use task_verify.
+    cannot finish or the plan changed. To record the verdict on finished work, use task_verify.
     """
     async with open_tool_state(ctx) as state:
         return mark_task(create_task_work(state), request)
@@ -132,7 +127,7 @@ TASK_TOOLS = (
         annotations=WRITES,
         icon='task',
         request_model=TaskVerifyRequest,
-        result_model=TaskView,
+        result_model=VerifyView,
         handler=task_verify,
     ),
     ToolSpec(

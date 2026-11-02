@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from mightymodels_core.tasks import FixRecorded, Readiness
+    from mightymodels_core.tasks import FixRecorded, Readiness, VerifyRequest
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
 
 UNKNOWN_HEAD = 'unknown'
@@ -40,6 +40,12 @@ class TaskView(BaseModel):
     text: str
     advanced: bool
     tasks: tuple[TaskRecordView, ...] = ()
+
+
+class VerifyView(TaskView):
+    commit_is_head: bool
+    base_is_ancestor: bool
+    outside_owned: tuple[str, ...]
 
 
 def short_head(head: str | None) -> str:
@@ -73,12 +79,25 @@ def render_started(record: TaskRecord, attempts: AttemptCounts, origin: StartOri
     return TaskView(text=text, advanced=True, tasks=create_record_views([record], attempts))
 
 
-def render_verified(record: TaskRecord, attempts: AttemptCounts) -> TaskView:
-    text = f'{record.key} {record.status}\n{render_problems(record.reasons)}'
-    return TaskView(
+def render_verified(
+    record: TaskRecord, attempts: AttemptCounts, request: VerifyRequest
+) -> VerifyView:
+    git = request.git
+    commit_is_head = request.commit == git.head
+    outside_owned = tuple(sorted(git.changed_files - set(record.owned)))
+    facts = (
+        f'  commit is HEAD: {"yes" if commit_is_head else "no"}\n'
+        f'  base is ancestor of commit: {"yes" if git.base_is_ancestor else "no"}\n'
+        f'  changed outside the owned set: {", ".join(outside_owned) or "none"}\n'
+    )
+    text = f'{record.key} {record.status}\n{facts}{render_problems(record.reasons)}'
+    return VerifyView(
         text=text,
         advanced=record.status == 'verified',
         tasks=create_record_views([record], attempts),
+        commit_is_head=commit_is_head,
+        base_is_ancestor=git.base_is_ancestor,
+        outside_owned=outside_owned,
     )
 
 

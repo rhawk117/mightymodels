@@ -100,14 +100,9 @@ class Flow:
         }
         await self.call('task_start', start)
         head = await commit_file(self.repository, OWNED)
-        brief = self.repository.joinpath('.mightymodels', SLUG, 'briefs', 'task-01.md')
-        brief.parent.mkdir(parents=True)
-        brief.write_text(
-            f'## ASKED\n  - AC-1: changed\n## DONE\ncommit: {head}\n', encoding='utf-8'
-        )
-        verify = {'slug': SLUG, 'task_id': 'T1', 'commit': head, 'assertions': {'AC-1': 'seen'}}
+        verify = {'slug': SLUG, 'task_id': 'T1', 'commit': head, 'verdict': 'verified'}
         view = await self.call('task_verify', verify)
-        assert view['text'] == 'T1 verified\n', (base, view['text'])
+        assert view['tasks'][0]['status'] == 'verified', (base, view['text'])
 
 
 @pytest.fixture(scope='module')

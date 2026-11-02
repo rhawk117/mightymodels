@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import anyio
 import pytest
 from mcp import Client
 from mcp.types import ToolAnnotations
@@ -141,28 +142,61 @@ class TestTaskVerify:
         self, started: TaskHarness
     ) -> None:
         head = await started.commit_owned_file()
-        arguments = {**KEY, 'commit': head, 'assertions': {'AC-1': 'seen in the diff'}}
+        arguments = {**KEY, 'commit': head, 'verdict': 'verified'}
 
         view = view_of(await started.call('task_verify', arguments))
 
-        assert view['text'] == 'R1 verified\n'
+        assert view['text'] == (
+            'R1 verified\n'
+            '  commit is HEAD: yes\n'
+            '  base is ancestor of commit: yes\n'
+            '  changed outside the owned set: none\n'
+        )
         assert view['advanced']
         assert view['tasks'][0]['commit'] == head
+        assert (view['commit_is_head'], view['base_is_ancestor'], view['outside_owned']) == (
+            True,
+            True,
+            [],
+        )
         assert 'resolve_head' in started.git_calls
 
-    async def test_blocked_verification_lists_the_problems(self, started: TaskHarness) -> None:
-        base = await started.git('rev-parse', 'HEAD')
-        await started.commit_owned_file()
-        arguments = {**KEY, 'commit': base, 'assertions': {'AC-1': 'seen in the diff'}}
+    async def test_verifies_a_commit_that_is_not_head_and_touches_other_files(
+        self, started: TaskHarness
+    ) -> None:
+        outside = anyio.Path(started.server.repository, 'src/elsewhere.py')
+        await outside.parent.mkdir(parents=True, exist_ok=True)
+        await outside.write_text('elsewhere\n')
+        await started.git('add', 'src/elsewhere.py')
+        earlier = await started.commit_owned_file()
+        await started.commit('later')
+
+        view = view_of(
+            await started.call('task_verify', {**KEY, 'commit': earlier, 'verdict': 'verified'})
+        )
+
+        assert view['tasks'][0]['status'] == 'verified'
+        assert view['advanced']
+        assert (view['commit_is_head'], view['base_is_ancestor']) == (False, True)
+        assert view['outside_owned'] == ['src/elsewhere.py']
+
+    async def test_failed_verdict_is_recorded_with_its_reason(self, started: TaskHarness) -> None:
+        head = await started.commit_owned_file()
+        arguments = {**KEY, 'commit': head, 'verdict': 'failed', 'reason': 'the test fails'}
 
         view = view_of(await started.call('task_verify', arguments))
 
-        problem = 'the reported commit must resolve to the current HEAD'
-        assert view['text'] == f'R1 blocked\n  - {problem}\n'
+        assert view['tasks'][0]['status'] == 'failed'
+        assert view['tasks'][0]['reasons'] == ['the test fails']
         assert not view['advanced']
 
+    async def test_failed_verdict_without_a_reason_is_refused(self, started: TaskHarness) -> None:
+        arguments = {**KEY, 'commit': 'HEAD', 'verdict': 'failed'}
+
+        assert (await started.call('task_verify', arguments)).is_error
+
     async def test_unstarted_task_is_refused_before_git_is_asked(self, staged: TaskHarness) -> None:
-        result = await staged.call('task_verify', {**KEY, 'commit': 'HEAD'})
+        result = await staged.call('task_verify', {**KEY, 'commit': 'HEAD', 'verdict': 'verified'})
 
         assert result.is_error
         assert staged.git_calls == []

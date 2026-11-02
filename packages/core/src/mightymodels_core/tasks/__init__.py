@@ -12,11 +12,7 @@ from .errors import (
     UnknownTaskError,
 )
 from .gates import (
-    Brief,
-    Evidence,
     GitFacts,
-    VerificationGate,
-    done_commit,
     get_plan_task_problem,
     get_readiness_problems,
     is_plan_task,
@@ -33,6 +29,7 @@ from .services import (
     TaskReadService,
     TaskService,
     VerifyRequest,
+    VerifyVerdict,
 )
 from .sqlite_attempts import SqliteAttemptRepository
 from .sqlite_tasks import SqliteTaskRepository
@@ -42,8 +39,6 @@ __all__ = [
     'Attempt',
     'AttemptCounts',
     'AttemptRepository',
-    'Brief',
-    'Evidence',
     'FailedFix',
     'FixNotUnderwayError',
     'FixPolicy',
@@ -70,9 +65,8 @@ __all__ = [
     'TransitionError',
     'TransitionPolicy',
     'UnknownTaskError',
-    'VerificationGate',
     'VerifyRequest',
-    'done_commit',
+    'VerifyVerdict',
     'get_plan_task_problem',
     'get_readiness_problems',
     'is_plan_task',
