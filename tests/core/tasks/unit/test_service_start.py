@@ -89,9 +89,11 @@ class TestStart:
             TaskRecord(key=FIRST_TASK, status='pending')
         ]
 
-    def test_start_refuses_a_task_that_is_verified(self, verified_harness: ServiceHarness) -> None:
+    def test_start_refuses_a_task_that_is_verified(
+        self, verified_task_harness: ServiceHarness
+    ) -> None:
         with pytest.raises(TransitionError):
-            verified_harness.service.start(SERVICE_SLUG, create_start_request())
+            verified_task_harness.service.start(SERVICE_SLUG, create_start_request())
 
     def test_start_refuses_an_intern_that_already_tried(
         self, declared_harness: ServiceHarness

@@ -83,16 +83,16 @@ class TestPrepareVerification:
 
 
 class TestVerify:
-    def test_verify_marks_a_proven_task_verified_with_the_commit(
-        self, proven_harness: ServiceHarness
+    def test_verify_marks_a_started_task_verified_with_the_commit(
+        self, started_harness: ServiceHarness
     ) -> None:
-        record = verify_as_asked(proven_harness, OWNED_CHANGE)
+        record = verify_as_asked(started_harness, OWNED_CHANGE)
 
         assert (record.status, record.commit, record.reasons) == ('verified', DONE_COMMIT, ())
 
     @pytest.fixture
-    def off_head_request(self, contracted_harness: ServiceHarness) -> VerifyRequest:
-        seen = contracted_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+    def off_head_request(self, started_harness: ServiceHarness) -> VerifyRequest:
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
         facts = replace(
             create_git_facts(changed_files=frozenset({OWNED_FILE, OUTSIDE_FILE})),
             head='fff9999',
@@ -103,9 +103,9 @@ class TestVerify:
         )
 
     def test_verify_records_a_verified_task_that_is_not_head_and_touched_other_files(
-        self, contracted_harness: ServiceHarness, off_head_request: VerifyRequest
+        self, started_harness: ServiceHarness, off_head_request: VerifyRequest
     ) -> None:
-        record = contracted_harness.service.verify(SERVICE_SLUG, off_head_request)
+        record = started_harness.service.verify(SERVICE_SLUG, off_head_request)
 
         assert (record.status, record.commit, record.reasons) == ('verified', DONE_COMMIT, ())
 
@@ -134,24 +134,24 @@ class TestVerify:
 
     @verify_movement_cases()
     def test_verify_refuses_a_task_that_moved_while_git_was_asked(
-        self, proven_harness: ServiceHarness, movement: Movement
+        self, started_harness: ServiceHarness, movement: Movement
     ) -> None:
-        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
         request = create_verify_request(seen, changed_files=OWNED_CHANGE)
-        self.move_task(proven_harness, seen, movement)
+        self.move_task(started_harness, seen, movement)
 
         with pytest.raises(TaskMovedError) as refused:
-            proven_harness.service.verify(SERVICE_SLUG, request)
+            started_harness.service.verify(SERVICE_SLUG, request)
 
         assert refused.value.changed == (movement.moved,)
-        assert proven_harness.held(FIRST_TASK).status == movement.status
+        assert started_harness.held(FIRST_TASK).status == movement.status
 
     def test_verify_refuses_a_ticket_closed_while_git_was_asked(
-        self, proven_harness: ServiceHarness
+        self, started_harness: ServiceHarness
     ) -> None:
-        seen = proven_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
         request = create_verify_request(seen, changed_files=OWNED_CHANGE)
-        proven_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
+        started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         with pytest.raises(ClosedTicketError):
-            proven_harness.service.verify(SERVICE_SLUG, request)
+            started_harness.service.verify(SERVICE_SLUG, request)

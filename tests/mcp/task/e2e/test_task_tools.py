@@ -316,7 +316,6 @@ class TestTaskReady:
     async def test_verified_plan_task_is_ready_at_head(self, staged: TaskHarness) -> None:
         head = await staged.commit('first')
         await staged.verify_plan_task()
-        await staged.prove_landing(head)
 
         view = view_of(await staged.call('task_ready', {'slug': SLUG}))
 

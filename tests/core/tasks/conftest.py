@@ -3,7 +3,6 @@
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.contract.records import Approval
 from mightymodels_core.database import ConnectionOptions, DatabaseSpec, open_database
 from mightymodels_core.schemas import DECLARATIONS
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
@@ -11,7 +10,6 @@ from mightymodels_core.schemas.tickets import TICKET_BY_SLUG, TicketSlugParams
 from mightymodels_core.tasks import MarkRequest, TaskReadService, TaskService
 from mightymodels_core.tickets import SqliteTicketRepository
 
-from tests.core.contract.fakes import ContractLedger, FakeContractRepository
 from tests.core.primitives.clock import create_fake_clock
 from tests.core.tasks.fakes import (
     FakeAttemptRepository,
@@ -22,15 +20,11 @@ from tests.core.tickets.fakes import FakeTicketRepository
 
 from .repository_builders import SQL, TICKET_SLUGS, create_ticket_section
 from .service_builders import (
-    BASE_COMMIT,
-    COMMAND_KEY,
     FIRST_TASK,
     OWNED_FILE,
     SERVICE_MOMENT,
     SERVICE_SLUG,
     ServiceHarness,
-    create_command,
-    create_receipt,
     create_start_request,
     verify_as_asked,
 )
@@ -84,7 +78,6 @@ def service_harness() -> ServiceHarness:
     tickets = FakeTicketRepository()
     record = tickets.stage(SERVICE_SLUG, create_ticket_section(SERVICE_SLUG), ())
     task_ledger = TaskLedger()
-    contracts = FakeContractRepository(ledger=ContractLedger())
     clock = create_fake_clock(SERVICE_MOMENT)
     task_repository = FakeTaskRepository(ledger=task_ledger)
     attempts = FakeAttemptRepository(ledger=task_ledger)
@@ -95,7 +88,6 @@ def service_harness() -> ServiceHarness:
         reads=reads,
         tickets=tickets,
         task_ledger=task_ledger,
-        contracts=contracts,
         clock=clock,
         ticket_id=record.id,
     )
@@ -125,25 +117,3 @@ def superseded_harness(started_harness: ServiceHarness) -> ServiceHarness:
         SERVICE_SLUG, MarkRequest(task_key=FIRST_TASK, to='superseded', reason='dropped')
     )
     return started_harness
-
-
-@pytest.fixture
-def contracted_harness(started_harness: ServiceHarness) -> ServiceHarness:
-    approval = Approval(at=SERVICE_MOMENT, head=BASE_COMMIT)
-    started_harness.contracts.approve(
-        started_harness.ticket_id, [create_command(COMMAND_KEY)], approval
-    )
-    return started_harness
-
-
-@pytest.fixture
-def proven_harness(contracted_harness: ServiceHarness) -> ServiceHarness:
-    receipt = create_receipt(COMMAND_KEY)
-    contracted_harness.contracts.record(contracted_harness.ticket_id, [receipt])
-    return contracted_harness
-
-
-@pytest.fixture
-def verified_harness(proven_harness: ServiceHarness) -> ServiceHarness:
-    verify_as_asked(proven_harness, frozenset({OWNED_FILE}))
-    return proven_harness

@@ -85,7 +85,7 @@ async def task_show(request: TaskRequest, ctx: ToolContext) -> TaskView:
 
 async def task_ready(request: TaskRequest, ctx: ToolContext) -> TaskView:
     """Say whether the tasks of a ticket are ready to close at the current HEAD. Use before
-    close_check or when finishing. For the commands themselves, use contract_status.
+    close_check or when finishing.
     """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
