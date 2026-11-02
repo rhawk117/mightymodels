@@ -15,7 +15,12 @@ if TYPE_CHECKING:
         WrapperRunner,
     )
 
-WORKER = {'agent_type': 'mightymodels:triage:code-scout', 'tool_input': {}}
+WORKER = {
+    'agent_id': 'a1',
+    'agent_type': 'mightymodels:triage:code-scout',
+    'tool_input': {},
+}
+PHASES = ('investigation', 'planning', 'implementation', 'review')
 ENGINEER = {'tool_input': {'subagent_type': 'mightymodels:workers:engineer'}}
 BARE_ARCHITECT = {'tool_input': {'subagent_type': 'architect'}}
 INTERN = {'tool_input': {'subagent_type': 'mightymodels:workers:intern'}}
@@ -93,3 +98,53 @@ class TestDispatchWrapper:
         outcome = dispatch_runner.run(launcher, SCOUT, with_ticket_dir=True)
 
         assert outcome.code == 0
+
+    @broken_launcher_cases()
+    @pytest.mark.parametrize('phase', PHASES)
+    def test_does_not_refuse_a_phase_main_thread_for_its_agent_type(
+        self, dispatch_runner: WrapperRunner, launcher: str, phase: str
+    ) -> None:
+        payload = {'agent_type': f'mightymodels:{phase}', **SCOUT}
+
+        outcome = dispatch_runner.run(launcher, payload)
+
+        assert outcome.code == 0
+
+    @broken_launcher_cases()
+    @pytest.mark.parametrize(
+        'target', [ENGINEER, SCOUT, {'tool_input': {'subagent_type': 'review'}}]
+    )
+    @pytest.mark.parametrize('phase', PHASES)
+    def test_refuses_any_dispatch_by_a_phase_worker(
+        self,
+        dispatch_runner: WrapperRunner,
+        launcher: str,
+        phase: str,
+        target: Mapping[str, object],
+    ) -> None:
+        payload = {'agent_id': 'a1', 'agent_type': f'mightymodels:{phase}', **target}
+
+        outcome = dispatch_runner.run(launcher, payload)
+
+        assert outcome.code == 2
+        assert 'refused' in outcome.stderr
+
+    @broken_launcher_cases()
+    @pytest.mark.parametrize('with_ticket_dir', [True, False], ids=['ticket-dir', 'no-ticket-dir'])
+    @pytest.mark.parametrize('prefix', ['', 'mightymodels:'], ids=['bare', 'prefixed'])
+    @pytest.mark.parametrize('phase', PHASES)
+    def test_refuses_a_phase_agent_target_from_the_main_thread(
+        self,
+        dispatch_runner: WrapperRunner,
+        launcher: str,
+        phase: str,
+        prefix: str,
+        *,
+        with_ticket_dir: bool,
+    ) -> None:
+        payload = {'tool_input': {'subagent_type': f'{prefix}{phase}'}}
+
+        outcome = dispatch_runner.run(launcher, payload, with_ticket_dir=with_ticket_dir)
+
+        assert outcome.code == 2
+        assert 'refused' in outcome.stderr
