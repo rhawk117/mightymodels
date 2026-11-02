@@ -26,6 +26,7 @@ from mightymodels_core.tasks.policy import (
     TaskOptions,
     TransitionPolicy,
     VerdictPolicy,
+    get_size_warning,
 )
 from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
 from mightymodels_core.tickets import open_ticket_of
@@ -154,6 +155,13 @@ class TaskService:
             ticket_id, start_transition(policy, request, self.clock.now()), attempt
         )
         return self.task_held(ticket_id, request.task_key)
+
+    def get_size_warning(self, request: StartRequest) -> str | None:
+        return get_size_warning(
+            acceptance_count=request.acceptance_count,
+            owned_count=len(set(request.owned)),
+            options=self.options,
+        )
 
     def declare(self, slug: Slug, task_keys: Sequence[TaskId]) -> list[TaskRecord]:
         ticket = open_ticket_of(self.tickets, slug)

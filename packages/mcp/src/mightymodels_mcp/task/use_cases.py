@@ -7,7 +7,7 @@ the records it returns from the same unit.
 
 from typing import TYPE_CHECKING
 
-from mightymodels_core.tasks import VerdictPolicy, get_size_warning
+from mightymodels_core.tasks import VerdictPolicy
 from mightymodels_core.units_of_work import TaskWork
 
 from mightymodels_mcp.server.state import create_work
@@ -45,12 +45,11 @@ def create_task_work(state: OpenState) -> TaskWork:
 
 def start_task(work: TaskWork, request: TaskStartRequest, head: str | None) -> TaskView:
     with work.write() as unit:
-        record = unit.tasks.start(request.slug, create_start_request(request, head))
+        start_request = create_start_request(request, head)
+        record = unit.tasks.start(request.slug, start_request)
+        warning = unit.tasks.get_size_warning(start_request)
         attempts = unit.task_reads.show(request.slug).attempts
 
-    warning = get_size_warning(
-        acceptance_count=len(request.acceptance), owned_count=len(set(request.owned))
-    )
     origin = StartOrigin(worker=request.by, head=head, warning=warning)
     return render_started(record, attempts, origin)
 

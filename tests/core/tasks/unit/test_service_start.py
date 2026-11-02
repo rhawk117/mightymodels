@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -7,6 +7,7 @@ from mightymodels_core.tasks import (
     InternSpentError,
     MarkRequest,
     ModeNeedsArchitectError,
+    TaskOptions,
     TaskRecord,
     TransitionError,
 )
@@ -128,3 +129,22 @@ class TestStart:
 
         with pytest.raises(ClosedTicketError):
             declared_harness.service.start(SERVICE_SLUG, create_start_request())
+
+
+class TestSizeWarning:
+    def test_a_configured_owned_limit_moves_the_size_warning(
+        self, declared_harness: ServiceHarness
+    ) -> None:
+        strict = replace(declared_harness.service, options=TaskOptions(warn_owned_above=0))
+        request = create_start_request()
+
+        assert strict.get_size_warning(request)
+        assert declared_harness.service.get_size_warning(request) is None
+
+    def test_a_configured_acceptance_limit_moves_the_size_warning(
+        self, declared_harness: ServiceHarness
+    ) -> None:
+        strict = replace(declared_harness.service, options=TaskOptions(warn_acceptance_above=0))
+        request = create_start_request(acceptance_count=1)
+
+        assert strict.get_size_warning(request)
