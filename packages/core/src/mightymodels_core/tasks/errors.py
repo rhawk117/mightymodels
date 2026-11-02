@@ -53,7 +53,7 @@ class ArchitectSpentError(StateError):
         super().__init__(
             f'{task_key} already had its architect recovery; route it to whats-broken, start it '
             'in systemic-refactor mode after the user approves a scope expansion, or in '
-            'diagnose-replan mode for a revised contract'
+            'diagnose-replan mode for a revised ASKED stanza'
         )
 
 

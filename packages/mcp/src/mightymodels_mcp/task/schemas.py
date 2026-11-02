@@ -87,7 +87,10 @@ class TaskMarkRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
     to: Literal['failed', 'blocked', 'superseded'] = Field(
-        description='The state to mark the task as.'
+        description=(
+            'failed or blocked: a worker reported it cannot finish, with no commit to judge. '
+            'superseded: the plan changed. For a verdict on a reported commit use task_verify.'
+        )
     )
     reason: ProseText = Field(description='Why the task is marked, kept in its history.')
 

@@ -156,17 +156,13 @@ def unstarted_ruling(target: str, tickets: BranchTicketsOrUnreadable) -> Ruling:
     return Denied(reason=NO_TASK_IN_PROGRESS.format(target=target, slug=tickets.unclosed[0]))
 
 
-def ticket_ruling(target: AgentName, tickets: BranchTicketsOrUnreadable) -> Ruling:
-    return unstarted_ruling(agent_type(target), tickets)
-
-
 async def started_ruling(caller: str | None, target: AgentName, started: StartedTasks) -> Ruling:
     if target == 'intern':
         refused = intern_denial(await started.started_by('intern'))
         return None if refused is None else Denied(reason=refused)
 
     if caller is None and target in STARTED_BEFORE_DISPATCH:
-        return ticket_ruling(target, await started.tickets_on_branch())
+        return unstarted_ruling(agent_type(target), await started.tickets_on_branch())
 
     return None
 

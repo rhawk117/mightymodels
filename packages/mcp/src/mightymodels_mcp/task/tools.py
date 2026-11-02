@@ -56,9 +56,11 @@ async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
 
 
 async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> VerifyView:
-    """Record the verdict on a task at a commit: verified, failed or blocked. Use after judging a
-    worker's report. The answer reports commit-is-HEAD, base-is-ancestor and files changed outside
-    the owned set; none changes the verdict. Failed and blocked need a reason.
+    """Record the primary's verdict on a task at the commit a worker reported: verified, failed or
+    blocked. Use after judging that commit. The answer reports commit-is-HEAD, the base status
+    (ancestor, not-ancestor or unresolved) and files changed outside the owned set; none changes
+    the verdict. Failed and blocked need a reason. For a stop with no commit to judge, use
+    task_mark.
     """
     async with open_tool_state(ctx) as state:
         work = create_task_work(state)
@@ -68,8 +70,9 @@ async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> VerifyVie
 
 
 async def task_mark(request: TaskMarkRequest, ctx: ToolContext) -> TaskView:
-    """Mark a task failed, blocked or superseded, with the reason. Use when a worker reports it
-    cannot finish or the plan changed. To record the verdict on finished work, use task_verify.
+    """Record a stop with no commit to judge, with the reason: failed or blocked when a worker's
+    own report says it cannot finish, superseded when the plan changed. To record the primary's
+    verdict on a reported commit, use task_verify.
     """
     async with open_tool_state(ctx) as state:
         return mark_task(create_task_work(state), request)
@@ -84,7 +87,7 @@ async def task_show(request: TaskRequest, ctx: ToolContext) -> TaskView:
 
 
 async def task_ready(request: TaskRequest, ctx: ToolContext) -> TaskView:
-    """Say whether the tasks of a ticket are ready to close at the current HEAD. Use before
+    """Say whether the tasks of a ticket are ready to close. Use before
     close_check or when finishing.
     """
     async with open_tool_state(ctx) as state:

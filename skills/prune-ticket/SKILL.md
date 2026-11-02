@@ -4,7 +4,7 @@ description: >-
   Close out a finished mightymodels unit of work: close_check refuses while live work
   remains (unverified tasks, a live whats-broken.md, undecided or unfixed review findings,
   unpushed commits), compacts the ticket's recorded state into a 30-line archive at
-  .mightymodels/archives/<slug>.md with a JSON sidecar (contracts and results, decisions,
+  .mightymodels/archives/<slug>.md with a JSON sidecar (decisions,
   review outcomes), marks the ticket closed, proposes cascading documentation updates as
   diffs for the user's approval, then, on explicit confirmation through AskUserQuestion,
   deletes the ticket directory.
