@@ -198,9 +198,10 @@ each finding `Fn` chosen for fixing:
    with usable Fix and Verify lines; the full template for uncle-bob findings, findings both
    personas raised, and anything Critical or High security. Either way the dispatch carries
    SLUG, that `R<n>` as the task id, and the persona's own id (`MV-n`, `UB-n`) in a slot of its
-   own as the finding: a finding id is never the task id. A residual carries `Fix:` and an outcome
-   sentence; the finding's `Verify:` bullet holds that outcome sentence and is not a command the
-   reader must run. The engineer runs the tests that show the outcome and names them.
+   own as the finding: a finding id is never the task id. A residual carries `Fix:`, `Outcome:` (the
+   finding's `Verify:` outcome sentence, verbatim) and `Verify:` (the scoped tests or checks the
+   primary names, never the outcome sentence). The engineer runs them and names each test it ran
+   with its output quoted.
 3. `task_verify` with `slug`, `task_id` that `R<n>`, the fix `commit` and `verdict`
    `verified`, then `review_resolve` with `run_id`, `finding` `Fn`,
    `result` `fixed` and `commit`.
