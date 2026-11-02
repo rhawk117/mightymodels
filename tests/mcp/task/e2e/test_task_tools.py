@@ -194,11 +194,7 @@ class TestTaskReady:
 
         view = view_of(await staged.call('task_ready', {'slug': SLUG}))
 
-        assert view['text'] == (
-            'not ready\n'
-            '  - T1 is in-progress, not verified\n'
-            '  - the contract has no live L* command; approve one with contract_approve\n'
-        )
+        assert view['text'] == ('not ready\n  - T1 is in-progress, not verified\n')
         assert not view['advanced']
         assert staged.git_calls == ['resolve_head']
 

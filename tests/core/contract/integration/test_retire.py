@@ -15,7 +15,6 @@ from mightymodels_core.contract import (
     UnknownCommandError,
 )
 from mightymodels_core.schemas.repositories import ENSURE_REPOSITORY, RepositoryKeyParams
-from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository, TaskReadService
 from mightymodels_core.tickets import SqliteTicketRepository
 
 from tests.core.contract.contract_builders import (
@@ -45,7 +44,6 @@ def create_request(key: str) -> RetireRequest:
 @dataclass(slots=True, kw_only=True, frozen=True)
 class RetireHarness:
     service: ContractService
-    reads: TaskReadService
     contracts: SqliteContractRepository
     ticket_id: int
 
@@ -62,12 +60,6 @@ def harness(database: Database, staged_ticket_ids: tuple[int, int]) -> Generator
             service=ContractService(
                 tickets=tickets, contracts=contracts, clock=create_fake_clock(SERVICE_MOMENT)
             ),
-            reads=TaskReadService(
-                tickets=tickets,
-                tasks=SqliteTaskRepository(unit=unit),
-                attempts=SqliteAttemptRepository(unit=unit),
-                contracts=contracts,
-            ),
             contracts=contracts,
             ticket_id=ticket_id,
         )
@@ -82,17 +74,6 @@ def approved(harness: RetireHarness) -> RetireHarness:
 
 
 class TestRetire:
-    def test_readiness_no_longer_names_a_retired_command_without_a_receipt(
-        self, approved: RetireHarness
-    ) -> None:
-        before = approved.reads.ready(SLUG, HEAD).problems
-        approved.service.retire(SLUG, create_request(FIRST_KEY))
-        after = approved.reads.ready(SLUG, HEAD).problems
-
-        assert any(FIRST_KEY in problem for problem in before)
-        assert not any(FIRST_KEY in problem for problem in after)
-        assert any(SECOND_KEY in problem for problem in after)
-
     def test_status_lists_the_retired_command_apart_from_the_live_ones(
         self, approved: RetireHarness
     ) -> None:

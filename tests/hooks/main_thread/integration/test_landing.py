@@ -43,19 +43,6 @@ class TestWithATicket:
         verdict = await harness.verdict(bash_payload(PUSH))
         assert (verdict.decision, 'T1 is in-progress' in verdict.detail) == ('deny', True)
 
-    async def test_push_is_denied_without_a_receipt_at_head(
-        self, harness: MainThreadHarness
-    ) -> None:
-        head = await commit_file(harness.checkout, 'a.txt')
-        await harness.dispatch.seed((VERIFIED,))
-        await harness.prove(head, 'landing')
-        await commit_file(harness.checkout, 'b.txt')
-        verdict = await harness.verdict(bash_payload(PUSH))
-        assert (verdict.decision, 'no receipt at the current HEAD' in verdict.detail) == (
-            'deny',
-            True,
-        )
-
     async def test_push_of_a_proven_landing_is_not_judged(self, harness: MainThreadHarness) -> None:
         head = await commit_file(harness.checkout, 'a.txt')
         await harness.dispatch.seed((VERIFIED,))
@@ -94,15 +81,6 @@ class TestLandingRule:
         await harness.prove(head, 'task')
         verdict = await harness.verdict(bash_payload(PUSH))
         assert verdict.decision is None
-
-    async def test_push_is_denied_when_the_contract_has_only_an_integration_command(
-        self, harness: MainThreadHarness
-    ) -> None:
-        head = await commit_file(harness.checkout, 'a.txt')
-        await harness.dispatch.seed((VERIFIED,))
-        await harness.prove(head, 'landing', key='I1')
-        verdict = await harness.verdict(bash_payload(PUSH))
-        assert (verdict.decision, 'no live L* command' in verdict.detail) == ('deny', True)
 
     async def test_push_ignores_a_retired_command_without_a_receipt(
         self, harness: MainThreadHarness

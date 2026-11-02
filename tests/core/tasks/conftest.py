@@ -89,9 +89,7 @@ def service_harness() -> ServiceHarness:
     task_repository = FakeTaskRepository(ledger=task_ledger)
     attempts = FakeAttemptRepository(ledger=task_ledger)
     service = TaskService(tickets=tickets, tasks=task_repository, attempts=attempts, clock=clock)
-    reads = TaskReadService(
-        tickets=tickets, tasks=task_repository, attempts=attempts, contracts=contracts
-    )
+    reads = TaskReadService(tickets=tickets, tasks=task_repository, attempts=attempts)
     return ServiceHarness(
         service=service,
         reads=reads,

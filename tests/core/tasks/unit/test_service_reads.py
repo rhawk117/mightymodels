@@ -2,15 +2,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_core.tasks import MarkRequest
-from mightymodels_core.tasks.gates import NO_LANDING_COMMAND
 from mightymodels_core.tickets import NotStagedError
 
 from tests.core.tasks.service_builders import (
-    COMMAND_KEY,
-    DONE_COMMIT,
     FIRST_TASK,
     OTHER_SLUG,
+    OWNED_FILE,
     SERVICE_SLUG,
+    verify_as_asked,
 )
 
 if TYPE_CHECKING:
@@ -49,42 +48,42 @@ class TestReady:
     def test_ready_names_the_missing_plan_task_when_none_started(
         self, service_harness: ServiceHarness
     ) -> None:
-        readiness = service_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
+        readiness = service_harness.reads.ready(SERVICE_SLUG)
 
-        assert readiness.problems == ['no plan task has been started', NO_LANDING_COMMAND]
+        assert readiness.problems == ['no plan task has been started']
 
     def test_ready_is_clear_when_every_plan_task_is_proven_at_head(
         self, verified_harness: ServiceHarness
     ) -> None:
-        readiness = verified_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
+        readiness = verified_harness.reads.ready(SERVICE_SLUG)
 
         assert readiness.problems == []
 
     def test_ready_names_a_task_still_in_progress(self, proven_harness: ServiceHarness) -> None:
-        readiness = proven_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
+        readiness = proven_harness.reads.ready(SERVICE_SLUG)
 
         assert readiness.problems == [f'{FIRST_TASK} is in-progress, not verified']
 
-    def test_ready_names_a_command_with_no_receipt_at_head(
-        self, verified_harness: ServiceHarness
-    ) -> None:
-        readiness = verified_harness.reads.ready(SERVICE_SLUG, 'newer01')
-
-        assert readiness.problems == [f'{COMMAND_KEY} has no receipt at the current HEAD']
-
-    def test_ready_still_names_the_commands_of_a_superseded_task(
+    def test_ready_ignores_the_contract_commands_of_the_ticket(
         self, contracted_harness: ServiceHarness
     ) -> None:
-        contracted_harness.service.mark(
+        verify_as_asked(contracted_harness, frozenset({OWNED_FILE}))
+
+        readiness = contracted_harness.reads.ready(SERVICE_SLUG)
+
+        assert readiness.problems == []
+
+    def test_ready_is_clear_for_a_superseded_task(self, started_harness: ServiceHarness) -> None:
+        started_harness.service.mark(
             SERVICE_SLUG, MarkRequest(task_key=FIRST_TASK, to='superseded', reason='dropped')
         )
 
-        readiness = contracted_harness.reads.ready(SERVICE_SLUG, DONE_COMMIT)
+        readiness = started_harness.reads.ready(SERVICE_SLUG)
 
-        assert any(COMMAND_KEY in problem for problem in readiness.problems)
+        assert readiness.problems == []
 
     def test_ready_refuses_a_ticket_that_was_never_staged(
         self, service_harness: ServiceHarness
     ) -> None:
         with pytest.raises(NotStagedError):
-            service_harness.reads.ready(OTHER_SLUG, DONE_COMMIT)
+            service_harness.reads.ready(OTHER_SLUG)

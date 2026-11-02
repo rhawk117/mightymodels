@@ -8,22 +8,15 @@ stuck.
 
 The caller passes the git facts and the brief text in as values; the gates call no git, read no
 file and return their problems as the lines the caller shows, an empty list being a pass.
-
-Landing is a separate rule, `get_landing_problems`: every command passed in needs a receipt at
-HEAD with a passing outcome, and at least one of them must be a landing (`L*`) command, or
-`NO_LANDING_COMMAND` leads the problems.
 """
 
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract.policy import is_landing_command
-
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from mightymodels_core.contract.records import Receipt, RecordedCommand
     from mightymodels_core.primitives import TaskId
     from mightymodels_core.tasks.records import TaskRecord
     from mightymodels_core.vocabulary.tasks import TaskStatus
@@ -34,7 +27,6 @@ DONE_COMMIT = re.compile(r'^\s*commit:\s*([0-9a-fA-F]{7,64})\s*$', re.MULTILINE)
 STUCK: frozenset[TaskStatus] = frozenset({'failed', 'blocked'})
 CLOSED: frozenset[TaskStatus] = frozenset({'verified', 'superseded'})
 PLAN_TASK_PREFIX = 'T'
-NO_LANDING_COMMAND = 'the contract has no live L* command; approve one with contract_approve'
 
 
 def is_plan_task(task_key: TaskId) -> bool:
@@ -71,35 +63,6 @@ class Evidence:
     commit: str
     brief: Brief | None
     assertions: Mapping[str, str]
-
-
-def get_receipt_problem(command_key: str, receipt: Receipt | None, head: str | None) -> str | None:
-    if receipt is None or head is None or receipt.head != head:
-        return f'{command_key} has no receipt at the current HEAD'
-
-    if receipt.outcome != 'pass':
-        return f'{command_key} {receipt.outcome} at HEAD'
-
-    return None
-
-
-def get_receipt_problems(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
-) -> list[str]:
-    problems = (
-        get_receipt_problem(command.key, receipts.get(command.key), head) for command in commands
-    )
-    return [problem for problem in problems if problem is not None]
-
-
-def get_landing_problems(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
-) -> list[str]:
-    problems = get_receipt_problems(commands, receipts, head)
-    if any(is_landing_command(command) for command in commands):
-        return problems
-
-    return [NO_LANDING_COMMAND, *problems]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

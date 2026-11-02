@@ -82,7 +82,7 @@ def show_tasks(work: TaskWork, slug: Slug) -> TaskView:
 
 def check_ready(work: TaskWork, slug: Slug, head: str | None) -> TaskView:
     with work.read() as unit:
-        readiness = unit.task_reads.ready(slug, head)
+        readiness = unit.task_reads.ready(slug)
         attempts = unit.task_reads.show(slug).attempts
 
     return render_readiness(readiness, attempts, head)

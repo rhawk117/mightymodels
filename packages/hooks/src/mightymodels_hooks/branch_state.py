@@ -11,7 +11,6 @@ as the error, so the caller can tell none from unreadable.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository, TaskReadService
 from mightymodels_core.tasks.gates import STUCK
 from mightymodels_core.tickets import SqliteTicketRepository
@@ -149,7 +148,7 @@ def tickets_on_branch(entry: Entry, branch: str | None) -> BranchTickets:
     )
 
 
-def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Landing:
+def landing_on_branch(entry: Entry, branch: str | None) -> Landing:
     found = branch_ticket(entry, branch)
     ticket = found.ticket
     if ticket is None:
@@ -157,11 +156,8 @@ def landing_on_branch(entry: Entry, branch: str | None, head: str | None) -> Lan
 
     tickets = tickets_of(entry)
     reads = ticket_reads_of(entry, ticket.id)
-    contracts = SqliteContractRepository(unit=entry.unit)
-    service = TaskReadService(
-        tickets=tickets, tasks=reads.tasks, attempts=reads.attempts, contracts=contracts
-    )
-    readiness = service.ready(ticket.slug, head)
+    service = TaskReadService(tickets=tickets, tasks=reads.tasks, attempts=reads.attempts)
+    readiness = service.ready(ticket.slug)
     return Landing(unclosed=found.unclosed, unproven=tuple(readiness.problems))
 
 
@@ -188,8 +184,8 @@ class TicketsRead:
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class LandingRead:
-    async def read(self, state: OpenState, branch: str | None, entry: Entry) -> Landing:
-        return landing_on_branch(entry, branch, await state.git.resolve_head())
+    async def read(self, _state: OpenState, branch: str | None, entry: Entry) -> Landing:
+        return landing_on_branch(entry, branch)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

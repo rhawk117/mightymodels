@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 import anyio
 import pytest
 from mcp import Client
-from mightymodels_core.tasks.gates import NO_LANDING_COMMAND
 from mightymodels_mcp.contract.settings import HEARTBEAT_VARIABLE
 
 from tests.core.git.git_builders import commit_file, run_git
@@ -152,34 +151,12 @@ async def quick_heartbeat_flow(
 
 
 class TestLandingFlow:
-    async def test_readiness_lifts_only_after_a_pass_at_head(self, flow: Flow) -> None:
+    async def test_readiness_ignores_the_receipts_of_the_contract(self, flow: Flow) -> None:
         await flow.approve(integration_command(), landing_command())
         await flow.start_and_verify_task()
         head = await flow.head()
 
-        before = await flow.ready()
-        assert before.startswith('not ready')
-        assert 'I1 has no receipt at the current HEAD' in before
-        assert 'L1 has no receipt at the current HEAD' in before
-
-        await flow.run('task', None, 'I1')
-        partial = await flow.ready()
-        assert 'L1 has no receipt at the current HEAD' in partial
-        assert 'I1 has no receipt' not in partial
-
-        await flow.run('landing', None, 'L1')
         assert await flow.ready() == f'ready at {head[:12]}\n'
-
-        await commit_file(flow.repository, 'later.txt')
-        moved = await flow.ready()
-        assert moved.startswith('not ready')
-        assert 'no receipt at the current HEAD' in moved
-
-        await flow.run('landing', None, 'L1')
-        assert 'I1 has no receipt at the current HEAD' in await flow.ready()
-
-        await flow.run('task', None, 'I1')
-        assert (await flow.ready()).startswith('ready at ')
 
     async def test_child_runs_in_the_target_repository_without_the_launcher_variables(
         self, flow: Flow
@@ -196,26 +173,6 @@ class TestLandingFlow:
             'UV_PROJECT_ENVIRONMENT False',
             'VIRTUAL_ENV False',
         ]
-
-    async def test_a_passing_integration_command_alone_is_not_ready(self, flow: Flow) -> None:
-        await flow.approve(integration_command())
-        await flow.start_and_verify_task()
-        await flow.run('task')
-
-        text = await flow.ready()
-
-        assert text == f'not ready\n  - {NO_LANDING_COMMAND}\n'
-
-    async def test_a_retired_command_stops_counting(self, flow: Flow) -> None:
-        await flow.approve(integration_command(), landing_command())
-        await flow.start_and_verify_task()
-        await flow.run('landing', None, 'L1')
-        assert 'I1 has no receipt' in await flow.ready()
-
-        retire = {'slug': SLUG, 'id': 'I1', 'why': 'moved', 'approved_by': APPROVER}
-        await flow.call('contract_retire', retire)
-
-        assert (await flow.ready()).startswith('ready at ')
 
 
 class TestHeartbeat:

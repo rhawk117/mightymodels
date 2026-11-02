@@ -96,7 +96,7 @@ class RunnerHarness:
         with self.work.read() as unit:
             return {
                 key: receipt.outcome
-                for key, receipt in unit.task_reads.contracts.latest_receipts(
+                for key, receipt in unit.contracts.contracts.latest_receipts(
                     unit.tasks.tickets.staged_ticket(SLUG).id
                 ).items()
             }

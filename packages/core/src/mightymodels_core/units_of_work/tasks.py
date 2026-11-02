@@ -63,8 +63,6 @@ class TaskWork:
             attempts=attempts,
             clock=self.clock,
         )
-        task_reads = TaskReadService(
-            tickets=tickets, tasks=task_repository, attempts=attempts, contracts=contracts
-        )
+        task_reads = TaskReadService(tickets=tickets, tasks=task_repository, attempts=attempts)
         contract_service = ContractService(tickets=tickets, contracts=contracts, clock=self.clock)
         return TaskUnit(tasks=tasks, task_reads=task_reads, contracts=contract_service)
