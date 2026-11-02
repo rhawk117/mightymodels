@@ -60,6 +60,17 @@ class TaskRepositoryContract:
             assert task is not None
             assert (task.base, task.owned) == ('def5678', ('src/c.py',))
 
+        def test_restart_with_no_head_keeps_the_stored_base(self, started: TaskHarness) -> None:
+            restart = create_transition(FIRST_TASK, 'failed', 'in-progress', day=3, head=None)
+
+            started.tasks.record_start(
+                started.ticket_id, restart, create_attempt(owned=('src/c.py',))
+            )
+
+            task = started.tasks.task(started.ticket_id, FIRST_TASK)
+            assert task is not None
+            assert (task.base, task.owned) == ('abc1234', ('src/c.py',))
+
         def test_tasks_come_back_in_start_order(self, started: TaskHarness) -> None:
             second = create_transition(SECOND_TASK, 'pending', 'in-progress')
 

@@ -92,11 +92,13 @@ class FakeTaskRepository:
 
     def record_start(self, ticket_id: int, transition: Transition, attempt: Attempt) -> None:
         address = (ticket_id, transition.task_key)
+        previous = self.ledger.held.get(address)
+        stored_base = None if previous is None else previous.base
         self.ledger.held[address] = TaskRecord(
             key=transition.task_key,
             status=transition.after,
             owned=attempt.owned,
-            base=transition.head,
+            base=transition.head if transition.head is not None else stored_base,
         )
         self.ledger.attempts.append(StartedAttempt(address=address, attempt=attempt))
         self.ledger.add_transition(address, transition)
