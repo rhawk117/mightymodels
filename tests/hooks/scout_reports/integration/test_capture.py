@@ -163,7 +163,7 @@ class TestFailures:
         self, harness: ScoutHarness
     ) -> None:
         harness.data_directory.mkdir()
-        harness.data_directory.joinpath('mightymodels.db').write_text('not a database')
+        harness.data_directory.joinpath('state.db').write_text('not a database')
 
         output = await harness.stop(stop_payload(CODE_SCOUT))
 

@@ -33,7 +33,7 @@ def database_spec() -> DatabaseSpec:
 
 @pytest.fixture
 def database(tmp_path: Path, database_spec: DatabaseSpec) -> Generator[Database]:
-    opened = open_database(tmp_path.joinpath('mightymodels.db'), database_spec, ConnectionOptions())
+    opened = open_database(tmp_path.joinpath('state.db'), database_spec, ConnectionOptions())
     yield opened
     opened.close()
 

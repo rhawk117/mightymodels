@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def harness(tmp_path: Path) -> Generator[UnitsOfWorkHarness]:
     database = open_database(
-        tmp_path.joinpath('mightymodels.db'), create_database_spec(), ConnectionOptions()
+        tmp_path.joinpath('state.db'), create_database_spec(), ConnectionOptions()
     )
     yield UnitsOfWorkHarness(
         database=database, workspace=workspace_at(tmp_path.joinpath('project'))

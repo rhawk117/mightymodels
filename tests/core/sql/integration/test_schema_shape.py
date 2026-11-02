@@ -97,11 +97,11 @@ class TestShape:
         stored = schema_inspection.execute('PRAGMA user_version').fetchone()
         assert stored == (int(match.group(1)),)
 
-    def test_database_stamped_by_the_old_plugin_is_refused(
+    def test_database_stamped_with_another_version_is_refused(
         self, database_path: Path, database_spec: DatabaseSpec
     ) -> None:
-        with closing(sqlite3.connect(database_path)) as old_plugin:
-            old_plugin.execute('PRAGMA user_version = 1')
+        with closing(sqlite3.connect(database_path)) as stamped:
+            stamped.execute('PRAGMA user_version = 2')
         with pytest.raises(SchemaVersionError) as refused:
             open_database(database_path, database_spec, ConnectionOptions())
-        assert refused.value.found == 1
+        assert refused.value.found == 2

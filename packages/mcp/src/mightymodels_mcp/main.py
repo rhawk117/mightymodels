@@ -23,7 +23,7 @@ from mightymodels_mcp.server.call_log import (
 )
 from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.server.registration import ToolCatalog
-from mightymodels_mcp.server.state import LocalStateOpener, discard_outdated_database
+from mightymodels_mcp.server.state import LocalStateOpener
 from mightymodels_mcp.snapshot.tools import register_snapshot_tools
 from mightymodels_mcp.task.tools import register_task_tools
 from mightymodels_mcp.ticket.tools import register_ticket_tools
@@ -70,7 +70,6 @@ def run(environ: Mapping[str, str], cwd: Path) -> int:
     with installed_logging(
         LogSettings(level=level, data_directory=data_directory, stream=sys.stderr)
     ):
-        discard_outdated_database(data_directory)
         create_server(ServerDependencies(state=state), create_catalog()).run()
 
     return 0

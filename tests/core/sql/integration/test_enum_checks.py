@@ -74,7 +74,7 @@ class TestCheckLists:
         table: str,
         constraint: str,
     ) -> set[str]:
-        path = tmp_path_factory.mktemp('checks').joinpath('mightymodels.db')
+        path = tmp_path_factory.mktemp('checks').joinpath('state.db')
         open_database(path, database_spec, ConnectionOptions()).close()
         with closing(sqlite3.connect(path)) as connection:
             return check_values(connection, table, constraint)

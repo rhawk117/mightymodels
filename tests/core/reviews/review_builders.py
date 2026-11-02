@@ -70,7 +70,7 @@ def open_sqlite_harness(directory: Path) -> Generator[ReviewHarness]:
         statements=SQL.joinpath('statements.sql'),
         declarations=DECLARATIONS,
     )
-    database = open_database(directory.joinpath('mightymodels.db'), spec, ConnectionOptions())
+    database = open_database(directory.joinpath('state.db'), spec, ConnectionOptions())
     try:
         with database.write() as unit:
             repository = unit.one(

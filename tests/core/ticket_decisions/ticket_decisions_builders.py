@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from mightymodels_core.database import Unit
     from mightymodels_core.ticket_decisions import IncomingDecision, TicketDecision
 
-DATABASE_FILE = 'mightymodels.db'
+DATABASE_FILE = 'state.db'
 NOW = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
 
 

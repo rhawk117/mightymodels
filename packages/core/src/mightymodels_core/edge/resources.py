@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from .data_directory import DataDirectory
 
-DATABASE_NAME = 'mightymodels.db'
+DATABASE_NAME = 'state.db'
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

@@ -40,7 +40,7 @@ class TestCataloguePlans:
     def plan_database_path(
         cls, tmp_path_factory: pytest.TempPathFactory, database_spec: DatabaseSpec
     ) -> Path:
-        path = tmp_path_factory.mktemp('plan').joinpath('mightymodels.db')
+        path = tmp_path_factory.mktemp('plan').joinpath('state.db')
         open_database(path, database_spec, ConnectionOptions()).close()
         return path
 

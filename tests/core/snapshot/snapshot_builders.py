@@ -193,7 +193,7 @@ def open_crowded_snapshot(directory: Path) -> Generator[CrowdedSnapshot]:
     key = RepositoryKey('owner/repo')
     clock = create_fake_clock(MOMENT)
     opened = open_database(
-        directory.joinpath('mightymodels.db'), create_database_spec(), ConnectionOptions()
+        directory.joinpath('state.db'), create_database_spec(), ConnectionOptions()
     )
     try:
         investigation = seed_investigation(opened, key, clock)
