@@ -4,14 +4,16 @@ import json
 import pytest
 from mightymodels_core.primitives import create_routing_table
 from mightymodels_hooks.payloads import SessionStartPayload
-from mightymodels_hooks.phase_directive import PHASE_SKILLS, phase_directive
+from mightymodels_hooks.phase_directive import phase_directive
 from mightymodels_hooks.session_start import SessionStartHandler
-from mightymodels_hooks.workers import PHASE_AGENTS, PLUGIN_PREFIX
+from mightymodels_hooks.workers import PHASE_AGENTS, PLUGIN_PREFIX, create_phase_skills
 
 from tests.core.primitives.clock import create_fake_clock
 from tests.hooks.session_start.session_start_builders import NOW
 
 pytestmark = pytest.mark.unit
+
+PHASE_SKILLS = create_phase_skills().skills
 
 BOUNDARY = "End the phase with mightymodels:baton-pass; never invoke the next phase's skill."
 

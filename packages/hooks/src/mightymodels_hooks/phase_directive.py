@@ -8,19 +8,10 @@ already holds it. It names no worker: the roster lives in the agent file's allow
 
 import json
 
-from mightymodels_hooks.workers import PHASE_AGENTS, PLUGIN_PREFIX
+from mightymodels_hooks.workers import PHASE_AGENTS, PLUGIN_PREFIX, create_phase_skills
 
 DIRECTIVE_SOURCES = frozenset({'startup', 'clear', 'compact'})
 BOUNDARY_RULE = "End the phase with mightymodels:baton-pass; never invoke the next phase's skill."
-PHASE_SKILLS = {
-    'investigation': 'run mightymodels:lets-investigate, then mightymodels:open-ticket',
-    'planning': (
-        'run mightymodels:game-plan, or mightymodels:one-shot for a small ticket; '
-        'stop before mightymodels:agents-assemble'
-    ),
-    'implementation': 'run mightymodels:agents-assemble, then mightymodels:stick-the-landing',
-    'review': 'run mightymodels:review-circus',
-}
 
 
 def phase_of(agent_type: str | None) -> str | None:
@@ -32,7 +23,8 @@ def phase_of(agent_type: str | None) -> str | None:
 
 
 def directive_text(phase: str) -> str:
-    return f'You are the mightymodels {phase} phase: {PHASE_SKILLS[phase]}. {BOUNDARY_RULE}'
+    skills = create_phase_skills().skills[phase]
+    return f'You are the mightymodels {phase} phase: {skills}. {BOUNDARY_RULE}'
 
 
 def phase_directive(agent_type: str | None, source: str | None) -> str | None:
