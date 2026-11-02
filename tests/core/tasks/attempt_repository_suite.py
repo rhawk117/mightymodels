@@ -176,22 +176,3 @@ class AttemptRepositoryContract:
             )
 
             assert into == []
-
-        def test_latest_transition_of_each_task_is_kept_once(self, moved: TaskHarness) -> None:
-            latest = moved.attempts.latest_transition_of_each_task_into(
-                moved.ticket_id, ['blocked', 'verified']
-            )
-
-            assert {key: move.at.day for key, move in latest.items()} == {
-                FIRST_TASK: 6,
-                SECOND_TASK: 5,
-            }
-
-        def test_latest_transition_of_each_task_reads_back_the_reasons(
-            self, moved: TaskHarness
-        ) -> None:
-            latest = moved.attempts.latest_transition_of_each_task_into(
-                moved.ticket_id, ['blocked']
-            )
-
-            assert latest[FIRST_TASK].reasons == (redact('still stuck'),)

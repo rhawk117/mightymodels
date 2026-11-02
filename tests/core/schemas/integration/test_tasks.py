@@ -10,7 +10,6 @@ from mightymodels_core.schemas.tasks import (
     ATTEMPTS_BY_WORKER,
     ATTEMPTS_IN_MODES,
     IN_PROGRESS_TASKS_STARTED_BY,
-    LATEST_TRANSITION_OF_EACH_TASK_INTO,
     LATEST_TRANSITIONS_INTO,
     RECORD_TASK_VERIFICATION,
     TASK_BY_KEY,
@@ -287,22 +286,7 @@ class TestTransitions:
         assert rows[0].head == 'abc'
         assert rows[0].at == STARTED_AT
 
-    def test_the_latest_transition_of_each_task_into_a_status_is_one_row_per_task(
-        self, database: Database, ticket_id: int
-    ) -> None:
-        params = TransitionsIntoParams(
-            ticket_id=ticket_id, statuses=['in-progress', 'failed'], limit=10
-        )
-        with database.read() as unit:
-            rows = unit.all(LATEST_TRANSITION_OF_EACH_TASK_INTO, params)
-
-        assert sorted((row.task_key, row.before) for row in rows) == [
-            ('T1', 'failed'),
-            ('T2', 'pending'),
-        ]
-
     def test_no_statuses_match_nothing(self, database: Database, ticket_id: int) -> None:
         params = TransitionsIntoParams(ticket_id=ticket_id, statuses=[], limit=10)
         with database.read() as unit:
             assert unit.all(LATEST_TRANSITIONS_INTO, params) == []
-            assert unit.all(LATEST_TRANSITION_OF_EACH_TASK_INTO, params) == []

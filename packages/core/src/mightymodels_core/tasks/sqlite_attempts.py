@@ -8,7 +8,6 @@ from mightymodels_core.schemas.tasks import (
     ADD_TASK_FAILED_FIX,
     ATTEMPTS_BY_WORKER,
     ATTEMPTS_IN_MODES,
-    LATEST_TRANSITION_OF_EACH_TASK_INTO,
     LATEST_TRANSITIONS_INTO,
     TASK_BY_KEY,
     TASK_FAILED_FIXES,
@@ -23,7 +22,6 @@ from mightymodels_core.tasks.errors import UnknownTaskError
 from mightymodels_core.tasks.records import (
     ATTEMPT_COUNTS,
     FAILED_FIXES,
-    TASKS,
     Transition,
 )
 
@@ -101,17 +99,6 @@ class SqliteAttemptRepository:
         params = TransitionsIntoParams(ticket_id=ticket_id, statuses=sorted(statuses), limit=limit)
         rows = self.unit.all(LATEST_TRANSITIONS_INTO, params)
         return [transition_of(row) for row in reversed(rows)]
-
-    def latest_transition_of_each_task_into(
-        self, ticket_id: int, statuses: Collection[TaskStatus]
-    ) -> dict[TaskId, Transition]:
-        params = TransitionsIntoParams(
-            ticket_id=ticket_id, statuses=sorted(statuses), limit=TASKS.fetched
-        )
-        rows = self.unit.all(LATEST_TRANSITION_OF_EACH_TASK_INTO, params)
-        if (error := TASKS.error(rows, owner=f'ticket {ticket_id}')) is not None:
-            raise error
-        return {TaskId(row.task_key): transition_of(row) for row in rows}
 
     def task_id_of(self, ticket_id: int, task_key: TaskId) -> int | None:
         row = self.unit.one(TASK_BY_KEY, TaskKeyParams(ticket_id=ticket_id, task_key=task_key))

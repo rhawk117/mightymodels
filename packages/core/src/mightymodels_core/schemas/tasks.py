@@ -158,9 +158,6 @@ ADD_TASK_TRANSITION = Command(name='add_task_transition', params=AddTaskTransiti
 LATEST_TRANSITIONS_INTO = Query(
     name='latest_transitions_into', params=TransitionsIntoParams, row=TransitionRow
 )
-LATEST_TRANSITION_OF_EACH_TASK_INTO = Query(
-    name='latest_transition_of_each_task_into', params=TransitionsIntoParams, row=TransitionRow
-)
 
 DECLARATIONS: tuple[Declaration, ...] = (
     TASK_BY_KEY,
@@ -177,5 +174,4 @@ DECLARATIONS: tuple[Declaration, ...] = (
     TASK_FAILED_FIXES,
     ADD_TASK_TRANSITION,
     LATEST_TRANSITIONS_INTO,
-    LATEST_TRANSITION_OF_EACH_TASK_INTO,
 )

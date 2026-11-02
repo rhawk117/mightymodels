@@ -260,26 +260,6 @@ WHERE t.ticket_id = :ticket_id
 ORDER BY tr.id DESC
 LIMIT :limit;
 
--- name: latest_transition_of_each_task_into
-SELECT json_object(
-  'task_key', t.task_key,
-  'before', tr.before,
-  'after', tr.after,
-  'reasons', json(tr.reasons),
-  'head', tr.head,
-  'at', tr.at
-)
-FROM tasks AS t
-JOIN task_transitions AS tr ON tr.task_id = t.id
-WHERE t.ticket_id = :ticket_id
-  AND tr.after IN (SELECT value FROM json_each(:statuses))
-  AND tr.id = (
-    SELECT max(latest.id)
-    FROM task_transitions AS latest
-    WHERE latest.task_id = t.id AND latest.after IN (SELECT value FROM json_each(:statuses))
-  )
-LIMIT :limit;
-
 -- name: approve_contract_command
 INSERT INTO contract_commands (
   ticket_id, command_key, argv, expect_exit, timeout, approved_by, approval_source,

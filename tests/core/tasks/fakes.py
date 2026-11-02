@@ -178,14 +178,3 @@ class FakeAttemptRepository:
     ) -> list[Transition]:
         into = [placed.transition for placed in self.ledger.transitions_into(ticket_id, statuses)]
         return into[max(len(into) - limit, 0) :]
-
-    def latest_transition_of_each_task_into(
-        self, ticket_id: int, statuses: Collection[TaskStatus]
-    ) -> dict[TaskId, Transition]:
-        latest = {
-            placed.address[1]: placed.transition
-            for placed in self.ledger.transitions_into(ticket_id, statuses)
-        }
-        if (error := TASKS.error(latest, owner=f'ticket {ticket_id}')) is not None:
-            raise error
-        return latest
