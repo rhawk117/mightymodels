@@ -20,7 +20,7 @@ defaults:
     shell: bash
 
 env:
-  PACKAGE_NAME: tf-harness-plugin
+  PACKAGE_NAME: mightymodels-plugin
   VERSION_BUMP: ${{ inputs.version-bump }}
   REPOSITORY_IS_FORK: ${{ github.event.repository.fork }}
 
@@ -48,6 +48,9 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+      actions: read
+      pull-requests: write
+      security-events: write
 
   prepare-release:
     name: Prepare Release
