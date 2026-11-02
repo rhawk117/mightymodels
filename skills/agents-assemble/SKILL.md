@@ -26,6 +26,8 @@ The per-task loop. Its design bet is that verification has a persisted target: t
 
 **Argument:** the ticket's slug, given when the skill was started: "$ARGUMENTS". Empty quotes mean none was given, and the ticket is the session's active one.
 
+You have a scratchpad at `.mightymodels/SLUG/scratchpad.md`: free-form, yours alone to write, deleted with the ticket directory at prune. Jot what you distrust and what you saw first-hand there as you go; baton-pass lifts what matters into BATON.md.
+
 Progress lives in the task tools: `task_show` is what a recovered session reads. Commands run in sandboxed Bash, by the workers.
 
 ## Per task

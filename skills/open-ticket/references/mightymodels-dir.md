@@ -13,7 +13,8 @@ The state itself is rows in one SQLite database, `state.db`, and that file is no
 │   ├── issue-body.md                  when no forge issue was created, or as the local draft
 │   ├── pr-body.md                     stick-the-landing's checked PR body
 │   ├── handoffs/snapshot.{json,md}    baton-pass writes what the snapshot tool returns: objective state from the database
-│   ├── handoffs/BATON.md              mid-work handoff, ≤40 lines, facts that live nowhere else
+│   ├── handoffs/BATON.md              mid-work handoff, ≤80 lines, the primary's judgment that lives nowhere else
+│   ├── scratchpad.md                  the primary's free-form working notes; baton-pass lifts what matters into BATON.md
 │   ├── briefs/task-NN.md              two halves, ≤80 lines (contracts.md)
 │   ├── review/<run>/                  one review-circus run: persona reports, metrics, the rendered report
 │   ├── whats-broken.md                only while a debug is live; regenerated per attempt
@@ -45,6 +46,7 @@ The database's only writers are the mighty-mcp tools. Each group of tables has o
 | briefs/ DONE half                                                    | implementer                                                                                         | primary, fact-checker                                    |
 | review/<run>/ directory                                              | `review_start` creates it; the primary writes persona reports, metrics and the rendered report | review-circus, stick-the-landing, prune-ticket, the user |
 | issue-body.md, pr-body.md                                            | open-ticket or one-shot (issue-body.md), stick-the-landing (pr-body.md)                             | `gh issue create`, `gh pr create`                        |
+| scratchpad.md                                                        | the primary only, free-form                                                                         | the primary; baton-pass lifts it into BATON.md           |
 | handoffs/                                                            | baton-pass, from `snapshot_take`'s text; BATON.md is the primary's own                          | the next session's primary                               |
 | whats-broken.md                                                      | the whats-broken primary                                                                              | `close_check`, which blocks closing while it exists   |
 | REPORT.md                                                            | agents-assemble primary                                                                             | stick-the-landing, review-circus, prune-ticket           |
@@ -52,7 +54,7 @@ The database's only writers are the mighty-mcp tools. Each group of tables has o
 
 ## Thinness rule for handoffs
 
-`BATON.md` carries only facts that live nowhere else. It is a bootstrap pointer — read ticket.yml, read issue #N, your role, what to invoke — plus nothing. Duplicated facts drift, and the next session reads ticket.yml first anyway.
+`BATON.md` carries only what lives nowhere else: the primary's judgment (what it distrusts, what it saw first-hand, decisions no tool stored), and a pointer to read ticket.yml, read issue #N, your role, what to invoke. Duplicated facts drift, and the next session reads ticket.yml first anyway.
 
 ## Never tracked
 
