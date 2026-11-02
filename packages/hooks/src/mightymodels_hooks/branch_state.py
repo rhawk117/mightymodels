@@ -11,7 +11,7 @@ as the error, so the caller can tell none from unreadable.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository, TaskReadService
+from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository
 from mightymodels_core.tasks.gates import STUCK
 from mightymodels_core.tickets import SqliteTicketRepository
 from mightymodels_core.units_of_work import UnknownRepositoryError
@@ -55,12 +55,6 @@ class BranchTickets:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class Landing:
-    unclosed: tuple[str, ...] = ()
-    unproven: tuple[str, ...] = ()
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
 class BranchTicket:
     unclosed: tuple[str, ...] = ()
     ticket: TicketRecord | None = None
@@ -68,7 +62,6 @@ class BranchTicket:
 
 type StartedOrUnreadable = tuple[StartedTask, ...] | Exception
 type BranchTicketsOrUnreadable = BranchTickets | Exception
-type LandingOrUnreadable = Landing | Exception
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -148,19 +141,6 @@ def tickets_on_branch(entry: Entry, branch: str | None) -> BranchTickets:
     )
 
 
-def landing_on_branch(entry: Entry, branch: str | None) -> Landing:
-    found = branch_ticket(entry, branch)
-    ticket = found.ticket
-    if ticket is None:
-        return Landing(unclosed=found.unclosed)
-
-    tickets = tickets_of(entry)
-    reads = ticket_reads_of(entry, ticket.id)
-    service = TaskReadService(tickets=tickets, tasks=reads.tasks, attempts=reads.attempts)
-    readiness = service.ready(ticket.slug)
-    return Landing(unclosed=found.unclosed, unproven=tuple(readiness.problems))
-
-
 @runtime_checkable
 class BranchRead[T](Protocol):
     async def read(self, state: OpenState, branch: str | None, entry: Entry, /) -> T: ...
@@ -180,12 +160,6 @@ class StartedRead:
 class TicketsRead:
     async def read(self, _state: OpenState, branch: str | None, entry: Entry) -> BranchTickets:
         return tickets_on_branch(entry, branch)
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class LandingRead:
-    async def read(self, _state: OpenState, branch: str | None, entry: Entry) -> Landing:
-        return landing_on_branch(entry, branch)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -212,6 +186,3 @@ class BranchState:
 
     async def tickets_on_branch(self) -> BranchTicketsOrUnreadable:
         return await self.guarded(TicketsRead(), BranchTickets())
-
-    async def landing_on_branch(self) -> LandingOrUnreadable:
-        return await self.guarded(LandingRead(), Landing())

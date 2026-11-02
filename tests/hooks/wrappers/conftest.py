@@ -25,13 +25,3 @@ def dispatch_runner(tmp_path: Path) -> WrapperRunner:
         launcher_variable='MIGHTYMODELS_DISPATCH_LAUNCHER',
         timer_variable='MIGHTYMODELS_DISPATCH_SECONDS',
     )
-
-
-@pytest.fixture
-def main_thread_runner(tmp_path: Path) -> WrapperRunner:
-    return WrapperRunner(
-        script=HOOKS_DIR / 'main-thread-hook.sh',
-        workdir=tmp_path,
-        launcher_variable='MIGHTYMODELS_MAIN_THREAD_LAUNCHER',
-        timer_variable='MIGHTYMODELS_MAIN_THREAD_SECONDS',
-    )

@@ -21,16 +21,6 @@
             "timeout": 10
           }
         ]
-      },
-      {
-        "matcher": "^(Edit|Write|Bash|mcp__plugin_mightymodels_mighty-mcp__contract_run|mcp__plugin_mightymodels_mighty-mcp__contract_approve|mcp__plugin_mightymodels_mighty-mcp__contract_retire)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/main-thread-hook.sh\"",
-            "timeout": 10
-          }
-        ]
       }
     ],
     "SubagentStop": [

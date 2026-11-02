@@ -19,9 +19,6 @@ def wrapper_cases() -> pytest.MarkDecorator:
         ('script', 'variable'),
         [
             pytest.param('dispatch-hook.sh', 'MIGHTYMODELS_DISPATCH_SECONDS', id='dispatch'),
-            pytest.param(
-                'main-thread-hook.sh', 'MIGHTYMODELS_MAIN_THREAD_SECONDS', id='main-thread'
-            ),
         ],
     )
 
