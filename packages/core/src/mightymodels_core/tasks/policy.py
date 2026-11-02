@@ -14,6 +14,8 @@ from mightymodels_core.tasks.errors import (
     InternSpentError,
     ModeNeedsArchitectError,
     TransitionError,
+    VerdictReasonError,
+    VerdictReasonRefusedError,
 )
 
 if TYPE_CHECKING:
@@ -85,6 +87,26 @@ class TransitionPolicy:
             return None
 
         return TransitionError(task_key=self.task_key, current=self.before, target=self.after)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class VerdictPolicy:
+    task_key: TaskId
+    verdict: TaskStatus
+    reason: str | None
+
+    @property
+    def has_reason(self) -> bool:
+        return bool((self.reason or '').strip())
+
+    def get_reason_problem(self) -> VerdictReasonError | VerdictReasonRefusedError | None:
+        if self.verdict == 'verified' and self.reason is not None:
+            return VerdictReasonRefusedError(task_key=self.task_key)
+
+        if self.verdict != 'verified' and not self.has_reason:
+            return VerdictReasonError(task_key=self.task_key, verdict=self.verdict)
+
+        return None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)

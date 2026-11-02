@@ -25,6 +25,7 @@ from mightymodels_core.tasks.policy import (
     StartPolicy,
     TaskOptions,
     TransitionPolicy,
+    VerdictPolicy,
 )
 from mightymodels_core.tasks.records import Attempt, FailedFix, Transition
 from mightymodels_core.tickets import open_ticket_of
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from mightymodels_core.primitives import Clock, RedactedText, Slug, TaskId
+    from mightymodels_core.tasks.errors import VerdictReasonError, VerdictReasonRefusedError
     from mightymodels_core.tasks.gates import GitFacts
     from mightymodels_core.tasks.records import TaskRecord
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
@@ -164,23 +166,29 @@ class TaskService:
         self.tasks.declare(ticket_id, sorted(set(task_keys)), self.clock.now())
         return self.tasks.tasks(ticket_id)
 
-    def prepare_verification(
-        self, slug: Slug, task_key: TaskId, verdict: VerifyVerdict
-    ) -> TaskRecord:
+    def prepare_verification(self, slug: Slug, policy: VerdictPolicy) -> TaskRecord:
         ticket_id = open_ticket_of(self.tickets, slug).id
-        task = self.tasks.task(ticket_id, task_key)
+        task = self.tasks.task(ticket_id, policy.task_key)
         if task is None:
-            raise TransitionError(task_key=task_key, current='pending', target=verdict)
+            raise TransitionError(
+                task_key=policy.task_key, current='pending', target=policy.verdict
+            )
 
-        self.check_verdict(task, verdict)
+        if problem := self.get_verdict_problem(task, policy):
+            raise problem
+
         return task
 
-    def check_verdict(self, task: TaskRecord, verdict: VerifyVerdict) -> None:
-        policy = TransitionPolicy(
-            task_key=task.key, before=task.status, after=verdict, options=self.options
+    def get_verdict_problem(
+        self, task: TaskRecord, policy: VerdictPolicy
+    ) -> TransitionError | VerdictReasonError | VerdictReasonRefusedError | None:
+        transition = TransitionPolicy(
+            task_key=task.key, before=task.status, after=policy.verdict, options=self.options
         )
-        if problem := policy.get_transition_problem():
-            raise problem
+        if problem := transition.get_transition_problem():
+            return problem
+
+        return policy.get_reason_problem()
 
     def verify(self, slug: Slug, request: VerifyRequest) -> TaskRecord:
         ticket = open_ticket_of(self.tickets, slug)
@@ -190,7 +198,10 @@ class TaskService:
         if moved := get_moved_fields(request.seen, current):
             raise TaskMovedError(task_key=task_key, changed=moved)
 
-        self.check_verdict(current, request.verdict)
+        verdict = VerdictPolicy(task_key=task_key, verdict=request.verdict, reason=request.reason)
+        if problem := self.get_verdict_problem(current, verdict):
+            raise problem
+
         transition = verification_transition(request, self.clock.now())
         self.tickets.mark_in_progress(ticket)
         self.tasks.record_verification(ticket_id, transition, request.commit)

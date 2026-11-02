@@ -7,7 +7,7 @@ file; a task above the warning bounds is started and its answer carries a warnin
 from typing import Annotated, Literal, Self
 
 from mightymodels_core.primitives import TaskId, parse_task_id
-from mightymodels_core.tasks import MarkRequest, StartRequest
+from mightymodels_core.tasks import MarkRequest, StartRequest, VerifyVerdict
 from mightymodels_core.vocabulary.tasks import ArchitectMode, Worker
 from pydantic import AfterValidator, Field, model_validator
 
@@ -62,7 +62,7 @@ class TaskVerifyRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
     commit: RevisionField = Field(description='The commit the worker reports for the task.')
-    verdict: Literal['verified', 'failed', 'blocked'] = Field(
+    verdict: VerifyVerdict = Field(
         description='The primary verdict on the task; git facts never change it.'
     )
     reason: ProseText | None = Field(

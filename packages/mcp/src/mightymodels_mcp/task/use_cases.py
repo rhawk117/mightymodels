@@ -7,7 +7,7 @@ the records it returns from the same unit.
 
 from typing import TYPE_CHECKING
 
-from mightymodels_core.tasks import get_size_warning
+from mightymodels_core.tasks import VerdictPolicy, get_size_warning
 from mightymodels_core.units_of_work import TaskWork
 
 from mightymodels_mcp.server.state import create_work
@@ -65,7 +65,10 @@ def declare_tasks(work: TaskWork, request: TaskDeclareRequest) -> TaskView:
 
 def prepare_verification(work: TaskWork, request: TaskVerifyRequest) -> TaskRecord:
     with work.read() as unit:
-        return unit.tasks.prepare_verification(request.slug, request.task_id, request.verdict)
+        verdict = VerdictPolicy(
+            task_key=request.task_id, verdict=request.verdict, reason=request.reason
+        )
+        return unit.tasks.prepare_verification(request.slug, verdict)
 
 
 def verify_task(work: TaskWork, slug: Slug, request: VerifyRequest) -> VerifyView:

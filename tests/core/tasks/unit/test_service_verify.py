@@ -2,7 +2,14 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import pytest
-from mightymodels_core.tasks import MarkRequest, TaskMovedError, TransitionError, VerifyRequest
+from mightymodels_core.tasks import (
+    MarkRequest,
+    TaskMovedError,
+    TransitionError,
+    VerdictReasonError,
+    VerdictReasonRefusedError,
+    VerifyRequest,
+)
 from mightymodels_core.tickets import ClosedTicketError
 
 from tests.core.tasks.service_builders import (
@@ -12,6 +19,7 @@ from tests.core.tasks.service_builders import (
     OWNED_FILE,
     SERVICE_SLUG,
     create_git_facts,
+    create_verdict,
     create_verify_request,
     verify_as_asked,
 )
@@ -55,7 +63,7 @@ class TestPrepareVerification:
     def test_prepare_returns_the_task_git_is_asked_about(
         self, started_harness: ServiceHarness
     ) -> None:
-        task = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+        task = started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
 
         assert (task.base, task.owned) == (BASE_COMMIT, (OWNED_FILE,))
 
@@ -63,7 +71,7 @@ class TestPrepareVerification:
         self, service_harness: ServiceHarness
     ) -> None:
         with pytest.raises(TransitionError):
-            service_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+            service_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
 
     def test_prepare_refuses_a_task_that_cannot_move_to_verified(
         self, started_harness: ServiceHarness
@@ -73,13 +81,28 @@ class TestPrepareVerification:
         )
 
         with pytest.raises(TransitionError):
-            started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+            started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
+
+    @verdict_cases()
+    def test_prepare_refuses_a_failed_or_blocked_verdict_without_a_reason(
+        self, started_harness: ServiceHarness, verdict: VerifyVerdict
+    ) -> None:
+        with pytest.raises(VerdictReasonError):
+            started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict(verdict))
+
+    def test_prepare_refuses_a_verified_verdict_with_a_reason(
+        self, started_harness: ServiceHarness
+    ) -> None:
+        with pytest.raises(VerdictReasonRefusedError):
+            started_harness.service.prepare_verification(
+                SERVICE_SLUG, create_verdict('verified', 'why')
+            )
 
     def test_prepare_refuses_a_closed_ticket(self, started_harness: ServiceHarness) -> None:
         started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 
         with pytest.raises(ClosedTicketError):
-            started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+            started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
 
 
 class TestVerify:
@@ -92,7 +115,7 @@ class TestVerify:
 
     @pytest.fixture
     def off_head_request(self, started_harness: ServiceHarness) -> VerifyRequest:
-        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
         facts = replace(
             create_git_facts(changed_files=frozenset({OWNED_FILE, OUTSIDE_FILE})),
             head='fff9999',
@@ -113,7 +136,9 @@ class TestVerify:
     def test_verify_records_the_verdict_with_its_reason(
         self, started_harness: ServiceHarness, verdict: VerifyVerdict
     ) -> None:
-        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, verdict)
+        seen = started_harness.service.prepare_verification(
+            SERVICE_SLUG, create_verdict(verdict, 'the test fails')
+        )
         request = create_verify_request(
             seen, changed_files=OWNED_CHANGE, verdict=verdict, reason='the test fails'
         )
@@ -126,6 +151,29 @@ class TestVerify:
             ('the test fails',),
         )
 
+    @verdict_cases()
+    def test_verify_refuses_a_failed_or_blocked_verdict_without_a_reason(
+        self, started_harness: ServiceHarness, verdict: VerifyVerdict
+    ) -> None:
+        seen = started_harness.service.prepare_verification(
+            SERVICE_SLUG, create_verdict(verdict, 'the test fails')
+        )
+        request = create_verify_request(
+            seen, changed_files=OWNED_CHANGE, verdict=verdict, reason=None
+        )
+
+        with pytest.raises(VerdictReasonError):
+            started_harness.service.verify(SERVICE_SLUG, request)
+
+    def test_verify_refuses_a_verified_verdict_with_a_reason(
+        self, started_harness: ServiceHarness
+    ) -> None:
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
+        request = create_verify_request(seen, changed_files=OWNED_CHANGE, reason='why')
+
+        with pytest.raises(VerdictReasonRefusedError):
+            started_harness.service.verify(SERVICE_SLUG, request)
+
     def move_task(self, harness: ServiceHarness, seen: TaskRecord, movement: Movement) -> None:
         address = (harness.ticket_id, FIRST_TASK)
         harness.task_ledger.held[address] = replace(
@@ -136,7 +184,7 @@ class TestVerify:
     def test_verify_refuses_a_task_that_moved_while_git_was_asked(
         self, started_harness: ServiceHarness, movement: Movement
     ) -> None:
-        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
         request = create_verify_request(seen, changed_files=OWNED_CHANGE)
         self.move_task(started_harness, seen, movement)
 
@@ -149,7 +197,7 @@ class TestVerify:
     def test_verify_refuses_a_ticket_closed_while_git_was_asked(
         self, started_harness: ServiceHarness
     ) -> None:
-        seen = started_harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+        seen = started_harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
         request = create_verify_request(seen, changed_files=OWNED_CHANGE)
         started_harness.tickets.seed_status(SERVICE_SLUG, 'closed')
 

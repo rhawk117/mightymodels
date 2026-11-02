@@ -34,6 +34,19 @@ class TransitionError(StateError):
         super().__init__(f'{task_key} cannot move from {current} to {target}')
 
 
+class VerdictReasonError(StateError):
+    def __init__(self, *, task_key: TaskId, verdict: TaskStatus) -> None:
+        self.task_key = task_key
+        self.verdict = verdict
+        super().__init__(f'{task_key} cannot be marked {verdict} without a reason')
+
+
+class VerdictReasonRefusedError(StateError):
+    def __init__(self, *, task_key: TaskId) -> None:
+        self.task_key = task_key
+        super().__init__(f'{task_key} is verified, and a verified task takes no reason')
+
+
 class ArchitectSpentError(StateError):
     def __init__(self, *, task_key: TaskId) -> None:
         self.task_key = task_key

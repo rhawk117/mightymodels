@@ -17,6 +17,9 @@ from mightymodels_core.tasks import (
     StartPolicy,
     TransitionError,
     TransitionPolicy,
+    VerdictPolicy,
+    VerdictReasonError,
+    VerdictReasonRefusedError,
     get_size_warning,
 )
 from mightymodels_core.vocabulary.tasks import TaskStatus
@@ -189,6 +192,40 @@ class TestTransitionPolicy:
         assert isinstance(problem, TransitionError)
         assert (problem.current, problem.target) == (before, after)
         assert str(problem) == f'{TASK} cannot move from {before} to {after}'
+
+
+class TestVerdictPolicy:
+    failing_verdicts = st.sampled_from(['failed', 'blocked'])
+    blank_reasons = st.one_of(st.none(), st.text(alphabet=' \t\n'))
+    real_reasons = st.text(min_size=1).filter(lambda text: text.strip() != '')
+
+    def find_problem(
+        self, verdict: TaskStatus, reason: str | None
+    ) -> VerdictReasonError | VerdictReasonRefusedError | None:
+        policy = VerdictPolicy(task_key=TASK, verdict=verdict, reason=reason)
+        return policy.get_reason_problem()
+
+    @given(verdict=failing_verdicts, reason=blank_reasons)
+    def test_failed_or_blocked_without_a_reason_is_refused(
+        self, verdict: TaskStatus, reason: str | None
+    ) -> None:
+        problem = self.find_problem(verdict, reason)
+
+        assert isinstance(problem, VerdictReasonError)
+        assert problem.verdict == verdict
+
+    @given(verdict=failing_verdicts, reason=real_reasons)
+    def test_failed_or_blocked_with_a_reason_is_accepted(
+        self, verdict: TaskStatus, reason: str
+    ) -> None:
+        assert self.find_problem(verdict, reason) is None
+
+    @given(reason=st.text())
+    def test_verified_with_a_reason_is_refused(self, reason: str) -> None:
+        assert isinstance(self.find_problem('verified', reason), VerdictReasonRefusedError)
+
+    def test_verified_without_a_reason_is_accepted(self) -> None:
+        assert self.find_problem('verified', None) is None
 
 
 class TestStartPolicy:

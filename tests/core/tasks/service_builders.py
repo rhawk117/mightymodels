@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from mightymodels_core.primitives import Slug, TaskId
-from mightymodels_core.tasks import GitFacts, StartRequest, VerifyRequest
+from mightymodels_core.tasks import GitFacts, StartRequest, VerdictPolicy, VerifyRequest
 
 from tests.core.tasks.fakes import FakeAttemptRepository, FakeTaskRepository
 
@@ -58,6 +58,10 @@ def create_git_facts(*, changed_files: frozenset[str] = frozenset({OWNED_FILE}))
     )
 
 
+def create_verdict(verdict: VerifyVerdict = 'verified', reason: str | None = None) -> VerdictPolicy:
+    return VerdictPolicy(task_key=FIRST_TASK, verdict=verdict, reason=reason)
+
+
 def create_verify_request(
     seen: TaskRecord,
     *,
@@ -75,7 +79,7 @@ def create_verify_request(
 
 
 def verify_as_asked(harness: ServiceHarness, changed_files: frozenset[str]) -> TaskRecord:
-    seen = harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK, 'verified')
+    seen = harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
     request = create_verify_request(seen, changed_files=changed_files)
     return harness.service.verify(SERVICE_SLUG, request)
 
