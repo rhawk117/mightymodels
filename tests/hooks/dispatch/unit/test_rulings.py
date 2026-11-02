@@ -7,7 +7,7 @@ from mightymodels_core.edge import PLUGIN_DATA_VARIABLE
 from mightymodels_core.primitives import StateError
 from mightymodels_hooks.branch_state import BranchTickets, StartedTask
 from mightymodels_hooks.cli import REFUSED, HookCommand, create_hook_router
-from mightymodels_hooks.workers import agent_type
+from mightymodels_hooks.workers import PHASE_AGENTS, agent_type
 
 from tests.hooks.dispatch.dispatch_builders import SLUG, FakeStartedTasks, judge, one_ticket
 
@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 ENGINEER = agent_type('engineer')
 ARCHITECT = agent_type('architect')
 INTERN = agent_type('intern')
+AGENT_ID = 'agent-1'
+IMPLEMENTATION = 'mightymodels:implementation'
 UNREADABLE = StateError('the database is locked')
 
 
@@ -107,6 +109,22 @@ def intern_tasks_cases() -> pytest.MarkDecorator:
     )
 
 
+def phase_target_cases() -> pytest.MarkDecorator:
+    targets = [f'{prefix}{phase}' for phase in PHASE_AGENTS for prefix in ('', 'mightymodels:')]
+    return pytest.mark.parametrize('target', targets)
+
+
+def phase_caller_cases() -> pytest.MarkDecorator:
+    callers = [
+        pytest.param((None, None), id='plain-main-thread'),
+        pytest.param((IMPLEMENTATION, None), id='phase-main-thread'),
+        pytest.param((ENGINEER, AGENT_ID), id='engineer'),
+        pytest.param((agent_type('code-scout'), AGENT_ID), id='code-scout'),
+        pytest.param((agent_type('merge-vader'), AGENT_ID), id='merge-vader'),
+    ]
+    return pytest.mark.parametrize('caller', callers)
+
+
 def unreadable_stdin_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(
         'stdin', ['', 'not json', '[1, 2]', '"agent_type": "mightymodels:']
@@ -116,16 +134,56 @@ def unreadable_stdin_cases() -> pytest.MarkDecorator:
 class TestWorkerCallers:
     @worker_dispatch_inside_row_cases()
     async def test_dispatch_inside_the_row_is_not_judged(self, dispatch: WorkerDispatch) -> None:
-        assert (await judge(dispatch.target, caller=dispatch.caller)).decision is None
+        assert (
+            await judge(dispatch.target, caller=dispatch.caller, agent_id=AGENT_ID)
+        ).decision is None
 
     @worker_dispatch_outside_row_cases()
     async def test_dispatch_outside_the_row_is_denied(self, dispatch: WorkerDispatch) -> None:
-        assert (await judge(dispatch.target, caller=dispatch.caller)).decision == 'deny'
+        assert (
+            await judge(dispatch.target, caller=dispatch.caller, agent_id=AGENT_ID)
+        ).decision == 'deny'
 
     async def test_worker_dispatch_reads_no_state(self) -> None:
         fake = FakeStartedTasks()
-        await judge('code-scout', fake, caller=ENGINEER)
+        await judge('code-scout', fake, caller=ENGINEER, agent_id=AGENT_ID)
         assert fake.reads == []
+
+
+class TestAgentId:
+    @pytest.mark.parametrize('target', ['code-scout', ENGINEER, ARCHITECT])
+    async def test_phase_agent_type_without_agent_id_gets_no_roster_refusal(
+        self, target: str
+    ) -> None:
+        fake = FakeStartedTasks(tickets=one_ticket(in_progress=('T1',)))
+        assert (await judge(target, fake, caller=IMPLEMENTATION)).decision is None
+
+    @pytest.mark.parametrize('target', [ENGINEER, ARCHITECT])
+    async def test_phase_main_thread_gets_the_started_task_ruling_of_a_plain_session(
+        self, target: str
+    ) -> None:
+        fake = FakeStartedTasks(tickets=one_ticket())
+        plain = await judge(target, fake)
+        phase = await judge(target, fake, caller=IMPLEMENTATION)
+        assert (plain.decision, phase) == ('deny', plain)
+
+    async def test_worker_with_agent_id_is_held_to_its_row(self) -> None:
+        verdict = await judge('wingman', caller=ENGINEER, agent_id=AGENT_ID)
+        assert (verdict.decision, ENGINEER in verdict.detail) == ('deny', True)
+
+    async def test_unknown_plugin_type_with_agent_id_is_refused(self) -> None:
+        verdict = await judge('code-scout', caller=IMPLEMENTATION, agent_id=AGENT_ID)
+        assert verdict.decision == 'deny'
+
+
+class TestPhaseTargets:
+    @phase_target_cases()
+    @phase_caller_cases()
+    async def test_phase_agent_is_refused_as_a_target(
+        self, target: str, caller: tuple[str | None, str | None]
+    ) -> None:
+        agent, agent_id = caller
+        assert (await judge(target, caller=agent, agent_id=agent_id)).decision == 'deny'
 
 
 class TestMainThreadStartedTask:

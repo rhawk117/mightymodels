@@ -60,10 +60,12 @@ class SeededTask:
 
 
 def dispatch_payload(
-    target: object, caller: str | None = None, cwd: str | None = None
+    target: object, caller: str | None = None, cwd: str | None = None, agent_id: str | None = None
 ) -> PreToolUsePayload:
     tool_input = {'subagent_type': target, 'prompt': CLAIM}
-    return PreToolUsePayload(tool_name='Agent', tool_input=tool_input, agent_type=caller, cwd=cwd)
+    return PreToolUsePayload(
+        tool_name='Agent', tool_input=tool_input, agent_type=caller, agent_id=agent_id, cwd=cwd
+    )
 
 
 def verdict_of(output: str | None) -> Verdict:
@@ -81,9 +83,12 @@ def verdict_of(output: str | None) -> Verdict:
 
 
 async def judge(
-    target: object, fake: FakeStartedTasks | None = None, caller: str | None = None
+    target: object,
+    fake: FakeStartedTasks | None = None,
+    caller: str | None = None,
+    agent_id: str | None = None,
 ) -> Verdict:
-    payload = dispatch_payload(target, caller)
+    payload = dispatch_payload(target, caller, agent_id=agent_id)
     ruling: Ruling = await dispatch_ruling(
         payload, fake or FakeStartedTasks(), create_dispatch_rules()
     )

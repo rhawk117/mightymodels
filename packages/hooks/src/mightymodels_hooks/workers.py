@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from mightymodels_core.primitives import AgentName
 
 PLUGIN_PREFIX = 'mightymodels:'
+PHASE_AGENTS = ('investigation', 'planning', 'implementation', 'review')
 
 
 def agent_type(name: AgentName) -> str:
@@ -26,3 +27,7 @@ def worker_named(name: str) -> AgentName | None:
 
 def plugin_caller(agent_type: str | None) -> str | None:
     return agent_type if agent_type is not None and agent_type.startswith(PLUGIN_PREFIX) else None
+
+
+def is_phase_agent(name: str) -> bool:
+    return name.removeprefix(PLUGIN_PREFIX) in PHASE_AGENTS

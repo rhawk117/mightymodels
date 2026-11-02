@@ -2,7 +2,8 @@
 
 Claude Code lets a subagent dispatch any subagent type and ignores an allow-list in a subagent's
 definition, so the plugin enforces the "delegate only to" lines of its agent files here. A call
-made inside a subagent carries `agent_type`, and the main conversation's does not. The rows police
+made inside a subagent carries `agent_id`, and the main conversation's does not, even when
+`claude --agent` gives it an `agent_type`. A phase agent is never a dispatch target. The rows police
 only this plugin's workers, whose `agent_type` begins `mightymodels:`: a worker's dispatch outside
 its row is denied, and a name under that prefix that is no worker has no row. Input that is not a
 JSON object never reaches this module; the command exits 2 on it, and hooks/dispatch-hook.sh turns
@@ -28,7 +29,7 @@ from mightymodels_core.primitives import AgentName, encode_compact
 from mightymodels_hooks.branch_state import BranchState
 from mightymodels_hooks.hook_context import create_hook_context_at
 from mightymodels_hooks.rulings import Denied, Unjudged, hook_output
-from mightymodels_hooks.workers import agent_type, plugin_caller, worker_named
+from mightymodels_hooks.workers import agent_type, is_phase_agent, plugin_caller, worker_named
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -55,6 +56,10 @@ TICKETS_UNREADABLE = (
 SEVERAL_TICKETS = (
     'mightymodels did not check the dispatch of {target} for a started task: the checked-out '
     'branch has {count} unclosed tickets ({names}), and the hook acts only when it has one'
+)
+PHASE_TARGET = (
+    '{caller} was refused a dispatch of {target}: a phase agent runs as the main thread, '
+    'never as a subagent'
 )
 STARTED_BEFORE_DISPATCH = frozenset({'engineer', 'architect'})
 
@@ -170,8 +175,11 @@ async def started_ruling(caller: str | None, target: AgentName, started: Started
 async def dispatch_ruling(
     payload: PreToolUsePayload, started: StartedTasks, rules: DispatchRules
 ) -> Ruling:
-    caller = plugin_caller(payload.agent_type)
+    caller = plugin_caller(payload.agent_type) if payload.agent_id is not None else None
     target = target_of(payload)
+    if isinstance(target, str) and is_phase_agent(target):
+        return Denied(reason=PHASE_TARGET.format(caller=caller or 'the main thread', target=target))
+
     if caller is not None and (refused := denial_for_worker(caller, target, rules)) is not None:
         return Denied(reason=refused)
 
