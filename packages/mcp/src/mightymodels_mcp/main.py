@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from
 from mightymodels_core.workspace import find_root
 
-from mightymodels_mcp.contract.tools import register_contract_tools
 from mightymodels_mcp.investigation.tools import register_investigation_tools
 from mightymodels_mcp.journal.tools import register_journal_tools
 from mightymodels_mcp.review.decision_tools import register_decision_tools
@@ -38,7 +37,6 @@ REFUSED_START = 2
 REGISTRARS = (
     register_ticket_tools,
     register_task_tools,
-    register_contract_tools,
     register_review_tools,
     register_decision_tools,
     register_review_metrics_tools,

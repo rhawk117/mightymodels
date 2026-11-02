@@ -7,7 +7,6 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from mightymodels_core.database import ConnectionOptions, open_database
-from mightymodels_core.schemas.contract import Outcome, Phase
 from mightymodels_core.schemas.crashouts import CrashoutSeverity, Verdict
 from mightymodels_core.schemas.investigations import EntryKind, EntrySource
 from mightymodels_core.schemas.reviews import (
@@ -40,8 +39,6 @@ STRING_CHECK_PAIRS = (
     ('task_attempts', 'ck_task_attempts_mode', ArchitectMode),
     ('task_transitions', 'ck_task_transitions_before', TaskStatus),
     ('task_transitions', 'ck_task_transitions_after', TaskStatus),
-    ('receipts', 'ck_receipts_outcome', Outcome),
-    ('receipts', 'ck_receipts_phase', Phase),
     ('review_runs', 'ck_review_runs_scope', Scope),
     ('review_runs', 'ck_review_runs_depth', Depth),
     ('review_runs', 'ck_review_runs_emphasis', Emphasis),

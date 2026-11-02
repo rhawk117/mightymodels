@@ -10,7 +10,6 @@ fields of a mirrored pair differ in name or type.
 from typing import TYPE_CHECKING
 
 from . import (
-    contract,
     crashouts,
     investigations,
     repositories,
@@ -31,7 +30,6 @@ DECLARATIONS: tuple[Declaration, ...] = (
     *tickets.DECLARATIONS,
     *investigations.DECLARATIONS,
     *tasks.DECLARATIONS,
-    *contract.DECLARATIONS,
     *crashouts.DECLARATIONS,
     *reviews.DECLARATIONS,
     *similarity.DECLARATIONS,

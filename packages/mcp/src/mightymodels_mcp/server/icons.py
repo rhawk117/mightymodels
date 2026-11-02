@@ -8,7 +8,6 @@ from mcp.types import Icon
 
 type IconName = Literal[
     'close',
-    'contract',
     'crashout',
     'failed_fix',
     'investigation',

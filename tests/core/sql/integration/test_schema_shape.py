@@ -23,8 +23,6 @@ TABLES = frozenset({
     'task_attempts',
     'task_failed_fixes',
     'task_transitions',
-    'contract_commands',
-    'receipts',
     'review_runs',
     'review_findings',
     'review_dispositions',

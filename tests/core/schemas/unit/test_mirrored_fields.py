@@ -3,12 +3,6 @@ from dataclasses import dataclass
 import msgspec
 from hypothesis import given
 from hypothesis import strategies as st
-from mightymodels_core.schemas.contract import (
-    ApproveContractCommandParams,
-    ContractCommandRow,
-    ReceiptRow,
-    RecordReceiptParams,
-)
 from mightymodels_core.schemas.crashouts import CrashoutRow, JournalCrashoutParams
 from mightymodels_core.schemas.investigations import (
     AddInvestigationParams,
@@ -64,26 +58,6 @@ MIRRORED_PAIRS = (
         row=TicketRow,
         params_only=frozenset({'repository_id'}),
         row_only=frozenset({'id', 'status', 'investigations'}),
-    ),
-    MirroredPair(
-        name='contract-command',
-        params=ApproveContractCommandParams,
-        row=ContractCommandRow,
-        params_only=frozenset({'ticket_id'}),
-        row_only=frozenset({
-            'id',
-            'retired_by',
-            'retired_why',
-            'retired_approval_source',
-            'retired_at',
-        }),
-    ),
-    MirroredPair(
-        name='receipt',
-        params=RecordReceiptParams,
-        row=ReceiptRow,
-        params_only=frozenset({'contract_command_id'}),
-        row_only=frozenset({'command_key'}),
     ),
     MirroredPair(
         name='review-run',

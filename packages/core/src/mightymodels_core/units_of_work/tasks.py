@@ -1,14 +1,9 @@
-"""The task unit of work: one unit per tool call, the stores and services on it.
-
-The task service and the contract service share the unit, so approving the contract runs in the
-same transaction as the reads that precede it.
-"""
+"""The task unit of work: one unit per tool call, the stores and services on it."""
 
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract import ContractService, SqliteContractRepository
 from mightymodels_core.tasks import (
     SqliteAttemptRepository,
     SqliteTaskRepository,
@@ -32,7 +27,6 @@ if TYPE_CHECKING:
 class TaskUnit:
     tasks: TaskService
     task_reads: TaskReadService
-    contracts: ContractService
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -54,7 +48,6 @@ class TaskWork:
     def create_unit(self, entry: Entry) -> TaskUnit:
         unit = entry.unit
         tickets = SqliteTicketRepository(unit=unit, repository_id=entry.repository_id)
-        contracts = SqliteContractRepository(unit=unit)
         task_repository = SqliteTaskRepository(unit=unit)
         attempts = SqliteAttemptRepository(unit=unit)
         tasks = TaskService(
@@ -64,5 +57,4 @@ class TaskWork:
             clock=self.clock,
         )
         task_reads = TaskReadService(tickets=tickets, tasks=task_repository, attempts=attempts)
-        contract_service = ContractService(tickets=tickets, contracts=contracts, clock=self.clock)
-        return TaskUnit(tasks=tasks, task_reads=task_reads, contracts=contract_service)
+        return TaskUnit(tasks=tasks, task_reads=task_reads)

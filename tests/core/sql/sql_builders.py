@@ -49,17 +49,6 @@ RETURNING json_object('id', id);
 -- name: add_attempt
 INSERT INTO task_attempts (task_id, worker) VALUES (:task_id, 'engineer');
 
--- name: add_command
-INSERT INTO contract_commands (ticket_id, command_key, argv, approved_by)
-VALUES (:ticket_id, 'I1', '["true"]', 'user')
-RETURNING json_object('id', id);
-
--- name: add_receipt
-INSERT INTO receipts (
-  contract_command_id, argv, outcome, duration_ms, stdout_tail, stderr_tail, digest, phase
-)
-VALUES (:contract_command_id, '["true"]', 'pass', 1, '', '', 'abc', 'task');
-
 -- name: add_closing
 INSERT INTO closings (ticket_id, shipped, archive) VALUES (:ticket_id, 'done', 'archive.md');
 
@@ -67,8 +56,6 @@ INSERT INTO closings (ticket_id, shipped, archive) VALUES (:ticket_id, 'done', '
 SELECT json_object(
   'tasks', (SELECT count(*) FROM tasks),
   'attempts', (SELECT count(*) FROM task_attempts),
-  'commands', (SELECT count(*) FROM contract_commands),
-  'receipts', (SELECT count(*) FROM receipts),
   'links', (SELECT count(*) FROM ticket_investigations),
   'closings', (SELECT count(*) FROM closings),
   'tickets', (SELECT count(*) FROM tickets),
@@ -148,15 +135,9 @@ class TaskIdPart(Struct, frozen=True, kw_only=True):
     task_id: int
 
 
-class CommandIdPart(Struct, frozen=True, kw_only=True):
-    contract_command_id: int
-
-
 class OwnedCounts(Struct, frozen=True, kw_only=True):
     tasks: int
     attempts: int
-    commands: int
-    receipts: int
     links: int
     closings: int
     tickets: int
@@ -204,8 +185,6 @@ class Statements:
     link_investigation: Command[LinkPart]
     add_task: Query[TicketIdPart, IdRow]
     add_attempt: Command[TaskIdPart]
-    add_command: Query[TicketIdPart, IdRow]
-    add_receipt: Command[CommandIdPart]
     add_closing: Command[TicketIdPart]
     count_owned: Query[NoPart, OwnedCounts]
     delete_ticket: Command[IdPart]
@@ -227,8 +206,6 @@ class Statements:
             self.link_investigation,
             self.add_task,
             self.add_attempt,
-            self.add_command,
-            self.add_receipt,
             self.add_closing,
             self.count_owned,
             self.delete_ticket,
@@ -251,8 +228,6 @@ def create_statements() -> Statements:
         link_investigation=Command(name='link_investigation', params=LinkPart),
         add_task=Query(name='add_task', params=TicketIdPart, row=IdRow),
         add_attempt=Command(name='add_attempt', params=TaskIdPart),
-        add_command=Query(name='add_command', params=TicketIdPart, row=IdRow),
-        add_receipt=Command(name='add_receipt', params=CommandIdPart),
         add_closing=Command(name='add_closing', params=TicketIdPart),
         count_owned=Query(name='count_owned', params=NoPart, row=OwnedCounts),
         delete_ticket=Command(name='delete_ticket', params=IdPart),

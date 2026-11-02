@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.crashouts import SqliteCrashoutRepository
 from mightymodels_core.investigations import InvestigationRecord, SqliteInvestigationRepository
 from mightymodels_core.primitives import RunId, Slug, TaskId, redact
@@ -49,7 +48,6 @@ def count_repositories(database: Database, repository_key: RepositoryKey) -> int
 
 SQLITE_STORES = (
     SqliteAttemptRepository,
-    SqliteContractRepository,
     SqliteCrashoutRepository,
     SqliteInvestigationRepository,
     SqliteReviewDecisionRepository,
