@@ -38,7 +38,7 @@ Slots: objective · acceptance sentences · verification · files-in-scope · in
 
 For one named residual with a bounded fix: a verification leftover, a mechanical CI failure, or a review finding carrying Fix: and Verify: lines. The finding's own lines are the payload; paste them verbatim, never paraphrase, because paraphrase is where scope creep starts. No brief is written for a residual, so the dispatch itself carries the ticket slug and the task id the brief path would have given. The task id is the one `task_start` just took: `R<n>` for a verification leftover or a review finding, `C<n>` for a CI failure. The finding's own id (`MV-3`, `UB-2`, `FC-1`) is one of the slots below, next to the task id.
 
-**Ten-second checklist:** exactly one issue named · the task id is started · Fix: is a bounded action, not a goal · Outcome is one sentence the Fix makes true · Verify: names the commands the engineer runs · files-in-scope names every file the Fix touches · commit/push instructions explicit.
+**Ten-second checklist:** exactly one issue named · the task id is started · Fix: is a bounded action, not a goal · Outcome is the finding's `Verify:` outcome sentence, pasted verbatim, one sentence the Fix makes true · Verify: names the scoped tests or checks the dispatcher wants run, never the outcome sentence · files-in-scope names every file the Fix touches · commit/push instructions explicit.
 
 ```text
 <objective>Close one residual: <finding id and one-line name>. Treat it as a group of one task with the id <task id>.</objective>
@@ -48,8 +48,8 @@ task-id: <the started R<n> or C<n>>
 finding: <the finding's own id, or the CI check's name>
 files-in-scope: [<every file the Fix touches>]
 Fix: <verbatim from the finding or verification failure>
-Outcome: <one sentence that is true once the Fix lands>
-Verify: <verbatim commands the engineer runs>
+Outcome: <the finding's `Verify:` outcome sentence, verbatim: what is true once the Fix lands>
+Verify: <the scoped tests or checks the engineer runs to show the outcome, named by the dispatcher; the outcome sentence is not pasted here>
 <constraints>Commit as "<message>" and never push. One attempt: run Verify in sandboxed Bash, scoped, and name each test run with its output quoted; the residual needs only a commit inside files-in-scope. Report a sandbox wall instead of changing code to get past it. If Verify still fails, report failed with the output tail; if the Fix needs a file outside files-in-scope, report blocked.</constraints>
 ```
 

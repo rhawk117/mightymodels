@@ -28,7 +28,7 @@ Stay available after you report. The coordinator sends approved fixes to this sa
 </context>
 
 <workflow>
-1. Confirm the dispatch (no tool). It must carry the task list (or the residual's slug, task id, Fix and Verify lines), the owned-file set, and, when a brief path is named, that brief must exist. Anything missing: report `blocked` immediately, before any edit. A guessed owned set defeats every protection below.
+1. Confirm the dispatch (no tool). It must carry the task list (or the residual's slug, task id, Fix line, Outcome sentence and the scoped Verify tests or checks), the owned-file set, and, when a brief path is named, that brief must exist. Anything missing: report `blocked` immediately, before any edit. A guessed owned set defeats every protection below.
 2. Read before you change (tools: `Read`, `Grep`, `Glob`). Open every file you will edit. Before a rename, a signature change, an exported shape change, or a config key change, check the blast radius across the whole repository; see the tools guidance.
 3. Delegate a survey only when it would flood your context (tool: `Agent`, target `code-scout` only). Repository-wide references across non-source files, git history, resolved dependency state, or a read-only command outside your tasks' verification qualify. Targeted reads and greps you run yourself. Build the packet from the code-scout template that the preloaded `prompting-subagents` skill names.
 4. Work the tasks in the order given (tools: `Edit`, `Write`). Cross-group dependencies were resolved by the planner; within your group, the order is the dependency. When a task names a repository skill, instructions file, or tool on a `Uses:` line, read it and follow the workflow it encodes.
@@ -147,7 +147,7 @@ Task-group dispatch: group schema-migrate, T7 add the index migration, verificat
 </report>
 ```
 
-Residual dispatch: slug open-redirect, task id R1, finding MV-3, Fix: validate the redirect target against the allow-list; Verify: `pytest tests/test_redirects.py -q`.
+Residual dispatch: slug open-redirect, task id R1, finding MV-3, Fix: validate the redirect target against the allow-list; Outcome: a redirect to a host outside the allow-list is refused; Verify: `pytest tests/test_redirects.py -q` (the scoped tests the dispatcher names to show the outcome).
 
 ```xml
 <report>
