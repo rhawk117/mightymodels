@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from mightymodels_core.tasks import BaseStatus, get_verify_facts
 from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
 from pydantic import BaseModel, ConfigDict
 
@@ -46,7 +47,7 @@ class TaskView(BaseModel):
 
 class VerifyView(TaskView):
     commit_is_head: bool
-    base_is_ancestor: bool
+    base_status: BaseStatus
     outside_owned: tuple[str, ...]
 
 
@@ -96,22 +97,20 @@ def yes_or_no(*, answer: bool) -> str:
 def render_verified(
     record: TaskRecord, attempts: AttemptCounts, request: VerifyRequest
 ) -> VerifyView:
-    git = request.git
-    commit_is_head = request.commit == git.head
-    outside_owned = tuple(sorted(git.changed_files - set(record.owned)))
+    verify = get_verify_facts(request, record)
     facts = (
-        f'  commit is HEAD: {yes_or_no(answer=commit_is_head)}\n'
-        f'  base is ancestor of commit: {yes_or_no(answer=git.base_is_ancestor)}\n'
-        f'  changed outside the owned set: {", ".join(outside_owned) or "none"}\n'
+        f'  commit is HEAD: {yes_or_no(answer=verify.commit_is_head)}\n'
+        f'  base is ancestor of commit: {verify.base_status}\n'
+        f'  changed outside the owned set: {", ".join(verify.outside_owned) or "none"}\n'
     )
     text = f'{record.key} {record.status}\n{facts}{render_problems(record.reasons)}'
     return VerifyView(
         text=text,
         advanced=record.status == 'verified',
         tasks=create_record_views([record], attempts),
-        commit_is_head=commit_is_head,
-        base_is_ancestor=git.base_is_ancestor,
-        outside_owned=outside_owned,
+        commit_is_head=verify.commit_is_head,
+        base_status=verify.base_status,
+        outside_owned=verify.outside_owned,
     )
 
 

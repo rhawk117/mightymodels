@@ -9,18 +9,21 @@ problems as the lines the caller shows, an empty list being a pass.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mightymodels_core.primitives import TaskId
     from mightymodels_core.tasks.records import TaskRecord
+    from mightymodels_core.tasks.services import VerifyRequest
     from mightymodels_core.vocabulary.tasks import TaskStatus
 
 STUCK: frozenset[TaskStatus] = frozenset({'failed', 'blocked'})
 CLOSED: frozenset[TaskStatus] = frozenset({'verified', 'superseded'})
 PLAN_TASK_PREFIX = 'T'
+
+type BaseStatus = Literal['ancestor', 'not-ancestor', 'unresolved']
 
 
 def is_plan_task(task_key: TaskId) -> bool:
@@ -33,6 +36,29 @@ class GitFacts:
     base_resolves: bool
     base_is_ancestor: bool
     changed_files: frozenset[str]
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class VerifyFacts:
+    commit_is_head: bool
+    base_status: BaseStatus
+    outside_owned: tuple[str, ...]
+
+
+def get_base_status(git: GitFacts) -> BaseStatus:
+    if not git.base_resolves:
+        return 'unresolved'
+
+    return 'ancestor' if git.base_is_ancestor else 'not-ancestor'
+
+
+def get_verify_facts(request: VerifyRequest, record: TaskRecord) -> VerifyFacts:
+    git = request.git
+    return VerifyFacts(
+        commit_is_head=request.commit == git.head,
+        base_status=get_base_status(git),
+        outside_owned=tuple(sorted(git.changed_files - set(record.owned))),
+    )
 
 
 def get_plan_task_problem(record: TaskRecord) -> str | None:

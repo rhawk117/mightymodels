@@ -13,9 +13,12 @@ from .errors import (
     VerdictReasonRefusedError,
 )
 from .gates import (
+    BaseStatus,
     GitFacts,
+    VerifyFacts,
     get_plan_task_problem,
     get_readiness_problems,
+    get_verify_facts,
     is_plan_task,
 )
 from .policy import (
@@ -47,6 +50,7 @@ __all__ = [
     'Attempt',
     'AttemptCounts',
     'AttemptRepository',
+    'BaseStatus',
     'FailedFix',
     'FixNotUnderwayError',
     'FixPolicy',
@@ -75,10 +79,12 @@ __all__ = [
     'VerdictPolicy',
     'VerdictReasonError',
     'VerdictReasonRefusedError',
+    'VerifyFacts',
     'VerifyRequest',
     'VerifyVerdict',
     'get_plan_task_problem',
     'get_readiness_problems',
     'get_size_warning',
+    'get_verify_facts',
     'is_plan_task',
 ]

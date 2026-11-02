@@ -7,14 +7,18 @@ from hypothesis import example, given
 from hypothesis import strategies as st
 from mightymodels_core.primitives import TaskId, redact
 from mightymodels_core.tasks import (
+    GitFacts,
     TaskRecord,
+    VerifyRequest,
     get_plan_task_problem,
     get_readiness_problems,
+    get_verify_facts,
     is_plan_task,
 )
 
 if TYPE_CHECKING:
     from mightymodels_core.schemas.tasks import TaskStatus
+    from mightymodels_core.tasks import VerifyFacts
 
 
 def create_record(key: str, status: TaskStatus, reasons: tuple[str, ...] = ()) -> TaskRecord:
@@ -82,3 +86,50 @@ class TestReadiness:
     @readiness_cases()
     def test_readiness_problems(self, records: list[TaskRecord], problems: list[str]) -> None:
         assert get_readiness_problems(records) == problems
+
+
+def create_verify_facts(
+    *,
+    commit: str = 'abc',
+    head: str | None = 'abc',
+    base_resolves: bool = True,
+    base_is_ancestor: bool = True,
+    changed_files: frozenset[str] = frozenset(),
+) -> VerifyFacts:
+    record = TaskRecord(key=TaskId('T1'), status='in-progress', owned=('src/a.py',))
+    git = GitFacts(
+        head=head,
+        base_resolves=base_resolves,
+        base_is_ancestor=base_is_ancestor,
+        changed_files=changed_files,
+    )
+    request = VerifyRequest(seen=record, commit=commit, verdict='verified', reason=None, git=git)
+    return get_verify_facts(request, record)
+
+
+class TestVerifyFacts:
+    def test_a_resolved_ancestor_base_reads_ancestor(self) -> None:
+        assert create_verify_facts().base_status == 'ancestor'
+
+    def test_a_resolved_base_that_is_not_an_ancestor_reads_not_ancestor(self) -> None:
+        facts = create_verify_facts(base_is_ancestor=False)
+
+        assert facts.base_status == 'not-ancestor'
+
+    @pytest.mark.parametrize('base_is_ancestor', [True, False])
+    def test_an_unresolved_base_reads_unresolved_whatever_the_raw_ancestor_flag(
+        self, *, base_is_ancestor: bool
+    ) -> None:
+        facts = create_verify_facts(base_resolves=False, base_is_ancestor=base_is_ancestor)
+
+        assert facts.base_status == 'unresolved'
+
+    def test_the_commit_is_head_only_when_it_equals_head(self) -> None:
+        assert create_verify_facts().commit_is_head
+        assert not create_verify_facts(commit='old').commit_is_head
+        assert not create_verify_facts(head=None).commit_is_head
+
+    def test_outside_owned_lists_the_changed_files_not_owned_sorted(self) -> None:
+        facts = create_verify_facts(changed_files=frozenset({'z.py', 'src/a.py', 'b.py'}))
+
+        assert facts.outside_owned == ('b.py', 'z.py')

@@ -58,7 +58,7 @@ What a quality finding does to the task depends on its severity and on what it c
 
 Call `task_verify` with the `slug`, the `task_id`, the engineer's `commit` and your `verdict`: `verified`, `failed` or `blocked`. A `failed` or `blocked` verdict needs a `reason`, and a `verified` one takes none. The verdict is yours, not the tool's.
 
-The answer returns the facts it found: `commit_is_head`, `base_is_ancestor` and `outside_owned`, the files the commit touched outside the owned set. They do not change the verdict; a stale commit or a file outside the owned set is yours to judge. A commit that is not HEAD, a base that is not an ancestor, or an unexpected file in `outside_owned` is a reason to look further, and a reason to record `failed` when the work is not what was asked. The brief's DONE half still has to name the commit on a `commit: <hash>` line of its own.
+The answer returns the facts it found: `commit_is_head`, `base_status` and `outside_owned`, the files the commit touched outside the owned set. They do not change the verdict; a stale commit or a file outside the owned set is yours to judge. A commit that is not HEAD, a base that is not an ancestor or is unresolved, or an unexpected file in `outside_owned` is a reason to look further, and a reason to record `failed` when the work is not what was asked. The brief's DONE half still has to name the commit on a `commit: <hash>` line of its own.
 
 **6. Route what did not verify.**
 

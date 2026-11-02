@@ -226,14 +226,14 @@ class TestTaskVerify:
         assert view['text'] == (
             'R1 verified\n'
             '  commit is HEAD: yes\n'
-            '  base is ancestor of commit: yes\n'
+            '  base is ancestor of commit: ancestor\n'
             '  changed outside the owned set: none\n'
         )
         assert view['advanced']
         assert view['tasks'][0]['commit'] == head
-        assert (view['commit_is_head'], view['base_is_ancestor'], view['outside_owned']) == (
+        assert (view['commit_is_head'], view['base_status'], view['outside_owned']) == (
             True,
-            True,
+            'ancestor',
             [],
         )
         assert 'resolve_head' in started.git_calls
@@ -258,7 +258,7 @@ class TestTaskVerify:
         assert view['tasks'][0]['status'] == 'verified'
         assert view['tasks'][0]['commit'] == earlier_commit
         assert view['advanced']
-        assert (view['commit_is_head'], view['base_is_ancestor']) == (False, True)
+        assert (view['commit_is_head'], view['base_status']) == (False, 'ancestor')
         assert view['outside_owned'] == ['src/elsewhere.py']
 
     async def test_failed_verdict_is_recorded_with_its_reason(self, started: TaskHarness) -> None:
