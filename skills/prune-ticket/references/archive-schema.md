@@ -20,19 +20,16 @@ REPORT.md open threads and the issue's open items are in no row the tool reads; 
 
 ## The JSON record
 
-`ArchiveRecord`, in `tools/close/schema.py`:
+`ArchiveRecord`, in `packages/core/src/mightymodels_core/ticket_closing/archive.py`:
 
 | Key                                    | From                                                                                                     |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `slug`, `closed_at`, `head`            | the call, the clock and the repository at close                                                          |
-| `shipped`, `pr`, `gotchas`             | the closing input (redacted, one line each; `shipped` required, `pr` optional, at most 3 gotchas)        |
+| `slug`                                 | the call                                                                                                 |
+| `closing`                              | the closing as given: `closed_at`, `head`, `shipped`, `pr`, `gotchas`, `archive` (input redacted, one line each; `shipped` required, `pr` optional, at most 3 gotchas) |
 | `summary`, `tracker`, `investigations` | the ticket's row                                                                                         |
 | `tasks`                                | each task's final status and attempts per worker                                                         |
-| `verification`                         | every contract command with argv, `expect_exit`, and its latest outcome, HEAD, and digest                |
-| `decisions`                            | the last 4 live `decision` entries of the linked ledgers, each with its investigation and entry (`from`) |
+| `decisions`                            | the last 4 live `decision` entries of the linked ledgers and the ticket's decisions, each with its `text` and `origin` |
 | `review`                               | the latest run: id, depth, finding count, ids grouped by outcome or decision, the recorded reasons       |
-| `agents`                               | `runs` 0, `by_status` empty and `recent` empty: `close_ticket` reads no worker rows yet                     |
-| `answers`                              | `recorded` 0 and `recent` empty: the database holds no answer rows yet                                    |
 
 A call with more than 3 gotchas, or with no `shipped`, is refused and stores nothing.
 
