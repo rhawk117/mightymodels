@@ -3,13 +3,14 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from mightymodels_core.tasks import BaseStatus, get_verify_facts
 from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
 from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from mightymodels_core.tasks import FixRecorded, Readiness
+    from mightymodels_core.tasks import FixRecorded, Readiness, VerifyRequest
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
 
 UNKNOWN_HEAD = 'unknown'
@@ -20,6 +21,7 @@ SHORT_HEAD_LENGTH = 12
 class StartOrigin:
     worker: Worker
     head: str | None
+    warning: str | None = None
 
 
 class TaskRecordView(BaseModel):
@@ -40,6 +42,13 @@ class TaskView(BaseModel):
     text: str
     advanced: bool
     tasks: tuple[TaskRecordView, ...] = ()
+    warning: str | None = None
+
+
+class VerifyView(TaskView):
+    commit_is_head: bool
+    base_status: BaseStatus
+    outside_owned: tuple[str, ...]
 
 
 def short_head(head: str | None) -> str:
@@ -70,15 +79,38 @@ def create_record_views(
 
 def render_started(record: TaskRecord, attempts: AttemptCounts, origin: StartOrigin) -> TaskView:
     text = f'{record.key} {record.status} by {origin.worker} from {short_head(origin.head)}\n'
-    return TaskView(text=text, advanced=True, tasks=create_record_views([record], attempts))
+    if origin.warning is not None:
+        text += f'warning: {origin.warning}\n'
 
-
-def render_verified(record: TaskRecord, attempts: AttemptCounts) -> TaskView:
-    text = f'{record.key} {record.status}\n{render_problems(record.reasons)}'
     return TaskView(
+        text=text,
+        advanced=True,
+        tasks=create_record_views([record], attempts),
+        warning=origin.warning,
+    )
+
+
+def yes_or_no(*, answer: bool) -> str:
+    return 'yes' if answer else 'no'
+
+
+def render_verified(
+    record: TaskRecord, attempts: AttemptCounts, request: VerifyRequest
+) -> VerifyView:
+    verify = get_verify_facts(request, record)
+    facts = (
+        f'  commit is HEAD: {yes_or_no(answer=verify.commit_is_head)}\n'
+        f'  base is ancestor of commit: {verify.base_status}\n'
+        f'  changed outside the owned set: {", ".join(verify.outside_owned) or "none"}\n'
+    )
+    text = f'{record.key} {record.status}\n{facts}{render_problems(record.reasons)}'
+    return VerifyView(
         text=text,
         advanced=record.status == 'verified',
         tasks=create_record_views([record], attempts),
+        commit_is_head=verify.commit_is_head,
+        base_status=verify.base_status,
+        outside_owned=verify.outside_owned,
     )
 
 

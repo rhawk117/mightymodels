@@ -42,7 +42,7 @@ def other_repository_key() -> RepositoryKey:
 @pytest.fixture
 def database(tmp_path: Path) -> Generator[Database]:
     opened = open_database(
-        tmp_path.joinpath('mightymodels.db'), create_database_spec(), ConnectionOptions()
+        tmp_path.joinpath('state.db'), create_database_spec(), ConnectionOptions()
     )
     yield opened
     opened.close()

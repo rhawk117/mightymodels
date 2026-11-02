@@ -13,10 +13,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from mightymodels_core.snapshot.records import (
-        CheckState,
         FailedAttempt,
         LedgerLine,
-        PassingCommand,
         ReviewDecision,
         ReviewState,
         SnapshotRecord,
@@ -63,14 +61,6 @@ def task_line(task: TaskState) -> str:
     return f'{task.task} {task.status}' + (f' ({detail})' if detail else '')
 
 
-def check_line(check: CheckState) -> str:
-    return f'{check.key} {check.state}'
-
-
-def passing_command_line(command: PassingCommand) -> str:
-    return f'{command.key}: `{" ".join(command.argv)}`'
-
-
 def ledger_line(line: LedgerLine) -> str:
     cite = '' if line.cite is None else f' [{line.cite}]'
     return f'{line.text}{cite} ({line.origin})'
@@ -105,10 +95,6 @@ def snapshot_markdown(record: SnapshotRecord) -> str:
     lines = [
         *header_lines(record),
         *section_lines('Tasks', map(task_line, record.tasks), empty='none started'),
-        *section_lines('Checks at HEAD', map(check_line, record.checks), empty='no contract'),
-        *section_lines(
-            'Works', map(passing_command_line, record.works), empty='no passing command yet'
-        ),
         *section_lines('Decisions', map(ledger_line, record.decisions), empty='none recorded'),
         *section_lines(
             'Open questions', map(ledger_line, record.open_questions), empty='none recorded'

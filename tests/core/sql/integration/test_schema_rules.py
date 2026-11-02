@@ -9,7 +9,6 @@ from mightymodels_core.database import (
 )
 
 from tests.core.sql.sql_builders import (
-    CommandIdPart,
     CustomTicketPart,
     IdPart,
     InvestigationPart,
@@ -68,11 +67,8 @@ def fill_ticket(scene: Scene) -> None:
     ticket = TicketIdPart(ticket_id=scene.ticket_id)
     with scene.database.write() as unit:
         task = unit.one(statements.add_task, ticket)
-        command = unit.one(statements.add_command, ticket)
         assert task is not None
-        assert command is not None
         unit.run(statements.add_attempt, TaskIdPart(task_id=task.id))
-        unit.run(statements.add_receipt, CommandIdPart(contract_command_id=command.id))
         unit.run(statements.add_closing, ticket)
         unit.run(
             statements.link_investigation,
@@ -95,12 +91,10 @@ class TestReferences:
         assert (
             counts.tasks,
             counts.attempts,
-            counts.commands,
-            counts.receipts,
             counts.links,
             counts.closings,
             counts.tickets,
-        ) == (0, 0, 0, 0, 0, 0, 0)
+        ) == (0, 0, 0, 0, 0)
         assert counts.investigations == 1
 
     def test_deleting_a_repository_is_refused(self, scene: Scene) -> None:

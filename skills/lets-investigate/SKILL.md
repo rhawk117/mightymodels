@@ -71,15 +71,17 @@ be asked through the tool: put the question it names to the user in one `AskUser
 dialog, then call again with `kind`. Kind `change` means a proposed change to weigh, which what-we-know opens.
 `investigation_start` returns the investigation id, and every later call names it.
 
-The session is pointed at the
-investigation from the first call that names the id, not from `investigation_start`. From then
-on the recorder hook on `AskUserQuestion` writes each answer the user gives in a dialog into the
-ledger as a `decision` entry from `user`, which covers every gate answer, because the round's
-`investigation_add` comes before its gate. Do not write those yourself. The framing answers come
-earlier, so nothing records them: record each as a `known` from `user` in round 0, along with
-any fact the user states, since facts are not decisions (cite `user`, source `user`). `known` and
-`resource` entries need a `cite`, and a `decision` entry's source can only be `user`, which is why
-the recorder writes it.
+The session is pointed at the investigation by the first `investigation_add`,
+`investigation_render` or `investigation_knowns` call that names the id; `investigation_start`
+does not point it. Until a pointer exists the recorder writes nothing. After that, the recorder
+hook on `AskUserQuestion` writes each answer the user gives in a dialog into the ledger as a
+`decision` entry from `user`, stamped with the ledger's latest round, or round 1 when that is 0,
+never round 0. An answer given before a round's `investigation_add` is stamped by the same rule, so it
+lands in the latest existing round, or in round 1 when only round 0 exists. Do not write a gate answer yourself. Record by hand, as a `known` from `user` in round 0
+(cite `user`, source `user`), each framing answer and any answer given before the first call
+naming the id, along with any fact the user states. The kind answer goes through the tool's own
+form: `investigation_start` stores it as the investigation's kind, and it is not a ledger entry.
+`known` and `resource` entries need a `cite`.
 
 When the user is resuming an earlier investigation, `investigation_list` shows the ids and
 `investigation_render` restores the ledger.
@@ -156,9 +158,11 @@ Rules that keep the ledger honest:
 
 - A claim with no citation goes in Open. ("The retry wrapper is applied everywhere" with no
   line is not a Known.)
-- A Decision carries the user's word from a gate or a framing dialog, and the recorder hook
-  writes it when the user answers an `AskUserQuestion`; you never add one. Your own conclusion,
-  however well cited, is a Known or an Open item until the user takes it through a dialog.
+- A Decision carries the user's word from a dialog. Once the session is pointed at the
+  investigation, the recorder hook writes each answer to an `AskUserQuestion` as a Decision; you
+  never add one. Answers given before that are recorded by hand as Knowns from `user` in round 0
+  (see Round zero). Your own conclusion, however well cited, is a Known or an Open item until the
+  user takes it through a dialog.
 - Resources record where facts came from so open-ticket can name them in the issue and the
   next session does not re-find them. A fetched docs page goes here with the version it
   describes; a docs page for the wrong version is a Resource with a warning, not a Known.

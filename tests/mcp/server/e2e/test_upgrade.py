@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING
 import pytest
 from mcp import Client
 from mcp.client.stdio import StdioServerParameters
-from mightymodels_core.edge import DATABASE_NAME
-from mightymodels_mcp.server.state import expected_schema_version
+from mightymodels_core.database.connection import parse_schema
+from mightymodels_core.edge import DATABASE_NAME, create_database_spec
+
+from tests.mcp.journal.journal_harness import FIRST_ENTRY
 
 if TYPE_CHECKING:
     from mcp.types import CallToolResult
@@ -18,7 +20,6 @@ if TYPE_CHECKING:
     from tests.mcp.server.server_harness import ServerHarness
 
 CONSOLE_SCRIPT = Path(sys.executable).with_name('mightymodels-mcp')
-SIBLING_SUFFIXES = ('-wal', '-shm')
 SLUG = 'upgrade-probe'
 
 
@@ -38,9 +39,9 @@ def result_text(result: CallToolResult) -> str:
 class StoredDatabase:
     path: Path
 
-    @property
-    def siblings(self) -> tuple[Path, ...]:
-        return tuple(self.path.with_name(f'{self.path.name}{s}') for s in SIBLING_SUFFIXES)
+
+def expected_schema_version() -> int:
+    return parse_schema(create_database_spec().schema.read_text(encoding='utf-8')).version
 
 
 class TestUpgrade:
@@ -58,29 +59,33 @@ class TestUpgrade:
         server_harness.data_directory.mkdir(parents=True)
         return StoredDatabase(path=server_harness.data_directory.joinpath(DATABASE_NAME))
 
+    @pytest.fixture
+    def old_plugin(self, stored: StoredDatabase) -> StoredDatabase:
+        return StoredDatabase(path=stored.path.with_name('mightymodels.db'))
+
     async def show_ticket(self, parameters: StdioServerParameters) -> CallToolResult:
         async with Client(parameters) as client:
             return await client.call_tool('ticket_show', {'slug': SLUG})
 
-    async def test_older_database_is_deleted_and_the_server_starts_fresh(
-        self, parameters: StdioServerParameters, stored: StoredDatabase
+    async def add_crashout(self, parameters: StdioServerParameters) -> CallToolResult:
+        async with Client(parameters) as client:
+            return await client.call_tool('crashout_add', dict(FIRST_ENTRY))
+
+    async def test_old_plugin_database_is_left_untouched_and_state_database_starts_fresh(
+        self, parameters: StdioServerParameters, stored: StoredDatabase, old_plugin: StoredDatabase
     ) -> None:
-        create_database(stored.path, expected_schema_version() - 1)
-        for sibling in stored.siblings:
-            sibling.write_bytes(b'stale')
+        create_database(old_plugin.path, 1)
+        before = old_plugin.path.read_bytes()
 
-        result = await self.show_ticket(parameters)
+        result = await self.add_crashout(parameters)
 
+        assert not result.is_error
         assert 'schema version' not in result_text(result)
-        assert not any(sibling.exists() for sibling in stored.siblings)
+        assert old_plugin.path.read_bytes() == before
         with closing(sqlite3.connect(stored.path)) as connection:
             assert connection.execute('PRAGMA user_version').fetchone()[0] == (
                 expected_schema_version()
             )
-            tables = connection.execute(
-                "SELECT name FROM sqlite_master WHERE name = 'legacy'"
-            ).fetchall()
-        assert tables == []
 
     async def test_newer_database_is_left_untouched(
         self, parameters: StdioServerParameters, stored: StoredDatabase

@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import anyio
 import pytest
 from mcp import Client
 from mcp.types import ToolAnnotations
@@ -85,6 +86,23 @@ class TestListedTools:
         assert tool.icons == [load_icon(icon)]
 
 
+def sized_start_cases() -> pytest.MarkDecorator:
+    sizes: list[ParameterSet] = [
+        pytest.param(3, 4, False, id='three-files-four-criteria'),
+        pytest.param(4, 4, True, id='four-files'),
+        pytest.param(3, 5, True, id='five-criteria'),
+    ]
+    return pytest.mark.parametrize(('files', 'criteria', 'warns'), sizes)
+
+
+def create_sized_start(files: int, criteria: int) -> dict[str, object]:
+    return {
+        **START,
+        'owned': [f'src/file_{number}.py' for number in range(files)],
+        'acceptance': [f'AC-{number}' for number in range(criteria)],
+    }
+
+
 class TestTaskStart:
     async def test_start_records_the_task_from_head(self, staged: TaskHarness) -> None:
         head = await staged.commit('first')
@@ -106,6 +124,32 @@ class TestTaskStart:
         ]
         assert staged.git_calls == ['resolve_head']
 
+    @sized_start_cases()
+    async def test_start_warns_only_above_the_size_bounds(
+        self, staged: TaskHarness, files: int, criteria: int, *, warns: bool
+    ) -> None:
+        view = view_of(await staged.call('task_start', create_sized_start(files, criteria)))
+
+        assert (view['warning'] is not None) is warns
+        assert ('break-it-down' in view['text']) is warns
+
+    async def test_start_above_the_old_bounds_is_not_refused_and_carries_the_warning(
+        self, staged: TaskHarness
+    ) -> None:
+        result = await staged.call('task_start', create_sized_start(11, 5))
+        view = view_of(result)
+
+        assert not result.is_error
+        assert view['advanced']
+        assert 'break-it-down' in view['warning']
+
+    async def test_start_counts_repeated_owned_files_once(self, staged: TaskHarness) -> None:
+        arguments = {**START, 'owned': ['src/a.py'] * 5}
+
+        view = view_of(await staged.call('task_start', arguments))
+
+        assert view['warning'] is None
+
     async def test_start_without_a_commit_names_an_unknown_head(self, staged: TaskHarness) -> None:
         view = view_of(await staged.call('task_start', START))
 
@@ -113,6 +157,40 @@ class TestTaskStart:
 
     async def test_starting_a_task_already_underway_is_refused(self, started: TaskHarness) -> None:
         assert (await started.call('task_start', START)).is_error
+
+
+@pytest.fixture
+async def restarted(started: TaskHarness) -> tuple[TaskHarness, str]:
+    elsewhere = anyio.Path(started.server.repository, 'src/elsewhere.py')
+    await elsewhere.parent.mkdir(parents=True, exist_ok=True)
+    await elsewhere.write_text('elsewhere\n')
+    await started.git('add', 'src/elsewhere.py')
+    later = await started.commit('between the attempts')
+    view_of(await started.call('task_mark', {**KEY, 'to': 'blocked', 'reason': 'waiting'}))
+    view_of(await started.call('task_start', START))
+    return started, later
+
+
+class TestTaskRestart:
+    async def test_a_restart_takes_the_current_head_as_its_base(
+        self, restarted: tuple[TaskHarness, str]
+    ) -> None:
+        harness, later = restarted
+
+        view = view_of(await harness.call('task_show', {'slug': SLUG}))
+
+        assert view['tasks'][0]['base'] == later
+
+    async def test_verify_after_a_restart_judges_files_against_the_new_base(
+        self, restarted: tuple[TaskHarness, str]
+    ) -> None:
+        harness, _later = restarted
+        head = await harness.commit_owned_file()
+
+        arguments = {**KEY, 'commit': head, 'verdict': 'verified'}
+        view = view_of(await harness.call('task_verify', arguments))
+
+        assert view['outside_owned'] == []
 
 
 class TestTaskShow:
@@ -141,28 +219,65 @@ class TestTaskVerify:
         self, started: TaskHarness
     ) -> None:
         head = await started.commit_owned_file()
-        arguments = {**KEY, 'commit': head, 'assertions': {'AC-1': 'seen in the diff'}}
+        arguments = {**KEY, 'commit': head, 'verdict': 'verified'}
 
         view = view_of(await started.call('task_verify', arguments))
 
-        assert view['text'] == 'R1 verified\n'
+        assert view['text'] == (
+            'R1 verified\n'
+            '  commit is HEAD: yes\n'
+            '  base is ancestor of commit: ancestor\n'
+            '  changed outside the owned set: none\n'
+        )
         assert view['advanced']
         assert view['tasks'][0]['commit'] == head
+        assert (view['commit_is_head'], view['base_status'], view['outside_owned']) == (
+            True,
+            'ancestor',
+            [],
+        )
         assert 'resolve_head' in started.git_calls
 
-    async def test_blocked_verification_lists_the_problems(self, started: TaskHarness) -> None:
-        base = await started.git('rev-parse', 'HEAD')
-        await started.commit_owned_file()
-        arguments = {**KEY, 'commit': base, 'assertions': {'AC-1': 'seen in the diff'}}
+    @pytest.fixture
+    async def earlier_commit(self, started: TaskHarness) -> str:
+        outside = anyio.Path(started.server.repository, 'src/elsewhere.py')
+        await outside.parent.mkdir(parents=True, exist_ok=True)
+        await outside.write_text('elsewhere\n')
+        await started.git('add', 'src/elsewhere.py')
+        earlier = await started.commit_owned_file()
+        await started.commit('later')
+        return earlier
+
+    async def test_verifies_a_commit_that_is_not_head_and_touches_other_files(
+        self, started: TaskHarness, earlier_commit: str
+    ) -> None:
+        arguments = {**KEY, 'commit': earlier_commit, 'verdict': 'verified'}
 
         view = view_of(await started.call('task_verify', arguments))
 
-        problem = 'the reported commit must resolve to the current HEAD'
-        assert view['text'] == f'R1 blocked\n  - {problem}\n'
+        assert view['tasks'][0]['status'] == 'verified'
+        assert view['tasks'][0]['commit'] == earlier_commit
+        assert view['advanced']
+        assert (view['commit_is_head'], view['base_status']) == (False, 'ancestor')
+        assert view['outside_owned'] == ['src/elsewhere.py']
+
+    async def test_failed_verdict_is_recorded_with_its_reason(self, started: TaskHarness) -> None:
+        head = await started.commit_owned_file()
+        arguments = {**KEY, 'commit': head, 'verdict': 'failed', 'reason': 'the test fails'}
+
+        view = view_of(await started.call('task_verify', arguments))
+
+        assert view['tasks'][0]['status'] == 'failed'
+        assert view['tasks'][0]['reasons'] == ['the test fails']
         assert not view['advanced']
 
+    async def test_failed_verdict_without_a_reason_is_refused(self, started: TaskHarness) -> None:
+        arguments = {**KEY, 'commit': 'HEAD', 'verdict': 'failed'}
+
+        assert (await started.call('task_verify', arguments)).is_error
+
     async def test_unstarted_task_is_refused_before_git_is_asked(self, staged: TaskHarness) -> None:
-        result = await staged.call('task_verify', {**KEY, 'commit': 'HEAD'})
+        result = await staged.call('task_verify', {**KEY, 'commit': 'HEAD', 'verdict': 'verified'})
 
         assert result.is_error
         assert staged.git_calls == []
@@ -194,18 +309,13 @@ class TestTaskReady:
 
         view = view_of(await staged.call('task_ready', {'slug': SLUG}))
 
-        assert view['text'] == (
-            'not ready\n'
-            '  - T1 is in-progress, not verified\n'
-            '  - the contract has no live L* command; approve one with contract_approve\n'
-        )
+        assert view['text'] == ('not ready\n  - T1 is in-progress, not verified\n')
         assert not view['advanced']
         assert staged.git_calls == ['resolve_head']
 
     async def test_verified_plan_task_is_ready_at_head(self, staged: TaskHarness) -> None:
         head = await staged.commit('first')
         await staged.verify_plan_task()
-        await staged.prove_landing(head)
 
         view = view_of(await staged.call('task_ready', {'slug': SLUG}))
 

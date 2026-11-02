@@ -2,10 +2,10 @@
 
 For escalating one task to the recovery tier after engineer returned `failed` or `blocked`, or after a designated reviewer rejected an implementation for poor code quality with structured evidence. The architect's standing contract (modes, envelope rules, result shape) lives in the architect agent file; carry only what varies per dispatch.
 
-**Ten-second checklist:** the trigger is pasted verbatim (the engineer's report, or the reviewer's finding with future pressure, expected churn, clean extension path, and locations) · the ASKED contract is the one the engineer received, unedited · files-in-scope is the original owned set, and `systemic-refactor` appears only with an approved expanded envelope attached · the brief path is named when the task has one, and a residual (`R<n>` or `C<n>`) has none, so its packet carries the slug · the task is started with `by` `architect`, after the owner's answer unless the ticket has `auto-escalate` on · this is the task's first architect dispatch; a second failure goes to whats-broken, not back here.
+**Ten-second checklist:** the trigger is pasted verbatim (the engineer's report, or the reviewer's finding with future pressure, expected churn, clean extension path, and locations) · the ASKED stanza is the one the engineer received, unedited, `interface` and `reuse-or-delete` included · files-in-scope is the original owned set, and `systemic-refactor` appears only with an approved expanded envelope attached · the brief path is named when the task has one, and a residual (`R<n>` or `C<n>`) has none, so its packet carries the slug · the task is started with `by` `architect`, after the owner's answer unless the ticket has `auto-escalate` on · this is the task's first architect dispatch; a second failure goes to whats-broken, not back here.
 
 ```text
-<objective>Recover task <task id> in <recovery-implementation | systemic-refactor | diagnose-replan> mode. Brief path: .mightymodels/<slug>/briefs/task-NN.md (replace its DONE half with yours before reporting; when you commit, it carries `commit: <hash>` on a line of its own, which the verify gate reads).</objective>
+<objective>Recover task <task id> in <recovery-implementation | systemic-refactor | diagnose-replan> mode. Brief path: .mightymodels/<slug>/briefs/task-NN.md (replace its DONE half with yours before reporting; when you commit, it carries `commit: <hash>` on a line of its own, which the fact-checker and the primary read).</objective>
 <context>
 Trigger: <engineer failed | engineer blocked | reviewer rejection>, verbatim below.
 <the engineer's report, or the reviewer finding, unedited>
@@ -15,7 +15,7 @@ Trigger: <engineer failed | engineer blocked | reviewer rejection>, verbatim bel
 <the task's ASKED stanza, unedited, including files-in-scope>
 
 <constraints>
-Run each verification command in sandboxed Bash and cite its output as evidence in your report.
+Run each verification command in sandboxed Bash, scoped as written, and name each test run with its output quoted in your report. Report a sandbox wall instead of changing code to get past it.
 Envelope: <files-in-scope from ASKED | the approved expanded envelope, listed>. Commit when done with message "<message>" and never push.
 </constraints>
 ```

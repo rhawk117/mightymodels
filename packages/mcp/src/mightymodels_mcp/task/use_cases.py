@@ -7,6 +7,7 @@ the records it returns from the same unit.
 
 from typing import TYPE_CHECKING
 
+from mightymodels_core.tasks import VerdictPolicy
 from mightymodels_core.units_of_work import TaskWork
 
 from mightymodels_mcp.server.state import create_work
@@ -24,12 +25,18 @@ from .views import (
 
 if TYPE_CHECKING:
     from mightymodels_core.edge import OpenState
-    from mightymodels_core.primitives import Slug, TaskId
+    from mightymodels_core.primitives import Slug
     from mightymodels_core.tasks import VerifyRequest
     from mightymodels_core.tasks.records import TaskRecord
 
-    from .schemas import FailedFixRequest, TaskDeclareRequest, TaskMarkRequest, TaskStartRequest
-    from .views import TaskView
+    from .schemas import (
+        FailedFixRequest,
+        TaskDeclareRequest,
+        TaskMarkRequest,
+        TaskStartRequest,
+        TaskVerifyRequest,
+    )
+    from .views import TaskView, VerifyView
 
 
 def create_task_work(state: OpenState) -> TaskWork:
@@ -38,10 +45,13 @@ def create_task_work(state: OpenState) -> TaskWork:
 
 def start_task(work: TaskWork, request: TaskStartRequest, head: str | None) -> TaskView:
     with work.write() as unit:
-        record = unit.tasks.start(request.slug, create_start_request(request, head))
+        start_request = create_start_request(request, head)
+        record = unit.tasks.start(request.slug, start_request)
+        warning = unit.tasks.get_size_warning(start_request)
         attempts = unit.task_reads.show(request.slug).attempts
 
-    return render_started(record, attempts, StartOrigin(worker=request.by, head=head))
+    origin = StartOrigin(worker=request.by, head=head, warning=warning)
+    return render_started(record, attempts, origin)
 
 
 def declare_tasks(work: TaskWork, request: TaskDeclareRequest) -> TaskView:
@@ -52,17 +62,20 @@ def declare_tasks(work: TaskWork, request: TaskDeclareRequest) -> TaskView:
     return render_listing(records, attempts)
 
 
-def prepare_verification(work: TaskWork, slug: Slug, task_id: TaskId) -> TaskRecord:
+def prepare_verification(work: TaskWork, request: TaskVerifyRequest) -> TaskRecord:
     with work.read() as unit:
-        return unit.tasks.prepare_verification(slug, task_id)
+        verdict = VerdictPolicy(
+            task_key=request.task_id, verdict=request.verdict, reason=request.reason
+        )
+        return unit.tasks.prepare_verification(request.slug, verdict)
 
 
-def verify_task(work: TaskWork, slug: Slug, request: VerifyRequest) -> TaskView:
+def verify_task(work: TaskWork, slug: Slug, request: VerifyRequest) -> VerifyView:
     with work.write() as unit:
         record = unit.tasks.verify(slug, request)
         attempts = unit.task_reads.show(slug).attempts
 
-    return render_verified(record, attempts)
+    return render_verified(record, attempts, request)
 
 
 def mark_task(work: TaskWork, request: TaskMarkRequest) -> TaskView:
@@ -82,7 +95,7 @@ def show_tasks(work: TaskWork, slug: Slug) -> TaskView:
 
 def check_ready(work: TaskWork, slug: Slug, head: str | None) -> TaskView:
     with work.read() as unit:
-        readiness = unit.task_reads.ready(slug, head)
+        readiness = unit.task_reads.ready(slug)
         attempts = unit.task_reads.show(slug).attempts
 
     return render_readiness(readiness, attempts, head)

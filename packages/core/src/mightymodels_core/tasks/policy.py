@@ -13,8 +13,9 @@ from mightymodels_core.tasks.errors import (
     FixNotUnderwayError,
     InternSpentError,
     ModeNeedsArchitectError,
-    TaskTooLargeError,
     TransitionError,
+    VerdictReasonError,
+    VerdictReasonRefusedError,
 )
 
 if TYPE_CHECKING:
@@ -25,11 +26,7 @@ if TYPE_CHECKING:
 
 type Transitions = dict[TaskStatus, frozenset[TaskStatus]]
 type StartProblem = (
-    ModeNeedsArchitectError
-    | TaskTooLargeError
-    | ArchitectSpentError
-    | InternSpentError
-    | TransitionError
+    ModeNeedsArchitectError | ArchitectSpentError | InternSpentError | TransitionError
 )
 
 IMPLEMENTATION_MODES: frozenset[ArchitectMode] = frozenset({
@@ -54,10 +51,24 @@ class TaskOptions:
     intern_limit: int = 1
     architect_limit: int = 1
     failed_fix_limit: int = 3
-    acceptance_limit: int = 4
-    owned_limit: int = 10
+    warn_owned_above: int = 3
+    warn_acceptance_above: int = 4
     hypothesis_limit: int = 4000
     transitions: Transitions = field(default_factory=create_transitions)
+
+
+def get_size_warning(
+    *, acceptance_count: int, owned_count: int, options: TaskOptions | None = None
+) -> str | None:
+    limits = options or TaskOptions()
+    if acceptance_count <= limits.warn_acceptance_above and owned_count <= limits.warn_owned_above:
+        return None
+
+    return (
+        f'{owned_count} owned files and {acceptance_count} acceptance criteria is more than one '
+        f'reviewable change ({limits.warn_owned_above} files, {limits.warn_acceptance_above} '
+        'criteria); split the task with break-it-down, which puts the split to the user'
+    )
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -79,6 +90,26 @@ class TransitionPolicy:
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
+class VerdictPolicy:
+    task_key: TaskId
+    verdict: TaskStatus
+    reason: str | None
+
+    @property
+    def has_reason(self) -> bool:
+        return bool((self.reason or '').strip())
+
+    def get_reason_problem(self) -> VerdictReasonError | VerdictReasonRefusedError | None:
+        if self.verdict == 'verified' and self.reason is not None:
+            return VerdictReasonRefusedError(task_key=self.task_key)
+
+        if self.verdict != 'verified' and not self.has_reason:
+            return VerdictReasonError(task_key=self.task_key, verdict=self.verdict)
+
+        return None
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
 class StartPolicy:
     task_key: TaskId
     before: TaskStatus
@@ -86,9 +117,6 @@ class StartPolicy:
     mode: ArchitectMode | None
     attempts: Mapping[Worker, int]
     implementation_spent: int
-    acceptance_count: int
-    owned_count: int
-    too_large_approved: bool = False
     options: TaskOptions = field(default_factory=TaskOptions)
 
     @property
@@ -129,8 +157,7 @@ class StartPolicy:
     @property
     def reasons(self) -> tuple[str, ...]:
         mode_reason = () if self.architect_mode is None else (f'in {self.architect_mode} mode',)
-        approval = ('too large, approved by user',) if self.too_large_approved else ()
-        return (f'by {self.worker}', *mode_reason, *approval)
+        return (f'by {self.worker}', *mode_reason)
 
     def get_mode_problem(self) -> ModeNeedsArchitectError | None:
         if self.worker == 'architect' or self.mode is None:
@@ -138,29 +165,8 @@ class StartPolicy:
 
         return ModeNeedsArchitectError(mode=self.mode)
 
-    def get_size_problem(self) -> TaskTooLargeError | None:
-        if self.too_large_approved:
-            return None
-
-        if self.acceptance_count > self.options.acceptance_limit:
-            return TaskTooLargeError(
-                counted='acceptance criteria',
-                count=self.acceptance_count,
-                limit=self.options.acceptance_limit,
-            )
-
-        if self.owned_count > self.options.owned_limit:
-            return TaskTooLargeError(
-                counted='owned files', count=self.owned_count, limit=self.options.owned_limit
-            )
-
-        return None
-
     def get_start_problem(self) -> StartProblem | None:
         if problem := self.get_mode_problem():
-            return problem
-
-        if problem := self.get_size_problem():
             return problem
 
         if self.is_architect_spent:

@@ -1,55 +1,33 @@
-"""The two gates of the task domain: what keeps a task from verified and a ticket from ready.
+"""The readiness gate of the task domain, and the git facts a verification reports.
 
-A task is proven only when the reported commit is the current HEAD and descends from the task's
-base, its DONE brief names the commit, every acceptance criterion carries a citation, and the
-commit touched only the files the task owns. Contract commands and receipts play no part. A
-ticket is ready only when a plan task has been started, every plan task is closed and no fix is
-stuck.
+A ticket is ready only when a plan task has been started, every plan task is closed and no fix is
+stuck. A verification is a verdict the primary records; the git facts beside it (HEAD, whether the
+base is an ancestor, the files changed) are reported, never judged.
 
-The caller passes the git facts and the brief text in as values; the gates call no git, read no
-file and return their problems as the lines the caller shows, an empty list being a pass.
-
-Landing is a separate rule, `get_landing_problems`: every command passed in needs a receipt at
-HEAD with a passing outcome, and at least one of them must be a landing (`L*`) command, or
-`NO_LANDING_COMMAND` leads the problems.
+The caller passes the git facts in as values; the gate calls no git, reads no file and returns its
+problems as the lines the caller shows, an empty list being a pass.
 """
 
-import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-from mightymodels_core.contract.policy import is_landing_command
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
-    from mightymodels_core.contract.records import Receipt, RecordedCommand
     from mightymodels_core.primitives import TaskId
     from mightymodels_core.tasks.records import TaskRecord
+    from mightymodels_core.tasks.services import VerifyRequest
     from mightymodels_core.vocabulary.tasks import TaskStatus
 
-DONE_HEADING = '## DONE'
-ASKED_CRITERION = re.compile(r'^\s*-\s*(AC-\d+)\s*:', re.MULTILINE)
-DONE_COMMIT = re.compile(r'^\s*commit:\s*([0-9a-fA-F]{7,64})\s*$', re.MULTILINE)
 STUCK: frozenset[TaskStatus] = frozenset({'failed', 'blocked'})
 CLOSED: frozenset[TaskStatus] = frozenset({'verified', 'superseded'})
 PLAN_TASK_PREFIX = 'T'
-NO_LANDING_COMMAND = 'the contract has no live L* command; approve one with contract_approve'
+
+type BaseStatus = Literal['ancestor', 'not-ancestor', 'unresolved']
 
 
 def is_plan_task(task_key: TaskId) -> bool:
     return task_key.startswith(PLAN_TASK_PREFIX)
-
-
-def done_commit(brief_text: str) -> str | None:
-    _, separator, done = brief_text.partition(DONE_HEADING)
-    named = DONE_COMMIT.search(done)
-    return str(named[1]) if separator and named else None
-
-
-def criteria_in_brief(brief_text: str) -> list[str]:
-    asked = brief_text.split(DONE_HEADING, 1)[0]
-    return [found[1] for found in ASKED_CRITERION.finditer(asked)]
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -58,113 +36,29 @@ class GitFacts:
     base_resolves: bool
     base_is_ancestor: bool
     changed_files: frozenset[str]
-    named_commit: str | None
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
-class Brief:
-    text: str | None
+class VerifyFacts:
+    commit_is_head: bool
+    base_status: BaseStatus
+    outside_owned: tuple[str, ...]
 
 
-@dataclass(slots=True, kw_only=True, frozen=True)
-class Evidence:
-    commit: str
-    brief: Brief | None
-    assertions: Mapping[str, str]
+def get_base_status(git: GitFacts) -> BaseStatus:
+    if not git.base_resolves:
+        return 'unresolved'
+
+    return 'ancestor' if git.base_is_ancestor else 'not-ancestor'
 
 
-def get_receipt_problem(command_key: str, receipt: Receipt | None, head: str | None) -> str | None:
-    if receipt is None or head is None or receipt.head != head:
-        return f'{command_key} has no receipt at the current HEAD'
-
-    if receipt.outcome != 'pass':
-        return f'{command_key} {receipt.outcome} at HEAD'
-
-    return None
-
-
-def get_receipt_problems(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
-) -> list[str]:
-    problems = (
-        get_receipt_problem(command.key, receipts.get(command.key), head) for command in commands
+def get_verify_facts(request: VerifyRequest, record: TaskRecord) -> VerifyFacts:
+    git = request.git
+    return VerifyFacts(
+        commit_is_head=request.commit == git.head,
+        base_status=get_base_status(git),
+        outside_owned=tuple(sorted(git.changed_files - set(record.owned))),
     )
-    return [problem for problem in problems if problem is not None]
-
-
-def get_landing_problems(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
-) -> list[str]:
-    problems = get_receipt_problems(commands, receipts, head)
-    if any(is_landing_command(command) for command in commands):
-        return problems
-
-    return [NO_LANDING_COMMAND, *problems]
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class VerificationGate:
-    task: TaskRecord
-    evidence: Evidence
-    git: GitFacts
-
-    @property
-    def brief_text(self) -> str | None:
-        brief = self.evidence.brief
-        return None if brief is None else brief.text
-
-    @property
-    def proven_criteria(self) -> set[str]:
-        return set(self.evidence.assertions)
-
-    def commit_problems(self) -> list[str]:
-        if self.evidence.commit != self.git.head:
-            return ['the reported commit must resolve to the current HEAD']
-
-        if self.task.base is None or not self.git.base_resolves:
-            return ['the task has no valid base commit']
-
-        if not self.git.base_is_ancestor:
-            return ['the task base is not an ancestor of the reported commit']
-
-        return []
-
-    def brief_problems(self) -> list[str]:
-        if self.evidence.brief is None:
-            return []
-
-        if self.brief_text is None:
-            return ['the task brief is missing']
-
-        if self.git.named_commit != self.evidence.commit:
-            return ['the DONE brief must name the reported HEAD commit']
-
-        return []
-
-    def criteria_problems(self) -> list[str]:
-        asked = criteria_in_brief(self.brief_text or '')
-        proven = self.proven_criteria
-        problems = [
-            f'{criterion} has no citation' for criterion in asked if criterion not in proven
-        ]
-        if not proven:
-            problems.append('no cited assertion proves this task')
-
-        return problems
-
-    def ownership_problems(self) -> list[str]:
-        outside = sorted(self.git.changed_files - set(self.task.owned))
-        return [f'changed outside the owned set: {path}' for path in outside]
-
-    def get_verification_problems(self) -> list[str]:
-        if problems := self.commit_problems():
-            return problems
-
-        return [
-            *self.brief_problems(),
-            *self.criteria_problems(),
-            *self.ownership_problems(),
-        ]
 
 
 def get_plan_task_problem(record: TaskRecord) -> str | None:

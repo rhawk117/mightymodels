@@ -26,7 +26,6 @@ def create_record() -> ArchiveRecord:
         investigations=(),
         closing=create_closing('Retry queue drains'),
         tasks={},
-        verification=(),
         decisions=(),
         review=None,
     )

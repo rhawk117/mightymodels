@@ -3,10 +3,8 @@
 from .records import (
     DEFAULT_LIMIT,
     MAX_LIMIT,
-    CheckState,
     FailedAttempt,
     LedgerLine,
-    PassingCommand,
     RepositoryFacts,
     RepositoryState,
     ReviewDecision,
@@ -21,10 +19,8 @@ from .services import SnapshotRequest, SnapshotService
 __all__ = [
     'DEFAULT_LIMIT',
     'MAX_LIMIT',
-    'CheckState',
     'FailedAttempt',
     'LedgerLine',
-    'PassingCommand',
     'RepositoryFacts',
     'RepositoryState',
     'ReviewDecision',

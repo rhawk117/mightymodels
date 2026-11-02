@@ -4,10 +4,10 @@ description: >-
   Hand the current session to the next one without losing what this session learned. Works
   from an active ticket (mid-sprint, or after stick-the-landing went green and review is
   next) or from a session with no ticket at all. Writes an objective snapshot from the
-  recorded state first (the snapshot tool: tasks, checks at HEAD, ledger decisions, failed
+  recorded state first (the snapshot tool: tasks, ledger decisions, failed
   attempts, review state), runs what-we-know in interactive mode, asks in one
   AskUserQuestion call what the next session should focus on and what to do with uncommitted
-  work, then writes handoffs/BATON.md with only what no
+  work, then writes handoffs/BATON.md with the writer's judgment, which no
   file holds. With no ticket it runs open-ticket first. Ends by printing the next session's
   opening prompt in chat. Not a ticket for work not yet
   started from a clean triage (open-ticket directly).
@@ -24,7 +24,7 @@ allowed-tools:
 # baton-pass
 
 A session that ends mid-work leaves two kinds of knowledge behind. One kind is already in
-artifacts: ticket.yml, the ticket's rows, the ledger, the verification receipts, the task
+artifacts: ticket.yml, the ticket's rows, the ledger, the task
 transitions, the review run, the commits. The other kind is only in this conversation: the
 approach that failed before it was ever recorded, the gotcha that cost an hour, the thread
 the user said to park. The next agent either receives that second kind or spends its first
@@ -47,7 +47,7 @@ progress.
 none was given, and the work in progress decides which ticket, if any.
 
 - **Active ticket.** Take the snapshot, write both files and read `snapshot.md`: tasks and
-  their attempts, checks at HEAD, decisions and open questions from the ledger, failed
+  their attempts, decisions and open questions from the ledger, failed
   attempts, review state, branch, HEAD, and changed paths. Then read ticket.yml, the issue's
   task list (or the plan), and the in-flight brief. Durable-before-advance applies: a commit with no DONE
   half is an incomplete task, and it is written down as one, not as "nearly done".
@@ -97,11 +97,17 @@ If the call or a write fails, stop: say what failed and do not print a next-sess
 handoff that claims to be ready while its objective half is missing is the failure this skill
 exists to prevent.
 
-Then write `handoffs/BATON.md`, 40 lines or fewer, and refresh the `context:` lines in
+Then read `scratchpad.md` in the ticket directory if it exists. It is the primary's free-form
+working notes: only the primary writes it, and it is deleted at prune with the ticket directory. Lift
+what matters from it into BATON.md; the scratchpad itself is not handed over.
+
+Then write `handoffs/BATON.md`, 80 lines or fewer, and refresh the `context:` lines in
 ticket.yml with any decision the next session cannot afford to lose (three to six lines
-total, no `file:line`). The baton carries only what no file holds: a task state, a check, a
-ledger decision, a failed attempt `failed_fix_record` recorded, a passing contract command, or a
-review decision is already in the snapshot, and repeating it here is a copy that drifts.
+total, no `file:line`). The baton carries only what no file holds, and what no file holds is
+your judgment: which reports you did not trust and why, what you saw yourself against what a
+worker told you, and what you decided that no tool stored. A task state, a ledger decision, a
+failed attempt `failed_fix_record` recorded, or a review decision is already in the snapshot,
+and repeating it here is a copy that drifts.
 
 ```markdown
 # Baton for <slug>
@@ -109,11 +115,20 @@ review decision is already in the snapshot, and repeating it here is a copy that
 Focus: <the user's answer, one line>
 In flight: <task, brief path, DONE half present or absent>; tree <clean | WIP commit sha | stash name>
 
+## What I distrust and why
+- <report, claim or result I did not accept> | why: <one line>
+
+## First-hand and reported
+- saw myself: <what I ran or read> | reported by a worker: <what I took on its word>
+
+## Decisions with no writer
+- <decision made in this session and recorded nowhere else> | why: <one line>
+
+## Next check
+- <the one check to run first> | expect: <result>
+
 ## Do not retry
 - <approach never recorded as a task attempt> | failed because: <one line>
-
-## Works
-- <exact command outside the verification contract> | for: <what it proves or sets up>
 
 ## Gotchas
 - <what cost time> | so: <what to do instead>
@@ -132,7 +147,7 @@ already decided (hand off), so it does not ask what comes next. It runs the
 interview for whatever the conversation has not answered, rolls the what-we-know findings
 into the issue body and ticket.yml `context`, and creates the branch or records the current
 checkout. When it returns, write the snapshot, then `handoffs/BATON.md` in the same shape,
-since the dead ends and working commands from this session are not part of a triage rollup.
+since the dead ends and judgment from this session are not part of a triage rollup.
 
 ## 4. Print the prompt
 
@@ -144,7 +159,7 @@ game-plan to re-plan; review-circus to review; the ramp per the
 routing table for a freshly prepared ticket). To land, the prompt names no skill to invoke: only
 the user can start stick-the-landing, so the prompt tells the next session to hand the user
 `/mightymodels:stick-the-landing <slug>`. The snapshot is a picture of the moment it was
-written; the next session calls `task_show` and `contract_status` before
+written; the next session calls `task_show` before
 acting on it. It carries the focus line verbatim and
 nothing else that lives in a file, so it cannot drift from them.
 

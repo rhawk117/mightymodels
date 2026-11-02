@@ -60,6 +60,10 @@ These checks find issues covered by their advisory sources and configured polici
 > [!WARNING]
 > Automated tracking issues are public, so they are not a disclosure channel. If a finding involves an unreported exploitable weakness or sensitive data, report it privately and keep the extra details out of the issue.
 
+## What the plugin's hooks do
+
+The plugin's hooks record and route. They refuse only a dispatch outside the caller's roster, an intern dispatch unless a task is started for the intern and every such task owns exactly one file, a dispatch of the engineer or architect from the main thread while the branch's unclosed ticket has no task in progress, a dispatch whose task or ticket state cannot be read (it fails closed), a payload that is malformed or names no target type (exit 2), and, when the hook itself cannot run (the launcher crashes or times out), any dispatch made by a plugin worker. They are not a permission control: they do not run or approve commands, and they do not replace the permission prompts of Claude Code.
+
 ## Guidance for users
 
 - Install updates from trusted repository releases, and review changes to hooks, scripts, executables and external-tool configuration.

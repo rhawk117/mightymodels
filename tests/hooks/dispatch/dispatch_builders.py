@@ -20,11 +20,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from mightymodels_core.vocabulary.tasks import TaskStatus, Worker
-    from mightymodels_hooks.branch_state import (
-        BlockedTask,
-        BranchTicketsOrUnreadable,
-        StartedOrUnreadable,
-    )
+    from mightymodels_hooks.branch_state import BranchTicketsOrUnreadable, StartedOrUnreadable
     from mightymodels_hooks.rulings import Ruling
 
 SLUG = Slug('port-it')
@@ -94,15 +90,8 @@ async def judge(
     return verdict_of(None if ruling is None else json.dumps(hook_output(ruling)))
 
 
-def one_ticket(
-    *,
-    in_progress: tuple[str, ...] = (),
-    auto_escalate: bool = False,
-    blocked: tuple[BlockedTask, ...] = (),
-) -> BranchTickets:
-    return BranchTickets(
-        unclosed=(SLUG,), in_progress=in_progress, auto_escalate=auto_escalate, blocked=blocked
-    )
+def one_ticket(*, in_progress: tuple[str, ...] = ()) -> BranchTickets:
+    return BranchTickets(unclosed=(SLUG,), in_progress=in_progress)
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -119,8 +108,8 @@ class DispatchHarness:
         payload = dispatch_payload(target, caller, str(self.checkout))
         return verdict_of(await self.handler().handle(payload))
 
-    async def seed(self, tasks: tuple[SeededTask, ...], *, auto_escalate: bool = False) -> None:
-        section = replace(create_ticket_section(SLUG), branch=BRANCH, auto_escalate=auto_escalate)
+    async def seed(self, tasks: tuple[SeededTask, ...]) -> None:
+        section = replace(create_ticket_section(SLUG), branch=BRANCH)
         async with open_state(self.data_directory, self.checkout) as state:
             with write_entry(state.database, state.checkout.repository_key()) as entry:
                 tickets = SqliteTicketRepository(unit=entry.unit, repository_id=entry.repository_id)

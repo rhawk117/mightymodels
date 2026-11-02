@@ -47,10 +47,21 @@ class TaskRepositoryContract:
 
             assert started.tasks.task(started.ticket_id, FIRST_TASK) == expected
 
-        def test_restart_keeps_the_first_base_and_takes_the_new_owned_files(
+        def test_restart_takes_the_new_base_and_the_new_owned_files(
             self, started: TaskHarness
         ) -> None:
             restart = create_transition(FIRST_TASK, 'failed', 'in-progress', day=3, head='def5678')
+
+            started.tasks.record_start(
+                started.ticket_id, restart, create_attempt(owned=('src/c.py',))
+            )
+
+            task = started.tasks.task(started.ticket_id, FIRST_TASK)
+            assert task is not None
+            assert (task.base, task.owned) == ('def5678', ('src/c.py',))
+
+        def test_restart_with_no_head_keeps_the_stored_base(self, started: TaskHarness) -> None:
+            restart = create_transition(FIRST_TASK, 'failed', 'in-progress', day=3, head=None)
 
             started.tasks.record_start(
                 started.ticket_id, restart, create_attempt(owned=('src/c.py',))

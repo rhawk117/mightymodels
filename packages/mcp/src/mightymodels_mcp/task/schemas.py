@@ -1,15 +1,15 @@
 """The task tools' requests, and the core requests they turn into.
 
-A task id is held to core's pattern and length. The size bounds on a task (criteria and owned
-files) stay core's, which refuses a task that is too large; a request only needs one of each.
+A task id is held to core's pattern and length. A request only needs one criterion and one owned
+file; a task above the warning bounds is started and its answer carries a warning.
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from mightymodels_core.primitives import TaskId, parse_task_id
-from mightymodels_core.tasks import MarkRequest, StartRequest
+from mightymodels_core.tasks import MarkRequest, StartRequest, VerifyVerdict
 from mightymodels_core.vocabulary.tasks import ArchitectMode, Worker
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, Field, model_validator
 
 from mightymodels_mcp.server.requests import (
     NameText,
@@ -49,10 +49,6 @@ class TaskStartRequest(RequestModel):
     mode: ArchitectMode | None = Field(
         default=None, description='The architect mode; pass it only when the worker is architect.'
     )
-    too_large_approved_by: Literal['user'] | None = Field(
-        default=None,
-        description='Pass user only after the user approved starting a task above the size bounds.',
-    )
 
 
 class TaskDeclareRequest(RequestModel):
@@ -66,17 +62,35 @@ class TaskVerifyRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
     commit: RevisionField = Field(description='The commit the worker reports for the task.')
-    assertions: dict[ProseText, ProseText] = Field(
-        default_factory=dict,
-        description='A citation for each acceptance criterion, as criterion to evidence.',
+    verdict: VerifyVerdict = Field(
+        description='The primary verdict on the task; git facts never change it.'
     )
+    reason: ProseText | None = Field(
+        default=None,
+        description='Why the task failed or is blocked; required for those, refused for verified.',
+    )
+
+    @model_validator(mode='after')
+    def require_reason_unless_verified(self) -> Self:
+        if self.verdict == 'verified' and self.reason is not None:
+            message = 'a verified task takes no reason'
+            raise ValueError(message)
+
+        if self.verdict != 'verified' and not (self.reason or '').strip():
+            message = f'a {self.verdict} task needs a reason'
+            raise ValueError(message)
+
+        return self
 
 
 class TaskMarkRequest(RequestModel):
     slug: SlugField
     task_id: TaskIdField
     to: Literal['failed', 'blocked', 'superseded'] = Field(
-        description='The state to mark the task as.'
+        description=(
+            'failed or blocked: a worker reported it cannot finish, with no commit to judge. '
+            'superseded: the plan changed. For a verdict on a reported commit use task_verify.'
+        )
     )
     reason: ProseText = Field(description='Why the task is marked, kept in its history.')
 
@@ -99,7 +113,6 @@ def create_start_request(request: TaskStartRequest, head: str | None) -> StartRe
         owned=request.owned,
         acceptance_count=len(request.acceptance),
         head=head,
-        too_large_approved=request.too_large_approved_by is not None,
     )
 
 

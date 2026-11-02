@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract import ApprovedCommand, Receipt
 from mightymodels_core.database import ConnectionOptions, open_database
 from mightymodels_core.edge import create_database_spec
 from mightymodels_core.investigations import AddRequest, IncomingEntry, StartRequest
@@ -33,33 +32,15 @@ if TYPE_CHECKING:
 
     from mightymodels_core.database import Database
     from mightymodels_core.primitives import Clock, RunId
-    from mightymodels_core.schemas.contract import Outcome
     from mightymodels_core.ticket_decisions import IncomingDecision
 
 HEAD = 'a' * 40
 MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
-OLD_HEAD = 'b' * 40
 REPOSITORY_FACTS = RepositoryFacts(
     branch='feat/widget', head=HEAD, dirty=('src/a.py', 'src/b.py', 'src/c.py'), refusal=None
 )
 FIRST_SUMMARY = 'add the widget'
 OTHER_SUMMARY = 'a ticket of the other repository'
-
-
-def create_receipt(key: str, *, outcome: Outcome, head: str) -> Receipt:
-    return Receipt(
-        key=key,
-        argv=('pytest', '-q', key),
-        outcome=outcome,
-        exit=0,
-        duration_ms=5,
-        stdout_tail=redact(''),
-        stderr_tail=redact(''),
-        digest='digest',
-        head=head,
-        phase='task',
-        at=MOMENT,
-    )
 
 
 def create_defect(source: str) -> IncomingFinding:
@@ -91,12 +72,6 @@ def create_section(summary: str) -> TicketSection:
     )
 
 
-def create_command(key: str) -> ApprovedCommand:
-    return ApprovedCommand(
-        key=key, argv=('pytest', '-q', key), expect_exit=0, timeout=60, approved_by='owner'
-    )
-
-
 def seed_investigation(database: Database, repository_key: RepositoryKey, clock: Clock) -> Slug:
     work = InvestigationWork(database=database, repository_key=repository_key, clock=clock)
     with work.write() as unit:
@@ -121,14 +96,6 @@ def seed_ticket(
     work = TaskWork(database=database, repository_key=repository_key, clock=clock)
     with work.write() as unit:
         unit.tasks.tickets.stage(slug, create_section(FIRST_SUMMARY), (investigation,))
-        unit.contracts.approve(slug, [create_command(key) for key in ('I1', 'I2', 'I3')], head=HEAD)
-        unit.contracts.record(
-            slug,
-            [
-                create_receipt('I1', outcome='pass', head=HEAD),
-                create_receipt('I2', outcome='fail', head=OLD_HEAD),
-            ],
-        )
         start = TaskStartRequest(
             task_key=TaskId('T1'),
             worker='engineer',
@@ -197,12 +164,7 @@ def seed_crowded_tasks(
         acceptance_count=1,
         head=HEAD,
     )
-    receipts = [
-        create_receipt('I2', outcome='pass', head=HEAD),
-        create_receipt('I3', outcome='pass', head=HEAD),
-    ]
     with work.write() as unit:
-        unit.contracts.record(seeded, receipts)
         unit.tasks.declare(seeded, [TaskId('T2')])
         unit.tasks.start(seeded, start)
         unit.tasks.mark(seeded, MarkRequest(task_key=TaskId('T2'), to='blocked', reason='a wall'))
@@ -231,7 +193,7 @@ def open_crowded_snapshot(directory: Path) -> Generator[CrowdedSnapshot]:
     key = RepositoryKey('owner/repo')
     clock = create_fake_clock(MOMENT)
     opened = open_database(
-        directory.joinpath('mightymodels.db'), create_database_spec(), ConnectionOptions()
+        directory.joinpath('state.db'), create_database_spec(), ConnectionOptions()
     )
     try:
         investigation = seed_investigation(opened, key, clock)

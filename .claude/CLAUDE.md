@@ -22,7 +22,7 @@ Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. 
 ## Layout
 
 - The plugin sits at the repository root, and `.claude-plugin/plugin.json` contains its manifest. The root `pyproject.toml` is both the plugin project and the uv workspace root, with members under `packages/`.
-- `packages/hooks` holds the plugin's hook code (`mightymodels_hooks`), which `hooks/hooks.json` runs through the shell wrappers in `hooks/`. `.claude/hooks/pyhooks.py` is the project's own hook script, a PEP 723 script that `.claude/settings.json` wires to Write, Edit and Read. ty does not check it, because `ty.toml` includes only `packages` and `tests`.
+- `packages/hooks` holds the plugin's hook code (`mightymodels_hooks`), which `hooks/hooks.json` runs through the shell wrappers in `hooks/`. `.claude/hooks/pyhooks.py` is the project's own hook script, a PEP 723 script that `.claude/settings.json` wires to Write, Edit and Read. ty does not check it, because `ty.toml` includes only `packages` and `tests`. The plugin's hooks record and route, and refuse only a dispatch outside the caller's roster, an intern dispatch unless a task is started for the intern and every such task owns exactly one file, a dispatch of the engineer or architect from the main thread while the branch's unclosed ticket has no task in progress, a dispatch whose task or ticket state cannot be read (it fails closed), a payload that is malformed or names no target type (exit 2), and, when the hook itself cannot run (the launcher crashes or times out), any dispatch made by a plugin worker.
 - `packages/mcp` also holds the `review_metrics` and `review_signals` tool domains, which carry the review commands that the removed command line used to run.
 - Read `.claude/rules/python.md` before writing Python and `.claude/rules/testing.md` before writing tests. Both load on their own when you touch a matching file.
 
@@ -39,7 +39,7 @@ Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. 
 
 ## Verification
 
-`.github/workflows/ci.yml` defines CI's quality job, which runs the pre-commit hooks on all files and then the tests. Match it with `make pre-commit`, then `uv run pytest -q -m "not integration"`, because `make test` skips the e2e tests and the unmarked tests that CI runs. `make check` is the faster local loop, but it skips the hygiene and uv-lock hooks, so it can pass where CI fails.
+`.github/workflows/ci.yml` defines CI's quality job, which runs the pre-commit hooks on all files and then the tests. Match it with `make pre-commit`, then `uv run pytest -q -m "not integration"`, because `make test` skips the e2e tests and the unmarked tests that CI runs. CI's integration job runs `pytest -q -m integration`. `make check` is the faster local loop, but it skips the hygiene and uv-lock hooks, so it can pass where CI fails.
 
 ## Claude Code
 

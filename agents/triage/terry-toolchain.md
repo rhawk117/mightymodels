@@ -70,7 +70,7 @@ head: 4f2a9c1 | claude: 2.1.296
 - TC-4 [declared] plugins/acme/agents/review/sql.md:2: agent `acme:review:sql`, a query reviewer
 
 ## Repository toolchain
-- TC-5 [seen] .git/hooks/pre-commit:3: every `git commit` runs `scripts/quality.sh --lint` (.pre-commit-config.yaml:41)
+- TC-5 [seen] .git/hooks/pre-commit:3: every `git commit` runs `bash ./scripts/lint.sh` (.pre-commit-config.yaml:55)
 - TC-6 [seen] .ruff.toml:68: autouse fixtures are banned (`pytest-fixture-autouse`)
 - TC-7 [seen] pyproject.toml:52: tests run with `uv run pytest`
 

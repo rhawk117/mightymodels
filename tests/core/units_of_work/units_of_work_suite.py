@@ -116,7 +116,6 @@ class UnitsOfWorkContract(UnitsOfWorkFastPaths):
                 assert unit.tickets.investigations.investigation(Slug('first-look')) is None
                 assert unit.closing.tasks.task(failed_ticket_id, TASK) is None
                 assert unit.closing.attempts.failed_fixes(failed_ticket_id, TASK) == []
-                assert unit.closing.contracts.commands(failed_ticket_id) == []
                 assert unit.closing.review_decisions.reviews.run(REVIEW_RUN) is None
                 assert unit.closing.review_decisions.decisions.dispositions(REVIEW_RUN) == []
                 assert unit.closing.closings.closing(failed_ticket_id) is None
@@ -226,14 +225,12 @@ class UnitsOfWorkContract(UnitsOfWorkFastPaths):
         ) -> None:
             with task_work.write() as unit:
                 assert unit.tasks.clock is task_work.clock
-                assert unit.contracts.clock is task_work.clock
 
-        def test_task_and_contract_services_share_one_unit(self, task_work: TaskWork) -> None:
+        def test_task_services_share_one_unit(self, task_work: TaskWork) -> None:
             with task_work.write() as unit:
                 tasks = unit.tasks
 
                 assert unit_of(tasks.tasks) is unit_of(tasks.attempts)
-                assert tasks.tickets is unit.contracts.tickets
                 assert unit_of(tasks.tickets) is unit_of(tasks.tasks)
 
     class TestReviewWork:

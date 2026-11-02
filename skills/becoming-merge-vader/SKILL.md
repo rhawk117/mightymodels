@@ -91,7 +91,7 @@ The diff shows `db.py` renaming `get_all_tasks` to `list_tasks`, with `handlers.
 Ledger row: `db.py` | public symbol renamed | sdlc | any callers of the old name outside the diff?
 Scout task: "List call sites of `get_all_tasks` anywhere in the repository except `app/db.py` and `app/handlers.py`. Report file:line. Exclude `.venv` and `__pycache__`."
 Scout returns VERIFIED: `scripts/nightly_report.py:12` calls `get_all_tasks`.
-Finding: MV-3 | sdlc | High | Evidence: `scripts/nightly_report.py:12` | Why: merging breaks the nightly report at import time, and the branch never touched the script so branch CI cannot catch it | Fix: update the call to `list_tasks` or keep a deprecation alias | Verify: `grep -rn "get_all_tasks" --include="*.py" .` returns nothing | Confidence: High.
+Finding: MV-3 | sdlc | High | Evidence: `scripts/nightly_report.py:12` | Why: merging breaks the nightly report at import time, and the branch never touched the script so branch CI cannot catch it | Fix: update the call to `list_tasks` or keep a deprecation alias | Verify: no Python file in the repository calls `get_all_tasks` any longer | Confidence: High.
 </example>
 <example>
 Weak dispatch: "Check if the CI changes on this branch weakened anything."
@@ -101,7 +101,7 @@ The comparison against the branch version is then yours to make, and it is judgm
 </example>
 <example>
 Findings: one Medium (new parser lacks tests), two Low (naming, stale internal comment). No Critical, no High, nothing UNKNOWN-BLOCKED.
-Verdict: MERGE WITH CONDITIONS. Condition 1: add parser tests covering the two malformed-input paths named in MV-1; verify with `pytest tests/test_parser.py`. Epigraph: "Impressive. Most impressive. But you are not a Jedi yet."
+Verdict: MERGE WITH CONDITIONS. Condition 1: the parser tests cover both malformed-input paths named in MV-1 and pass. Epigraph: "Impressive. Most impressive. But you are not a Jedi yet."
 </example>
 </examples>
 

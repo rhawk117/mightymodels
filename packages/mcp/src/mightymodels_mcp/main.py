@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from mightymodels_core.edge import PLUGIN_DATA_VARIABLE, data_directory_from
 from mightymodels_core.workspace import find_root
 
-from mightymodels_mcp.contract.tools import register_contract_tools
 from mightymodels_mcp.investigation.tools import register_investigation_tools
 from mightymodels_mcp.journal.tools import register_journal_tools
 from mightymodels_mcp.review.decision_tools import register_decision_tools
@@ -24,7 +23,7 @@ from mightymodels_mcp.server.call_log import (
 )
 from mightymodels_mcp.server.dependencies import ServerDependencies
 from mightymodels_mcp.server.registration import ToolCatalog
-from mightymodels_mcp.server.state import LocalStateOpener, discard_outdated_database
+from mightymodels_mcp.server.state import LocalStateOpener
 from mightymodels_mcp.snapshot.tools import register_snapshot_tools
 from mightymodels_mcp.task.tools import register_task_tools
 from mightymodels_mcp.ticket.tools import register_ticket_tools
@@ -38,7 +37,6 @@ REFUSED_START = 2
 REGISTRARS = (
     register_ticket_tools,
     register_task_tools,
-    register_contract_tools,
     register_review_tools,
     register_decision_tools,
     register_review_metrics_tools,
@@ -72,7 +70,6 @@ def run(environ: Mapping[str, str], cwd: Path) -> int:
     with installed_logging(
         LogSettings(level=level, data_directory=data_directory, stream=sys.stderr)
     ):
-        discard_outdated_database(data_directory)
         create_server(ServerDependencies(state=state), create_catalog()).run()
 
     return 0

@@ -15,9 +15,12 @@ from mightymodels_core.tasks import (
     InternSpentError,
     ModeNeedsArchitectError,
     StartPolicy,
-    TaskTooLargeError,
     TransitionError,
     TransitionPolicy,
+    VerdictPolicy,
+    VerdictReasonError,
+    VerdictReasonRefusedError,
+    get_size_warning,
 )
 from mightymodels_core.vocabulary.tasks import TaskStatus
 
@@ -48,9 +51,6 @@ class StartScenario:
     before: TaskStatus = 'pending'
     attempts: tuple[tuple[Worker, int], ...] = ()
     implementation_spent: int = 0
-    acceptance_count: int = 2
-    owned_count: int = 2
-    too_large_approved: bool = False
     problem: type[Exception] | None = None
     marks: tuple[pytest.MarkDecorator, ...] = ()
 
@@ -67,9 +67,6 @@ class StartScenario:
             mode=self.mode,
             attempts=dict(self.attempts),
             implementation_spent=self.implementation_spent,
-            acceptance_count=self.acceptance_count,
-            owned_count=self.owned_count,
-            too_large_approved=self.too_large_approved,
         )
 
 
@@ -99,14 +96,6 @@ def start_accepted_cases() -> pytest.MarkDecorator:
             mode='systemic-refactor',
             before='in-progress',
         ),
-        StartScenario(name='acceptance-at-the-bound', acceptance_count=4),
-        StartScenario(name='owned-at-the-bound', owned_count=10),
-        StartScenario(
-            name='over-the-bound-with-user-approval',
-            acceptance_count=9,
-            owned_count=30,
-            too_large_approved=True,
-        ),
     ]
     return pytest.mark.parametrize('scenario', [scenario.param for scenario in scenarios])
 
@@ -124,10 +113,6 @@ def start_refused_cases() -> pytest.MarkDecorator:
             mode='diagnose-replan',
             problem=ModeNeedsArchitectError,
         ),
-        StartScenario(
-            name='acceptance-over-the-bound', acceptance_count=5, problem=TaskTooLargeError
-        ),
-        StartScenario(name='owned-over-the-bound', owned_count=11, problem=TaskTooLargeError),
         StartScenario(
             name='second-architect-recovery',
             worker='architect',
@@ -175,11 +160,6 @@ def start_reasons_cases() -> pytest.MarkDecorator:
             ('by architect', 'in recovery-implementation mode'),
             id='architect-default-mode',
         ),
-        pytest.param(
-            StartScenario(name='approved', too_large_approved=True),
-            ('by engineer', 'too large, approved by user'),
-            id='too-large-approved',
-        ),
     ]
     return pytest.mark.parametrize(('scenario', 'reasons'), cases)
 
@@ -214,11 +194,41 @@ class TestTransitionPolicy:
         assert str(problem) == f'{TASK} cannot move from {before} to {after}'
 
 
-class TestStartPolicy:
-    @pytest.fixture
-    def oversized_owned(self) -> StartScenario:
-        return StartScenario(name='big', owned_count=11)
+class TestVerdictPolicy:
+    failing_verdicts = st.sampled_from(['failed', 'blocked'])
+    blank_reasons = st.one_of(st.none(), st.text(alphabet=' \t\n'))
+    real_reasons = st.text(min_size=1).filter(lambda text: text.strip() != '')
 
+    def find_problem(
+        self, verdict: TaskStatus, reason: str | None
+    ) -> VerdictReasonError | VerdictReasonRefusedError | None:
+        policy = VerdictPolicy(task_key=TASK, verdict=verdict, reason=reason)
+        return policy.get_reason_problem()
+
+    @given(verdict=failing_verdicts, reason=blank_reasons)
+    def test_failed_or_blocked_without_a_reason_is_refused(
+        self, verdict: TaskStatus, reason: str | None
+    ) -> None:
+        problem = self.find_problem(verdict, reason)
+
+        assert isinstance(problem, VerdictReasonError)
+        assert problem.verdict == verdict
+
+    @given(verdict=failing_verdicts, reason=real_reasons)
+    def test_failed_or_blocked_with_a_reason_is_accepted(
+        self, verdict: TaskStatus, reason: str
+    ) -> None:
+        assert self.find_problem(verdict, reason) is None
+
+    @given(reason=st.text())
+    def test_verified_with_a_reason_is_refused(self, reason: str) -> None:
+        assert isinstance(self.find_problem('verified', reason), VerdictReasonRefusedError)
+
+    def test_verified_without_a_reason_is_accepted(self) -> None:
+        assert self.find_problem('verified', None) is None
+
+
+class TestStartPolicy:
     @start_accepted_cases()
     def test_start_is_accepted(self, scenario: StartScenario) -> None:
         assert scenario.policy.get_start_problem() is None
@@ -235,11 +245,31 @@ class TestStartPolicy:
     ) -> None:
         assert scenario.policy.reasons == reasons
 
-    def test_size_problem_names_what_is_counted(self, oversized_owned: StartScenario) -> None:
-        problem = oversized_owned.policy.get_size_problem()
 
-        assert isinstance(problem, TaskTooLargeError)
-        assert (problem.counted, problem.count, problem.limit) == ('owned files', 11, 10)
+def size_warning_cases() -> pytest.MarkDecorator:
+    sizes: list[ParameterSet] = [
+        pytest.param(3, 4, False, id='three-files-four-criteria'),
+        pytest.param(4, 4, True, id='four-files'),
+        pytest.param(3, 5, True, id='five-criteria'),
+        pytest.param(12, 6, True, id='both-over'),
+    ]
+    return pytest.mark.parametrize(('owned_count', 'acceptance_count', 'warns'), sizes)
+
+
+class TestSizeWarning:
+    @size_warning_cases()
+    def test_warns_only_above_the_bounds(
+        self, owned_count: int, acceptance_count: int, *, warns: bool
+    ) -> None:
+        warning = get_size_warning(acceptance_count=acceptance_count, owned_count=owned_count)
+
+        assert (warning is not None) is warns
+
+    def test_warning_names_break_it_down(self) -> None:
+        warning = get_size_warning(acceptance_count=5, owned_count=4)
+
+        assert warning is not None
+        assert 'break-it-down' in warning
 
 
 class TestFixPolicy:

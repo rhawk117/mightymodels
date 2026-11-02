@@ -1,7 +1,14 @@
 """The task services."""
 
 from .reads import Readiness, TaskListing, TaskReadService
-from .writes import FixRecorded, MarkRequest, StartRequest, TaskService, VerifyRequest
+from .writes import (
+    FixRecorded,
+    MarkRequest,
+    StartRequest,
+    TaskService,
+    VerifyRequest,
+    VerifyVerdict,
+)
 
 __all__ = [
     'FixRecorded',
@@ -12,4 +19,5 @@ __all__ = [
     'TaskReadService',
     'TaskService',
     'VerifyRequest',
+    'VerifyVerdict',
 ]

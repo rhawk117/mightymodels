@@ -13,11 +13,10 @@ from mightymodels_core.primitives import short_head
 from mightymodels_core.primitives.value_types import ARCHIVES_DIRECTORY
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Mapping
 
     from mightymodels_core.primitives import TaskId
     from mightymodels_core.ticket_closing.archive import (
-        ArchivedCommand,
         ArchivedReview,
         ArchivedTask,
         ArchiveRecord,
@@ -63,25 +62,6 @@ def tasks_line(tasks: Mapping[TaskId, ArchivedTask]) -> str:
     return f'tasks: {shown or NONE_RECORDED}'
 
 
-def retired_texts(verification: Sequence[ArchivedCommand]) -> list[str]:
-    return [
-        f'{command.key} by {command.retirement.by} ({command.retirement.approval_source}): '
-        f'{command.retirement.why}'
-        for command in verification
-        if command.retirement
-    ]
-
-
-def checks_line(verification: Sequence[ArchivedCommand]) -> str:
-    not_passing = [command.key for command in verification if command.outcome != 'pass']
-    passing = len(verification) - len(not_passing)
-    tail = f'; not passing: {", ".join(not_passing)}' if not_passing else ''
-    retired = '; '.join(retired_texts(verification))
-    retired_tail = f'; retired: {retired}' if retired else ''
-    counts = f'{len(verification)} contract commands, {passing} passing at last run'
-    return f'checks: {counts}{tail}{retired_tail}'
-
-
 def review_line(review: ArchivedReview | None) -> str:
     if review is None:
         return 'review: none'
@@ -107,7 +87,6 @@ def archive_markdown(record: ArchiveRecord, record_name: str, decision_limit: in
         f'# {record.slug}',
         shipped_line(record),
         tasks_line(record.tasks),
-        checks_line(record.verification),
         review_line(record.review),
         'decisions:',
         *decision_lines(record, decision_limit),

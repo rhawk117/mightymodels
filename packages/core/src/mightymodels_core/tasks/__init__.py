@@ -7,21 +7,28 @@ from .errors import (
     InternSpentError,
     ModeNeedsArchitectError,
     TaskMovedError,
-    TaskTooLargeError,
     TransitionError,
     UnknownTaskError,
+    VerdictReasonError,
+    VerdictReasonRefusedError,
 )
 from .gates import (
-    Brief,
-    Evidence,
+    BaseStatus,
     GitFacts,
-    VerificationGate,
-    done_commit,
+    VerifyFacts,
     get_plan_task_problem,
     get_readiness_problems,
+    get_verify_facts,
     is_plan_task,
 )
-from .policy import FixPolicy, StartPolicy, TaskOptions, TransitionPolicy
+from .policy import (
+    FixPolicy,
+    StartPolicy,
+    TaskOptions,
+    TransitionPolicy,
+    VerdictPolicy,
+    get_size_warning,
+)
 from .records import Attempt, AttemptCounts, FailedFix, TaskRecord, Transition
 from .repository import AttemptRepository, TaskRepository
 from .services import (
@@ -33,6 +40,7 @@ from .services import (
     TaskReadService,
     TaskService,
     VerifyRequest,
+    VerifyVerdict,
 )
 from .sqlite_attempts import SqliteAttemptRepository
 from .sqlite_tasks import SqliteTaskRepository
@@ -42,8 +50,7 @@ __all__ = [
     'Attempt',
     'AttemptCounts',
     'AttemptRepository',
-    'Brief',
-    'Evidence',
+    'BaseStatus',
     'FailedFix',
     'FixNotUnderwayError',
     'FixPolicy',
@@ -65,15 +72,19 @@ __all__ = [
     'TaskRecord',
     'TaskRepository',
     'TaskService',
-    'TaskTooLargeError',
     'Transition',
     'TransitionError',
     'TransitionPolicy',
     'UnknownTaskError',
-    'VerificationGate',
+    'VerdictPolicy',
+    'VerdictReasonError',
+    'VerdictReasonRefusedError',
+    'VerifyFacts',
     'VerifyRequest',
-    'done_commit',
+    'VerifyVerdict',
     'get_plan_task_problem',
     'get_readiness_problems',
+    'get_size_warning',
+    'get_verify_facts',
     'is_plan_task',
 ]

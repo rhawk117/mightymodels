@@ -31,7 +31,7 @@ VERDICT: <BLOCK | MERGE WITH CONDITIONS | CLEAR>
 - Evidence (<metric | idiom | convention>): <conditional; the cite, for a quality finding at Medium or above>
 - Why it matters: <the concrete failure mode>
 - Fix: <action an engineer can take without re-deriving the analysis>
-- Verify: <command or check that confirms the fix landed>
+- Verify: <one sentence stating an outcome someone can observe once the fix has landed>
 - Confidence: <High | Low>
 - Signals: <conditional; qualitylens analysis and values>
 - Architect escalation: <conditional; why the fix needs a design decision>
@@ -46,7 +46,7 @@ VERDICT: <BLOCK | MERGE WITH CONDITIONS | CLEAR>
 
 ## Conditions
 
-<Conditional; MERGE WITH CONDITIONS only. Numbered. Each names the finding it resolves and repeats its Verify step.>
+<Conditional; MERGE WITH CONDITIONS only. Numbered. Each names the finding it resolves and repeats its Verify outcome.>
 
 ## Not verified
 
@@ -65,4 +65,4 @@ Field notes:
 - The epigraph is the only flavored line in the file.
 - The first word of the untyped `Evidence:` bullet is the finding's location, `<file>:<line>` or `<file>:<start>-<end>`; review-circus refuses a finding without one. The dimension sets how it is recorded: `security` marks a security defect, `quality` makes a quality finding that needs the typed bullet at Medium or above (idiom-evidence.md), and `sdlc`, `docs` and `plan` are defects.
 - Evidence lines quote at most one source line. The reader has the repo; the report needs the pointer, not the payload.
-- Conditions must be independently checkable. A condition without a Verify step is an opinion.
+- Conditions must be independently checkable. A condition without an observable outcome in its Verify is an opinion.

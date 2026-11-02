@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# Sourced by hook.sh, dispatch-hook.sh and main-thread-hook.sh. The caller sets `here`.
+# Sourced by hook.sh and dispatch-hook.sh. The caller sets `here`.
 
 root=${CLAUDE_PLUGIN_ROOT:-${here%/*}}
 export UV_PROJECT="${root}"

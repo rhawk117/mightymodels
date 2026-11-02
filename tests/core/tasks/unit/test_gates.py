@@ -1,6 +1,5 @@
-"""The task gates: what keeps a task from verified and a ticket from ready."""
+"""The task gates: what keeps a ticket from ready."""
 
-from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -8,117 +7,22 @@ from hypothesis import example, given
 from hypothesis import strategies as st
 from mightymodels_core.primitives import TaskId, redact
 from mightymodels_core.tasks import (
-    Brief,
-    Evidence,
     GitFacts,
     TaskRecord,
-    VerificationGate,
-    done_commit,
+    VerifyRequest,
     get_plan_task_problem,
     get_readiness_problems,
+    get_verify_facts,
     is_plan_task,
 )
 
 if TYPE_CHECKING:
-    from _pytest.mark import ParameterSet
     from mightymodels_core.schemas.tasks import TaskStatus
-
-HEAD = 'abc1234'
-BRIEF = '## ASKED\n  - AC-1: first\n  - AC-2: second\n## DONE\ncommit: abc1234\n'
-TASK = TaskId('T7')
+    from mightymodels_core.tasks import VerifyFacts
 
 
 def create_record(key: str, status: TaskStatus, reasons: tuple[str, ...] = ()) -> TaskRecord:
     return TaskRecord(key=TaskId(key), status=status, reasons=tuple(map(redact, reasons)))
-
-
-@dataclass(slots=True, kw_only=True, frozen=True)
-class GateScenario:
-    name: str
-    git: GitFacts = field(
-        default_factory=lambda: GitFacts(
-            head=HEAD,
-            base_resolves=True,
-            base_is_ancestor=True,
-            changed_files=frozenset({'src/a.py'}),
-            named_commit=HEAD,
-        )
-    )
-    evidence: Evidence = field(
-        default_factory=lambda: Evidence(
-            commit=HEAD,
-            brief=Brief(text=BRIEF),
-            assertions={'AC-1': 'src/a.py:1', 'AC-2': 'src/a.py:2'},
-        )
-    )
-    base: str | None = 'base123'
-    problems: tuple[str, ...] = ()
-
-    @property
-    def param(self) -> ParameterSet:
-        return pytest.param(self, id=self.name)
-
-    @property
-    def gate(self) -> VerificationGate:
-        task = TaskRecord(key=TASK, status='in-progress', owned=('src/a.py',), base=self.base)
-        return VerificationGate(task=task, evidence=self.evidence, git=self.git)
-
-
-def proven() -> GateScenario:
-    return GateScenario(name='proven')
-
-
-def with_git(name: str, problems: tuple[str, ...], **changes: object) -> GateScenario:
-    return GateScenario(name=name, git=replace(proven().git, **changes), problems=problems)
-
-
-def with_evidence(name: str, problems: tuple[str, ...], **changes: object) -> GateScenario:
-    return GateScenario(
-        name=name, evidence=replace(proven().evidence, **changes), problems=problems
-    )
-
-
-def verification_cases() -> pytest.MarkDecorator:
-    scenarios = [
-        proven(),
-        with_git(
-            'head-moved-past-the-commit',
-            ('the reported commit must resolve to the current HEAD',),
-            head='fff9999',
-        ),
-        with_git('no-head', ('the reported commit must resolve to the current HEAD',), head=None),
-        with_git('base-unresolved', ('the task has no valid base commit',), base_resolves=False),
-        GateScenario(name='base-unset', base=None, problems=('the task has no valid base commit',)),
-        with_git(
-            'base-not-an-ancestor',
-            ('the task base is not an ancestor of the reported commit',),
-            base_is_ancestor=False,
-        ),
-        with_git(
-            'changed-outside-the-owned-set',
-            ('changed outside the owned set: src/b.py',),
-            changed_files=frozenset({'src/a.py', 'src/b.py'}),
-        ),
-        with_evidence('brief-missing', ('the task brief is missing',), brief=Brief(text=None)),
-        with_git(
-            'done-names-another-commit',
-            ('the DONE brief must name the reported HEAD commit',),
-            named_commit='old0000',
-        ),
-        with_evidence(
-            'criterion-unproven',
-            ('AC-2 has no citation',),
-            assertions={'AC-1': 'src/a.py:1'},
-        ),
-        with_evidence(
-            'nothing-proves-the-task',
-            ('no cited assertion proves this task',),
-            brief=None,
-            assertions={},
-        ),
-        with_evidence('residual-has-no-brief', (), brief=None),
-    ]
-    return pytest.mark.parametrize('scenario', [scenario.param for scenario in scenarios])
 
 
 def readiness_cases() -> pytest.MarkDecorator:
@@ -164,28 +68,6 @@ def readiness_cases() -> pytest.MarkDecorator:
     return pytest.mark.parametrize(('records', 'problems'), cases)
 
 
-class TestVerificationGate:
-    @verification_cases()
-    def test_verification_problems(self, scenario: GateScenario) -> None:
-        assert scenario.gate.get_verification_problems() == list(scenario.problems)
-
-
-def done_commit_cases() -> pytest.MarkDecorator:
-    cases = [
-        pytest.param(BRIEF, 'abc1234', id='named'),
-        pytest.param('## ASKED\ncommit: abc1234\n', None, id='before-the-done-heading'),
-        pytest.param('## DONE\nno hash\n', None, id='done-without-a-commit'),
-        pytest.param('## DONE\ncommit: xyz\n', None, id='not-a-hash'),
-    ]
-    return pytest.mark.parametrize(('brief_text', 'named'), cases)
-
-
-class TestDoneCommit:
-    @done_commit_cases()
-    def test_done_commit(self, brief_text: str, named: str | None) -> None:
-        assert done_commit(brief_text) == named
-
-
 class TestPlanTask:
     keys = st.text()
 
@@ -204,3 +86,50 @@ class TestReadiness:
     @readiness_cases()
     def test_readiness_problems(self, records: list[TaskRecord], problems: list[str]) -> None:
         assert get_readiness_problems(records) == problems
+
+
+def create_verify_facts(
+    *,
+    commit: str = 'abc',
+    head: str | None = 'abc',
+    base_resolves: bool = True,
+    base_is_ancestor: bool = True,
+    changed_files: frozenset[str] = frozenset(),
+) -> VerifyFacts:
+    record = TaskRecord(key=TaskId('T1'), status='in-progress', owned=('src/a.py',))
+    git = GitFacts(
+        head=head,
+        base_resolves=base_resolves,
+        base_is_ancestor=base_is_ancestor,
+        changed_files=changed_files,
+    )
+    request = VerifyRequest(seen=record, commit=commit, verdict='verified', reason=None, git=git)
+    return get_verify_facts(request, record)
+
+
+class TestVerifyFacts:
+    def test_a_resolved_ancestor_base_reads_ancestor(self) -> None:
+        assert create_verify_facts().base_status == 'ancestor'
+
+    def test_a_resolved_base_that_is_not_an_ancestor_reads_not_ancestor(self) -> None:
+        facts = create_verify_facts(base_is_ancestor=False)
+
+        assert facts.base_status == 'not-ancestor'
+
+    @pytest.mark.parametrize('base_is_ancestor', [True, False])
+    def test_an_unresolved_base_reads_unresolved_whatever_the_raw_ancestor_flag(
+        self, *, base_is_ancestor: bool
+    ) -> None:
+        facts = create_verify_facts(base_resolves=False, base_is_ancestor=base_is_ancestor)
+
+        assert facts.base_status == 'unresolved'
+
+    def test_the_commit_is_head_only_when_it_equals_head(self) -> None:
+        assert create_verify_facts().commit_is_head
+        assert not create_verify_facts(commit='old').commit_is_head
+        assert not create_verify_facts(head=None).commit_is_head
+
+    def test_outside_owned_lists_the_changed_files_not_owned_sorted(self) -> None:
+        facts = create_verify_facts(changed_files=frozenset({'z.py', 'src/a.py', 'b.py'}))
+
+        assert facts.outside_owned == ('b.py', 'z.py')

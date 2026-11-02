@@ -142,58 +142,6 @@ CREATE TABLE task_transitions (
 ) STRICT;
 CREATE INDEX ix_task_transitions_after ON task_transitions (task_id, after);
 
-CREATE TABLE contract_commands (
-  id INTEGER CONSTRAINT pk_contract_commands PRIMARY KEY,
-  ticket_id INTEGER NOT NULL,
-  command_key TEXT NOT NULL,
-  argv TEXT NOT NULL,
-  expect_exit INTEGER NOT NULL DEFAULT 0,
-  timeout INTEGER NOT NULL DEFAULT 300,
-  approved_by TEXT NOT NULL,
-  approval_source TEXT NOT NULL DEFAULT 'fallback',
-  approved_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  head TEXT,
-  retired_by TEXT,
-  retired_why TEXT,
-  retired_approval_source TEXT,
-  retired_at INTEGER,
-  CONSTRAINT fk_contract_commands_ticket FOREIGN KEY (ticket_id)
-    REFERENCES tickets (id) ON DELETE CASCADE,
-  CONSTRAINT uq_contract_commands_key UNIQUE (ticket_id, command_key),
-  CONSTRAINT ck_contract_commands_argv CHECK (json_valid(argv)),
-  CONSTRAINT ck_contract_commands_approval_source CHECK (approval_source IN ('form', 'fallback')),
-  CONSTRAINT ck_contract_commands_retired_approval_source
-    CHECK (retired_approval_source IS NULL OR retired_approval_source IN ('form', 'fallback')),
-  CONSTRAINT ck_contract_commands_retired_together CHECK (
-    (retired_by IS NULL AND retired_why IS NULL AND retired_approval_source IS NULL
-      AND retired_at IS NULL)
-    OR (retired_by IS NOT NULL AND retired_why IS NOT NULL AND retired_approval_source IS NOT NULL
-      AND retired_at IS NOT NULL)
-  )
-) STRICT;
-
-CREATE TABLE receipts (
-  id INTEGER CONSTRAINT pk_receipts PRIMARY KEY,
-  contract_command_id INTEGER NOT NULL,
-  argv TEXT NOT NULL,
-  outcome TEXT NOT NULL,
-  exit INTEGER,
-  duration_ms INTEGER NOT NULL,
-  stdout_tail TEXT NOT NULL,
-  stderr_tail TEXT NOT NULL,
-  digest TEXT NOT NULL,
-  head TEXT,
-  phase TEXT NOT NULL,
-  at INTEGER NOT NULL DEFAULT (unixepoch()),
-  CONSTRAINT fk_receipts_contract_command FOREIGN KEY (contract_command_id)
-    REFERENCES contract_commands (id) ON DELETE CASCADE,
-  CONSTRAINT ck_receipts_argv CHECK (json_valid(argv)),
-  CONSTRAINT ck_receipts_outcome
-    CHECK (outcome IN ('pass', 'fail', 'timeout', 'not-found', 'refused', 'undecodable')),
-  CONSTRAINT ck_receipts_phase CHECK (phase IN ('planning', 'task', 'review', 'landing'))
-) STRICT;
-CREATE INDEX ix_receipts_contract_command ON receipts (contract_command_id);
-
 CREATE TABLE review_runs (
   id INTEGER CONSTRAINT pk_review_runs PRIMARY KEY,
   repository_id INTEGER NOT NULL,
@@ -415,4 +363,4 @@ SELECT
   ) AS projection
 FROM tickets AS t;
 
-PRAGMA user_version = 2;
+PRAGMA user_version = 1;

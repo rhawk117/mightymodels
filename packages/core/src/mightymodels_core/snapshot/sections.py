@@ -1,20 +1,17 @@
 """The functions that turn stored rows into the sections of a snapshot.
 
 Each one is pure: it takes the rows a store returned and the caller's display limit, and returns a
-frozen value. The caps are applied here: the dirty paths, the passing commands, the last `limit`
+frozen value. The caps are applied here: the dirty paths, the last `limit`
 ledger lines, the review decisions and the failed attempts.
 """
 
 from itertools import islice
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract.policy import ReceiptAssessment
 from mightymodels_core.primitives import short_head
 from mightymodels_core.snapshot.records import (
-    CheckState,
     FailedAttempt,
     LedgerLine,
-    PassingCommand,
     RepositoryState,
     ReviewDecision,
     ReviewState,
@@ -23,9 +20,8 @@ from mightymodels_core.snapshot.records import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
-    from mightymodels_core.contract.records import Receipt, RecordedCommand
     from mightymodels_core.git import GitRefusal
     from mightymodels_core.investigations.ledger import Ledger, LinkedLedgers
     from mightymodels_core.reviews.services import LatestReview
@@ -36,7 +32,6 @@ if TYPE_CHECKING:
     from mightymodels_core.vocabulary.investigations import EntryKind
 
 NOT_STARTED = 'not started'
-NEVER_RUN = 'never-run'
 
 
 def git_warnings(refusal: GitRefusal | None) -> tuple[str, ...]:
@@ -70,41 +65,6 @@ def task_state(record: TaskRecord, attempts: AttemptCounts) -> TaskState:
         attempts=attempts.get(record.key, {}),
         reasons=record.reasons,
     )
-
-
-def check_text(receipt: Receipt | None, head: str | None) -> str:
-    if receipt is None:
-        return NEVER_RUN
-
-    if ReceiptAssessment(receipt=receipt, head=head).state == 'stale':
-        return f'stale ({receipt.outcome} at {short_head(receipt.head)})'
-
-    return receipt.outcome
-
-
-def check_states(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], head: str | None
-) -> tuple[CheckState, ...]:
-    return tuple(
-        CheckState(key=command.key, state=check_text(receipts.get(command.key), head))
-        for command in commands
-    )
-
-
-def last_passed(command: RecordedCommand, receipts: Mapping[str, Receipt]) -> bool:
-    receipt = receipts.get(command.key)
-    return receipt is not None and receipt.outcome == 'pass'
-
-
-def passing_commands(
-    commands: Sequence[RecordedCommand], receipts: Mapping[str, Receipt], limit: int
-) -> tuple[PassingCommand, ...]:
-    passing = (
-        PassingCommand(key=command.key, argv=command.argv)
-        for command in commands
-        if last_passed(command, receipts)
-    )
-    return tuple(islice(passing, limit))
 
 
 def failed_attempts(stuck: Sequence[Transition]) -> tuple[FailedAttempt, ...]:

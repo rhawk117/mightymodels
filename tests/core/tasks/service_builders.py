@@ -4,17 +4,20 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract.records import ApprovedCommand, Receipt
-from mightymodels_core.primitives import Slug, TaskId, redact
-from mightymodels_core.tasks import Brief, GitFacts, StartRequest, VerifyRequest
+from mightymodels_core.primitives import Slug, TaskId
+from mightymodels_core.tasks import GitFacts, StartRequest, VerdictPolicy, VerifyRequest
 
 from tests.core.tasks.fakes import FakeAttemptRepository, FakeTaskRepository
 
 if TYPE_CHECKING:
     from mightymodels_core.schemas.tasks import ArchitectMode, Worker
-    from mightymodels_core.tasks import TaskReadService, TaskRecord, TaskService
+    from mightymodels_core.tasks import (
+        TaskReadService,
+        TaskRecord,
+        TaskService,
+        VerifyVerdict,
+    )
 
-    from tests.core.contract.fakes import FakeContractRepository
     from tests.core.primitives.clock import FakeClock
     from tests.core.tasks.fakes import TaskLedger
     from tests.core.tickets.fakes import FakeTicketRepository
@@ -26,8 +29,6 @@ SERVICE_MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 BASE_COMMIT = 'base001'
 DONE_COMMIT = 'abc1234'
 OWNED_FILE = 'src/a.py'
-COMMAND_KEY = 'L1'
-BRIEF_TEXT = f'## ASKED\nacceptance:\n  - AC-1: it works\n## DONE\ncommit: {DONE_COMMIT}\n'
 
 
 def create_start_request(
@@ -54,46 +55,33 @@ def create_git_facts(*, changed_files: frozenset[str] = frozenset({OWNED_FILE}))
         base_resolves=True,
         base_is_ancestor=True,
         changed_files=changed_files,
-        named_commit=DONE_COMMIT,
     )
 
 
-def create_verify_request(seen: TaskRecord, *, changed_files: frozenset[str]) -> VerifyRequest:
+def create_verdict(verdict: VerifyVerdict = 'verified', reason: str | None = None) -> VerdictPolicy:
+    return VerdictPolicy(task_key=FIRST_TASK, verdict=verdict, reason=reason)
+
+
+def create_verify_request(
+    seen: TaskRecord,
+    *,
+    changed_files: frozenset[str],
+    verdict: VerifyVerdict = 'verified',
+    reason: str | None = None,
+) -> VerifyRequest:
     return VerifyRequest(
         seen=seen,
         commit=DONE_COMMIT,
-        assertions={'AC-1': f'{OWNED_FILE}:1'},
+        verdict=verdict,
+        reason=reason,
         git=create_git_facts(changed_files=changed_files),
-        brief=Brief(text=BRIEF_TEXT),
     )
 
 
 def verify_as_asked(harness: ServiceHarness, changed_files: frozenset[str]) -> TaskRecord:
-    seen = harness.service.prepare_verification(SERVICE_SLUG, FIRST_TASK)
+    seen = harness.service.prepare_verification(SERVICE_SLUG, create_verdict())
     request = create_verify_request(seen, changed_files=changed_files)
     return harness.service.verify(SERVICE_SLUG, request)
-
-
-def create_receipt(key: str, *, head: str = DONE_COMMIT) -> Receipt:
-    return Receipt(
-        key=key,
-        argv=('true',),
-        outcome='pass',
-        exit=0,
-        duration_ms=1,
-        stdout_tail=redact(''),
-        stderr_tail=redact(''),
-        digest='digest',
-        head=head,
-        phase='task',
-        at=SERVICE_MOMENT,
-    )
-
-
-def create_command(key: str) -> ApprovedCommand:
-    return ApprovedCommand(
-        key=key, argv=('true',), expect_exit=0, timeout=10, approved_by='the user'
-    )
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
@@ -102,7 +90,6 @@ class ServiceHarness:
     reads: TaskReadService
     tickets: FakeTicketRepository
     task_ledger: TaskLedger
-    contracts: FakeContractRepository
     clock: FakeClock
     ticket_id: int
 

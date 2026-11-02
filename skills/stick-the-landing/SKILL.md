@@ -1,10 +1,10 @@
 ---
 name: stick-the-landing
 description: >-
-  Close an mightymodels sprint: gate the push on `task_ready` and a landing `contract_run`, push, open the PR
+  Close an mightymodels sprint: gate the push on `task_ready`, push, open the PR
   with a checked body, have gitty-up watch CI, and route each failing check as a recorded C task
   (mechanical fixes to an engineer residual, then architect once; non-obvious causes to
-  whats-broken), re-running the landing contract at every new HEAD before re-pushing.
+  whats-broken), treating CI as the hard gate at every new HEAD.
   On green, ask through AskUserQuestion whether to review now (review-circus) or hand off (baton-pass).
   Not for Jira sprint operations, not the review itself
   (review-circus), and not for mid-sprint work (agents-assemble owns the loop).
@@ -21,8 +21,6 @@ allowed-tools:
   - mcp__plugin_mightymodels_mighty-mcp__task_verify
   - mcp__plugin_mightymodels_mighty-mcp__task_mark
   - mcp__plugin_mightymodels_mighty-mcp__task_show
-  - mcp__plugin_mightymodels_mighty-mcp__contract_run
-  - mcp__plugin_mightymodels_mighty-mcp__contract_status
 ---
 
 # stick-the-landing
@@ -35,7 +33,6 @@ Run from the repository root. Claude Code substitutes `${CLAUDE_PLUGIN_ROOT}` in
 an absolute path:
 
 - `task_ready`, `task_start`, `task_verify`, `task_mark` and `task_show` for task state.
-- `contract_run` with phase `landing` to run the contract commands, and `contract_status` to read them.
 - `python3 "${CLAUDE_PLUGIN_ROOT}/skills/open-ticket/scripts/humanize_tracker_body.py"` for the PR body.
 
 Dispatch workers through prompting-subagents. Models are the fixed aliases `subagent-models`
@@ -50,23 +47,16 @@ none was given, and the ticket is the session's active one.
 loop stopped early. Say so and stop rather than papering over it. Then call `task_ready` with
 the `slug`. It answers `ready` only when a plan task has been started, every plan task is
 verified or superseded, and no C or R task is failed or blocked; otherwise it answers
-`not ready` and lists the reasons. It also answers `not ready` while a live command has no
-passing receipt at HEAD, or while no live `L*` command exists. Route by reason. When the only
-reasons are receipts not passing at HEAD, run the landing contract as the next paragraph
-describes, once, and call `task_ready` again. When the reason is the missing `L*` command, say so
-and send the user back to game-plan. Any other reason is the loop's unfinished work: list the
-reasons and send the user back to agents-assemble.
+`not ready` and lists the reasons. It reads task status only and runs no command. Any
+`not ready` is the loop's unfinished work: list the reasons and send the user back to
+agents-assemble.
 
-Run the landing contract with `contract_run`, the `slug` and phase `landing`, leaving `ids`
-out so every live command runs. Only the primary holds this tool, because a hook denies it to
-subagents. A run longer than about two minutes moves to the background: wait for its result, and
-do not treat the notice that it moved as a pass. The push hold lifts when at least one live `L*`
-command exists and every live command passes at HEAD; a ticket with no `L*` command cannot
-land, so say so and send the user back to game-plan. Nothing is pushed on old evidence.
+CI is the hard gate at landing, and there is no local proof step before a push. Treat every check
+on the PR as gating whether or not branch protection requires it.
 
 ## 2. Push and open the PR
 
-The primary pushes the branch. The main-thread hook refuses a `git push` while the ticket is unclosed unless no plan task is open, at least one live `L*` command exists, and every live command has a passing landing-phase receipt at HEAD, so when it refuses, close what it names, run step 1's `contract_run` again and push. A rejected push is reported and the skill stops; never force-push around it.
+The primary pushes the branch. A rejected push is reported and the skill stops; never force-push around it.
 
 Write the PR body to `.mightymodels/SLUG/pr-body.md`: the repository's pull request template
 (`.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE/`) filled from REPORT.md,
@@ -99,33 +89,29 @@ tail alone?*
   Fix:/Verify: verbatim, with SLUG, `C1` as the task id and the check's name as the finding:
 
   The call carries SLUG, `C1` as the task id, `by` `engineer`, `owned` the files the log tail
-  names and `acceptance` the criterion ids.
+  names and `acceptance` the outcome sentence the Fix must make true, as one short sentence.
 
-  When a local command reproduces the check, it is the Verify line: the engineer runs it in
-  sandboxed Bash and the output is cited in `task_verify`. Otherwise the Verify line is the CI
-  check itself, proven after the re-push.
+  The residual carries `Fix:` and an outcome sentence, for example "the lint check passes on
+  this file". When a local command reproduces the check, the engineer runs it in sandboxed Bash,
+  names it and quotes its output. Otherwise the CI check itself proves the outcome after the
+  re-push.
 
 - **No, non-obvious** (a behavioral failure, a flake that is not obviously a flake, anything
   where the cause would be a guess). Invoke **whats-broken**; the phased protocol exists so
   the cheapest worker does not symptom-patch CI into a worse state. Its fix dispatch is the C
   task's engineer attempt, recorded with `task_start` the same way.
 
-## 5. Re-prove, then re-push
+## 5. Re-push
 
-A fix commit moves HEAD, so every receipt is stale. Before any push, run `contract_run` with
-phase `landing` again, as in step 1, and wait for its result, then `task_ready`. A C task still in
-progress does not block `ready`, since its proof is the CI run the push starts; a failing contract
-command does. When the run fails on an `I*` or `L*` command, the CI fix broke verified work:
-`task_mark` the C task `failed` with the reason `"<id> regressed"`, and climb (step 6). Never push
-past it.
-
-Push, then gitty-up re-watches.
+Run `task_ready`, push, and let CI prove the new HEAD. A C task still in progress does not block
+`ready`, since its proof is the CI run the push starts. A CI fix that breaks verified work shows up
+as a failing check and is routed as one (step 4). Then gitty-up re-watches.
 
 ## 6. Close or climb
 
 - **The check passes.** Close the C task on the evidence of the check it repaired, with
-  `task_verify`: the `slug`, `task_id` `C1`, the fix `commit`, and `assertions` mapping `AC-1` to
-  the check link from gitty-up. The commit must stay inside the owned set.
+  `task_verify`: the `slug`, `task_id` `C1`, the fix `commit` and `verdict` `verified`, on gitty-up's
+  evidence that the check passed. The commit must stay inside the owned set.
 
 - **The check still fails**, or the engineer returns `failed` or `blocked`.
   `task_mark` with `to` `failed` or `blocked` and a `reason` (a task the gate blocked already
@@ -135,12 +121,12 @@ Push, then gitty-up re-watches.
   **whats-broken**; whats-broken's own stop rules end at the user,
   with every attempt's evidence.
 
-After a compaction, `task_show` and `contract_status` (each with `slug`) and `gh pr view`
+After a compaction, `task_show` (with `slug`) and `gh pr view`
 are the state; the conversation is not.
 
 ## 7. On green
 
-Every check passes and `task_ready` answers `ready` and the landing run passed at the pushed HEAD. Tell the user, then
+Every check passes and `task_ready` answers `ready`. Tell the user, then
 ask once through `AskUserQuestion` (up to four questions a call, two to four options each):
 
 - **Review now**: invoke review-circus in this session. Recommended when this session runs a

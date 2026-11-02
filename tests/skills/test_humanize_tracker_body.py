@@ -20,7 +20,7 @@ SCRIPT = (
 ASSET = (
     Path(__file__).resolve().parents[2] / 'skills' / 'open-ticket' / 'assets' / 'tracker-body.md'
 )
-pytestmark = pytest.mark.unit
+pytestmark = pytest.mark.integration
 
 CLEAN, ISSUES, REJECTED = 0, 1, 2
 EM_DASH = '\u2014'

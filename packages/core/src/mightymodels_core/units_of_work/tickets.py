@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract import SqliteContractRepository
 from mightymodels_core.investigations import SqliteInvestigationRepository
 from mightymodels_core.tasks import SqliteAttemptRepository, SqliteTaskRepository
 from mightymodels_core.ticket_closing import ClosingService, SqliteClosingRepository
@@ -109,7 +108,6 @@ class TicketWork:
             tickets=ticket_store,
             tasks=SqliteTaskRepository(unit=unit),
             attempts=SqliteAttemptRepository(unit=unit),
-            contracts=SqliteContractRepository(unit=unit),
             review_decisions=review_decisions,
             investigations=investigations,
             closings=SqliteClosingRepository(unit=unit),

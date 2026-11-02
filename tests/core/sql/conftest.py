@@ -25,7 +25,7 @@ def statements() -> Statements:
 
 @pytest.fixture
 def database_path(tmp_path: Path) -> Path:
-    return tmp_path.joinpath('mightymodels.db')
+    return tmp_path.joinpath('state.db')
 
 
 @pytest.fixture(scope='session')

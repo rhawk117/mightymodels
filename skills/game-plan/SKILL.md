@@ -5,11 +5,9 @@ description: >-
   ticket's claims with scouts, run cross-examine so the user
   decides the design before drafting, interview the user (AskUserQuestion) on how each risk is handled, then
   write the ticket's plan.md as a compaction-safe ledger: intent, approach, invariants that
-  must hold throughout, dependency-ordered tasks each with deterministic acceptance criteria
-  and the commands that verify them, non-goals, and risks with the user's chosen handling. No
-  file:line citations. Records the invariant (I) and landing (L) commands in a user-approved
-  contract and runs them at HEAD before approval, declares the plan's tasks, then invokes
-  agents-assemble.
+  must hold throughout, small dependency-ordered tasks each with plain-word acceptance
+  criteria (observable outcome sentences), non-goals, and risks with the user's chosen
+  handling. No file:line citations. Declares the plan's tasks, then invokes agents-assemble.
   Not for small tickets (one-shot), not a design
   document or ADR (the plan sequences work on a settled design).
 when_to_use: >-
@@ -19,9 +17,6 @@ when_to_use: >-
 argument-hint: "[ticket-slug]"
 allowed-tools:
   - AskUserQuestion
-  - mcp__plugin_mightymodels_mighty-mcp__contract_approve
-  - mcp__plugin_mightymodels_mighty-mcp__contract_run
-  - mcp__plugin_mightymodels_mighty-mcp__contract_status
   - mcp__plugin_mightymodels_mighty-mcp__task_declare
   - mcp__plugin_mightymodels_mighty-mcp__ticket_validate
 ---
@@ -38,14 +33,18 @@ Two consequences follow, and the tension between them is where plans go inconsis
 - **No file:line citations.** A plan written at commit A runs across commits B through K; a
   line number carried in it is stale by task three and trusted anyway. what-we-know compiles
   fresh citations per task, inside the loop, at dispatch time.
-- **Deterministic acceptance and verification per task.** A task whose intent is one line and
-  whose acceptance is left to the sprint gets re-interpreted at every dispatch, and the
-  interpretations drift. Acceptance criteria and verification commands are not citations: a
-  command is checkable at HEAD whenever it runs, and if it stops existing the engineer's
-  `blocked` verdict names the plan mismatch, which is the contract working.
+- **Plain-word acceptance per task.** A task whose intent is one line and whose acceptance is
+  left to the sprint gets re-interpreted at every dispatch, and the interpretations drift.
+  Acceptance is written as observable outcome sentences, which are not citations: a sentence
+  stays checkable as the code moves, and a sentence with no observable effect ("works
+  correctly") is refused at write time.
 
-Altitude is not vagueness. A task says what and where, never how; it also says exactly what
-proves it done.
+Altitude is not vagueness. A task says what and where, never how; it also says what outcome
+shows it done.
+
+An observable outcome sentence says what a person or a test can see happen, with no ids and no
+commands. Good: "Asking for a ticket that does not exist returns a not-found message instead of
+a stack trace." Refused: "Error handling works correctly."
 
 ## Sequence
 
@@ -71,8 +70,8 @@ plan on top of them.
 surveys the harness's tools, the installed skills, plugins and agents, the repository's own
 toolchain (git hooks, lint and format bans, CI, and where the test, lint and build commands
 are declared) and the sandbox and permission limits. It writes no file: save its report
-verbatim as `toolchain.md` in the ticket directory, replacing an earlier run's. The commands
-in step 4 are the ones it reports, not guesses, and a hook, ban or denial a task would run
+verbatim as `toolchain.md` in the ticket directory, replacing an earlier run's. The tests
+and checks the plan names are the ones it reports, not guesses, and a hook, ban or denial a task would run
 into becomes an invariant, a criterion or a Risk in the draft, so that it does not come back
 as a `blocked` engineer. What its `Not seen` section lists is a Risk as well.
 
@@ -99,28 +98,6 @@ record into the schema below before writing anything of your own:
 Then read the draft as the post-compaction primary would and check every line of the list
 under "Consistency check". Fix the draft until the list is clean. Do this before the user
 sees it; the user's time is for direction, not for catching a task with no acceptance.
-
-**4b. Approve and run the contract commands.** The contract holds two kinds of command, and
-only the primary runs them. An invariant's proving command gets an `I` id (`I1`, `I2`): it must
-stay true across the sprint. A landing command gets an `L` id (`L1`, `L2`): it is what the push
-hold re-runs at HEAD before anything is pushed, so every ticket needs at least one, usually the
-repository's full test or check command. A plan with no `L` command cannot land: add one, and
-when the repository has no obvious check command, ask the user through `AskUserQuestion` what it
-should be. A task's acceptance command takes no contract id: the engineer
-runs it in the sandbox and cites it in `task_verify`. Call `contract_approve` once with the full
-list of commands and leave `approved_by` out; the tool puts each id and argv to the user.
-
-An answer starting `not approved` means the user wants the list changed: change it as they said
-and call again. An answer starting `needs input` means no one could be asked through the tool: put
-the question it names to the user in one `AskUserQuestion` dialog, and on approval call again with
-`"approved_by": "user"` on each command.
-
-Then call `contract_run` with the `slug`, phase `planning` and `ids` of the new commands, to run
-them at HEAD. A check that needs a pipeline belongs in a script the repository owns. A different
-command gets a new id. Record each command's planning outcome in the plan: an invariant that fails at HEAD is a
-finding for the user before anything is built; a landing command that fails because the thing it
-tests does not exist yet is the expected baseline. Call `contract_status` when a run is refused,
-and read `references/verification-contract.md` for the rules behind it.
 
 **5. Interview the user on risks.** Every risk in the draft gets a handling chosen by the user,
 not by you. One `AskUserQuestion` dialog, risks batched up to four a call, each offering the same
@@ -160,7 +137,7 @@ a delta rather than re-reading two hundred lines. A revision that contradicts a 
 is a new decision: put it back through one cross-examine round rather than editing the plan
 around it. On abandon, leave no plan.md behind.
 
-## plan.md schema (~200 lines max, contracts.md cap)
+## plan.md schema (~200 lines max)
 
 ```markdown
 # <slug> plan
@@ -168,58 +145,48 @@ base-intent: <what this unit of work changes, one paragraph>
 approach: <the strategy, and why it beats the alternative considered>
 
 ## Invariants
-- I1: <what must stay true across every task> | proves: <contract id I1: the command, and its outcome at HEAD>
-
-## Landing
-- L1: <the command the push hold re-runs at HEAD> | planning outcome: <its outcome at HEAD>
+- I1: <what must stay true across every task> | shown by: <the test, CI job or read that shows it, in words>
 
 ## Tasks
 ### T1 (<tiny|sm|med|large>): <one-line intent: what and where, no how>
 depends-on: []
 acceptance:
-- AC-1: <a command with its expected result, or an assertion naming a file or behavior>
-- AC-2: <...>
-verify: <the acceptance commands, in order>
+- <an observable outcome sentence>
+- <...>
 
 ### T2 (<size>): <...>
 depends-on: [T1]
 acceptance:
-- AC-1: <...>
-verify: <...>
+- <...>
 
 ## Non-goals
 - <explicitly out of scope> | why: <one line>
 
 ## Risks
-- R1: <what could go wrong> | signal: <the early observable> | handling: <accept | mitigate: T-n AC-n | gate | re-plan> (user)
+- R1: <what could go wrong> | signal: <the early observable> | handling: <accept | mitigate: T-n | gate | re-plan> (user)
 ```
 
 What each section is for, since the reader will not have this file:
 
-- **Invariants** are the things that must hold at every task boundary, with the command that
-  proves them: the test suite stays green, a public endpoint keeps its contract, a migration
-  is never touched. They are the "cannot be forgotten under any circumstances" layer; a
-  post-compaction primary reads them before every dispatch. Three to five is typical. An
-  invariant without a proving command is a wish.
+- **Invariants** are the things that must hold at every task boundary, with what shows
+  them: the test suite stays green, a public endpoint keeps its shape, a migration is never
+  touched. They are the "cannot be forgotten under any circumstances" layer; a post-compaction
+  primary reads them before every dispatch. Three to five is typical. An invariant with no
+  `shown by` is a wish.
 - **Tasks** are in dependency order, and `depends-on` makes the order checkable rather than
-  implied. A task's size picks its worker: `tiny` goes to the intern and every other size to
+  implied. A task is one reviewable change of about 1-3 files. A large wrong task derails the
+  sprint: the implementer runs out of room, the check proves only half of it, and the reviewer
+  cannot hold the diff. Cut it small. A task's size picks its worker: `tiny` goes to the intern and every other size to
   the engineer, which may also take a tiny task. `tiny` is a bound that can be checked, not a
-  feeling: the task owns exactly one file and every acceptance criterion is a command with an
-  expected result. A task that misses either half is `sm` or larger, and the dispatch hook
-  refuses the intern on a started task that owns any other number of files. A ticket has one
+  feeling: the task owns exactly one file and the change is mechanical. A task that misses
+  either half is `sm` or larger, and the dispatch hook refuses the intern on a started task
+  that owns any other number of files. A ticket has one
   scope, its tasks do not.
 - **acceptance** is lifted into the task's ASKED stanza at dispatch, so the same rule applies
-  now: every criterion is a command someone runs or an assertion someone checks at a named
-  location. "Works correctly", "handles errors appropriately", and "is consistent with the
-  rest of the code" are refused at write time. Two to four criteria per task; a task needing
-  more is two tasks, and `task_start` refuses one with more than four criteria or more than
-  ten owned files, naming break-it-down.
-- **verify** is the sequence of acceptance commands the engineer runs in the sandbox before
-  appending DONE and cites in `task_verify`. It is the same sequence in every task, which is what
-  makes verification comparable across tasks. These commands are not in the contract; only the
-  `I` and `L` commands are, and only the primary runs those.
-- **Landing** holds the `L` commands the push hold re-runs at HEAD. There is at least one; a plan
-  without one cannot be pushed.
+  now: every criterion is an observable outcome sentence. "Works correctly", "handles errors
+  appropriately", and "is consistent with the rest of the code" are refused at write time. Two
+  to four criteria per task; a task needing more is two tasks, and `task_start` warns above
+  three owned files or four criteria, naming break-it-down. CI is the hard gate at landing.
 - **Non-goals** are load-bearing: they are what keeps a long sprint from growing sideways while
   nobody is watching. Each carries its one-line why so a later session does not relitigate it.
 - **Risks** carry the user's handling verbatim, tagged `(user)`, so the sprint knows the
@@ -230,34 +197,32 @@ What each section is for, since the reader will not have this file:
 Run this against the draft before the risk interview, and again against the final plan before
 approval. Each item is a way plans have gone wrong; each is a yes/no question.
 
-- Every task has at least one acceptance criterion that is a command or a located assertion,
+- Every task has at least one acceptance criterion that is an observable outcome sentence,
   and none of the refused phrasings appear anywhere.
-- Every `proves` line names a contract id the user approved in step 4b, and the plan states its
-  planning outcome at HEAD. At least one `L` command exists. No task criterion carries a
-  contract id.
+- Every task is about 1-3 files and no more than four criteria.
 - Every Decided line in the cross-examine record appears in the plan as the approach, a task,
   an invariant, a non-goal, or an acceptance criterion, and no plan line contradicts one.
 - Every Open and Assumed line in the record appears as a Risk with a signal.
 - Every `depends-on` names a task that appears earlier in the file.
 - No task's intent overlaps another task's intent; overlap means the split is wrong.
 - No task does something a non-goal excludes, and no non-goal excludes something a task needs.
-- Every invariant has a proving command.
+- Every invariant has a `shown by`.
 - Every risk has a signal that is observable during the sprint, not only after it, and (after
   the interview) a handling tagged `(user)`. A mitigation names the task or criterion it
   added.
 - Task sizes are plausible against the ticket's `scope`; five `large` tasks on a `med` ticket
   is a scope finding for the user, not a plan.
 - Nothing in the file is a `file:line` citation or a path that only makes sense at this
-  commit. Commands are fine; locations are not.
+  commit.
 - The file is under the cap. Hitting it means content belongs in a task's future ASKED stanza
   or in the issue, not that the plan grows.
 
 ## Boundaries
 
 game-plan writes `toolchain.md` from the survey's report and `plan.md`, the plan only after
-cross-examine and the risk interview, plus the ticket's contract commands and their planning
-receipts, and the declared plan tasks, and the `auto-escalate` line of ticket.yml when the user chose it. It dispatches scouts and terry-toolchain and runs only approved contract commands through `contract_run`;
-no engineer, no architect, no edits to the repository. If step 2
+cross-examine and the risk interview, plus the declared plan tasks, and the `auto-escalate`
+line of ticket.yml when the user chose it. It dispatches scouts and terry-toolchain; no
+engineer, no architect, no edits to the repository. If step 2
 shows the ticket's claims are wrong enough that the approach changes, that is a report to the
 user and possibly a return to open-ticket, not a plan built on a corrected premise the
 ticket does not record.

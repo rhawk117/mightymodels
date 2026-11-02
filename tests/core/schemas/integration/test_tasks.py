@@ -10,7 +10,6 @@ from mightymodels_core.schemas.tasks import (
     ATTEMPTS_BY_WORKER,
     ATTEMPTS_IN_MODES,
     IN_PROGRESS_TASKS_STARTED_BY,
-    LATEST_TRANSITION_OF_EACH_TASK_INTO,
     LATEST_TRANSITIONS_INTO,
     RECORD_TASK_VERIFICATION,
     TASK_BY_KEY,
@@ -94,7 +93,7 @@ class TestTasks:
         assert task.updated_at == STARTED_AT
         assert missing is None
 
-    def test_restarting_keeps_the_first_base_and_the_task_id(
+    def test_restarting_takes_the_new_base_and_keeps_the_task_id(
         self, database: Database, ticket_id: int
     ) -> None:
         first = start(database, upsert(ticket_id, 'T1', base='base1'))
@@ -105,7 +104,7 @@ class TestTasks:
 
         assert again == first
         assert task is not None
-        assert task.base == 'base1'
+        assert task.base == 'base2'
 
     def test_a_mark_before_any_start_has_no_base(self, database: Database, ticket_id: int) -> None:
         start(database, upsert(ticket_id, 'T1', status='blocked', base=None))
@@ -287,22 +286,7 @@ class TestTransitions:
         assert rows[0].head == 'abc'
         assert rows[0].at == STARTED_AT
 
-    def test_the_latest_transition_of_each_task_into_a_status_is_one_row_per_task(
-        self, database: Database, ticket_id: int
-    ) -> None:
-        params = TransitionsIntoParams(
-            ticket_id=ticket_id, statuses=['in-progress', 'failed'], limit=10
-        )
-        with database.read() as unit:
-            rows = unit.all(LATEST_TRANSITION_OF_EACH_TASK_INTO, params)
-
-        assert sorted((row.task_key, row.before) for row in rows) == [
-            ('T1', 'failed'),
-            ('T2', 'pending'),
-        ]
-
     def test_no_statuses_match_nothing(self, database: Database, ticket_id: int) -> None:
         params = TransitionsIntoParams(ticket_id=ticket_id, statuses=[], limit=10)
         with database.read() as unit:
             assert unit.all(LATEST_TRANSITIONS_INTO, params) == []
-            assert unit.all(LATEST_TRANSITION_OF_EACH_TASK_INTO, params) == []

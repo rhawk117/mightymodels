@@ -21,16 +21,6 @@
             "timeout": 10
           }
         ]
-      },
-      {
-        "matcher": "^(Edit|Write|Bash|mcp__plugin_mightymodels_mighty-mcp__contract_run|mcp__plugin_mightymodels_mighty-mcp__contract_approve|mcp__plugin_mightymodels_mighty-mcp__contract_retire)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/main-thread-hook.sh\"",
-            "timeout": 10
-          }
-        ]
       }
     ],
     "SubagentStop": [
@@ -40,16 +30,6 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh\" subagent-record",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "^mightymodels:workers:(engineer|architect|intern)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/hook.sh\" completion-gate",
             "timeout": 10
           }
         ]
@@ -77,7 +57,7 @@
         ]
       },
       {
-        "matcher": "^mcp__plugin_mightymodels_mighty-mcp__(ticket_write|ticket_validate|ticket_show|ticket_update_context|close_check|close_ticket|task_declare|task_start|task_verify|task_mark|task_show|task_ready|failed_fix_record|contract_approve|contract_status|contract_retire|contract_run|review_start|snapshot_take|crashout_add|investigation_add|investigation_render|investigation_knowns)$",
+        "matcher": "^mcp__plugin_mightymodels_mighty-mcp__(ticket_write|ticket_validate|ticket_show|ticket_update_context|close_check|close_ticket|task_declare|task_start|task_verify|task_mark|task_show|task_ready|failed_fix_record|review_start|snapshot_take|crashout_add|investigation_add|investigation_render|investigation_knowns)$",
         "hooks": [
           {
             "type": "command",

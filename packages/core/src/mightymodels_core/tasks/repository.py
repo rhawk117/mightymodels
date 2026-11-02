@@ -2,14 +2,14 @@
 
 `TaskRepository` reads and writes the task rows. `declare` writes `pending` rows for the ids that
 have no row and leaves every existing row, and the transitions, as they were. `record_start`
-upserts the task as in progress, keeps the base it first had, and writes the attempt and the
-transition with it.
+upserts the task as in progress, takes the current head as its base, and writes the attempt and
+the transition with it.
 `record_verification` sets the verified commit and refuses a task that was never started.
 `record_mark` moves a task that may never have started, keeping what it held. A write that leaves
 the ticket with more tasks than one read returns is refused.
 
 `AttemptRepository` reads the attempts, failed fixes and transitions the starts and marks wrote.
-`failed_fixes` and `latest_transition_of_each_task_into` refuse to answer from part of the rows.
+`failed_fixes` refuses to answer from part of the rows.
 `latest_transitions_into` returns the newest `limit` moves into the statuses, oldest first.
 """
 
@@ -62,7 +62,3 @@ class AttemptRepository(Protocol):
     def latest_transitions_into(
         self, ticket_id: int, statuses: Collection[TaskStatus], limit: int
     ) -> list[Transition]: ...
-
-    def latest_transition_of_each_task_into(
-        self, ticket_id: int, statuses: Collection[TaskStatus]
-    ) -> dict[TaskId, Transition]: ...

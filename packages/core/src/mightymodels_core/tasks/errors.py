@@ -34,13 +34,26 @@ class TransitionError(StateError):
         super().__init__(f'{task_key} cannot move from {current} to {target}')
 
 
+class VerdictReasonError(StateError):
+    def __init__(self, *, task_key: TaskId, verdict: TaskStatus) -> None:
+        self.task_key = task_key
+        self.verdict = verdict
+        super().__init__(f'{task_key} cannot be marked {verdict} without a reason')
+
+
+class VerdictReasonRefusedError(StateError):
+    def __init__(self, *, task_key: TaskId) -> None:
+        self.task_key = task_key
+        super().__init__(f'{task_key} is verified, and a verified task takes no reason')
+
+
 class ArchitectSpentError(StateError):
     def __init__(self, *, task_key: TaskId) -> None:
         self.task_key = task_key
         super().__init__(
             f'{task_key} already had its architect recovery; route it to whats-broken, start it '
             'in systemic-refactor mode after the user approves a scope expansion, or in '
-            'diagnose-replan mode for a revised contract'
+            'diagnose-replan mode for a revised ASKED stanza'
         )
 
 
@@ -54,17 +67,6 @@ class ModeNeedsArchitectError(StateError):
     def __init__(self, *, mode: ArchitectMode) -> None:
         self.mode = mode
         super().__init__(f'{mode} is an architect mode; start the task by architect to use it')
-
-
-class TaskTooLargeError(StateError):
-    def __init__(self, *, counted: str, count: int, limit: int) -> None:
-        self.counted = counted
-        self.count = count
-        self.limit = limit
-        super().__init__(
-            f'{count} {counted} is over the {limit} one task may have; split the task with '
-            'break-it-down, which puts the split to the user'
-        )
 
 
 class FixesSpentError(StateError):

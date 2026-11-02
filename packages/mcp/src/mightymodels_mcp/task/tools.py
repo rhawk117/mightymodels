@@ -7,8 +7,6 @@ task_show, task_mark and failed_fix_record never ask git.
 
 from typing import TYPE_CHECKING
 
-from mightymodels_core.workspace import workspace_at
-
 from mightymodels_mcp.server.annotations import MARKS, READS, REFRESHES, WRITES
 from mightymodels_mcp.server.registration import ToolSpec, open_tool_state, register_specs
 
@@ -32,7 +30,7 @@ from .use_cases import (
     start_task,
     verify_task,
 )
-from .views import TaskView
+from .views import TaskView, VerifyView
 
 if TYPE_CHECKING:
     from mightymodels_mcp.server.registration import ToolCatalog, ToolContext
@@ -49,33 +47,29 @@ async def task_declare(request: TaskDeclareRequest, ctx: ToolContext) -> TaskVie
 
 async def task_start(request: TaskStartRequest, ctx: ToolContext) -> TaskView:
     """Start a task for a worker on the files it owns. Use just before dispatching that worker, so
-    its owned files and acceptance criteria are on record. Refused if the task is too large
-    unless the user approved it. A plan task never declared is refused; declare it with
-    task_declare first.
+    its owned files and acceptance criteria are on record. A large task starts with a warning to
+    split it. A plan task never declared is refused; declare it with task_declare first.
     """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
         return start_task(create_task_work(state), request, head)
 
 
-async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> TaskView:
-    """Verify a task against the reported commit, its brief's citations and its owned
-    files. Use when a worker reports done, before the task closes. To record a failure or block
-    instead, use task_mark.
+async def task_verify(request: TaskVerifyRequest, ctx: ToolContext) -> VerifyView:
+    """Record the primary's verdict on a reported commit: verified, failed or blocked (the last two
+    need a reason). Use after judging that commit. Reports the base status: ancestor, not-ancestor
+    or unresolved. For a stop with no commit, use task_mark.
     """
     async with open_tool_state(ctx) as state:
         work = create_task_work(state)
-        seen = prepare_verification(work, request.slug, request.task_id)
-        sources = VerificationSources(
-            git=state.git, workspace=workspace_at(state.checkout.toplevel)
-        )
-        verification = await gather_verification(sources, seen, request)
+        seen = prepare_verification(work, request)
+        verification = await gather_verification(VerificationSources(git=state.git), seen, request)
         return verify_task(work, request.slug, verification)
 
 
 async def task_mark(request: TaskMarkRequest, ctx: ToolContext) -> TaskView:
-    """Mark a task failed, blocked or superseded, with the reason. Use when a worker reports it
-    cannot finish or the plan changed. To close a task as done, use task_verify.
+    """Record a stop with no commit to judge: failed or blocked from a worker's own report,
+    superseded for a plan change. Use task_verify to record a verdict on a reported commit.
     """
     async with open_tool_state(ctx) as state:
         return mark_task(create_task_work(state), request)
@@ -90,8 +84,8 @@ async def task_show(request: TaskRequest, ctx: ToolContext) -> TaskView:
 
 
 async def task_ready(request: TaskRequest, ctx: ToolContext) -> TaskView:
-    """Say whether the tasks of a ticket are ready to close at the current HEAD. Use before
-    close_check or when finishing. For the commands themselves, use contract_status.
+    """Say whether the tasks of a ticket are ready to close. Use before
+    close_check or when finishing.
     """
     async with open_tool_state(ctx) as state:
         head = await state.git.resolve_head()
@@ -132,7 +126,7 @@ TASK_TOOLS = (
         annotations=WRITES,
         icon='task',
         request_model=TaskVerifyRequest,
-        result_model=TaskView,
+        result_model=VerifyView,
         handler=task_verify,
     ),
     ToolSpec(

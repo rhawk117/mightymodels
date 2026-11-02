@@ -4,7 +4,7 @@
 
 ## What changed
 
-<!-- What a reviewer needs to know before the diff, in a few sentences. Name the contract files touched, if any. -->
+<!-- What a reviewer needs to know before the diff, in a few sentences. -->
 
 ## Verification
 

@@ -2,7 +2,7 @@
 
 Per-ticket files, sparse, organized by unit of work, at the git toplevel whichever directory the session started in. The unit of deletion for files is the unit of work: `/prune-ticket` removes a whole ticket directory, so file rot cannot outlive its ticket. The ticket's rows stay in the database.
 
-The state itself is rows in one SQLite database, `mightymodels.db`, and that file is not in this directory. It is in the plugin data directory, the one Claude Code names in `CLAUDE_PLUGIN_DATA`, it serves every repository, and each row carries the key of the repository it belongs to: the origin remote's `owner/name`, or a hash of the toplevel path when there is no origin or the origin is not exactly `owner/name` on a host. The database holds tickets, tasks, the contract, ledgers, reviews, crashouts and closings. A database an earlier version left inside this directory is not read, imported or changed, and can be deleted.
+The state itself is rows in one SQLite database, `state.db`, and that file is not in this directory. It is in the plugin data directory, the one Claude Code names in `CLAUDE_PLUGIN_DATA`, it serves every repository, and each row carries the key of the repository it belongs to: the origin remote's `owner/name`, or a hash of the toplevel path when there is no origin or the origin is not exactly `owner/name` on a host. The database holds tickets, tasks, the contract, ledgers, reviews, crashouts and closings. A database an earlier version left inside this directory is not read, imported or changed, and can be deleted.
 
 ```
 .mightymodels/
@@ -13,7 +13,8 @@ The state itself is rows in one SQLite database, `mightymodels.db`, and that fil
 │   ├── issue-body.md                  when no forge issue was created, or as the local draft
 │   ├── pr-body.md                     stick-the-landing's checked PR body
 │   ├── handoffs/snapshot.{json,md}    baton-pass writes what the snapshot tool returns: objective state from the database
-│   ├── handoffs/BATON.md              mid-work handoff, ≤40 lines, facts that live nowhere else
+│   ├── handoffs/BATON.md              mid-work handoff, ≤80 lines, the primary's judgment that lives nowhere else
+│   ├── scratchpad.md                  the primary's free-form working notes; baton-pass lifts what matters into BATON.md
 │   ├── briefs/task-NN.md              two halves, ≤80 lines (contracts.md)
 │   ├── review/<run>/                  one review-circus run: persona reports, metrics, the rendered report
 │   ├── whats-broken.md                only while a debug is live; regenerated per attempt
@@ -32,8 +33,6 @@ The database's only writers are the mighty-mcp tools. Each group of tables has o
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | `tickets`                                                            | `ticket_validate` and `ticket_update_context` stage the row; the task tools move a staged ticket to in-progress and refuses a closed one, and `close_ticket` moves the ticket to closed                                   | every session                                            |
 | `tasks`, `task_attempts`, `task_transitions`, `task_failed_fixes`  | the task tools (`task_declare`, `task_start`, `task_verify`, `task_mark`), called by the plan skills and agents-assemble; `failed_fix_record` for `task_failed_fixes`, called by an engineer |  agents-assemble, stick-the-landing, baton-pass           |
-| `contract_commands`                                                  | `contract_approve` and `contract_retire`, called by game-plan and one-shot                                   | the task tools, every skill that proves work            |
-| `receipts`                                                           | `contract_run`, primary only                                                                           | the task tools and `snapshot_take`, every skill that proves work |
 | `ledger_entries`                                                     | the `investigation_*` tools                                                                            | what-we-know, open-ticket, the `snapshot` tool           |
 | `review_runs`, `review_findings`, `review_dispositions`, `review_outcomes` | the `review_*` tools                                                                             | review-circus, stick-the-landing, `close_ticket`       |
 | `crashouts`                                                          | the `crashout_*` tools                                                                                 | crashout                                                 |
@@ -45,6 +44,7 @@ The database's only writers are the mighty-mcp tools. Each group of tables has o
 | briefs/ DONE half                                                    | implementer                                                                                         | primary, fact-checker                                    |
 | review/<run>/ directory                                              | `review_start` creates it; the primary writes persona reports, metrics and the rendered report | review-circus, stick-the-landing, prune-ticket, the user |
 | issue-body.md, pr-body.md                                            | open-ticket or one-shot (issue-body.md), stick-the-landing (pr-body.md)                             | `gh issue create`, `gh pr create`                        |
+| scratchpad.md                                                        | the primary only, free-form                                                                         | the primary; baton-pass lifts it into BATON.md           |
 | handoffs/                                                            | baton-pass, from `snapshot_take`'s text; BATON.md is the primary's own                          | the next session's primary                               |
 | whats-broken.md                                                      | the whats-broken primary                                                                              | `close_check`, which blocks closing while it exists   |
 | REPORT.md                                                            | agents-assemble primary                                                                             | stick-the-landing, review-circus, prune-ticket           |
@@ -52,7 +52,7 @@ The database's only writers are the mighty-mcp tools. Each group of tables has o
 
 ## Thinness rule for handoffs
 
-`BATON.md` carries only facts that live nowhere else. It is a bootstrap pointer — read ticket.yml, read issue #N, your role, what to invoke — plus nothing. Duplicated facts drift, and the next session reads ticket.yml first anyway.
+`BATON.md` carries only what lives nowhere else: the primary's judgment (what it distrusts, what it saw first-hand, decisions no tool stored), and a pointer to read ticket.yml, read issue #N, your role, what to invoke. Duplicated facts drift, and the next session reads ticket.yml first anyway.
 
 ## Never tracked
 

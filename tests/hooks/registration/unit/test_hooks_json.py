@@ -3,11 +3,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 from mightymodels_hooks.cli import create_hook_router
-from mightymodels_hooks.main_thread import (
-    CONTRACT_APPROVE_TOOL,
-    CONTRACT_RETIRE_TOOL,
-    CONTRACT_RUN_TOOL,
-)
 from mightymodels_hooks.session_pointer import create_pointer_fields
 
 from tests.hooks.registration.registration_builders import ROOT
@@ -16,25 +11,15 @@ if TYPE_CHECKING:
     from tests.hooks.registration.registration_builders import RegisteredHook
 
 POINTER_TOOLS = create_pointer_fields().tool_names
-MAIN_THREAD_MATCHER = (
-    f'^(Edit|Write|Bash|{CONTRACT_RUN_TOOL}|{CONTRACT_APPROVE_TOOL}|{CONTRACT_RETIRE_TOOL})$'
-)
 POINTER_MATCHER = '^mcp__plugin_mightymodels_mighty-mcp__(' + '|'.join(POINTER_TOOLS) + ')$'
 EXPECTED = [
     ('SessionStart', None, 'hook.sh', 'session-start'),
     ('PreToolUse', 'Agent', 'dispatch-hook.sh', None),
-    ('PreToolUse', MAIN_THREAD_MATCHER, 'main-thread-hook.sh', None),
     (
         'SubagentStop',
         '^mightymodels:triage:(code-scout|web-scout)$',
         'hook.sh',
         'subagent-record',
-    ),
-    (
-        'SubagentStop',
-        '^mightymodels:workers:(engineer|architect|intern)$',
-        'hook.sh',
-        'completion-gate',
     ),
     ('PostToolUse', 'SubagentHandback', 'hook.sh', 'subagent-handback'),
     ('PostToolUse', 'AskUserQuestion', 'hook.sh', 'ask-recorder'),
@@ -48,13 +33,12 @@ def fixed_wrapper_cases() -> pytest.MarkDecorator:
         'script',
         [
             pytest.param('dispatch-hook.sh', id='dispatch'),
-            pytest.param('main-thread-hook.sh', id='main-thread'),
         ],
     )
 
 
 class TestHooksJson:
-    def test_the_nine_command_hooks_are_registered(
+    def test_the_seven_command_hooks_are_registered(
         self, registered_hooks: list[RegisteredHook]
     ) -> None:
         found = [(h.event, h.matcher, h.script, h.subcommand) for h in registered_hooks]
@@ -77,8 +61,8 @@ class TestHooksJson:
 
         assert all(router.find_handler(name) is not None for name in named)
 
-    def test_the_pointer_matcher_names_twenty_three_tools(self) -> None:
-        assert len(POINTER_TOOLS) == 23
+    def test_the_pointer_matcher_names_nineteen_tools(self) -> None:
+        assert len(POINTER_TOOLS) == 19
 
     @fixed_wrapper_cases()
     def test_fixed_wrappers_take_no_subcommand(

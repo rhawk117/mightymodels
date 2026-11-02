@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract import SqliteContractRepository
-from mightymodels_core.contract.records import Approval, ApprovedCommand
 from mightymodels_core.crashouts import SqliteCrashoutRepository
 from mightymodels_core.investigations import InvestigationRecord, SqliteInvestigationRepository
 from mightymodels_core.primitives import RunId, Slug, TaskId, redact
@@ -50,7 +48,6 @@ def count_repositories(database: Database, repository_key: RepositoryKey) -> int
 
 SQLITE_STORES = (
     SqliteAttemptRepository,
-    SqliteContractRepository,
     SqliteCrashoutRepository,
     SqliteInvestigationRepository,
     SqliteReviewDecisionRepository,
@@ -71,7 +68,6 @@ MOMENT = datetime(2026, 5, 6, 7, 8, 9, tzinfo=UTC)
 TASK = TaskId('T1')
 REVIEW_RUN = RunId('20260506-070809')
 FINDING_KEY = 'MV-1'
-COMMAND_KEY = 'I1'
 
 
 class UnitFailedError(Exception):
@@ -89,10 +85,6 @@ def write_task_stores(unit: TicketWriteUnit, ticket_id: int) -> None:
     )
     fix = FailedFix(task_key=TASK, hypothesis=redact('a hypothesis'), at=MOMENT)
     unit.closing.attempts.record_failed_fix(ticket_id, fix)
-    command = ApprovedCommand(
-        key=COMMAND_KEY, argv=('make', 'test'), expect_exit=0, timeout=300, approved_by='planner'
-    )
-    unit.closing.contracts.approve(ticket_id, [command], Approval(at=MOMENT, head='abc1234'))
 
 
 def write_review_stores(unit: TicketWriteUnit, slug: Slug) -> None:

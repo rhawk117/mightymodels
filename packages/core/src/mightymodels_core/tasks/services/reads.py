@@ -3,11 +3,9 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from mightymodels_core.contract.policy import live_commands
-from mightymodels_core.tasks.gates import get_landing_problems, get_readiness_problems
+from mightymodels_core.tasks.gates import get_readiness_problems
 
 if TYPE_CHECKING:
-    from mightymodels_core.contract.repository import ContractRepository
     from mightymodels_core.primitives import Slug
     from mightymodels_core.tasks.records import AttemptCounts, TaskRecord
     from mightymodels_core.tasks.repository import AttemptRepository, TaskRepository
@@ -31,7 +29,6 @@ class TaskReadService:
     tickets: TicketRepository
     tasks: TaskRepository
     attempts: AttemptRepository
-    contracts: ContractRepository
 
     def show(self, slug: Slug) -> TaskListing:
         ticket_id = self.tickets.staged_ticket(slug).id
@@ -40,14 +37,7 @@ class TaskReadService:
             attempts=self.attempts.attempts_by_worker(ticket_id),
         )
 
-    def ready(self, slug: Slug, head: str | None) -> Readiness:
+    def ready(self, slug: Slug) -> Readiness:
         ticket_id = self.tickets.staged_ticket(slug).id
         records = self.tasks.tasks(ticket_id)
-        receipts = self.contracts.latest_receipts(ticket_id)
-        problems = [
-            *get_readiness_problems(records),
-            *get_landing_problems(
-                live_commands(self.contracts.commands(ticket_id)), receipts, head
-            ),
-        ]
-        return Readiness(records=records, problems=problems)
+        return Readiness(records=records, problems=get_readiness_problems(records))

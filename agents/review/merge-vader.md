@@ -54,7 +54,7 @@ The first line after the title is the verdict line, exactly `VERDICT: ` followed
 </output_format>
 
 <verification>
-Before returning, apply the doctrine's own checks and these four. Every Critical and High finding cites a line you opened yourself, not only a scout's `INFERRED` lead. The verdict follows the doctrine's deterministic rule from the findings you listed, including the cap when a security-relevant question ended `UNKNOWN-BLOCKED`. Every finding has a Verify step someone else can run. Plan conformance and Clean dimensions are present even when empty.
+Before returning, apply the doctrine's own checks and these four. Every Critical and High finding cites a line you opened yourself, not only a scout's `INFERRED` lead. The verdict follows the doctrine's deterministic rule from the findings you listed, including the cap when a security-relevant question ended `UNKNOWN-BLOCKED`. Every finding has a Verify outcome sentence someone else can observe. Plan conformance and Clean dimensions are present even when empty.
 
 review-circus can verify the report by grepping the verdict line, recomputing the verdict from the severities, and opening each Evidence location.
 </verification>

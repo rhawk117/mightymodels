@@ -62,7 +62,7 @@ Convert the ledger plus scout facts into findings. Every finding carries:
 - **Typed evidence**: a `quality` finding at Medium or above carries a typed bullet naming one kind (`Evidence (metric): <cite>`, or `idiom` or `convention` in its place), as idiom-evidence.md defines.
 - **Why it matters**: the concrete failure mode in one or two sentences.
 - **Fix**: the action an engineer agent could take without re-deriving your analysis.
-- **Verify**: how to confirm the fix landed (a command, a grep, a test to run).
+- **Verify**: an outcome sentence, true once the fix has landed, that someone can observe (not a command to run).
 - **Confidence**: High when the evidence is verified, Low when it rests on inference.
 - **Signals** (optional): qualitylens churn or coupling values that bear on the finding, with the analysis name.
 - **Architect escalation** (optional): request it only when the fix needs a design decision beyond the finding's own Fix line, and say why. review-circus decides; you never dispatch an implementer.

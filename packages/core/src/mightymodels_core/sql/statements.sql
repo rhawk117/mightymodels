@@ -191,7 +191,7 @@ VALUES (:ticket_id, :task_key, :status, :owned, :base, :commit, :reasons, :updat
 ON CONFLICT (ticket_id, task_key) DO UPDATE SET
   status = excluded.status,
   owned = excluded.owned,
-  base = coalesce(tasks.base, excluded.base),
+  base = coalesce(excluded.base, tasks.base),
   "commit" = excluded."commit",
   reasons = excluded.reasons,
   updated_at = excluded.updated_at
@@ -258,95 +258,6 @@ JOIN task_transitions AS tr ON tr.task_id = t.id
 WHERE t.ticket_id = :ticket_id
   AND tr.after IN (SELECT value FROM json_each(:statuses))
 ORDER BY tr.id DESC
-LIMIT :limit;
-
--- name: latest_transition_of_each_task_into
-SELECT json_object(
-  'task_key', t.task_key,
-  'before', tr.before,
-  'after', tr.after,
-  'reasons', json(tr.reasons),
-  'head', tr.head,
-  'at', tr.at
-)
-FROM tasks AS t
-JOIN task_transitions AS tr ON tr.task_id = t.id
-WHERE t.ticket_id = :ticket_id
-  AND tr.after IN (SELECT value FROM json_each(:statuses))
-  AND tr.id = (
-    SELECT max(latest.id)
-    FROM task_transitions AS latest
-    WHERE latest.task_id = t.id AND latest.after IN (SELECT value FROM json_each(:statuses))
-  )
-LIMIT :limit;
-
--- name: approve_contract_command
-INSERT INTO contract_commands (
-  ticket_id, command_key, argv, expect_exit, timeout, approved_by, approval_source,
-  approved_at, head
-)
-VALUES (
-  :ticket_id, :command_key, :argv, :expect_exit, :timeout, :approved_by, :approval_source,
-  :approved_at, :head
-);
-
--- name: retire_contract_command
-UPDATE contract_commands
-SET retired_by = :retired_by,
-    retired_why = :retired_why,
-    retired_approval_source = :retired_approval_source,
-    retired_at = :retired_at
-WHERE ticket_id = :ticket_id AND command_key = :command_key;
-
--- name: contract_commands_of_ticket
-SELECT json_object(
-  'id', id,
-  'command_key', command_key,
-  'argv', json(argv),
-  'expect_exit', expect_exit,
-  'timeout', timeout,
-  'approved_by', approved_by,
-  'approval_source', approval_source,
-  'approved_at', approved_at,
-  'head', head,
-  'retired_by', retired_by,
-  'retired_why', retired_why,
-  'retired_approval_source', retired_approval_source,
-  'retired_at', retired_at
-)
-FROM contract_commands
-WHERE ticket_id = :ticket_id
-ORDER BY id
-LIMIT :limit;
-
--- name: record_receipt
-INSERT INTO receipts (
-  contract_command_id, argv, outcome, exit, duration_ms, stdout_tail, stderr_tail, digest, head,
-  phase, at
-)
-VALUES (
-  :contract_command_id, :argv, :outcome, :exit, :duration_ms, :stdout_tail, :stderr_tail, :digest,
-  :head, :phase, :at
-);
-
--- name: latest_receipts
-SELECT json_object(
-  'command_key', c.command_key,
-  'argv', json(r.argv),
-  'outcome', r.outcome,
-  'exit', r.exit,
-  'duration_ms', r.duration_ms,
-  'stdout_tail', r.stdout_tail,
-  'stderr_tail', r.stderr_tail,
-  'digest', r.digest,
-  'head', r.head,
-  'phase', r.phase,
-  'at', r.at
-)
-FROM contract_commands AS c
-JOIN receipts AS r ON r.contract_command_id = c.id
-WHERE c.ticket_id = :ticket_id
-  AND r.id = (SELECT max(latest.id) FROM receipts AS latest WHERE latest.contract_command_id = c.id)
 LIMIT :limit;
 
 -- name: journal_crashout

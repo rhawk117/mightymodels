@@ -93,12 +93,12 @@ class FakeTaskRepository:
     def record_start(self, ticket_id: int, transition: Transition, attempt: Attempt) -> None:
         address = (ticket_id, transition.task_key)
         previous = self.ledger.held.get(address)
-        first_base = None if previous is None else previous.base
+        stored_base = None if previous is None else previous.base
         self.ledger.held[address] = TaskRecord(
             key=transition.task_key,
             status=transition.after,
             owned=attempt.owned,
-            base=transition.head if first_base is None else first_base,
+            base=transition.head if transition.head is not None else stored_base,
         )
         self.ledger.attempts.append(StartedAttempt(address=address, attempt=attempt))
         self.ledger.add_transition(address, transition)
@@ -178,14 +178,3 @@ class FakeAttemptRepository:
     ) -> list[Transition]:
         into = [placed.transition for placed in self.ledger.transitions_into(ticket_id, statuses)]
         return into[max(len(into) - limit, 0) :]
-
-    def latest_transition_of_each_task_into(
-        self, ticket_id: int, statuses: Collection[TaskStatus]
-    ) -> dict[TaskId, Transition]:
-        latest = {
-            placed.address[1]: placed.transition
-            for placed in self.ledger.transitions_into(ticket_id, statuses)
-        }
-        if (error := TASKS.error(latest, owner=f'ticket {ticket_id}')) is not None:
-            raise error
-        return latest

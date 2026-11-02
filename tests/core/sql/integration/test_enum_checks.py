@@ -7,7 +7,6 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from mightymodels_core.database import ConnectionOptions, open_database
-from mightymodels_core.schemas.contract import Outcome, Phase
 from mightymodels_core.schemas.crashouts import CrashoutSeverity, Verdict
 from mightymodels_core.schemas.investigations import EntryKind, EntrySource
 from mightymodels_core.schemas.reviews import (
@@ -40,8 +39,6 @@ STRING_CHECK_PAIRS = (
     ('task_attempts', 'ck_task_attempts_mode', ArchitectMode),
     ('task_transitions', 'ck_task_transitions_before', TaskStatus),
     ('task_transitions', 'ck_task_transitions_after', TaskStatus),
-    ('receipts', 'ck_receipts_outcome', Outcome),
-    ('receipts', 'ck_receipts_phase', Phase),
     ('review_runs', 'ck_review_runs_scope', Scope),
     ('review_runs', 'ck_review_runs_depth', Depth),
     ('review_runs', 'ck_review_runs_emphasis', Emphasis),
@@ -77,7 +74,7 @@ class TestCheckLists:
         table: str,
         constraint: str,
     ) -> set[str]:
-        path = tmp_path_factory.mktemp('checks').joinpath('mightymodels.db')
+        path = tmp_path_factory.mktemp('checks').joinpath('state.db')
         open_database(path, database_spec, ConnectionOptions()).close()
         with closing(sqlite3.connect(path)) as connection:
             return check_values(connection, table, constraint)

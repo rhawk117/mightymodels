@@ -3,10 +3,8 @@ from datetime import UTC, datetime
 import pytest
 from mightymodels_core.primitives import RunId, Slug, TaskId
 from mightymodels_core.snapshot import (
-    CheckState,
     FailedAttempt,
     LedgerLine,
-    PassingCommand,
     RepositoryState,
     ReviewDecision,
     ReviewState,
@@ -30,8 +28,6 @@ def create_record(repository: RepositoryState, *, warnings: tuple[str, ...] = ()
         ),
         repository=repository,
         tasks=(),
-        checks=(),
-        works=(),
         decisions=(),
         open_questions=(),
         do_not_retry=(),
@@ -46,8 +42,6 @@ def section_line_cases() -> pytest.MarkDecorator:
         [
             '- T1 blocked (engineer 2 | a wall)',
             '- T2 not started',
-            '- I1 never-run',
-            '- I2: `pytest -q`',
             '- use sqlite [doc] (cache e1)',
             '- which size (cache e2)',
             '- T1 blocked at aaaaaaaaaaaa: a wall',
@@ -82,14 +76,6 @@ class TestEmptySnapshot:
             '## Tasks',
             '',
             '- none started',
-            '',
-            '## Checks at HEAD',
-            '',
-            '- no contract',
-            '',
-            '## Works',
-            '',
-            '- no passing command yet',
             '',
             '## Decisions',
             '',
@@ -140,8 +126,6 @@ class TestFilledSnapshot:
                 ),
                 TaskState(task=TaskId('T2'), status='not started', attempts={}, reasons=()),
             ),
-            checks=(CheckState(key='I1', state='never-run'),),
-            works=(PassingCommand(key='I2', argv=('pytest', '-q')),),
             decisions=(
                 LedgerLine(kind='decision', text='use sqlite', cite='doc', origin='cache e1'),
             ),
