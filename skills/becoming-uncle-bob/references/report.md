@@ -131,7 +131,7 @@ package Ca/Ce/I/A/D table. Numbers only — interpretation goes in findings.>
 - Expected churn: <high | medium | low, with the git or qualitylens evidence>
 - Clean extension path: <yes, naming it | no, and why>
 - Fix: <what Martin prescribes, as an action an engineer can take without re-deriving the analysis>
-- Verify: <command or check that confirms the fix landed>
+- Verify: <one sentence stating an outcome someone can observe once the fix has landed>
 - Confidence: <High | Low>
 - Architect escalation: <conditional; only when the fix needs a design decision beyond its Fix line, and why>
 (repeat per finding; then ### High, ### Medium, ### Low)
