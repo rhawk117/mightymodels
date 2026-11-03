@@ -27,13 +27,35 @@ A Claude Code harness that treats every subagent as a unit of context: the main 
 
 ______________________________________________________________________
 
-Every long agent session hits the same wall. As the context window fills, the model gets worse at recalling what is in it, because context is a finite resource with diminishing returns ([Anthropic, 2025](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)). Compaction is the usual answer, and it feels like a memory wipe: it rarely keeps what mattered, your instructions and the decisions you made along the way, and a session that keeps compacting gets more expensive while it gets worse. Spec-driven development tries to fix this by writing the context down, but a spec is legacy the moment implementation starts. It cannot adapt when the work changes, and it stays in the repository as stale context for the next agent to trip over.
+Every long agent session hits the same wall:
 
-mightymodels is built on one idea: **a subagent is a unit of context.** The primary session plans, routes and judges, and never fills its own window with file dumps, logs or diffs. Every task goes to a worker with a precise brief and a clean context window, sized to one reviewable change. Workers explore thoroughly in their own windows and hand back a condensed report, the pattern behind Anthropic's finding that an Opus lead with Sonnet subagents outperformed single-agent Opus by 90.2% on their research eval ([Anthropic, 2025](https://www.anthropic.com/engineering/multi-agent-research-system)). And when a worker gets it wrong, it breaks one task, not the workflow: the failure is caught, routed and retried inside that task's boundary.
+- **The window fills, and the model gets worse.** Context is a finite resource with diminishing returns: the more tokens in the window, the worse the model recalls what is in it ([Anthropic, 2025](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)).
+- **Compaction feels like a memory wipe.** It rarely keeps what mattered, your instructions and the decisions you made along the way, and a session that keeps compacting gets more expensive while it gets worse.
+- **Specs go stale on arrival.** Spec-driven development writes the context down, but a spec is legacy the moment implementation starts. It cannot adapt when the work changes, and it stays in the repository as stale context for the next agent to trip over.
 
-**The workers run as an org chart, not a swarm.** A naive multi-agent setup passes one agent's output straight into the next, so a single hallucination compounds down the chain. In mightymodels every role has a tier, a job and a limit. Scouts retrieve and never diagnose. Implementers build against a brief written before they start. A separate fact-checker, in its own clean context, sets each report against what was asked. And a worker that gets stuck escalates up a bounded ladder that always ends with you. See [An org chart, not a swarm](#an-org-chart-not-a-swarm).
+mightymodels is built on one idea: **a subagent is a unit of context.**
 
-**State lives outside the conversation, so compaction stops being a memory wipe.** Tickets, tasks, decisions and review findings are recorded in a state database, the work moves through gated phases (triage, planning, execution, review), and any session, fresh or compacted, resumes from what was recorded rather than what was remembered. The paper trail goes where it belongs: the problem and its findings to a GitHub issue or Jira ticket, the summary to the PR, the review to a PR comment. Your git history holds the commits and nothing else, and the local working files are archived and deleted when the work merges.
+- The primary session plans, routes and judges. It never fills its own window with file dumps, logs or diffs.
+- Every task goes to a worker with a precise brief and a clean context window, sized to one reviewable change.
+- Workers explore thoroughly in their own windows and hand back a condensed report. That is the pattern behind Anthropic's finding that an Opus lead with Sonnet subagents outperformed single-agent Opus by 90.2% on their research eval ([Anthropic, 2025](https://www.anthropic.com/engineering/multi-agent-research-system)).
+- A worker that gets it wrong breaks one task, not the workflow: the failure is caught, routed and retried inside that task's boundary.
+
+**The workers run as an org chart, not a swarm.** A naive multi-agent setup passes one agent's output straight into the next, so a single hallucination compounds down the chain. In mightymodels every role has a tier, a job and a limit:
+
+- Scouts retrieve and never diagnose.
+- Implementers build against a brief written before they start.
+- A separate fact-checker, in its own clean context, sets each report against what was asked.
+- A worker that gets stuck escalates up a bounded ladder that always ends with you.
+
+See [An org chart, not a swarm](#an-org-chart-not-a-swarm).
+
+**State lives outside the conversation, so compaction stops being a memory wipe.**
+
+- Tickets, tasks, decisions and review findings are recorded in a state database.
+- The work moves through gated phases: triage, planning, execution, review.
+- Any session, fresh or compacted, resumes from what was recorded, not from what was remembered.
+- The paper trail goes where it belongs: the problem and its findings to a GitHub issue or Jira ticket, the summary to the PR, the review to a PR comment.
+- Your git history holds the commits and nothing else. The local working files are archived and deleted when the work merges.
 
 <details>
 <summary><b>Sources</b></summary>
@@ -44,12 +66,12 @@ mightymodels is built on one idea: **a subagent is a unit of context.** The prim
 </details>
 
 > [!IMPORTANT]
-> Nothing here is decoration. Every skill, worker, hook and gate exists because I hit the problem it solves while coding with agents. The plugin ships **nineteen skills**, **twelve worker agents**, **seven hooks** and **one MCP server** that holds the state, and [Why it exists](#why-it-exists) maps each failure to its fix.
+> Nothing here is decoration. Every skill, worker, hook and gate exists because I hit the problem it solves while coding with agents. The plugin ships **nineteen skills**, **twelve worker agents**, **seven hooks** and **one MCP server** that holds the state, and [What it fixes](#what-it-fixes) maps each failure to its fix.
 
 <details>
 <summary><b>Table of contents</b></summary>
 
-- [Why it exists](#why-it-exists)
+- [What it fixes](#what-it-fixes)
 - [An org chart, not a swarm](#an-org-chart-not-a-swarm)
 - [The ritual](#the-ritual)
 - [Nothing is tracked by git](#nothing-is-tracked-by-git)
@@ -70,12 +92,7 @@ mightymodels is built on one idea: **a subagent is a unit of context.** The prim
 
 </details>
 
-## Why it exists
-
-mightymodels is human-in-the-loop by design, and it is the plugin I cannot live without. It has cut my token consumption, the model gets more of the work right, and it has changed the way I work with AI.
-
-> [!NOTE]
-> I have no numbers for any of that yet. I plan to evaluate this release aggressively over the coming days, and what I measure will go here.
+## What it fixes
 
 Each row is a failure I hit in agentic coding, and the part of the harness built to stop it.
 
@@ -92,9 +109,30 @@ Each row is a failure I hit in agentic coding, and the part of the harness built
 | A rule written in a prompt gets ignored. | Where it matters, the rule is code. The dispatch hook refuses a worker sent out of order, and the `task` tool refuses to close a task in the wrong state or against the wrong commit. |
 | Specs, plans and notes pile up in git history and become context for the next agent. | Tracking goes to the tracker: the issue in GitHub or Jira, the summary in the PR body, the review in a PR comment. Nothing under `.mightymodels/` is ever tracked by git, and `/prune-ticket` archives the ticket and deletes it when the work merges. |
 
+What using it has been like for me:
+
+- It is human-in-the-loop by design: the model does the work, you make the calls.
+- It has cut my token consumption.
+- The model gets more of the work right the first time.
+- It changed the way I work with AI, and it is the plugin I cannot live without.
+
+> [!NOTE]
+> I have no numbers for any of that yet. I plan to evaluate this release aggressively over the coming days, and what I measure will go here.
+
 ## An org chart, not a swarm
 
-Most multi-agent frameworks treat subagents as interchangeable helpers and chain their outputs together. That is how hallucinations amplify: one agent states a guess as a fact, the next builds on it, and by the third hand-off the error is load-bearing. mightymodels organizes its twelve workers the way an engineering org works. Every role has one job, a fixed model tier, a defined set of people it may call on, and a limit on how many times it may try before the problem goes up a level.
+Most multi-agent frameworks treat subagents as interchangeable helpers and chain their outputs together. That is how hallucinations amplify:
+
+- one agent states a guess as a fact,
+- the next builds on it,
+- and by the third hand-off the error is load-bearing.
+
+mightymodels organizes its twelve workers the way an engineering org works. Every role has:
+
+- **one job**, and it refuses the rest;
+- **a fixed model tier**: haiku retrieves and checks, sonnet builds, opus recovers, fable advises;
+- **a roster** of the workers it may call on, enforced by a hook;
+- **a limit** on how many times it may try before the problem goes up a level.
 
 ```mermaid
 flowchart TD
@@ -131,7 +169,10 @@ Every rung of the ladder has a limit, and every ladder ends with you.
 
 ## The ritual
 
-The state machine runs as a ritual, a predictable ceremony by design. Every piece of work goes through the same steps in the same order, and the value comes from that sameness. A step that always happens is one the model cannot skip.
+The state machine runs as a ritual, a predictable ceremony by design:
+
+- Every piece of work goes through the same steps in the same order.
+- The value comes from that sameness: a step that always happens is one the model cannot skip.
 
 Four ideas sit under it:
 
@@ -142,17 +183,24 @@ Four ideas sit under it:
 
 ## Nothing is tracked by git
 
-Nothing under `.mightymodels/` is ever tracked by git, and that is by design.
+A unit of work, and the tasks inside it, does not belong in source control. It belongs in GitHub or Jira, where you already go to look for previous work. So mightymodels splits the record:
+
+- **The tracker** gets the paper trail: the problem and its findings in the issue or Jira ticket, the summary in the PR body, the review in a PR comment.
+- **Git** gets the work itself: the commits, and nothing else.
+- **`.mightymodels/`** holds the working files while the work is live, and is never tracked by git.
 
 > [!IMPORTANT]
 > Spec-driven development has historically left tons of slop artifacts behind, which litter the repository and confuse the agents that read them later. mightymodels keeps its working files where git cannot see them and deletes them when the work merges.
 
-Nobody runs an ignore step by hand. Whenever the plugin opens the state database, it adds the line `.mightymodels/` to `info/exclude` in git's common directory, so worktrees share it and no commit is needed. The line covers the whole directory, the archives and every `ticket.yml` included.
+How the exclusion works:
+
+- Nobody runs an ignore step by hand. Whenever the plugin opens the state database, it adds `.mightymodels/` to `info/exclude` in git's common directory.
+- Worktrees share it, and no commit is needed.
+- The line covers the whole directory, the archives and every `ticket.yml` included.
+- `/prune-ticket` archives the ticket and deletes it when the work merges.
 
 > [!WARNING]
 > There is also a _second_ reason for keeping the exclusion local. `briefs/` and `review/` carry raw command output that can hold secrets, and a local exclusion means a careless `git add -A` cannot ship them. See [SECURITY.md](SECURITY.md#local-working-state).
-
-What reaches git is the work itself: the commits. The review trail goes on the PR.
 
 ## The names
 
