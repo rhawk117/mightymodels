@@ -13,12 +13,12 @@ concurrency:
 jobs:
   audit-supply-chain:
     if: ${{ github.event.repository.fork != true }}
-    name: Audit Python Dependencies
+    name: 🔍 Audit Python Dependencies
     uses: ./.github/workflows/supply-chain-check.yml
 
   report-security-findings:
     if: ${{ always() && !cancelled() && github.event.repository.fork != true }}
-    name: Report Security Findings
+    name: 📣 Report Security Findings
     needs: [audit-supply-chain]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

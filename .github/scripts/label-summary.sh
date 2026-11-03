@@ -1,29 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-format_labels() {
-  local raw=$1 fallback=$2 label
-  local -a labels=()
-  local found=false
-
-  IFS=',' read -r -a labels <<<"$raw"
-
-  for label in "${labels[@]}"; do
-    label="${label#"${label%%[![:space:]]*}"}"
-    label="${label%"${label##*[![:space:]]}"}"
-
-    [[ -n "$label" ]] || continue
-
-    # shellcheck disable=SC2016
-    printf -- '- `%s`\n' "${label//\`/\\\`}"
-    found=true
-  done
-
-  if [[ $found == false ]]; then
-    printf '%s\n' "$fallback"
-  fi
-}
-
 main() {
   : "${GITHUB_STEP_SUMMARY:?GITHUB_STEP_SUMMARY is required}"
 
@@ -55,6 +32,29 @@ main() {
     printf '%s\n' '' '### Current PR Labels' ''
     format_labels "${all_labels}" 'No labels found.'
   } >>"${GITHUB_STEP_SUMMARY}"
+}
+
+format_labels() {
+  local raw=$1 fallback=$2 label
+  local -a labels=()
+  local found=false
+
+  IFS=',' read -r -a labels <<<"$raw"
+
+  for label in "${labels[@]}"; do
+    label="${label#"${label%%[![:space:]]*}"}"
+    label="${label%"${label##*[![:space:]]}"}"
+
+    [[ -n "$label" ]] || continue
+
+    # shellcheck disable=SC2016
+    printf -- '- `%s`\n' "${label//\`/\\\`}"
+    found=true
+  done
+
+  if [[ $found == false ]]; then
+    printf '%s\n' "$fallback"
+  fi
 }
 
 main "$@"

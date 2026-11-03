@@ -21,7 +21,7 @@ env:
 
 jobs:
   pysentry:
-    name: Python Supply Chain Audit
+    name: 🔍 Python Supply Chain Audit
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

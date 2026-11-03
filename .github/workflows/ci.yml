@@ -48,7 +48,7 @@ jobs:
           ALL_LABELS: ${{ steps.apply-labels.outputs.all-labels }}
 
   security-scanner:
-    name: Supply Chain Integrity
+    name: 🔒 Supply Chain Integrity
     uses: ./.github/workflows/supply-chain-check.yml
     permissions:
       contents: read
@@ -56,7 +56,7 @@ jobs:
       security-events: write
 
   quality-checks:
-    name: Quality Checks (prek)
+    name: 🧹 Quality Checks (prek)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -83,7 +83,7 @@ jobs:
         run: uv run --no-sync pytest -q -m "not integration"
 
   integration-checks:
-    name: Integration Tests
+    name: 🧪 Integration Tests
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -116,112 +116,27 @@ jobs:
 
   workflow-narrator:
     name: 🔉 Workflow Narrator
-    needs: [labeler, quality-checks, integration-checks]
+    needs: [labeler, security-scanner, quality-checks, integration-checks]
     if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
       pull-requests: write
     env:
-      NEEDS_CONTEXT: ${{ toJson(needs) }}
-      BRANCH_NAME: ${{ github.head_ref }}
+      NARRATOR_JOB_NAME: 🔉 Workflow Narrator
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
       - name: Publish Workflow Summary
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ github.token }}
           script: |
-            const pr = context.payload.pull_request;
-
-            if (!pr) {
-              core.setFailed('Workflow Narrator requires a pull request.');
-              return;
-            }
-
-            const { owner, repo } = context.repo;
-            const marker = '<!-- gha:plugin-ci:workflow-summary -->';
-            const workflowUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`;
-            const needs = JSON.parse(process.env.NEEDS_CONTEXT);
-
-            const icons = new Map([
-              ['success', ':heavy_check_mark:'],
-              ['failure', ':x:'],
-              ['cancelled', ':no_entry:'],
-              ['skipped', ':fast_forward:'],
-            ]);
-
-            const lines = [
-              marker,
-              `## Workflow Narrator - (${pr.head.ref})`,
-              '',
-              '| Job | Result | Logs |',
-              '| --- | --- | --- |',
-            ];
-
-            let succeeded = true;
-
-            for (const [name, { result }] of Object.entries(needs)) {
-              const icon = icons.get(result) ?? ':grey_question:';
-              const title = result.charAt(0).toUpperCase() + result.slice(1);
-              const logs = `[View Logs](${workflowUrl})`;
-
-              lines.push(`| ${name} | ${icon} ${title} | ${logs} |`);
-
-              if (result === 'success' || (name === 'labeler' && result === 'skipped')) {
-                continue;
-              }
-
-              succeeded = false;
-            }
-
-            lines.push('');
-
-            if (succeeded) {
-              lines.push(':heavy_check_mark: Workflow Succeeded');
-            } else {
-              lines.push(':warning: Workflow Did Not Succeed');
-            }
-
-            const body = lines.join('\n');
-            await core.summary.addRaw(body, true).write();
-
-            if (!succeeded) {
-              core.setFailed('One or more required jobs did not succeed.');
-            }
-
-            if (pr.head.repo?.full_name !== `${owner}/${repo}`) {
-              return;
-            }
-
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number: pr.number,
-              per_page: 100,
-            });
-
-            const existing = comments.find(({ user, body }) => {
-              if (user?.login !== 'github-actions[bot]') {
-                return false;
-              }
-
-              return body?.startsWith(marker);
-            });
-
-            if (!existing) {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: pr.number,
-                body,
-              });
-              return;
-            }
-
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: existing.id,
-              body,
-            });
+            const { default: narrate } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/narrator.mjs`);
+            await narrate({ github, context, core });

@@ -9,6 +9,20 @@ readonly SARIF_FILE="${RUNNER_TEMP}/pysentry-results.sarif"
 
 existing_issue=""
 
+main() {
+  setup_environment
+  find_existing_issue
+
+  if [[ "$AUDIT_RESULT" == success ]]; then
+    resolve_security_issue
+    return
+  fi
+
+  download_audit_report
+  write_failure_report
+  publish_security_issue
+}
+
 setup_environment() {
   local repository_root
   repository_root=$(git rev-parse --show-toplevel)
@@ -106,20 +120,6 @@ resolve_security_issue() {
 
   printf 'Weekly security audit passed: %s\n' "$WORKFLOW_URL" >>"$GITHUB_STEP_SUMMARY"
   log::step_end
-}
-
-main() {
-  setup_environment
-  find_existing_issue
-
-  if [[ "$AUDIT_RESULT" == success ]]; then
-    resolve_security_issue
-    return
-  fi
-
-  download_audit_report
-  write_failure_report
-  publish_security_issue
 }
 
 main "$@"
