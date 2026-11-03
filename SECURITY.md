@@ -62,7 +62,11 @@ These checks find issues covered by their advisory sources and configured polici
 
 ## What the plugin's hooks do
 
-The plugin's hooks record and route. They refuse only a dispatch outside the caller's roster, an intern dispatch unless a task is started for the intern and every such task owns exactly one file, a dispatch of the engineer or architect from the main thread while the branch's unclosed ticket has no task in progress, a dispatch whose task or ticket state cannot be read (it fails closed), a payload that is malformed or names no target type (exit 2), and, when the hook itself cannot run (the launcher crashes or times out), any dispatch made by a plugin worker. They are not a permission control: they do not run or approve commands, and they do not replace the permission prompts of Claude Code.
+The plugin's hooks record and route. They refuse only a dispatch outside the caller's roster, an intern dispatch unless a task is started for the intern and every such task owns exactly one file, a dispatch of the engineer or architect from the main thread while the branch's only unclosed ticket has no task in progress (with several unclosed tickets the hook warns instead of refusing), a dispatch whose task or ticket state cannot be read (it fails closed), and a payload that is malformed or names no target type (exit 2). When the hook itself cannot run (the launcher crashes or times out), it refuses any dispatch made by a plugin worker, and any dispatch of the engineer, architect or intern while the project has a `.mightymodels/` directory. They are not a permission control: they do not run or approve commands, and they do not replace the permission prompts of Claude Code.
+
+## Local working state
+
+A ticket's working files live in `.mightymodels/` at the git toplevel of the repository being worked on. Briefs and review runs there can carry raw command output, and raw output can hold secrets. Whenever the plugin opens its state database, it adds `.mightymodels/` to `info/exclude` in git's common directory, so the directory stays out of git without a commit, and a careless `git add -A` cannot ship it. Never commit it or move the exclusion into a tracked `.gitignore`.
 
 ## Guidance for users
 
