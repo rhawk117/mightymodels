@@ -56,7 +56,7 @@ jobs:
       security-events: write
 
   quality-checks:
-    name: Quality Checks (Pre-Commit)
+    name: Quality Checks (prek)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -76,8 +76,8 @@ jobs:
       - name: Synchronize Dependencies
         run: uv sync --locked --all-packages --group check --group test
 
-      - name: Run Pre-Commit
-        run: uv run --no-sync pre-commit run --all-files
+      - name: Run prek Hooks
+        run: uv run --no-sync prek run --all-files --show-diff-on-failure
 
       - name: Run Test Suite (Unit Tier)
         run: uv run --no-sync pytest -q -m "not integration"

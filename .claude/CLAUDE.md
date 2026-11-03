@@ -2,22 +2,22 @@
 
 ## Commands
 
-Every command goes through `make`. Each target delegates to uv or to a script under `scripts/`.
+Every command goes through `make`. Each target delegates to uv, prek or a script under `scripts/`.
 
-- `make setup` installs the pre-commit git hook and syncs every workspace package and dependency group. A fresh clone has no git hook, so run it before the first commit.
+- `make setup` installs the prek git hooks and syncs every workspace package and dependency group. A fresh clone has no git hook, so run it before the first commit.
 - `make sync` syncs the workspace packages and dependency groups.
-- `make format` runs the formatters.
-- `make lint` runs ruff format and ruff check without fixing, mdformat and ty.
+- `make format` runs the prek hooks in the `format` group on all files: the hygiene fixers, uv-lock, ruff fix and format, shfmt and mdformat.
+- `make lint` runs the prek hooks in the `lint` group on all files: the hygiene checks, ruff check, ty and shellcheck.
 - `make typecheck` runs ty alone.
 - `make test` runs `pytest -q -m "unit or agents or smoke"`, with coverage.
 - `make test.end-to-end` runs `pytest -q -m e2e`.
-- `make pre-commit` runs every pre-commit hook on all files, including the hygiene fixers and uv-lock.
+- `make pre-commit` runs every prek hook in `.pre-commit-config.yaml` on all files.
 - `make check` runs lint, then test.
-- `make quality` runs pre-commit on all files, then `pytest -q -m "not integration"`, which matches CI's quality job.
+- `make quality` runs every prek hook on all files, then `pytest -q -m "not integration"`, which matches CI's quality job.
 
 ## Stack
 
-Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. `.github/workflows/ci.yml` sets up CI: `astral-sh/setup-uv` takes its uv version from the `UV_VERSION` repository variable, and `actions/setup-node` takes its Node version from the `NODE_VERSION` repository variable.
+Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and prek. `.github/workflows/ci.yml` sets up CI: `astral-sh/setup-uv` takes its uv version from the `UV_VERSION` repository variable, and `actions/setup-node` takes its Node version from the `NODE_VERSION` repository variable.
 
 ## Layout
 
@@ -39,7 +39,7 @@ Python 3.14 (`.python-version`), uv, ruff, ty, pytest, mdformat and pre-commit. 
 
 ## Verification
 
-`.github/workflows/ci.yml` defines CI's quality job, which runs the pre-commit hooks on all files and then the tests. Match it with `make pre-commit`, then `uv run pytest -q -m "not integration"`, because `make test` skips the e2e tests and the unmarked tests that CI runs. CI's integration job runs `pytest -q -m integration`. `make check` is the faster local loop, but it skips the hygiene and uv-lock hooks, so it can pass where CI fails.
+`.github/workflows/ci.yml` defines CI's quality job, which runs every prek hook on all files and then the tests. Match it with `make pre-commit`, then `uv run pytest -q -m "not integration"`, because `make test` skips the e2e tests and the unmarked tests that CI runs. CI's integration job runs `pytest -q -m integration`. `make check` is the faster local loop, but it skips the `format` group (the hygiene fixers, uv-lock, shfmt and mdformat), so it can pass where CI fails.
 
 ## Claude Code
 
