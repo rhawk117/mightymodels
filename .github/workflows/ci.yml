@@ -47,25 +47,25 @@ jobs:
           NEW_LABELS: ${{ steps.apply-labels.outputs.new-labels }}
           ALL_LABELS: ${{ steps.apply-labels.outputs.all-labels }}
 
-  security-scanner:
-    name: 🔒 Supply Chain Integrity
-    uses: ./.github/workflows/supply-chain-check.yml
+  quality-checks:
+    name: 🧹 Quality Checks (prek)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
       actions: read
       security-events: write
-
-  quality-checks:
-    name: 🧹 Quality Checks (prek)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
     steps:
       - name: Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: 🔒 Supply Chain Audit
+        uses: ./.github/actions/pysentry
+        with:
+          uv-version: ${{ vars.UV_VERSION }}
+          upload-sarif: ${{ github.event.repository.fork != true && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -80,7 +80,9 @@ jobs:
         run: uv run --no-sync prek run --all-files --show-diff-on-failure
 
       - name: Run Test Suite (Unit Tier)
-        run: uv run --no-sync pytest -q -m "not integration"
+        uses: ./.github/actions/test-suite
+        with:
+          markers: not integration
 
   integration-checks:
     name: 🧪 Integration Tests
@@ -112,11 +114,13 @@ jobs:
         run: bash ./.github/scripts/cc-plugin-checker.sh
 
       - name: Run Integration Tests
-        run: uv run --no-sync pytest -q -m "integration"
+        uses: ./.github/actions/test-suite
+        with:
+          markers: integration
 
   workflow-narrator:
     name: 🔉 Workflow Narrator
-    needs: [labeler, security-scanner, quality-checks, integration-checks]
+    needs: [labeler, quality-checks, integration-checks]
     if: ${{ always() && !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5

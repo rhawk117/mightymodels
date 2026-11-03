@@ -41,7 +41,7 @@ The repository uses PySentry to audit Python dependency metadata and resolved de
 
 | Check | Workflow | Behavior |
 | --- | --- | --- |
-| Dependency audit in CI | `.github/workflows/supply-chain-check.yml` | A reusable workflow that checks dependencies. A successful result can be reused from a cache keyed to dependency metadata and an ISO-week window. |
+| Dependency audit in CI | `.github/actions/pysentry`, run by the quality job in `.github/workflows/ci.yml` before any dependency is installed | A composite action that checks dependencies. A successful result can be reused from a cache keyed to dependency metadata and an ISO-week window. |
 | Scheduled audit | `.github/workflows/weekly-security-scan.yml` | Runs weekly and forces a fresh scan whether or not dependencies changed. It can also be started manually. |
 
 What happens with the results:
