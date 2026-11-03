@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-readonly PACKAGE_NAME="${PACKAGE_NAME:-tf-harness-plugin}"
+readonly PACKAGE_NAME="${PACKAGE_NAME:-mightymodels-plugin}"
 readonly VERSION_BUMP="${VERSION_BUMP:-recover}"
 readonly LOGGING_UTILS="./scripts/log.sh"
 readonly PLUGIN_MANIFEST=".claude-plugin/plugin.json"
@@ -11,6 +11,20 @@ readonly RELEASE_BOT_EMAIL="41898282+github-actions[bot]@users.noreply.github.co
 
 release_version=""
 release_tag=""
+
+main() {
+  setup_environment
+  validate_release_context
+  validate_current_release
+
+  if [[ "$VERSION_BUMP" != recover ]]; then
+    bump_release
+    synchronize_plugin_manifest
+    record_version_bump
+  fi
+
+  write_release_outputs
+}
 
 panic() {
   log::error "$*"
@@ -110,20 +124,6 @@ write_release_outputs() {
     printf 'version=%s\n' "$release_version"
     printf 'tag=%s\n' "$release_tag"
   } >>"${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
-}
-
-main() {
-  setup_environment
-  validate_release_context
-  validate_current_release
-
-  if [[ "$VERSION_BUMP" != recover ]]; then
-    bump_release
-    synchronize_plugin_manifest
-    record_version_bump
-  fi
-
-  write_release_outputs
 }
 
 main "$@"

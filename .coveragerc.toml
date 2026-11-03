@@ -1,0 +1,21 @@
+[run]
+branch = true
+relative_files = true
+source = ["packages"]
+omit = ["*/test_*.py", "*/conftest.py"]
+
+[report]
+include = ["packages/*/src/**/*.py"]
+include_namespace_packages = true
+show_missing = true
+skip_covered = true
+skip_empty = true
+precision = 1
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[html]
+skip_covered = false

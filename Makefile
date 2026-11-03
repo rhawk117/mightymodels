@@ -22,11 +22,11 @@ setup: ## Setup Developer Environment
 sync: ## Sync all workspace packages and dependency groups
 	$(UV) sync --all-packages --all-groups
 
-format: ## Run the formatters
-	bash ./scripts/format.sh
+format: ## Run the prek format hooks on all files
+	$(UV) run prek run --all-files --group format
 
-lint: ## Run the linters
-	bash ./scripts/lint.sh
+lint: ## Run the prek lint hooks on all files
+	$(UV) run prek run --all-files --group lint
 
 test: ## Run the unit, agents and smoke tests
 	$(UV) run pytest -q -m "unit or agents or smoke"
@@ -34,11 +34,11 @@ test: ## Run the unit, agents and smoke tests
 test.end-to-end: ## Run the end-to-end tests
 	$(UV) run pytest -q -m e2e
 
-quality: ## Run pre-commit on all files, then the tests CI runs
-	$(UV) run pre-commit run --all-files
+quality: ## Run every prek hook on all files, then the tests CI runs
+	$(UV) run prek run --all-files
 	$(UV) run pytest -q -m "not integration"
 
-pre-commit: ## Run pre-commit on all files
-	$(UV) run pre-commit run --all-files
+pre-commit: ## Run every prek hook on all files
+	$(UV) run prek run --all-files
 
 check: lint test ## Run lint then test
