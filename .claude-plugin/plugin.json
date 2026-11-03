@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "mightymodels",
   "displayName": "mightymodels",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Context management for agentic coding in Claude Code. The main session keeps its window for judgment, every task runs in a worker with a clean context and a precise brief, state survives compaction, and the record of the work goes to GitHub or Jira instead of your repository. Nineteen skills, twelve worker agents, seven hooks and a state server.",
   "homepage": "https://github.com/rhawk117/mightymodels",
   "repository": "https://github.com/rhawk117/mightymodels",
