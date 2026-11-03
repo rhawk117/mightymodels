@@ -71,13 +71,6 @@ runs:
         path: ${{ inputs.sarif-path }}
         key: ${{ steps.audit-key.outputs.value }}
 
-    - name: Install UV
-      if: ${{ inputs.force-scan == 'true' || steps.cache.outputs.cache-hit != 'true' }}
-      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-      with:
-        version: ${{ inputs.uv-version }}
-        cache-dependency-glob: uv.lock
-
     - name: Validate Lockfile
       if: ${{ inputs.force-scan == 'true' || steps.cache.outputs.cache-hit != 'true' }}
       shell: bash

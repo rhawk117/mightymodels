@@ -17,10 +17,10 @@ defaults:
 
 jobs:
   labeler:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     name: 📎 Label Pull Request
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
       contents: read
       pull-requests: write
@@ -61,25 +61,27 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install UV
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ vars.UV_VERSION }}
+          cache-dependency-glob: uv.lock
+
       - name: 🔒 Supply Chain Audit
         uses: ./.github/actions/pysentry
         with:
           uv-version: ${{ vars.UV_VERSION }}
           upload-sarif: ${{ github.event.repository.fork != true && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        with:
-          version: ${{ vars.UV_VERSION }}
-          cache-dependency-glob: uv.lock
-
       - name: Synchronize Dependencies
         run: uv sync --locked --all-packages --group check --group test
 
-      - name: Run prek Hooks
+      - name: Run Prek Hooks
+        background: true
         run: uv run --no-sync prek run --all-files --show-diff-on-failure
 
       - name: Run Test Suite (Unit Tier)
+        background: true
         uses: ./.github/actions/test-suite
         with:
           markers: not integration
@@ -96,24 +98,26 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install uv
+      - name: Install UV
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: ${{ vars.UV_VERSION }}
           cache-dependency-glob: uv.lock
-
-      - name: Synchronize Dependencies
-        run: uv sync --locked --all-packages --group check --group test
 
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ vars.NODE_VERSION }}
 
+      - name: Synchronize Dependencies
+        run: uv sync --locked --all-packages --group check --group test
+
       - name: Validate Claude Code Plugin
+        background: true
         run: bash ./.github/scripts/cc-plugin-checker.sh
 
       - name: Run Integration Tests
+        background: true
         uses: ./.github/actions/test-suite
         with:
           markers: integration
