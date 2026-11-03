@@ -2,8 +2,8 @@
 
 # mightymodels
 
-**From the first question you ask a model to a merged PR.**<br>
-You make the decisions. Cheap workers do the reading. Nothing is called done until it is checked.
+**Context is the bottleneck of agentic coding. mightymodels manages it.**<br>
+A Claude Code harness that treats every subagent as a unit of context: the main session keeps its window for judgment, every task runs in a clean one, and the record of the work lives in GitHub or Jira, not your repository.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/rhawk117/mightymodels/ci.yml?event=pull_request&label=CI&logo=githubactions&logoColor=white)](https://github.com/rhawk117/mightymodels/actions/workflows/ci.yml)
 [![Supply chain](https://img.shields.io/github/actions/workflow/status/rhawk117/mightymodels/weekly-security-scan.yml?label=supply%20chain&logo=githubactions&logoColor=white)](https://github.com/rhawk117/mightymodels/actions/workflows/weekly-security-scan.yml)
@@ -27,14 +27,30 @@ You make the decisions. Cheap workers do the reading. Nothing is called done unt
 
 ______________________________________________________________________
 
-Each piece of work gets one `.mightymodels/<slug>/` directory and one `ticket.yml` carrying its scope and model routing. When the work merges, `/prune-ticket` compresses the directory into a 30-line archive and deletes it. The unit of deletion is the unit of work, which is what stops working state from turning into a landfill of stale evidence.
+Every long agent session hits the same wall. As the context window fills, the model gets worse at recalling what is in it, because context is a finite resource with diminishing returns ([Anthropic, 2025](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)). Compaction is the usual answer, and it feels like a memory wipe: it rarely keeps what mattered, your instructions and the decisions you made along the way, and a session that keeps compacting gets more expensive while it gets worse. Spec-driven development tries to fix this by writing the context down, but a spec is legacy the moment implementation starts. It cannot adapt when the work changes, and it stays in the repository as stale context for the next agent to trip over.
 
-The plugin ships **nineteen skills**, **twelve worker agents**, **seven hooks** and **one MCP server** that holds the state.
+mightymodels is built on one idea: **a subagent is a unit of context.** The primary session plans, routes and judges, and never fills its own window with file dumps, logs or diffs. Every task goes to a worker with a precise brief and a clean context window, sized to one reviewable change. Workers explore thoroughly in their own windows and hand back a condensed report, the pattern behind Anthropic's finding that an Opus lead with Sonnet subagents outperformed single-agent Opus by 90.2% on their research eval ([Anthropic, 2025](https://www.anthropic.com/engineering/multi-agent-research-system)). And when a worker gets it wrong, it breaks one task, not the workflow: the failure is caught, routed and retried inside that task's boundary.
+
+**The workers run as an org chart, not a swarm.** A naive multi-agent setup passes one agent's output straight into the next, so a single hallucination compounds down the chain. In mightymodels every role has a tier, a job and a limit. Scouts retrieve and never diagnose. Implementers build against a brief written before they start. A separate fact-checker, in its own clean context, sets each report against what was asked. And a worker that gets stuck escalates up a bounded ladder that always ends with you. See [An org chart, not a swarm](#an-org-chart-not-a-swarm).
+
+**State lives outside the conversation, so compaction stops being a memory wipe.** Tickets, tasks, decisions and review findings are recorded in a state database, the work moves through gated phases (triage, planning, execution, review), and any session, fresh or compacted, resumes from what was recorded rather than what was remembered. The paper trail goes where it belongs: the problem and its findings to a GitHub issue or Jira ticket, the summary to the PR, the review to a PR comment. Your git history holds the commits and nothing else, and the local working files are archived and deleted when the work merges.
+
+<details>
+<summary><b>Sources</b></summary>
+
+- Anthropic, [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) (September 2025): "as the number of tokens in the context window increases, the model's ability to accurately recall information from that context decreases," and specialized sub-agents "handle focused tasks with clean context windows," each returning "a condensed, distilled summary of its work."
+- Anthropic, [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) (June 2025): the multi-agent system "outperformed single-agent Claude Opus 4 by 90.2% on our internal research eval," with subagents "operating in parallel with their own context windows" and providing "separation of concerns."
+
+</details>
+
+> [!IMPORTANT]
+> Nothing here is decoration. Every skill, worker, hook and gate exists because I hit the problem it solves while coding with agents. The plugin ships **nineteen skills**, **twelve worker agents**, **seven hooks** and **one MCP server** that holds the state, and [Why it exists](#why-it-exists) maps each failure to its fix.
 
 <details>
 <summary><b>Table of contents</b></summary>
 
-- [The problem it solves](#the-problem-it-solves)
+- [Why it exists](#why-it-exists)
+- [An org chart, not a swarm](#an-org-chart-not-a-swarm)
 - [The ritual](#the-ritual)
 - [Nothing is tracked by git](#nothing-is-tracked-by-git)
 - [The names](#the-names)
@@ -54,28 +70,68 @@ The plugin ships **nineteen skills**, **twelve worker agents**, **seven hooks** 
 
 </details>
 
-## The problem it solves
+## Why it exists
 
-mightymodels is built from the failures of spec-driven development. It is oriented around human-in-the-loop decision making, and it is the plugin I cannot live without. It has cut my token consumption, the model gets more of the work right, and it has changed the way I work with AI.
+mightymodels is human-in-the-loop by design, and it is the plugin I cannot live without. It has cut my token consumption, the model gets more of the work right, and it has changed the way I work with AI.
 
 > [!NOTE]
 > I have no numbers for any of that yet. I plan to evaluate this release aggressively over the coming days, and what I measure will go here.
 
-Each row is a way agent work goes wrong, and what the loop does about it.
+Each row is a failure I hit in agentic coding, and the part of the harness built to stop it.
 
 | What goes wrong | What mightymodels does |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A plan written up front goes stale as the code moves. | `plan.md` is a ledger of invariants, tasks, non-goals and risks, deliberately free of code citations. Citations are gathered fresh for each task, at the moment it starts. |
-| The agent makes a decision that was yours to make. | Facts go to scouts and decisions go to you. Investigation rounds stop at a gate, the plan needs your approval before any dispatch, and no review finding is fixed unless you picked it. |
-| "Done" is a claim nobody checked. | The primary writes what was asked, the implementer writes what it did, and the fact-checker compares the two. A task closes only through the `task` tool, against its recorded commit. |
-| An expensive model spends its context reading files. | Scouts do the reading on `haiku`. The primary spends its context on routing and judgment. Each worker refuses the work of the tier above it. |
-| You cannot stop without losing what the session knew. | `baton-pass` writes down the facts that live nowhere else and prints the opening prompt for the next session. The rest already lives in the ticket directory and the state database. |
-| A failure gets retried blind. | What does not verify is routed: to a residual fix, then to you, then to the architect, then to a debugging protocol that stops after three strikes. |
-| Plans, specs and notes pile up in the repository and confuse the next agent. | Nothing under `.mightymodels/` is ever tracked by git, and `/prune-ticket` archives the ticket in 30 lines and deletes the directory when the work merges. |
+| --- | --- |
+| The main session fills with file dumps, logs and diffs, and quality drops as the window fills. | The primary never does the reading. Scouts retrieve, workers implement, the fact-checker verifies, and each hands back a capped report, so the primary's window stays free for decisions. |
+| Compaction wipes your instructions and the decisions you made along the way. | State is recorded outside the conversation: tickets, tasks, decisions and findings in the state database, a snapshot before every compaction, and `baton-pass` for the facts that live nowhere else. A session resumes from the record, not from memory. |
+| A worker is dispatched with a vague prompt and guesses. | Every task gets a two-half brief: what is asked, written before the worker starts, with acceptance criteria and only the files it owns. Each worker is built for one kind of work and refuses the work of the tier above it. |
+| One agent's mistake derails the whole run. | A worker can only break its own task. The fact-checker compares what was asked with what was done, and the failure is routed inside that task's boundary: a residual fix, then you, then the architect, then a three-strike debugging protocol. |
+| The agent starts building from a guess. | Triage comes first. Scouts answer one narrow question each, every round stops at a gate where you decide what happens next, and a ticket is cut only once the problem is understood. |
+| The agent makes a decision that was yours to make. | Facts go to scouts and decisions go to you. `cross-examine` puts every design choice to you, the plan needs your approval before any dispatch, and no review finding is fixed unless you picked it. |
+| A spec goes stale the moment the code moves, and cannot adapt when the work changes. | There is no spec. `plan.md` is a ledger of decisions, invariants, tasks and risks, free of code citations and revised when you change course. Citations are gathered fresh for each task, at the moment it starts. |
+| "Done" is a claim nobody checked. | A task closes only through the `task` tool, on the primary's verdict, against its recorded commit, after the fact-checker has set the implementer's report against the brief. |
+| A rule written in a prompt gets ignored. | Where it matters, the rule is code. The dispatch hook refuses a worker sent out of order, and the `task` tool refuses to close a task in the wrong state or against the wrong commit. |
+| Specs, plans and notes pile up in git history and become context for the next agent. | Tracking goes to the tracker: the issue in GitHub or Jira, the summary in the PR body, the review in a PR comment. Nothing under `.mightymodels/` is ever tracked by git, and `/prune-ticket` archives the ticket and deletes it when the work merges. |
+
+## An org chart, not a swarm
+
+Most multi-agent frameworks treat subagents as interchangeable helpers and chain their outputs together. That is how hallucinations amplify: one agent states a guess as a fact, the next builds on it, and by the third hand-off the error is load-bearing. mightymodels organizes its twelve workers the way an engineering org works. Every role has one job, a fixed model tier, a defined set of people it may call on, and a limit on how many times it may try before the problem goes up a level.
+
+```mermaid
+flowchart TD
+    U["You\ndesign decisions and approvals"] --> P["Primary\nplans, routes, gives verdicts"]
+    P -.->|"stuck on a judgment call"| W["wingman · fable\nadvisor, no tools"]
+    P --> S["code-scout, web-scout · haiku\nretrieve, never diagnose"]
+    P --> I["intern · haiku\none tiny task, one attempt"]
+    P --> E["engineer · sonnet\none task, up to three fixes"]
+    P --> A["architect · opus\nrecovery, one pass"]
+    P --> F["fact-checker · haiku\nchecks DONE against ASKED"]
+    P --> R["uncle-bob, merge-vader\nreview"]
+    E --> S
+    A --> S
+    R --> S
+```
+
+### Checks and balances
+
+- **Facts and judgment are kept apart.** Scouts retrieve and do not diagnose, and they mark every claim `VERIFIED` or `INFERRED`, with a file:line or URL citation. A guess cannot enter the workflow dressed as a fact.
+- **What was asked is written before the work starts.** The primary writes the ASKED half of the brief, the implementer appends DONE, and the fact-checker, a different agent in a clean context, checks DONE against ASKED one criterion at a time, citing file and line.
+- **The primary is a skeptical manager, not a second implementer.** It sets the implementer's report against the fact-checker's and digs in only where they contradict each other or go vague, so its own context stays free for the verdict.
+- **Nobody works above their tier.** Each worker refuses the work of the tier above it, and a hook refuses any dispatch outside a worker's roster, so the intern cannot quietly spin up an architect.
+
+### When a worker gets stuck
+
+Every rung of the ladder has a limit, and every ladder ends with you.
+
+| Who is stuck | What happens | If that fails |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| The intern | It reports `blocked` at the first wall, without debugging. | The engineer takes the task. |
+| The engineer | `agent-debugging`: reproduce, record each failed fix with the `failed_fix_record` tool, one hypothesis at a time. | A fourth fix is refused. It reports `blocked`, and you decide whether the architect takes it. |
+| The architect | It diagnoses the root cause and gets one pass, inside the original task's boundary. | `whats-broken`: evidence first, three strikes, then you. |
+| The primary, on a judgment call | `ask-an-adult` hands the decision to wingman, the strongest reasoner in the fleet, with every fact gathered so far. | Wingman's questions come to you before any work resumes. |
 
 ## The ritual
 
-mightymodels is a ritual, a predictable ceremony by design. Every piece of work goes through the same steps in the same order, and the value comes from that sameness. A step that always happens is one the model cannot skip.
+The state machine runs as a ritual, a predictable ceremony by design. Every piece of work goes through the same steps in the same order, and the value comes from that sameness. A step that always happens is one the model cannot skip.
 
 Four ideas sit under it:
 
